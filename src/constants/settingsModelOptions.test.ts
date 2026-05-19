@@ -48,9 +48,7 @@ describe('settingsModelOptions', () => {
   });
 
   it('shows Gemini 3.5 Flash with matching supported option groups', () => {
-    expect(CONNECTION_TEST_MODELS.find((model) => model.id === 'gemini-3.5-flash')?.name).toBe(
-      'Gemini 3.5 Flash',
-    );
+    expect(CONNECTION_TEST_MODELS.find((model) => model.id === 'gemini-3.5-flash')?.name).toBe('Gemini 3.5 Flash');
     expect(AVAILABLE_TRANSCRIPTION_MODELS.find((model) => model.id === 'gemini-3.5-flash')?.name).toBe(
       'Gemini 3.5 Flash',
     );

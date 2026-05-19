@@ -143,9 +143,6 @@ describe('getTabCycleModelIds', () => {
   });
 
   it('falls back to the default order when the stored selection is fully stale', () => {
-    expect(getTabCycleModelIds(models, ['missing-model'])).toEqual([
-      'gemini-3.1-pro-preview',
-      'gemini-3.5-flash',
-    ]);
+    expect(getTabCycleModelIds(models, ['missing-model'])).toEqual(['gemini-3.1-pro-preview', 'gemini-3.5-flash']);
   });
 });
