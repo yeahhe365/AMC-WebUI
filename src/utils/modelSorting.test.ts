@@ -51,7 +51,7 @@ describe('sortModels', () => {
   it('keeps the preferred pinned Gemini text model order for the model picker', () => {
     const models: ModelOption[] = [
       { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', isPinned: true },
-      { id: 'gemini-3.5-flash-preview', name: 'Gemini 3.5 Flash Preview', isPinned: true },
+      { id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash', isPinned: true },
       { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash Lite Preview', isPinned: true },
       { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', isPinned: true },
     ];
@@ -60,7 +60,7 @@ describe('sortModels', () => {
 
     expect(result.map((model) => model.id)).toEqual([
       'gemini-3.1-pro-preview',
-      'gemini-3.5-flash-preview',
+      'gemini-3.5-flash',
       'gemini-3-flash-preview',
       'gemini-3.1-flash-lite',
     ]);

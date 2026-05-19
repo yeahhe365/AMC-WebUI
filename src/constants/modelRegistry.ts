@@ -11,7 +11,7 @@ interface RegisteredModel {
 
 const MODEL_REGISTRY: RegisteredModel[] = [
   {
-    id: 'gemini-3.5-flash-preview',
+    id: 'gemini-3.5-flash',
     name: 'Gemini 3.5 Flash',
     groups: ['defaultPinned', 'liveArtifacts', 'connectionTest', 'transcription'],
     groupLabels: {

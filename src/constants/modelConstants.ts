@@ -5,8 +5,8 @@ const GEMINI_3_REQUIRED_THINKING_MODEL_IDS = [
   'models/gemini-3.1-pro-preview',
   'gemini-3-flash',
   'models/gemini-3-flash',
-  'gemini-3.5-flash-preview',
-  'models/gemini-3.5-flash-preview',
+  'gemini-3.5-flash',
+  'models/gemini-3.5-flash',
   'gemini-3-flash-preview',
   'models/gemini-3-flash-preview',
   'gemini-3.1-flash-lite',
@@ -18,7 +18,7 @@ export const GEMINI_3_RO_MODELS: string[] = [...GEMINI_3_REQUIRED_THINKING_MODEL
 export const MODELS_MANDATORY_THINKING: string[] = [...GEMINI_3_REQUIRED_THINKING_MODEL_IDS];
 
 export const MODELS_SUPPORTING_RAW_MODE = [
-  'gemini-3.5-flash-preview',
+  'gemini-3.5-flash',
   'gemini-3-flash-preview',
   'gemini-3.1-flash-lite',
   'gemini-3.1-pro-preview',
