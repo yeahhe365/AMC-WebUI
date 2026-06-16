@@ -35,6 +35,52 @@
 
 ---
 
+## 🤝 Atlas Cloud：OpenAI 兼容的多模型 LLM 后端
+
+<p align="center">
+  <a href="https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=AMC-WebUI" target="_blank">
+    <img src="./docs/atlas-cloud-logo.png" alt="Atlas Cloud Logo" width="180">
+  </a>
+</p>
+
+**AMC-WebUI 已原生支持 OpenAI 兼容 API**，可直接对接 [Atlas Cloud](https://www.atlascloud.ai/?utm_source=github&utm_medium=link&utm_campaign=AMC-WebUI) 作为 Gemini 的补充或替代后端。Atlas Cloud 提供统一 OpenAI 兼容接口，覆盖 DeepSeek、Qwen、GLM、Kimi、MiniMax 等 59 个主流 LLM，一个密钥即可全部调用，无需修改 AMC-WebUI 的任何代码。
+
+### 快速接入
+
+1. 前往 [Atlas Cloud 免费配额](https://www.atlascloud.ai/console/coding-plan) 获取 API Key
+2. 在 AMC-WebUI **设置 → API 配置** 中切换为 **OpenAI 兼容模式**，填写：
+
+```
+Base URL : https://api.atlascloud.ai/v1
+API Key  : <你的 Atlas Cloud Key>
+模型     : deepseek-ai/deepseek-v4-pro   # 或见下方清单任选
+```
+
+> ⚠️ 注意：设置模型时请确保 `max_tokens` ≥ 512，否则可能收到空回复。
+
+### 支持的 59 个模型
+
+<details>
+<summary>点击展开完整模型清单</summary>
+
+| 系列 | 模型 ID |
+| :--- | :------ |
+| **DeepSeek** | deepseek-ai/deepseek-v4-pro, deepseek-ai/deepseek-v3, deepseek-ai/deepseek-r1, deepseek-ai/deepseek-r1-0528, deepseek-ai/deepseek-r1-distill-llama-70b, deepseek-ai/deepseek-r1-distill-qwen-32b, deepseek-ai/deepseek-v2.5 |
+| **Qwen** | qwen/qwen3-235b-a22b, qwen/qwen3-30b-a3b, qwen/qwen3-32b, qwen/qwen3-14b, qwen/qwen3-8b, qwen/qwen2.5-72b-instruct, qwen/qwen2.5-32b-instruct, qwen/qwen2.5-vl-72b-instruct, qwen/qwq-32b |
+| **GLM / Zhipu** | THUDM/glm-4-32b, THUDM/glm-z1-32b, THUDM/glm-z1-rumination-32b, THUDM/glm-4-9b-chat |
+| **Kimi / Moonshot** | moonshotai/kimi-k2-instruct, moonshotai/moonlight-16b-a3b-instruct |
+| **MiniMax** | MiniMax/MiniMax-Text-01, MiniMax/MiniMax-M1 |
+| **Yi / 01.AI** | 01-ai/yi-lightning |
+| **Llama** | meta-llama/llama-4-maverick, meta-llama/llama-4-scout, meta-llama/llama-3.3-70b-instruct, meta-llama/llama-3.1-8b-instruct |
+| **Mistral** | mistralai/mistral-small-3.2-24b-instruct, mistralai/mistral-nemo, mistralai/codestral-2501 |
+| **Gemma** | google/gemma-3-27b-it, google/gemma-3-12b-it |
+| **Phi** | microsoft/phi-4, microsoft/phi-4-mini-instruct |
+| **其他** | nvidia/llama-3.1-nemotron-ultra-253b-v1, nvidia/llama-3.3-nemotron-super-49b-v1, amazon/nova-pro, amazon/nova-lite, cohere/command-r-plus-08-2024, 01-ai/yi-vl-plus, internlm/internlm3-8b-instruct |
+
+</details>
+
+---
+
 ## 界面预览
 
 <p align="center">
