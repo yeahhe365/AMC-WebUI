@@ -100,7 +100,7 @@
     "workbox-strategies": "^7.4.0"
   },
   "overrides": {
-    "dompurify": "^3.4.1",
+    "dompurify": "^3.4.11",
     "protobufjs": "7.5.8",
     "uuid": "14.0.0",
     "serialize-javascript": "7.0.5",
