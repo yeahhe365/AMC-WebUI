@@ -1,7 +1,7 @@
 // Minimal static + reverse-proxy server for the Docker web container (Dockerfile.web).
 // Serves the web container:
 //   - serves static files from /usr/share/nginx/html with SPA fallback to index.html
-//   - proxies /api/* to http://api:3001 (path preserved, body + response streamed)
+//   - proxies /api/* and /health to http://api:3001 (path preserved, body + response streamed)
 //   - generates /runtime-config.js at startup from RUNTIME_* env vars
 //   - long-cache headers for /assets/*, no-store for /runtime-config.js
 // Uses only Node built-ins (http, fs, path) so no npm install is needed in the image.
@@ -21,6 +21,7 @@ const jsonStringOrNull = (value) => {
   if (!trimmed) return 'null';
   return JSON.stringify(trimmed);
 };
+const normalizeBackendFlavor = (value) => (trim(value).toLowerCase() === 'vertex' ? 'vertex' : 'aistudio');
 
 function writeRuntimeConfig() {
   const config = {
@@ -29,6 +30,8 @@ function writeRuntimeConfig() {
     useApiProxy: toBool(process.env.RUNTIME_USE_API_PROXY ?? 'true'),
     apiProxyUrl: JSON.parse(jsonStringOrNull(process.env.RUNTIME_API_PROXY_URL ?? '/api/gemini')),
     pyodideBaseUrl: JSON.parse(jsonStringOrNull(process.env.RUNTIME_PYODIDE_BASE_URL)),
+    backendFlavor: normalizeBackendFlavor(process.env.RUNTIME_BACKEND_FLAVOR),
+    enforceApiConfig: toBool(process.env.RUNTIME_ENFORCE_API_CONFIG),
   };
   const content = `window.__AMC_RUNTIME_CONFIG__ = ${JSON.stringify({ ...(globalThis.__AMC_RUNTIME_CONFIG__ || {}), ...config }, null, 2)};`;
   fs.writeFileSync(path.join(ROOT, 'runtime-config.js'), content);
@@ -146,7 +149,7 @@ function serveStatic(req, res) {
 
 const server = http.createServer((req, res) => {
   const pathname = new URL(req.url, 'http://localhost').pathname;
-  if (pathname === '/api' || pathname.startsWith('/api/')) {
+  if (pathname === '/health' || pathname === '/api' || pathname.startsWith('/api/')) {
     return proxyApi(req, res);
   }
   return serveStatic(req, res);

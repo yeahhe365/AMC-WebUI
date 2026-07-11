@@ -7,26 +7,32 @@ import {
   readMacOsClipboardPng,
 } from './clipboardImage.js';
 import { getCorsHeaders, sendJson } from './cors.js';
-import { GEMINI_PROXY_PREFIX, proxyGeminiRequest, type GeminiProxyConfig } from './geminiProxy.js';
+import type { GcsFilesAdapter } from './gcsFilesAdapter.js';
+import { GEMINI_PROXY_PREFIX, proxyGeminiRequest } from './geminiProxy.js';
 import { IMAGE_PROXY_PATH, proxyExternalImage } from './imageProxy.js';
 import { createMcpClientBridge } from './mcpClient.js';
 import { handleMcpRequest } from './mcpRoutes.js';
 import type { McpClientBridge } from './mcpTypes.js';
+import type { VertexAccessTokenProvider } from './vertexAuth.js';
 
 export { readMacOsClipboardPng } from './clipboardImage.js';
 
 interface CreateServerDependencies {
   fetchImpl?: typeof fetch;
   readLocalClipboardImage?: () => Promise<LocalClipboardImage | null>;
+  vertexAuth?: VertexAccessTokenProvider;
+  gcsFilesAdapter?: GcsFilesAdapter;
   mcpClient?: McpClientBridge;
 }
 
 type CreateServerConfig = Pick<ApiServerConfig, 'geminiApiBase' | 'geminiApiKey'> &
-  Partial<Pick<ApiServerConfig, 'allowedOrigins' | 'enableMcpStdio' | 'enableMcpPrivateHttp'>>;
+  Partial<
+    Pick<ApiServerConfig, 'allowedOrigins' | 'backendFlavor' | 'vertex' | 'enableMcpStdio' | 'enableMcpPrivateHttp'>
+  >;
 
-interface ResolvedServerConfig
-  extends Omit<CreateServerConfig, 'allowedOrigins' | 'enableMcpStdio' | 'enableMcpPrivateHttp'>, GeminiProxyConfig {
+interface ResolvedServerConfig extends CreateServerConfig {
   allowedOrigins: string[];
+  backendFlavor: ApiServerConfig['backendFlavor'];
   enableMcpStdio: boolean;
   enableMcpPrivateHttp: boolean;
 }
@@ -35,12 +41,15 @@ export function createServer(config: CreateServerConfig, dependencies: CreateSer
   const resolvedConfig: ResolvedServerConfig = {
     ...config,
     allowedOrigins: config.allowedOrigins ?? [],
+    backendFlavor: config.backendFlavor ?? 'aistudio',
     enableMcpStdio: config.enableMcpStdio ?? false,
     enableMcpPrivateHttp: config.enableMcpPrivateHttp ?? false,
   };
 
   const fetchImpl = dependencies.fetchImpl ?? fetch;
   const readLocalClipboardImage = dependencies.readLocalClipboardImage ?? readMacOsClipboardPng;
+  const vertexAuth = dependencies.vertexAuth;
+  const gcsFilesAdapter = dependencies.gcsFilesAdapter;
   const mcpClient = dependencies.mcpClient ?? createMcpClientBridge();
 
   return http.createServer(async (request, response) => {
@@ -101,7 +110,7 @@ export function createServer(config: CreateServerConfig, dependencies: CreateSer
       }
 
       if (path === GEMINI_PROXY_PREFIX || path.startsWith(`${GEMINI_PROXY_PREFIX}/`)) {
-        await proxyGeminiRequest(request, response, resolvedConfig, fetchImpl);
+        await proxyGeminiRequest(request, response, resolvedConfig, { fetchImpl, vertexAuth, gcsFilesAdapter });
         return;
       }
 

@@ -8,8 +8,17 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GEMINI_API_BASE: ${GEMINI_API_BASE:-https://generativelanguage.googleapis.com}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      GEMINI_BACKEND: ${GEMINI_BACKEND:-aistudio}
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
+      GCP_LOCATION: ${GCP_LOCATION:-us-central1}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      GCS_BUCKET: ${GCS_BUCKET:-}
+      GCS_OBJECT_PREFIX: ${GCS_OBJECT_PREFIX:-amc-files/}
+      GCS_MAX_FILE_BYTES: ${GCS_MAX_FILE_BYTES:-2147483648}
       ENABLE_MCP_STDIO: ${ENABLE_MCP_STDIO:-false}
       ENABLE_MCP_PRIVATE_HTTP: ${ENABLE_MCP_PRIVATE_HTTP:-false}
+    volumes:
+      - ${GOOGLE_APPLICATION_CREDENTIALS_DIR:-./docker/empty-secrets}:/run/secrets:ro
     expose:
       - '3001'
     restart: unless-stopped
@@ -26,6 +35,8 @@ services:
       RUNTIME_USE_API_PROXY: ${RUNTIME_USE_API_PROXY:-true}
       RUNTIME_API_PROXY_URL: ${RUNTIME_API_PROXY_URL:-/api/gemini}
       RUNTIME_PYODIDE_BASE_URL: ${RUNTIME_PYODIDE_BASE_URL:-}
+      RUNTIME_BACKEND_FLAVOR: ${RUNTIME_BACKEND_FLAVOR:-aistudio}
+      RUNTIME_ENFORCE_API_CONFIG: ${RUNTIME_ENFORCE_API_CONFIG:-false}
     ports:
       - '${WEB_PORT:-8080}:80'
     restart: unless-stopped

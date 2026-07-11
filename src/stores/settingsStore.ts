@@ -8,6 +8,7 @@ import { logService } from '@/services/logService';
 import { resolveSupportedModelId, sanitizeModelOptions } from '@/utils/modelSorting';
 import { dbService } from '@/services/db/dbService';
 import { normalizeLiveArtifactsSystemPrompts } from '@/utils/liveArtifactsPromptSettings';
+import { getRuntimeConfigAppSettingsOverrides, isRuntimeApiConfigEnforced } from '@/runtime/runtimeConfig';
 import { type ConcreteThemeId } from '@/utils/themeMode';
 import { resolveUpdaterOrValue, type UpdaterOrValue } from './stateUpdaters';
 import { CHAT_SYNC_CHANNEL_NAME } from './chatSyncChannel';
@@ -64,6 +65,7 @@ function sanitizeAppSettings(settings: AppSettings): AppSettings {
     sanitizedOpenAICompatibleModels.length > 0
       ? sanitizedOpenAICompatibleModels
       : defaultSettings.openaiCompatibleModels;
+  const enforcedRuntimeOverrides = isRuntimeApiConfigEnforced() ? getRuntimeConfigAppSettingsOverrides() : {};
 
   return {
     ...settings,
@@ -95,6 +97,7 @@ function sanitizeAppSettings(settings: AppSettings): AppSettings {
     liveArtifactsSystemPrompts: normalizeLiveArtifactsSystemPrompts(settings),
     liveTranslateTargetLanguageCode: settings.liveTranslateTargetLanguageCode ?? defaultSettings.liveTranslateTargetLanguageCode,
     liveTranslateEchoTargetLanguage: settings.liveTranslateEchoTargetLanguage ?? defaultSettings.liveTranslateEchoTargetLanguage,
+    ...enforcedRuntimeOverrides,
   };
 }
 

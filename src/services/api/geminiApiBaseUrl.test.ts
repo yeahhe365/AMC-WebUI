@@ -36,6 +36,16 @@ describe('geminiApiBaseUrl', () => {
     ).toBe('https://proxy.example.com/gemini');
   });
 
+  it('resolves same-origin proxy paths to absolute URLs for SDK use', () => {
+    expect(
+      getGeminiApiBaseUrlForSettings({
+        useCustomApiConfig: true,
+        useApiProxy: true,
+        apiProxyUrl: '/api/gemini/v1beta',
+      }),
+    ).toBe('http://localhost/api/gemini');
+  });
+
   it('returns a normalized proxy base URL only when proxy mode is active', () => {
     expect(getGeminiProxyBaseUrlForSettings(disabledProxySettings)).toBeNull();
     expect(

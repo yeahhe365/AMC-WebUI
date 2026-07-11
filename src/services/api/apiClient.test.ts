@@ -3,6 +3,11 @@ import { GoogleGenAI } from '@google/genai';
 import { getClient, getConfiguredApiClient, getConfiguredApiClientContext } from './apiClient';
 import { dbService } from '@/services/db/dbService';
 
+const { mockGetRuntimeConfigAppSettingsOverrides, mockIsRuntimeApiConfigEnforced } = vi.hoisted(() => ({
+  mockGetRuntimeConfigAppSettingsOverrides: vi.fn(() => ({})),
+  mockIsRuntimeApiConfigEnforced: vi.fn(() => false),
+}));
+
 type MockGoogleGenAIConfig = {
   apiKey: string;
   httpOptions?: {
@@ -32,6 +37,11 @@ vi.mock('@/services/logService', async () => {
 
   return createLogServiceMockModule();
 });
+
+vi.mock('@/runtime/runtimeConfig', () => ({
+  getRuntimeConfigAppSettingsOverrides: mockGetRuntimeConfigAppSettingsOverrides,
+  isRuntimeApiConfigEnforced: mockIsRuntimeApiConfigEnforced,
+}));
 
 // ── getClient ──
 
@@ -100,6 +110,8 @@ describe('getClient', () => {
 describe('getConfiguredApiClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetRuntimeConfigAppSettingsOverrides.mockReturnValue({});
+    mockIsRuntimeApiConfigEnforced.mockReturnValue(false);
   });
 
   it('uses proxy when both useCustomApiConfig and useApiProxy are true', async () => {
@@ -132,11 +144,35 @@ describe('getConfiguredApiClient', () => {
     const callArgs = vi.mocked(GoogleGenAI).mock.calls[0][0] as MockGoogleGenAIConfig;
     expect(callArgs.httpOptions?.baseUrl).toBeUndefined();
   });
+
+  it('forces an enforced runtime proxy over stale stored settings', async () => {
+    mockIsRuntimeApiConfigEnforced.mockReturnValue(true);
+    mockGetRuntimeConfigAppSettingsOverrides.mockReturnValue({
+      serverManagedApi: true,
+      useCustomApiConfig: true,
+      useApiProxy: true,
+      apiProxyUrl: '/api/gemini',
+    });
+    vi.mocked(dbService.getAppSettings).mockResolvedValue({
+      useCustomApiConfig: false,
+      useApiProxy: false,
+      apiProxyUrl: 'https://generativelanguage.googleapis.com',
+    } as StoredAppSettings);
+
+    await getConfiguredApiClient('key');
+
+    expect(GoogleGenAI).toHaveBeenCalledWith({
+      apiKey: 'key',
+      httpOptions: { baseUrl: 'http://localhost/api/gemini' },
+    });
+  });
 });
 
 describe('getConfiguredApiClientContext', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetRuntimeConfigAppSettingsOverrides.mockReturnValue({});
+    mockIsRuntimeApiConfigEnforced.mockReturnValue(false);
   });
 
   it('builds the client and routing URLs from one settings read', async () => {
@@ -156,6 +192,24 @@ describe('getConfiguredApiClientContext', () => {
     expect(context).toMatchObject({
       apiBaseUrl: 'https://proxy.example.com/gemini',
       proxyBaseUrl: 'https://proxy.example.com/gemini',
+    });
+  });
+
+  it('routes enforced-profile uploads through the same-origin proxy', async () => {
+    mockIsRuntimeApiConfigEnforced.mockReturnValue(true);
+    mockGetRuntimeConfigAppSettingsOverrides.mockReturnValue({
+      serverManagedApi: true,
+      useCustomApiConfig: true,
+      useApiProxy: true,
+      apiProxyUrl: '/api/gemini',
+    });
+    vi.mocked(dbService.getAppSettings).mockResolvedValue(undefined);
+
+    const context = await getConfiguredApiClientContext('key');
+
+    expect(context).toMatchObject({
+      apiBaseUrl: 'http://localhost/api/gemini',
+      proxyBaseUrl: '/api/gemini',
     });
   });
 });

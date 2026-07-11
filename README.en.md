@@ -243,19 +243,29 @@ Notes:
 
 ### Runtime Configuration and Environment Variables
 
-| Variable                        | Purpose                                                                                          | Public                | Docker default                              |
-| :------------------------------ | :----------------------------------------------------------------------------------------------- | :-------------------- | :------------------------------------------ |
-| `GEMINI_API_KEY`                | Optional server-managed Gemini API key; when set, it takes precedence over browser settings keys | Server only           | Empty                                       |
-| `PORT`                          | Port used by the API service                                                                     | Server only           | `3001`                                      |
-| `GEMINI_API_BASE`               | Upstream Gemini API base URL                                                                     | Server only           | `https://generativelanguage.googleapis.com` |
-| `ALLOWED_ORIGINS`               | Comma-separated CORS allowlist for cross-origin deployments                                      | Server only           | Empty                                       |
-| `ENABLE_MCP_STDIO`              | Enables `stdio` MCP server calls                                                                 | Server only           | `false`                                     |
-| `ENABLE_MCP_PRIVATE_HTTP`       | Allows the API service to call private or local HTTP MCP URLs                                    | Server only           | `false`                                     |
-| `RUNTIME_SERVER_MANAGED_API`    | Enables server-managed API mode by default in the frontend                                       | Public runtime config | `false`                                     |
-| `RUNTIME_USE_CUSTOM_API_CONFIG` | Enables custom API configuration by default                                                      | Public runtime config | `true`                                      |
-| `RUNTIME_USE_API_PROXY`         | Enables API proxy mode by default                                                                | Public runtime config | `true`                                      |
-| `RUNTIME_API_PROXY_URL`         | Default Gemini proxy URL for the frontend                                                        | Public runtime config | `/api/gemini`                               |
-| `RUNTIME_PYODIDE_BASE_URL`      | Optional Pyodide runtime asset URL; when blank, same-origin `/pyodide/` is used                  | Public runtime config | Empty                                       |
+| Variable                             | Purpose                                                                         | Public                | Docker default                              |
+| :----------------------------------- | :------------------------------------------------------------------------------ | :-------------------- | :------------------------------------------ |
+| `GEMINI_API_KEY`                     | Optional server-managed Gemini API key for AI Studio mode                       | Server only           | Empty                                       |
+| `PORT`                               | Port used by the API service                                                    | Server only           | `3001`                                      |
+| `GEMINI_API_BASE`                    | AI Studio upstream API base URL                                                 | Server only           | `https://generativelanguage.googleapis.com` |
+| `GEMINI_BACKEND`                     | Upstream backend: `aistudio` or `vertex`                                        | Server only           | `aistudio`                                  |
+| `GCP_PROJECT_ID`                     | Google Cloud project used by Vertex AI                                          | Server only           | Empty                                       |
+| `GCP_LOCATION`                       | Vertex AI location, such as `global` or `us-central1`                           | Server only           | `us-central1`                               |
+| `GOOGLE_APPLICATION_CREDENTIALS_DIR` | Host directory mounted at `/run/secrets`; use `./secrets` only for Vertex mode  | Docker host config    | `./docker/empty-secrets`                    |
+| `GOOGLE_APPLICATION_CREDENTIALS`     | Service Account JSON path inside the API container                              | Server only           | Empty                                       |
+| `GCS_BUCKET`                         | Optional GCS bucket backing Gemini Files API requests in Vertex mode            | Server only           | Empty                                       |
+| `GCS_OBJECT_PREFIX`                  | Object prefix used for uploaded files                                           | Server only           | `amc-files/`                                |
+| `GCS_MAX_FILE_BYTES`                 | Maximum file size accepted by the GCS adapter                                   | Server only           | `2147483648`                                |
+| `ALLOWED_ORIGINS`                    | Comma-separated CORS allowlist for cross-origin deployments                     | Server only           | Empty                                       |
+| `ENABLE_MCP_STDIO`                   | Enables `stdio` MCP server calls                                                | Server only           | `false`                                     |
+| `ENABLE_MCP_PRIVATE_HTTP`            | Allows the API service to call private or local HTTP MCP URLs                   | Server only           | `false`                                     |
+| `RUNTIME_SERVER_MANAGED_API`         | Enables server-managed API mode by default in the frontend                      | Public runtime config | `false`                                     |
+| `RUNTIME_USE_CUSTOM_API_CONFIG`      | Enables custom API configuration by default                                     | Public runtime config | `true`                                      |
+| `RUNTIME_USE_API_PROXY`              | Enables API proxy mode by default                                               | Public runtime config | `true`                                      |
+| `RUNTIME_API_PROXY_URL`              | Default Gemini proxy URL for the frontend                                       | Public runtime config | `/api/gemini`                               |
+| `RUNTIME_PYODIDE_BASE_URL`           | Optional Pyodide runtime asset URL; when blank, same-origin `/pyodide/` is used | Public runtime config | Empty                                       |
+| `RUNTIME_BACKEND_FLAVOR`             | Frontend backend behavior: `aistudio` or `vertex`                               | Public runtime config | `aistudio`                                  |
+| `RUNTIME_ENFORCE_API_CONFIG`         | Makes runtime API routing override stale browser settings                       | Public runtime config | `false`                                     |
 
 The `RUNTIME_*` values are written into `runtime-config.js` at container startup and are readable by the browser. Only put public configuration there. The public/runtime-config.js template is used for static builds and keeps custom API configuration and proxy mode disabled by default; Docker overwrites it through `docker/web-server.js` at container startup using the defaults above.
 
@@ -268,6 +278,84 @@ Docker defaults to BYOK: after you enter an API key in Settings, regular Gemini 
 If you want server-managed credentials for regular Gemini requests, set `GEMINI_API_KEY` and `RUNTIME_SERVER_MANAGED_API=true`. Live API still requires an API key available in the browser. A browser-local key is suitable for personal or trusted deployments, but it is not a server secret: scripts running in the same browser context, extensions, XSS, or device compromise may still read it.
 
 OpenAI Compatible mode currently does not read `RUNTIME_API_PROXY_URL`, `RUNTIME_USE_API_PROXY`, or `RUNTIME_SERVER_MANAGED_API`. It sends `chat/completions` requests directly to the OpenAI-compatible Base URL configured in Settings, using its separate key set. If you want that mode to pass through your own gateway, point the Base URL at that gateway directly.
+
+#### Switching backend profiles
+
+The repository includes three Docker environment examples:
+
+```text
+.env.vertex.example
+.env.aistudio.example
+.env.byok.example
+```
+
+Create private local copies and fill in only the required secrets:
+
+```bash
+cp .env.vertex.example .env.vertex.local
+cp .env.aistudio.example .env.aistudio.local
+cp .env.byok.example .env.byok.local
+```
+
+The `.local` files are ignored by Git. Switch modes without rebuilding images:
+
+```bash
+npm run backend:switch -- vertex
+npm run backend:switch -- aistudio
+npm run backend:switch -- byok
+```
+
+- `vertex` uses the Service Account under `GOOGLE_APPLICATION_CREDENTIALS_DIR` and server-managed Vertex authentication.
+- `aistudio` requires `GEMINI_API_KEY` in `.env.aistudio.local`; the browser does not receive that key.
+- `byok` requires `GEMINI_API_KEY` to remain empty; enter the key in the browser settings instead.
+
+The switch command validates the selected profile, recreates the containers, and waits for `/health`. Refresh every open AMC WebUI tab after switching; accept the in-app update prompt or use a hard reload when a new frontend image was built. All three profiles set `RUNTIME_ENFORCE_API_CONFIG=true`, so stale IndexedDB settings cannot keep the previous credential mode active after reload. AI Studio and BYOK profiles mount `./docker/empty-secrets` instead of the real Service Account directory.
+
+#### Vertex AI and GCS
+
+Vertex mode authenticates in the API service with Google Application Default Credentials, rewrites Gemini model requests to Vertex AI publisher endpoints, and removes the browser API-key requirement. To use it with Docker Compose:
+
+```env
+GEMINI_BACKEND=vertex
+GCP_PROJECT_ID=your-gcp-project-id
+GCP_LOCATION=global
+GOOGLE_APPLICATION_CREDENTIALS_DIR=./secrets
+GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/sa.json
+
+# Optional: enables Gemini Files API compatibility through GCS.
+GCS_BUCKET=your-gcs-bucket
+GCS_OBJECT_PREFIX=amc-files/
+GCS_MAX_FILE_BYTES=2147483648
+
+RUNTIME_BACKEND_FLAVOR=vertex
+RUNTIME_ENFORCE_API_CONFIG=true
+RUNTIME_API_PROXY_URL=/api/gemini
+```
+
+1. Put the Service Account JSON at `./secrets/sa.json` and set `GOOGLE_APPLICATION_CREDENTIALS_DIR=./secrets`. Docker Compose mounts that directory read-only at `/run/secrets`.
+2. Grant the Service Account `roles/aiplatform.user`. If `GCS_BUCKET` is configured, also grant `roles/storage.objectUser` on that bucket.
+3. To create/configure the bucket, run:
+
+```bash
+GCP_PROJECT_ID=... GCS_BUCKET=... GCS_LOCATION=us-central1 VERTEX_SA_EMAIL=... \
+  bash scripts/setup-gcs-bucket.sh
+```
+
+When `RUNTIME_BACKEND_FLAVOR=vertex`, the frontend enforces server-managed `/api/gemini` routing even if the browser has stale AI Studio settings. The optional GCS adapter accepts the existing resumable Files API flow, writes uploads under `gs://<bucket>/<prefix>`, and rewrites file references before forwarding model requests. Frontend chunks are 8 MB; the API rejects buffered chunks over 50 MB and enforces `GCS_MAX_FILE_BYTES` per file.
+
+Vertex mode covers HTTP model requests and the GCS-backed Files adapter. Live API still connects directly from the browser and requires a browser-available Gemini API key; it is not proxied through Vertex mode.
+
+After the containers are running, a real-project smoke test is available:
+
+```bash
+GCP_PROJECT_ID=... \
+GCS_BUCKET=... \
+GOOGLE_APPLICATION_CREDENTIALS=./secrets/sa.json \
+SKIP_IMAGEN=1 \
+npm run verify:vertex-e2e
+```
+
+Remove `SKIP_IMAGEN=1` to include an Imagen request. If `WEB_PORT` is not `8080`, set `API_BASE_URL=http://localhost:<port>`. The script verifies health, text generation, resumable upload, the GCS object, metadata refresh, multimodal generation, and optional Imagen generation, then deletes its test object unless `NO_CLEANUP=1` is set.
 
 ### Option 3: Cloudflare Pages + Standalone API
 

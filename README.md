@@ -249,19 +249,29 @@ docker compose up -d --build
 
 部署时请区分两类配置：
 
-| 变量名                          | 用途                                                          | 公开性             | Docker 默认值                               |
-| :------------------------------ | :------------------------------------------------------------ | :----------------- | :------------------------------------------ |
-| `GEMINI_API_KEY`                | 可选的服务端托管 Gemini API Key（配置后优先于浏览器设置 key） | **仅服务端**       | 空                                          |
-| `PORT`                          | `api` 服务监听端口                                            | 仅服务端           | `3001`                                      |
-| `GEMINI_API_BASE`               | Gemini 上游地址（代理目标）                                   | 仅服务端           | `https://generativelanguage.googleapis.com` |
-| `ALLOWED_ORIGINS`               | 逗号分隔 CORS 白名单（跨域部署时使用）                        | 仅服务端           | 空                                          |
-| `ENABLE_MCP_STDIO`              | 启用 `stdio` MCP 服务调用能力                                 | 仅服务端           | `false`                                     |
-| `ENABLE_MCP_PRIVATE_HTTP`       | 允许 API 服务访问内网/本机 HTTP MCP 地址                      | 仅服务端           | `false`                                     |
-| `RUNTIME_SERVER_MANAGED_API`    | 前端默认启用服务端托管 API                                    | **公开运行时配置** | `false`                                     |
-| `RUNTIME_USE_CUSTOM_API_CONFIG` | 前端默认启用“自定义 API 配置”                                 | 公开运行时配置     | `true`                                      |
-| `RUNTIME_USE_API_PROXY`         | 前端默认启用 API 代理                                         | 公开运行时配置     | `true`                                      |
-| `RUNTIME_API_PROXY_URL`         | 前端默认 Gemini 代理地址                                      | 公开运行时配置     | `/api/gemini`                               |
-| `RUNTIME_PYODIDE_BASE_URL`      | 可选 Pyodide 运行时资源地址；留空时使用同源 `/pyodide/`       | 公开运行时配置     | 空                                          |
+| 变量名                               | 用途                                                               | 公开性             | Docker 默认值                               |
+| :----------------------------------- | :----------------------------------------------------------------- | :----------------- | :------------------------------------------ |
+| `GEMINI_API_KEY`                     | AI Studio 模式下可选的服务端托管 Gemini API Key                    | **仅服务端**       | 空                                          |
+| `PORT`                               | `api` 服务监听端口                                                 | 仅服务端           | `3001`                                      |
+| `GEMINI_API_BASE`                    | AI Studio 上游地址（代理目标）                                     | 仅服务端           | `https://generativelanguage.googleapis.com` |
+| `GEMINI_BACKEND`                     | 上游后端类型：`aistudio` 或 `vertex`                               | 仅服务端           | `aistudio`                                  |
+| `GCP_PROJECT_ID`                     | Vertex AI 所属 Google Cloud 项目 ID                                | 仅服务端           | 空                                          |
+| `GCP_LOCATION`                       | Vertex AI 区域，例如 `global` 或 `us-central1`                     | 仅服务端           | `us-central1`                               |
+| `GOOGLE_APPLICATION_CREDENTIALS_DIR` | 挂载到 `/run/secrets` 的宿主机目录；仅 Vertex 模式使用 `./secrets` | Docker 宿主机配置  | `./docker/empty-secrets`                    |
+| `GOOGLE_APPLICATION_CREDENTIALS`     | Service Account JSON 在 API 容器内的路径                           | **仅服务端**       | 空                                          |
+| `GCS_BUCKET`                         | Vertex 模式下为 Gemini Files API 提供存储的可选 GCS Bucket         | 仅服务端           | 空                                          |
+| `GCS_OBJECT_PREFIX`                  | 上传文件使用的 GCS 对象前缀                                        | 仅服务端           | `amc-files/`                                |
+| `GCS_MAX_FILE_BYTES`                 | GCS 适配器允许的单文件大小上限                                     | 仅服务端           | `2147483648`                                |
+| `ALLOWED_ORIGINS`                    | 逗号分隔 CORS 白名单（跨域部署时使用）                             | 仅服务端           | 空                                          |
+| `ENABLE_MCP_STDIO`                   | 启用 `stdio` MCP 服务调用能力                                      | 仅服务端           | `false`                                     |
+| `ENABLE_MCP_PRIVATE_HTTP`            | 允许 API 服务访问内网/本机 HTTP MCP 地址                           | 仅服务端           | `false`                                     |
+| `RUNTIME_SERVER_MANAGED_API`         | 前端默认启用服务端托管 API                                         | **公开运行时配置** | `false`                                     |
+| `RUNTIME_USE_CUSTOM_API_CONFIG`      | 前端默认启用“自定义 API 配置”                                      | 公开运行时配置     | `true`                                      |
+| `RUNTIME_USE_API_PROXY`              | 前端默认启用 API 代理                                              | 公开运行时配置     | `true`                                      |
+| `RUNTIME_API_PROXY_URL`              | 前端默认 Gemini 代理地址                                           | 公开运行时配置     | `/api/gemini`                               |
+| `RUNTIME_PYODIDE_BASE_URL`           | 可选 Pyodide 运行时资源地址；留空时使用同源 `/pyodide/`            | 公开运行时配置     | 空                                          |
+| `RUNTIME_BACKEND_FLAVOR`             | 前端运行时使用的后端类型：`aistudio` 或 `vertex`                   | 公开运行时配置     | `aistudio`                                  |
+| `RUNTIME_ENFORCE_API_CONFIG`         | 让运行时 API 路由覆盖浏览器中残留的旧设置                          | 公开运行时配置     | `false`                                     |
 
 说明：
 
@@ -275,6 +285,84 @@ docker compose up -d --build
 - OpenAI 兼容模式当前不读取 `RUNTIME_API_PROXY_URL`、`RUNTIME_USE_API_PROXY` 或 `RUNTIME_SERVER_MANAGED_API`；它会直接使用设置里的 OpenAI 兼容 Base URL 和独立 Key 发起 `chat/completions` 请求。如需走你自己的网关，请直接把该网关地址填为 OpenAI 兼容 Base URL。
 - 浏览器本地 key 适合自用/可信部署。它不会因为“保存在本地”而变成服务器密钥，同一浏览器上下文中的脚本、扩展、XSS 或设备风险仍可能读取它。
 - 前端在部署时默认只依赖后端端点：`/api/gemini/*`；Live API 从浏览器直连官方 Live 服务。
+
+#### 快速切换后端配置
+
+仓库提供三份 Docker 环境配置示例：
+
+```text
+.env.vertex.example
+.env.aistudio.example
+.env.byok.example
+```
+
+先创建不会提交到 Git 的本地配置，再填写各模式需要的私密值：
+
+```bash
+cp .env.vertex.example .env.vertex.local
+cp .env.aistudio.example .env.aistudio.local
+cp .env.byok.example .env.byok.local
+```
+
+无需重新构建镜像即可切换：
+
+```bash
+npm run backend:switch -- vertex
+npm run backend:switch -- aistudio
+npm run backend:switch -- byok
+```
+
+- `vertex` 使用 `GOOGLE_APPLICATION_CREDENTIALS_DIR` 下的 Service Account，由服务端完成 Vertex 鉴权。
+- `aistudio` 要求在 `.env.aistudio.local` 设置 `GEMINI_API_KEY`，该 Key 不会发送给浏览器。
+- `byok` 要求服务端 `GEMINI_API_KEY` 保持为空，用户在浏览器设置中填写自己的 Key。
+
+切换命令会校验配置、重建容器并等待 `/health`。切换后请刷新所有已打开的 AMC WebUI 标签页；如果刚构建了新的前端镜像，请接受应用内更新提示或执行强制刷新。三种 Profile 都会设置 `RUNTIME_ENFORCE_API_CONFIG=true`，刷新后可避免 IndexedDB 中的旧设置继续使用上一种凭据模式。AI Studio 和 BYOK 模式会挂载 `./docker/empty-secrets`，而不是实际的 Service Account 目录。
+
+#### Vertex AI 与 GCS
+
+Vertex 模式在 API 服务中通过 Google Application Default Credentials 鉴权，将 Gemini 模型请求改写到 Vertex AI publisher endpoint，并让浏览器不再需要 Vertex API Key。Docker Compose 最小配置示例：
+
+```env
+GEMINI_BACKEND=vertex
+GCP_PROJECT_ID=your-gcp-project-id
+GCP_LOCATION=global
+GOOGLE_APPLICATION_CREDENTIALS_DIR=./secrets
+GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/sa.json
+
+# 可选：通过 GCS 兼容 Gemini Files API。
+GCS_BUCKET=your-gcs-bucket
+GCS_OBJECT_PREFIX=amc-files/
+GCS_MAX_FILE_BYTES=2147483648
+
+RUNTIME_BACKEND_FLAVOR=vertex
+RUNTIME_ENFORCE_API_CONFIG=true
+RUNTIME_API_PROXY_URL=/api/gemini
+```
+
+1. 将 Service Account JSON 放到 `./secrets/sa.json`，并设置 `GOOGLE_APPLICATION_CREDENTIALS_DIR=./secrets`。Docker Compose 会把该目录只读挂载到 `/run/secrets`。
+2. 为 Service Account 授予 `roles/aiplatform.user`；配置 `GCS_BUCKET` 时，还需在该 Bucket 上授予 `roles/storage.objectUser`。
+3. 如需创建并配置 Bucket，可运行：
+
+```bash
+GCP_PROJECT_ID=... GCS_BUCKET=... GCS_LOCATION=us-central1 VERTEX_SA_EMAIL=... \
+  bash scripts/setup-gcs-bucket.sh
+```
+
+设置 `RUNTIME_BACKEND_FLAVOR=vertex` 后，即使浏览器保留了旧的 AI Studio 设置，前端也会强制使用服务端托管的 `/api/gemini` 路由。可选 GCS 适配器会接收现有的可恢复 Files API 上传流程，把对象写入 `gs://<bucket>/<prefix>`，并在请求模型前改写文件引用。前端分片大小为 8 MB；API 对单个缓冲分片设置 50 MB 上限，并通过 `GCS_MAX_FILE_BYTES` 限制单文件大小。
+
+Vertex 模式覆盖 HTTP 模型请求与 GCS Files 适配。Live API 仍由浏览器直连，并需要浏览器中可用的 Gemini API Key；它不会通过 Vertex 模式代理。
+
+容器启动后，可以使用真实 GCP 项目执行端到端检查：
+
+```bash
+GCP_PROJECT_ID=... \
+GCS_BUCKET=... \
+GOOGLE_APPLICATION_CREDENTIALS=./secrets/sa.json \
+SKIP_IMAGEN=1 \
+npm run verify:vertex-e2e
+```
+
+移除 `SKIP_IMAGEN=1` 可加入 Imagen 请求。如果 `WEB_PORT` 不是 `8080`，请设置 `API_BASE_URL=http://localhost:<port>`。脚本会检查健康状态、文本生成、可恢复上传、GCS 对象、元数据刷新、多模态生成和可选 Imagen 生成；除非设置 `NO_CLEANUP=1`，测试对象会在结束时删除。
 
 ### 方式三：Cloudflare Pages（静态前端）+ 独立 API 服务
 

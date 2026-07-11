@@ -1,11 +1,15 @@
 import type { AppSettings } from '@/types';
 
+type BackendFlavor = 'aistudio' | 'vertex';
+
 type RuntimeConfigKey =
   | 'serverManagedApi'
   | 'useCustomApiConfig'
   | 'useApiProxy'
   | 'apiProxyUrl'
-  | 'pyodideBaseUrl';
+  | 'pyodideBaseUrl'
+  | 'backendFlavor'
+  | 'enforceApiConfig';
 
 type RuntimeConfigShape = Partial<Record<RuntimeConfigKey, unknown>>;
 
@@ -54,6 +58,15 @@ export function getPyodideBaseUrl(): string | null {
   return readNullableString(getRuntimeConfig()?.pyodideBaseUrl) ?? null;
 }
 
+export function getBackendFlavor(): BackendFlavor {
+  const value = getRuntimeConfig()?.backendFlavor;
+  return typeof value === 'string' && value.trim().toLowerCase() === 'vertex' ? 'vertex' : 'aistudio';
+}
+
+export function isRuntimeApiConfigEnforced(): boolean {
+  return getBackendFlavor() === 'vertex' || readBooleanValue(getRuntimeConfig()?.enforceApiConfig) === true;
+}
+
 export function getRuntimeConfigAppSettingsOverrides(): Partial<
   Pick<AppSettings, 'serverManagedApi' | 'useCustomApiConfig' | 'useApiProxy' | 'apiProxyUrl'>
 > {
@@ -85,6 +98,16 @@ export function getRuntimeConfigAppSettingsOverrides(): Partial<
   const apiProxyUrl = readNullableString(runtimeConfig.apiProxyUrl);
   if (apiProxyUrl !== undefined) {
     overrides.apiProxyUrl = apiProxyUrl;
+  }
+
+  if (getBackendFlavor() === 'vertex') {
+    return {
+      ...overrides,
+      serverManagedApi: true,
+      useCustomApiConfig: true,
+      useApiProxy: true,
+      apiProxyUrl: typeof overrides.apiProxyUrl === 'string' ? overrides.apiProxyUrl : '/api/gemini',
+    };
   }
 
   return overrides;

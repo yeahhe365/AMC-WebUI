@@ -1,6 +1,8 @@
 import type { GoogleGenAI } from '@google/genai';
+import type { AppSettings } from '@/types';
 import { dbService } from '@/services/db/dbService';
 import { logService } from '@/services/logService';
+import { getRuntimeConfigAppSettingsOverrides, isRuntimeApiConfigEnforced } from '@/runtime/runtimeConfig';
 import {
   getGeminiApiBaseUrlForSettings,
   getGeminiProxyBaseUrlForSettings,
@@ -14,8 +16,10 @@ type ClientConfig = {
   httpOptions?: GeminiClientHttpOptions;
 };
 
+type GeminiApiRoutingSettings = Pick<AppSettings, 'useCustomApiConfig' | 'useApiProxy' | 'apiProxyUrl'>;
+
 type ConfiguredApiRouting = {
-  settings: Awaited<ReturnType<typeof dbService.getAppSettings>>;
+  settings: GeminiApiRoutingSettings | null;
   apiProxyUrl: string | null;
 };
 
@@ -82,8 +86,24 @@ export const getClient = async (
   }
 };
 
+const applyEnforcedRuntimeRouting = (
+  settings: GeminiApiRoutingSettings | null | undefined,
+): GeminiApiRoutingSettings | null => {
+  if (!isRuntimeApiConfigEnforced()) {
+    return settings ?? null;
+  }
+
+  const runtimeOverrides = getRuntimeConfigAppSettingsOverrides();
+  return {
+    useCustomApiConfig: runtimeOverrides.useCustomApiConfig ?? settings?.useCustomApiConfig ?? false,
+    useApiProxy: runtimeOverrides.useApiProxy ?? settings?.useApiProxy ?? false,
+    apiProxyUrl:
+      runtimeOverrides.apiProxyUrl !== undefined ? runtimeOverrides.apiProxyUrl : (settings?.apiProxyUrl ?? null),
+  };
+};
+
 const loadConfiguredApiRouting = async (): Promise<ConfiguredApiRouting> => {
-  const settings = await dbService.getAppSettings();
+  const settings = applyEnforcedRuntimeRouting(await dbService.getAppSettings());
 
   const shouldUseProxy = !!(settings?.useCustomApiConfig && settings?.useApiProxy);
   const apiProxyUrl = settings ? resolveConfiguredGeminiBaseUrl(settings) : null;

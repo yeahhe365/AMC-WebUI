@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockGetRuntimeConfigAppSettingsOverrides } = vi.hoisted(() => ({
+const { mockGetRuntimeConfigAppSettingsOverrides, mockIsRuntimeApiConfigEnforced } = vi.hoisted(() => ({
   mockGetRuntimeConfigAppSettingsOverrides: vi.fn(() => ({})),
+  mockIsRuntimeApiConfigEnforced: vi.fn(() => false),
 }));
 
 vi.mock('@/services/db/dbService', async () => {
@@ -18,6 +19,7 @@ vi.mock('@/services/logService', async () => {
 
 vi.mock('@/runtime/runtimeConfig', () => ({
   getRuntimeConfigAppSettingsOverrides: mockGetRuntimeConfigAppSettingsOverrides,
+  isRuntimeApiConfigEnforced: mockIsRuntimeApiConfigEnforced,
 }));
 
 import { DEFAULT_APP_SETTINGS } from '@/constants/settingsDefaults';
@@ -32,6 +34,7 @@ describe('settingsStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetRuntimeConfigAppSettingsOverrides.mockReturnValue({});
+    mockIsRuntimeApiConfigEnforced.mockReturnValue(false);
     useSettingsStore.setState({
       appSettings: DEFAULT_APP_SETTINGS,
       currentTheme: createTheme(),
@@ -266,6 +269,60 @@ describe('settingsStore', () => {
       expect(appSettings.useApiProxy).toBe(true);
       expect(appSettings.apiProxyUrl).toBe('https://runtime-proxy.example.com/v1beta');
       expect(appSettings.serverManagedApi).toBe(true);
+    });
+
+    it('overrides stale stored proxy settings when the runtime profile is enforced', async () => {
+      mockIsRuntimeApiConfigEnforced.mockReturnValue(true);
+      mockGetRuntimeConfigAppSettingsOverrides.mockReturnValue({
+        serverManagedApi: true,
+        useCustomApiConfig: true,
+        useApiProxy: true,
+        apiProxyUrl: '/api/gemini',
+      });
+      vi.mocked(dbService.getAppSettings).mockResolvedValue(
+        createStoredSettingsSnapshot({
+          serverManagedApi: false,
+          useCustomApiConfig: false,
+          useApiProxy: false,
+          apiProxyUrl: 'https://old-ai-studio-proxy.example.com/v1beta',
+        }),
+      );
+
+      await useSettingsStore.getState().loadSettings();
+
+      expect(useSettingsStore.getState().appSettings).toMatchObject({
+        serverManagedApi: true,
+        useCustomApiConfig: true,
+        useApiProxy: true,
+        apiProxyUrl: '/api/gemini',
+      });
+    });
+
+    it('clears stale server-managed mode for an enforced BYOK profile', async () => {
+      mockIsRuntimeApiConfigEnforced.mockReturnValue(true);
+      mockGetRuntimeConfigAppSettingsOverrides.mockReturnValue({
+        serverManagedApi: false,
+        useCustomApiConfig: true,
+        useApiProxy: true,
+        apiProxyUrl: '/api/gemini',
+      });
+      vi.mocked(dbService.getAppSettings).mockResolvedValue(
+        createStoredSettingsSnapshot({
+          serverManagedApi: true,
+          useCustomApiConfig: false,
+          useApiProxy: false,
+          apiProxyUrl: null,
+        }),
+      );
+
+      await useSettingsStore.getState().loadSettings();
+
+      expect(useSettingsStore.getState().appSettings).toMatchObject({
+        serverManagedApi: false,
+        useCustomApiConfig: true,
+        useApiProxy: true,
+        apiProxyUrl: '/api/gemini',
+      });
     });
 
     it('handles DB errors gracefully', async () => {

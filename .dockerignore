@@ -1,0 +1,2 @@
+# Never send local cloud credentials to the Docker build context.
+secrets/
