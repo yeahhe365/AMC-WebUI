@@ -33,7 +33,7 @@
   "dependencies": {
     "@formkit/auto-animate": "^0.8.2",
     "@google/genai": "^1.50.1",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@viz-js/viz": "^3.25.0",
     "dompurify": "^3.4.11",
     "highlight.js": "^11.9.0",
