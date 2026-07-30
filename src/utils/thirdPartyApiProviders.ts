@@ -16,6 +16,7 @@ export const THIRD_PARTY_PROVIDER_IDS = [
   'qwen',
   'kimi',
   'glm',
+  'atlascloud',
   'custom',
 ] as const;
 
@@ -27,6 +28,7 @@ export const THIRD_PARTY_PROVIDER_LABELS: Record<ThirdPartyProviderId, string> =
   qwen: 'Qwen',
   kimi: 'Kimi',
   glm: 'GLM',
+  atlascloud: 'Atlas Cloud',
   custom: 'Custom',
 };
 
@@ -95,6 +97,14 @@ const DEFAULT_THIRD_PARTY_PROVIDER_CONFIGS: Record<ThirdPartyProviderId, ThirdPa
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     modelId: 'glm-5.2',
     models: [{ id: 'glm-5.2', name: 'GLM-5.2', isPinned: true }],
+    protocol: 'openai-compatible',
+    enabled: false,
+  },
+  atlascloud: {
+    apiKey: null,
+    baseUrl: 'https://api.atlascloud.ai/v1',
+    modelId: 'deepseek-ai/deepseek-v4-pro',
+    models: [{ id: 'deepseek-ai/deepseek-v4-pro', name: 'DeepSeek V4 Pro', isPinned: true }],
     protocol: 'openai-compatible',
     enabled: false,
   },

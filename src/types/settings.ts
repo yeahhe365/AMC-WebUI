@@ -51,6 +51,7 @@ export const THIRD_PARTY_PROVIDER_IDS = [
   'qwen',
   'kimi',
   'glm',
+  'atlascloud',
   'custom',
 ] as const;
 export type ThirdPartyProviderId = (typeof THIRD_PARTY_PROVIDER_IDS)[number];
