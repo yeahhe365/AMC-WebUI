@@ -44,7 +44,7 @@
     "lamejs": "^1.2.1",
     "lucide-react": "^0.417.0",
     "mammoth": "^1.12.0",
-    "mermaid": "^10.9.6",
+    "mermaid": "^10.9.8",
     "pdfjs-dist": "^4.10.38",
     "pyodide": "^0.27.7",
     "react": "^18.3.1",
