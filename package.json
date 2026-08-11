@@ -36,7 +36,7 @@
     "@google/genai": "^1.50.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@viz-js/viz": "^3.25.0",
-    "dompurify": "3.4.12",
+    "dompurify": "3.4.13",
     "highlight.js": "^11.9.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
@@ -106,7 +106,7 @@
     "@iconify-json/material-icon-theme": "1.2.70"
   },
   "overrides": {
-    "dompurify": "3.4.12",
+    "dompurify": "3.4.13",
     "protobufjs": "7.6.5",
     "hono": "4.12.34",
     "ws": "^8.20.2",
