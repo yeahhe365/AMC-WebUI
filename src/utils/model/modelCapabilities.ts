@@ -5,6 +5,7 @@ import { normalizeModelId } from './modelId';
 export const isGemini3Model = (modelId: string): boolean => {
   if (!modelId) return false;
   const lowerId = modelId.toLowerCase();
+  if (lowerId.includes('transcribe')) return false;
   return (
     REQUIRED_THINKING_MODEL_IDS.some((model) => lowerId.includes(model)) ||
     lowerId.includes('gemini-3-pro') ||
@@ -17,15 +18,38 @@ export const isGemmaModel = (modelId: string): boolean => !!modelId && modelId.t
 export const isGeminiRoboticsModel = (modelId: string): boolean =>
   !!modelId && modelId.toLowerCase().includes('gemini-robotics-er');
 
+/**
+ * gemini-3.7-flash and gemini-3.8-flash have thinking levels low/medium/high
+ * — minimal is not supported and returns an error per their model cards.
+ * 3.5/3.6 Flash and 3.5 Flash-Lite do accept MINIMAL.
+ */
+const isGemini37Or38FlashModel = (modelId: string): boolean => {
+  if (!modelId) return false;
+  const lowerId = modelId.toLowerCase();
+  return lowerId.includes('gemini-3.7-flash') || lowerId.includes('gemini-3.8-flash');
+};
+
 export const isLiveTranslateModel = (modelId: string): boolean =>
   !!modelId && modelId.toLowerCase().includes('live-translate');
 
+export const isLiveTranscribeModel = (modelId: string): boolean =>
+  !!modelId && modelId.toLowerCase().includes('transcribe-live');
+
+export const isTranscribeModel = (modelId: string): boolean =>
+  !!modelId && modelId.toLowerCase().includes('transcribe') && !modelId.toLowerCase().includes('transcribe-live');
+
 const isNativeAudioModel = (modelId: string): boolean => {
   const lowerId = modelId.toLowerCase();
-  return lowerId.includes('native-audio') || lowerId.includes('-live-') || lowerId.includes('live-translate');
+  return (
+    lowerId.includes('native-audio') ||
+    lowerId.includes('-live-') ||
+    lowerId.includes('live-translate') ||
+    lowerId.includes('transcribe-live')
+  );
 };
 
-const isGemini31FlashLiveModel = (modelId: string): boolean => modelId.toLowerCase().includes('gemini-3.1-flash-live');
+export const isGemini31FlashLiveModel = (modelId: string): boolean =>
+  modelId.toLowerCase().includes('gemini-3.1-flash-live');
 
 const isGemini31FlashImageModel = (modelId: string): boolean => {
   const lowerId = modelId.toLowerCase();
@@ -38,18 +62,22 @@ const isGemini31FlashLiteImageModel = (modelId: string): boolean =>
 
 const isTtsModel = (modelId: string): boolean => modelId.toLowerCase().includes('tts');
 
-const isOpenAIGpt5FamilyModel = (modelId: string): boolean => {
+export const isOpenAIGpt5FamilyModel = (modelId: string): boolean => {
   const lowerId = modelId.toLowerCase();
   return lowerId.startsWith('gpt-5') || lowerId.includes('/gpt-5');
 };
 
-const isKimiK3Model = (modelId: string): boolean => {
+export const isKimiK3Model = (modelId: string): boolean => {
   const lowerId = modelId.toLowerCase();
   return lowerId === 'kimi-k3' || lowerId.startsWith('kimi-k3-') || lowerId.includes('kimi-k3');
 };
 
-/** Claude models that accept output_config.effort (adaptive thinking). */
-const isAnthropicEffortModel = (modelId: string): boolean => {
+/**
+ * Models that use adaptive thinking + output_config.effort.
+ * Manual extended thinking (`thinking: { type: "enabled", budget_tokens }`) is rejected
+ * on Claude Sonnet 5 / Opus 5 / Opus 4.8 / Fable 5 — use effort instead.
+ */
+export const isAnthropicEffortModel = (modelId: string): boolean => {
   const id = modelId.toLowerCase();
   if (/fable|mythos/.test(id)) {
     return true;
@@ -60,27 +88,34 @@ const isAnthropicEffortModel = (modelId: string): boolean => {
   );
 };
 
+/** GLM-5 series models use the OpenAI-compatible thinking parameter. */
+export const isGlmModel = (modelId: string): boolean => modelId.toLowerCase().startsWith('glm-');
+
 const supportsThinkingLevel = (modelId: string): boolean => {
-  const lowerId = modelId.toLowerCase();
   // GLM-5 series supports thinking via the OpenAI-compatible thinking parameter.
-  if (lowerId.startsWith('glm-')) {
+  if (isGlmModel(modelId)) {
     return true;
   }
   // Third-party reasoning controls mapped in openaiCompatibleMessages / anthropicMessages.
   if (isOpenAIGpt5FamilyModel(modelId) || isKimiK3Model(modelId) || isAnthropicEffortModel(modelId)) {
     return true;
   }
-  return !isTtsModel(modelId) && (isGemini3Model(modelId) || isGeminiRoboticsModel(modelId));
+  if (isGemini31FlashImageModel(modelId)) {
+    return true;
+  }
+  return (
+    !isTtsModel(modelId) &&
+    !isTranscribeModel(modelId) &&
+    !isImageGenerationModel(modelId) &&
+    (isGemini3Model(modelId) || isGeminiRoboticsModel(modelId))
+  );
 };
 
 const isGemini3ImageModel = (modelId: string): boolean =>
   normalizeModelId(modelId) === 'gemini-3-pro-image-preview' ||
   normalizeModelId(modelId) === 'gemini-3.1-flash-image-preview';
 
-const isFlashImageModel = (modelId: string): boolean => modelId.toLowerCase().includes('gemini-2.5-flash-image');
-
-export const isImageGenerationModel = (modelId: string): boolean =>
-  isFlashImageModel(modelId) || isGemini3ImageModel(modelId) || modelId.toLowerCase().includes('image');
+export const isImageGenerationModel = (modelId: string): boolean => modelId.toLowerCase().includes('image');
 
 export interface ModelInteractionPermissions {
   canAcceptAttachments: boolean;
@@ -103,20 +138,19 @@ export interface ModelCapabilities {
   isGemini3: boolean;
   supportsRawReasoningPrefill: boolean;
   supportsThinkingLevel: boolean;
-  supportsThinkingBudgetConfig: boolean;
   isGemmaModel: boolean;
-  isFlashModel: boolean;
-  isGemini25Model: boolean;
   isGemini3FlashModel: boolean;
   isGemini31FlashLiveModel: boolean;
   isGemini31FlashImageModel: boolean;
   isGeminiRoboticsModel: boolean;
+  supportsMinimalThinkingLevel: boolean;
   isGemini3ImageModel: boolean;
-  isFlashImageModel: boolean;
   isImageGenerationModel: boolean;
   isTtsModel: boolean;
+  isTranscribeModel: boolean;
   isNativeAudioModel: boolean;
   isLiveTranslate: boolean;
+  isLiveTranscribe: boolean;
   supportsBuiltInCustomToolCombination: boolean;
   permissions: ModelInteractionPermissions;
   supportedAspectRatios?: string[];
@@ -128,25 +162,39 @@ export const getModelCapabilities = (modelId: string): ModelCapabilities => {
   const isGemini3 = isGemini3Model(modelId);
   const supportsThinkingLevelSelection = supportsThinkingLevel(modelId);
   const gemini3ImageModel = isGemini3ImageModel(modelId);
-  const flashImageModel = isFlashImageModel(modelId);
   const ttsModel = isTtsModel(modelId);
+  const transcribeModel = isTranscribeModel(modelId);
   const nativeAudioModel = isNativeAudioModel(modelId);
   const flashModel = lowerId.includes('flash');
-  const gemini25Model = lowerId.includes('gemini-2.5');
   const gemini3FlashModel = isGemini3 && flashModel;
   const gemini31FlashLiveModel = isGemini31FlashLiveModel(modelId);
   const roboticsModel = isGeminiRoboticsModel(modelId);
   const imageGenerationModel = isImageGenerationModel(modelId);
-  const canUseTextChatTools = !nativeAudioModel && !imageGenerationModel && !ttsModel;
+  const canUseTextChatTools = !nativeAudioModel && !imageGenerationModel && !ttsModel && !transcribeModel;
+  const gemmaModel = isGemmaModel(modelId);
+  // Gemma models on the Gemini API support no tools at all (no grounding, no
+  // code execution) — tool toggles for them would only produce API 400s.
+  const canUseSearchFamily =
+    (canUseTextChatTools ||
+      (nativeAudioModel && !isLiveTranslateModel(modelId) && !isLiveTranscribeModel(modelId)) ||
+      gemini3ImageModel) &&
+    !gemmaModel;
   const permissions: ModelInteractionPermissions = {
     canAcceptAttachments: !ttsModel && !nativeAudioModel,
     canUseTools: canUseTextChatTools || nativeAudioModel || gemini3ImageModel || imageGenerationModel,
-    canUseGoogleSearch: canUseTextChatTools || nativeAudioModel || gemini3ImageModel,
-    canUseGoogleMaps: canUseTextChatTools || nativeAudioModel || gemini3ImageModel,
-    canUseDeepSearch: canUseTextChatTools,
-    canUseCodeExecution: canUseTextChatTools && !isGemmaModel(modelId),
-    canUseLocalPython: canUseTextChatTools || nativeAudioModel,
-    canUseUrlContext: canUseTextChatTools && !isGemmaModel(modelId),
+    canUseGoogleSearch: canUseSearchFamily,
+    // Maps grounding is documented for text Gemini 2.5/3 models only — not for
+    // image-generation models, and the Live API never sends it.
+    canUseGoogleMaps: canUseTextChatTools && !gemmaModel,
+    canUseDeepSearch: canUseTextChatTools && !gemmaModel,
+    canUseCodeExecution: canUseTextChatTools && !gemmaModel,
+    // Local Python drives a function-declaration round-trip, so it needs the
+    // same API function-calling support Gemma lacks. Live (native audio)
+    // supports function calling, except for Live Translate and Transcribe Live.
+    canUseLocalPython:
+      (canUseTextChatTools && !gemmaModel) ||
+      (nativeAudioModel && !isLiveTranslateModel(modelId) && !isLiveTranscribeModel(modelId)),
+    canUseUrlContext: canUseTextChatTools && !gemmaModel,
     canUseTokenCount: !nativeAudioModel,
     canUseYouTubeUrl: canUseTextChatTools,
     canGenerateSuggestions: canUseTextChatTools,
@@ -180,7 +228,7 @@ export const getModelCapabilities = (modelId: string): ModelCapabilities => {
         '21:9',
       ];
     }
-  } else if (gemini3ImageModel || flashImageModel) {
+  } else if (gemini3ImageModel) {
     supportedAspectRatios = ['Auto', '1:1', '16:9', '9:16', '4:3', '3:4', '3:2', '2:3', '4:5', '5:4', '21:9'];
   }
 
@@ -198,20 +246,19 @@ export const getModelCapabilities = (modelId: string): ModelCapabilities => {
     isGemini3,
     supportsRawReasoningPrefill: MODELS_SUPPORTING_RAW_MODE.some((model) => modelId.includes(model)),
     supportsThinkingLevel: supportsThinkingLevelSelection,
-    supportsThinkingBudgetConfig: gemini25Model || roboticsModel,
     isGemmaModel: isGemmaModel(modelId),
-    isFlashModel: flashModel,
-    isGemini25Model: gemini25Model,
     isGemini3FlashModel: gemini3FlashModel,
     isGemini31FlashLiveModel: gemini31FlashLiveModel,
     isGemini31FlashImageModel: isGemini31FlashImageModel(modelId),
     isGeminiRoboticsModel: roboticsModel,
+    supportsMinimalThinkingLevel: !isGemini3ProTextModel(modelId) && !isGemini37Or38FlashModel(modelId),
     isGemini3ImageModel: gemini3ImageModel,
-    isFlashImageModel: flashImageModel,
     isImageGenerationModel: imageGenerationModel,
     isTtsModel: ttsModel,
+    isTranscribeModel: transcribeModel,
     isNativeAudioModel: nativeAudioModel,
     isLiveTranslate: isLiveTranslateModel(modelId),
+    isLiveTranscribe: isLiveTranscribeModel(modelId),
     supportsBuiltInCustomToolCombination: isGemini3,
     permissions,
     supportedAspectRatios,
@@ -267,7 +314,8 @@ export const normalizeThinkingLevelForModel = (
 ): ThinkingLevel => {
   const resolvedLevel = thinkingLevel ?? fallback;
 
-  if (resolvedLevel === 'MINIMAL' && isGemini3ProTextModel(modelId)) {
+  // Both families reject MINIMAL with an API error per their model cards.
+  if (resolvedLevel === 'MINIMAL' && (isGemini3ProTextModel(modelId) || isGemini37Or38FlashModel(modelId))) {
     return 'LOW';
   }
 

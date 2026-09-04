@@ -6,13 +6,12 @@ import { logService } from '@/services/logService';
 import type { AppSettings, LiveTranscriptHandler } from '@/types';
 import type { LiveErrorState } from '@/utils/live-api/liveErrorState';
 import { useStateWithRef } from '@/hooks/useStateWithRef';
+import { isGemini31FlashLiveModel, isLiveTranslateModel } from '@/utils/model/modelCapabilities';
 
 const MAX_RECONNECT_RETRIES = 5;
 const RECONNECT_BASE_DELAY_MS = 1000;
 
 type LiveRealtimeInput = Parameters<LiveSession['sendRealtimeInput']>[0];
-
-const isGemini31FlashLiveModel = (modelId: string): boolean => modelId.toLowerCase().includes('gemini-3.1-flash-live');
 
 const toGemini31FlashLiveRealtimeInput = (part: Part): LiveRealtimeInput | null => {
   if (typeof part.text === 'string' && Object.keys(part).every((key) => key === 'text')) {
@@ -54,6 +53,7 @@ interface UseLiveConnectionProps {
   tools: Tool[];
   initializeAudio: (
     onAudioData: (data: Float32Array) => void,
+    onSpeechEnd?: () => void,
   ) => Promise<void | { outputAudioContext: AudioContext; inputAudioContext: AudioContext }>;
   cleanupAudio: () => void;
   clearBufferedAudio?: () => void;
@@ -206,27 +206,44 @@ export const useLiveConnection = ({
         setupCompleteRejectRef.current = reject;
       });
 
-      await initializeAudio((pcmData) => {
-        // IMPORTANT: If connection is closed/closing, stop sending immediately to prevent WebSocket flood errors
-        if (!isConnectedRef.current) return;
+      await initializeAudio(
+        (pcmData) => {
+          // IMPORTANT: If connection is closed/closing, stop sending immediately to prevent WebSocket flood errors
+          if (!isConnectedRef.current) return;
 
-        const base64Data = float32ToPCM16Base64(pcmData);
-        if (sessionRef.current) {
+          const base64Data = float32ToPCM16Base64(pcmData);
+          if (sessionRef.current) {
+            sessionRef.current.then((session) => {
+              try {
+                session.sendRealtimeInput({
+                  audio: {
+                    mimeType: 'audio/pcm;rate=16000',
+                    data: base64Data,
+                  },
+                });
+              } catch (audioSendError) {
+                // Catch synchronous send errors (e.g. if socket closed between checks)
+                logService.warn('Failed to send audio frame:', audioSendError);
+              }
+            });
+          }
+        },
+        () => {
+          // Hybrid VAD: client-side silence detected after speech, finalize turn early
+          // Live Translate is a continuous-stream model with server-side VAD only:
+          // it kills the session ("Request contains an invalid argument") when audio
+          // resumes after an audioStreamEnd, so never signal it there.
+          if (isLiveTranslateModel(modelId)) return;
+          if (!isConnectedRef.current || !sessionRef.current) return;
           sessionRef.current.then((session) => {
             try {
-              session.sendRealtimeInput({
-                audio: {
-                  mimeType: 'audio/pcm;rate=16000',
-                  data: base64Data,
-                },
-              });
-            } catch (audioSendError) {
-              // Catch synchronous send errors (e.g. if socket closed between checks)
-              logService.warn('Failed to send audio frame:', audioSendError);
+              session.sendRealtimeInput({ audioStreamEnd: true });
+            } catch {
+              // Ignore transient sends racing with teardown
             }
           });
-        }
-      });
+        },
+      );
       if (shouldAbortConnect()) {
         resetAudioState();
         return false;
@@ -509,6 +526,39 @@ export const useLiveConnection = ({
     return disconnectOnUnmount;
   }, [disconnectOnUnmount]);
 
+  const signalActivityStart = useCallback(() => {
+    if (!isConnectedRef.current || !sessionRef.current) return;
+    sessionRef.current.then((session) => {
+      try {
+        session.sendRealtimeInput({ activityStart: {} });
+      } catch {
+        // Ignore
+      }
+    });
+  }, [isConnectedRef, sessionRef]);
+
+  const signalActivityEnd = useCallback(() => {
+    if (!isConnectedRef.current || !sessionRef.current) return;
+    sessionRef.current.then((session) => {
+      try {
+        session.sendRealtimeInput({ activityEnd: {} });
+      } catch {
+        // Ignore
+      }
+    });
+  }, [isConnectedRef, sessionRef]);
+
+  const sendAudioStreamEnd = useCallback(() => {
+    if (!isConnectedRef.current || !sessionRef.current) return;
+    sessionRef.current.then((session) => {
+      try {
+        session.sendRealtimeInput({ audioStreamEnd: true });
+      } catch {
+        // Ignore
+      }
+    });
+  }, [isConnectedRef, sessionRef]);
+
   return {
     isConnected,
     isReconnecting,
@@ -518,5 +568,8 @@ export const useLiveConnection = ({
     disconnect,
     sendText,
     sendContent,
+    signalActivityStart,
+    signalActivityEnd,
+    sendAudioStreamEnd,
   };
 };

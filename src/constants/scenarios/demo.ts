@@ -2,10 +2,10 @@ import { type SavedScenario } from '@/types';
 
 export const voxelScenario: SavedScenario = {
   id: 'voxel-designer-scenario-default',
-  title: 'Voxel 3D Designer',
+  title: '🧊 Voxel 3D Designer',
   messages: [],
   emoji: '🧊',
-  category: 'creative',
+  category: 'coding',
   description: 'Generates interactive Three.js voxel art from a text description.',
   systemInstruction: `**系统提示词：体素模型生成专家 (Voxel Art Generator)**
 

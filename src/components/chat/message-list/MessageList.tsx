@@ -1,17 +1,19 @@
 import { logService } from '@/services/logService';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { Message } from '@/components/message/Message';
 import { WelcomeScreen } from './WelcomeScreen';
 import { ScrollNavigation } from './ScrollNavigation';
 import { TextSelectionToolbar } from './TextSelectionToolbar';
+import { SelectionAskPanel } from './text-selection/SelectionAskPanel';
 import { useMessageListUi } from './hooks/useMessageListUi';
 import { useMessageListScroll } from './hooks/useMessageListScroll';
 import { useExpandedUserMessages } from './hooks/useExpandedUserMessages';
 import { MessageListFooter } from './MessageListFooter';
 import { MessageListModals } from './MessageListModals';
 import { isGemini3Model } from '@/utils/model/modelCapabilities';
-import { getVisibleChatMessages } from '@/utils/chat/visibility';
+import { getMcpToolPairs, getVisibleChatMessages } from '@/utils/chat/visibility';
+import { McpToolCallGroup } from '@/components/mcp/McpToolCallGroup';
 import { isMarkdownFile } from '@/utils/file/fileTypeClassification';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useChatStore } from '@/stores/chatStore';
@@ -30,7 +32,7 @@ const MessageListComponent: React.FC = () => {
   const { language } = useI18n();
   const messages = useChatStore((state) => state.activeMessages);
   const setCommandedInput = useChatStore((state) => state.setCommandedInput);
-  const { activeSessionId, currentChatSettings } = useChatState(appSettings);
+  const { activeSessionId, currentChatSettings, isLoading } = useChatState(appSettings);
   const chatInputHeight = useUIStore((state) => state.chatInputHeight);
   const { onSendMessage } = useChatInputRuntime();
   const {
@@ -59,6 +61,11 @@ const MessageListComponent: React.FC = () => {
     },
     [setCommandedInput],
   );
+  const [selectionAskState, setSelectionAskState] = React.useState<{ text: string; rect: DOMRect | null } | null>(null);
+  const handleAsk = React.useCallback((text: string, rect: DOMRect | null) => {
+    if (!text.trim()) return;
+    setSelectionAskState({ text, rect });
+  }, []);
   const handleLiveArtifactFollowUp = React.useCallback(
     (payload: LiveArtifactFollowupPayload) => {
       const followupPrompt = formatLiveArtifactFollowupPrompt(payload, language);
@@ -72,13 +79,23 @@ const MessageListComponent: React.FC = () => {
     [language, onSendMessage],
   );
   const visibleMessages = useMemo(() => getVisibleChatMessages(messages), [messages]);
+  const mcpPairs = useMemo(() => getMcpToolPairs(messages), [messages]);
+  const mcpPairMap = useMemo(() => new Map(mcpPairs.map((pair) => [pair.parentId, pair])), [mcpPairs]);
   const userMessageCollapse = useExpandedUserMessages(activeSessionId);
+
+  // Warm the lazily-loaded renderer/diagram chunks at mount so a message's
+  // first render doesn't have to wait on a chunk download (fallback→real DOM
+  // swaps and their height changes are what makes Virtuoso jump).
+  useEffect(() => {
+    void import('@/components/message/MathMarkdownRenderer').catch(() => {});
+    void import('@/components/message/blocks/MermaidBlock').catch(() => {});
+    void import('@/components/message/blocks/GraphvizBlock').catch(() => {});
+  }, []);
 
   const {
     previewFile,
     isHtmlPreviewModalOpen,
-    htmlToPreview,
-    initialTrueFullscreenRequest,
+    htmlPreview,
     configuringFile,
     setConfiguringFile,
     handleFileClick,
@@ -98,6 +115,7 @@ const MessageListComponent: React.FC = () => {
     handleScrollerRef,
     setAtBottom,
     onRangeChanged,
+    handleTotalListHeightChanged,
     scrollToPrevTurn,
     scrollToNextTurn,
     scrollToTop,
@@ -123,32 +141,39 @@ const MessageListComponent: React.FC = () => {
     [VirtuosoFooter],
   );
   const renderMessageItem = React.useCallback(
-    (index: number, message: (typeof visibleMessages)[number]) => (
-      <div className="px-1.5 sm:px-2 md:px-3 max-w-7xl mx-auto w-full">
-        <Message
-          key={message.id}
-          message={message}
-          sessionTitle={sessionTitle}
-          prevMessage={index > 0 ? visibleMessages[index - 1] : undefined}
-          messageIndex={index}
-          onEditMessage={onEditMessage}
-          onDeleteMessage={onDeleteMessage}
-          onRetryMessage={onRetryMessage}
-          onImageClick={handleFileClick}
-          onOpenHtmlPreview={handleOpenHtmlPreview}
-          onLiveArtifactFollowUp={handleLiveArtifactFollowUp}
-          showThoughts={currentChatSettings.showThoughts}
-          onContinueGeneration={onContinueGeneration}
-          onForkMessage={onForkMessage}
-          onSuggestionClick={onFollowUpSuggestionClick}
-          onSuggestionFill={onFollowUpSuggestionFill}
-          onOpenSidePanel={onOpenSidePanel}
-          onConfigureFile={message.role === 'user' ? handleConfigureFile : undefined}
-          isGemini3={isGemini3}
-          userMessageCollapse={userMessageCollapse}
-        />
-      </div>
-    ),
+    (index: number, message: (typeof visibleMessages)[number]) => {
+      const pair = mcpPairMap.get(message.id);
+      return (
+        // flow-root contains the message's top margins inside the item wrapper;
+        // collapsed-through margins otherwise create gaps Virtuoso never
+        // measures, shifting every scroll target (incl. the true bottom) short.
+        <div className="flow-root px-1.5 sm:px-2 md:px-3 max-w-7xl mx-auto w-full">
+          <Message
+            key={message.id}
+            message={message}
+            sessionTitle={sessionTitle}
+            prevMessage={index > 0 ? visibleMessages[index - 1] : undefined}
+            messageIndex={index}
+            onEditMessage={onEditMessage}
+            onDeleteMessage={onDeleteMessage}
+            onRetryMessage={onRetryMessage}
+            onImageClick={handleFileClick}
+            onOpenHtmlPreview={handleOpenHtmlPreview}
+            onLiveArtifactFollowUp={handleLiveArtifactFollowUp}
+            showThoughts={currentChatSettings.showThoughts}
+            onContinueGeneration={onContinueGeneration}
+            onForkMessage={onForkMessage}
+            onSuggestionClick={onFollowUpSuggestionClick}
+            onSuggestionFill={onFollowUpSuggestionFill}
+            onOpenSidePanel={onOpenSidePanel}
+            onConfigureFile={message.role === 'user' ? handleConfigureFile : undefined}
+            isGemini3={isGemini3}
+            userMessageCollapse={userMessageCollapse}
+          />
+          {pair ? <McpToolCallGroup calls={pair.calls} responses={pair.responses} turnActive={isLoading} /> : null}
+        </div>
+      );
+    },
     [
       currentChatSettings.showThoughts,
       handleConfigureFile,
@@ -156,6 +181,8 @@ const MessageListComponent: React.FC = () => {
       handleLiveArtifactFollowUp,
       handleOpenHtmlPreview,
       isGemini3,
+      isLoading,
+      mcpPairMap,
       onContinueGeneration,
       onDeleteMessage,
       onEditMessage,
@@ -183,11 +210,12 @@ const MessageListComponent: React.FC = () => {
             data={visibleMessages}
             scrollerRef={handleScrollerRef}
             atBottomStateChange={setAtBottom}
-            atBottomThreshold={150}
+            atBottomThreshold={40}
             followOutput={followOutput}
             computeItemKey={(_, message) => message.id}
             rangeChanged={onRangeChanged}
-            increaseViewportBy={{ top: 800, bottom: 800 }}
+            totalListHeightChanged={handleTotalListHeightChanged}
+            increaseViewportBy={{ top: 1200, bottom: 800 }}
             className="custom-scrollbar chat-message-list-scroller"
             onScroll={handleScroll}
             components={virtuosoComponents}
@@ -198,9 +226,19 @@ const MessageListComponent: React.FC = () => {
         <TextSelectionToolbar
           onQuote={handleQuote}
           onInsert={handleInsert}
+          onAsk={handleAsk}
           onTTS={onQuickTTS}
           containerRef={scrollerRef}
         />
+        {selectionAskState && (
+          <SelectionAskPanel
+            selectedText={selectionAskState.text}
+            anchorRect={selectionAskState.rect}
+            onClose={() => setSelectionAskState(null)}
+            onInsert={handleInsert}
+            onQuote={handleQuote}
+          />
+        )}
 
         <ScrollNavigation
           showUp={showScrollUp}
@@ -222,8 +260,7 @@ const MessageListComponent: React.FC = () => {
         currentImageIndex={currentImageIndex}
         imageCount={allImages.length}
         isHtmlPreviewModalOpen={isHtmlPreviewModalOpen}
-        htmlToPreview={htmlToPreview}
-        initialTrueFullscreenRequest={initialTrueFullscreenRequest}
+        htmlPreview={htmlPreview}
         handleCloseHtmlPreview={handleCloseHtmlPreview}
         handleLiveArtifactFollowUp={handleLiveArtifactFollowUp}
         configuringFile={configuringFile}

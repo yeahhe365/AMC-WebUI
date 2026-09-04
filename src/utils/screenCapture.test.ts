@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useToastStore } from '@/stores/toastStore';
 import { captureScreenImage } from './screenCapture';
 
 const originalMediaDevices = navigator.mediaDevices;
@@ -27,11 +28,10 @@ describe('captureScreenImage', () => {
       configurable: true,
       value: undefined,
     });
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
     await expect(captureScreenImage(messages)).resolves.toBeNull();
 
-    expect(alertSpy).toHaveBeenCalledWith('Screen capture unsupported.');
+    expect(useToastStore.getState().toasts.map((toast) => toast.message)).toContain('Screen capture unsupported.');
   });
 
   it('settles and stops the stream when the video fallback never becomes ready', async () => {

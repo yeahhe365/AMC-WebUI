@@ -1,15 +1,29 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { type UploadedFile } from '@/types';
 import { usePdfViewer } from '@/hooks/ui/usePdfViewer';
 import { PdfSidebar } from './pdf-viewer/PdfSidebar';
 import { PdfMainContent } from './pdf-viewer/PdfMainContent';
 import { PdfToolbar } from './pdf-viewer/PdfToolbar';
+import type { PdfNavHighlight } from '@/stores/mediaNavStore';
 
 interface PdfViewerProps {
   file: UploadedFile;
+  /** Visual-grounding box overlay (PDF navigation panel). */
+  highlight?: PdfNavHighlight | null;
+  /** External jump request; consumed via onTargetPageConsumed once scrolled to. */
+  targetPage?: number | null;
+  onTargetPageConsumed?: () => void;
+  /** Notified whenever scroll tracking lands on a different page. */
+  onCurrentPageChange?: (page: number) => void;
 }
 
-const PdfViewerContent: React.FC<PdfViewerProps> = ({ file }) => {
+const PdfViewerContent: React.FC<PdfViewerProps> = ({
+  file,
+  highlight,
+  targetPage,
+  onTargetPageConsumed,
+  onCurrentPageChange,
+}) => {
   const {
     numPages,
     currentPage,
@@ -32,6 +46,18 @@ const PdfViewerContent: React.FC<PdfViewerProps> = ({ file }) => {
     handleRotate,
     toggleSidebar,
   } = usePdfViewer(file);
+
+  useEffect(() => {
+    if (targetPage == null || !numPages) return;
+    // Pages render lazily; keep the request queued until the page exists.
+    if (scrollToPage(targetPage)) {
+      onTargetPageConsumed?.();
+    }
+  }, [targetPage, numPages, scrollToPage, onTargetPageConsumed]);
+
+  useEffect(() => {
+    onCurrentPageChange?.(currentPage);
+  }, [currentPage, onCurrentPageChange]);
 
   return (
     <div className="w-full h-full relative flex flex-row bg-gray-900 overflow-hidden select-none">
@@ -56,6 +82,7 @@ const PdfViewerContent: React.FC<PdfViewerProps> = ({ file }) => {
           onLoadError={onDocumentLoadError}
           setPageRef={setPageRef}
           containerRef={containerRef}
+          highlight={highlight}
         />
 
         <PdfToolbar

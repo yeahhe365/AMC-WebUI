@@ -19,12 +19,12 @@ describe('MessageListFooter', () => {
 
     const spacer = renderer.container.firstElementChild as HTMLDivElement | null;
 
-    expect(spacer?.style.height).toContain('52dvh');
+    expect(spacer?.style.height).toContain('52svh');
     expect(spacer?.style.height).toContain('164px');
     expect(spacer?.style.maxHeight).toContain('24rem');
     expect(spacer?.style.maxHeight).toContain('164px');
     expect(spacer?.style.height).not.toBe('85vh');
-    expect(spacer?.style.transition).toBe('');
+    expect(spacer?.style.transition).toContain('height 180ms ease-out');
     expect(spacer?.style.overflowAnchor).toBe('none');
   });
 

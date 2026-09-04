@@ -122,6 +122,19 @@ export const getSession = async (id: string): Promise<SavedChatSession | undefin
   return hydratedSession;
 };
 
+/**
+ * Lightweight session read for code that only needs the session record (title,
+ * titleSource, settings, message *text*) and not the attached file blobs.
+ *
+ * Unlike getSession this does NOT query FILES_STORE and does NOT hydrate file
+ * data onto the messages, so it stays fast even for sessions with many or large
+ * attachments. It also skips the inline-file migration write that getSession
+ * performs, so the returned session may still carry legacy inline file payloads
+ * — callers must not persist it back wholesale.
+ */
+export const getSessionMetadataOnly = async (id: string): Promise<SavedChatSession | undefined> =>
+  getItem<SavedChatSession>(SESSIONS_STORE, id);
+
 export const getAllSessions = async (): Promise<SavedChatSession[]> => {
   const sessions = await getAll<SavedChatSession>(SESSIONS_STORE);
   const hydratedSessions = await Promise.all(sessions.map((session) => getSession(session.id)));

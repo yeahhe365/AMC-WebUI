@@ -75,7 +75,7 @@ export const usePreloadedScenarios = ({
 
     const title = scenarioToLoad.title || generateSessionTitle(messages) || 'New Chat';
 
-    const newSession = createNewSession(sessionSettings, messages, title);
+    const newSession = createNewSession(sessionSettings, messages, title, null, 'manual');
 
     updateAndPersistSessions((prev) => [newSession, ...prev.filter((session) => session.id !== newSession.id)]);
     setActiveSessionId(newSession.id);

@@ -31,7 +31,6 @@ const REACT_PACKAGES = ['react', 'react-dom', 'scheduler'];
 const PDF_VIEWER_PACKAGES = ['react-pdf'];
 const PDFJS_PACKAGES = ['pdfjs-dist'];
 const GRAPHVIZ_PACKAGES = ['@viz-js/viz'];
-const DATA_PACKAGES = ['xlsx'];
 const VITE_PRELOAD_HELPER_ID = 'vite/preload-helper';
 
 export const HEAVY_PRELOAD_PATTERNS = [
@@ -45,7 +44,6 @@ export const HEAVY_PRELOAD_PATTERNS = [
   /^assets\/genai-vendor-.*\.js$/,
   /^assets\/graphviz-vendor-.*\.js$/,
   /^assets\/html2canvas\.esm-.*\.js$/,
-  /^assets\/data-vendor-.*\.js$/,
 ];
 
 const isSourcePath = (id: string, sourcePath: string) =>
@@ -108,10 +106,6 @@ export const getManualChunk = (id: string) => {
 
   if (isPackagePath(id, PDF_VIEWER_PACKAGES)) {
     return 'pdf-viewer-vendor';
-  }
-
-  if (isPackagePath(id, DATA_PACKAGES)) {
-    return 'data-vendor';
   }
 
   return undefined;

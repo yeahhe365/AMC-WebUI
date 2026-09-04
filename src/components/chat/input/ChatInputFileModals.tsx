@@ -78,6 +78,7 @@ export const ChatInputFileModals: React.FC<ChatInputFileModalsProps> = ({
             file={configuringFile}
             onSave={onSaveFileConfig}
             isGemini3={isGemini3}
+            globalMediaResolution={appSettings.mediaResolution}
           />
         </Suspense>
       )}

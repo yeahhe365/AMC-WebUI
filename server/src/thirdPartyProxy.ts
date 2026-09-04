@@ -1,26 +1,17 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
-import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
-import { isPrivateNetworkHostname } from '../../shared/privateNetwork.js';
-import { getCorsHeaders, sendJson } from './cors.js';
+import {
+  parseThirdPartyExtraHeadersHeader,
+  THIRD_PARTY_EXTRA_HEADERS_HEADER,
+} from '../../shared/thirdPartyExtraHeaders.js';
+import { sendJson } from './cors.js';
 import type { ThirdPartyProxyRoute } from './config.js';
+import { forwardUpstream, guardPublicHttpsUrl } from './proxyForward.js';
+import { runDetachedUpstream, maybeStreamWithSharedJob, type StreamJob } from './streamJobStore.js';
+import { copyProxyRequestHeaders } from './proxyHeaders.js';
 
 export const OPENAI_PROXY_PREFIX = '/api/openai';
 
-const HOP_BY_HOP_HEADERS = new Set([
-  'connection',
-  'keep-alive',
-  'proxy-authenticate',
-  'proxy-authorization',
-  'te',
-  'trailer',
-  'transfer-encoding',
-  'upgrade',
-]);
-
 const STRIPPED_PROXY_REQUEST_HEADERS = new Set([
-  ...HOP_BY_HOP_HEADERS,
   'accept-encoding',
   'content-length',
   'cookie',
@@ -33,9 +24,8 @@ const STRIPPED_PROXY_REQUEST_HEADERS = new Set([
   // route table entry). It is consumed by resolveRoute and must not leak
   // upstream.
   'x-third-party-base-url',
+  'x-third-party-extra-headers',
 ]);
-
-const STRIPPED_PROXY_RESPONSE_HEADERS = new Set([...HOP_BY_HOP_HEADERS, 'content-encoding', 'content-length']);
 
 const THIRD_PARTY_PROVIDER_HEADER = 'x-third-party-provider';
 // When the server route table has no entry for a provider (pure BYOK), the
@@ -47,19 +37,6 @@ export interface ThirdPartyProxyConfig {
   thirdPartyRoutes: Record<string, ThirdPartyProxyRoute>;
   serverKeyPriority?: boolean;
   allowedOrigins: string[];
-}
-
-function getConnectionManagedHeaders(value: string | null | undefined): Set<string> {
-  if (!value) {
-    return new Set();
-  }
-
-  return new Set(
-    value
-      .split(',')
-      .map((headerName) => headerName.trim().toLowerCase())
-      .filter((headerName) => headerName.length > 0),
-  );
 }
 
 function resolveProviderId(request: IncomingMessage): string | null {
@@ -132,28 +109,7 @@ const resolveRoute = (
 };
 
 function buildProxyHeaders(request: IncomingMessage, route: ResolvedRoute, providerId: string): Headers {
-  const headers = new Headers();
-  const connectionManagedHeaders = getConnectionManagedHeaders(
-    Array.isArray(request.headers.connection) ? request.headers.connection.join(',') : request.headers.connection,
-  );
-
-  for (const [name, value] of Object.entries(request.headers)) {
-    if (typeof value === 'undefined') {
-      continue;
-    }
-
-    const normalizedName = name.toLowerCase();
-    if (STRIPPED_PROXY_REQUEST_HEADERS.has(normalizedName) || connectionManagedHeaders.has(normalizedName)) {
-      continue;
-    }
-
-    if (Array.isArray(value)) {
-      headers.set(normalizedName, value.join(','));
-      continue;
-    }
-
-    headers.set(normalizedName, value);
-  }
+  const headers = copyProxyRequestHeaders(request, STRIPPED_PROXY_REQUEST_HEADERS);
 
   headers.set(THIRD_PARTY_PROVIDER_HEADER, providerId);
 
@@ -165,28 +121,14 @@ function buildProxyHeaders(request: IncomingMessage, route: ResolvedRoute, provi
     headers.set('x-api-key', route.apiKey);
   }
 
+  const extraHeadersHeader = request.headers[THIRD_PARTY_EXTRA_HEADERS_HEADER];
+  const extraHeadersRaw = Array.isArray(extraHeadersHeader) ? extraHeadersHeader[0] : extraHeadersHeader;
+  const extraHeaders = parseThirdPartyExtraHeadersHeader(extraHeadersRaw);
+  for (const [name, value] of Object.entries(extraHeaders)) {
+    headers.set(name, value);
+  }
+
   return headers;
-}
-
-function buildProxyResponseHeaders(
-  request: IncomingMessage,
-  upstreamResponse: Response,
-  allowedOrigins: string[],
-): Record<string, string> {
-  const responseHeaders: Record<string, string> = {};
-  const connectionManagedHeaders = getConnectionManagedHeaders(upstreamResponse.headers.get('connection'));
-
-  upstreamResponse.headers.forEach((value, key) => {
-    const normalizedName = key.toLowerCase();
-    if (STRIPPED_PROXY_RESPONSE_HEADERS.has(normalizedName) || connectionManagedHeaders.has(normalizedName)) {
-      return;
-    }
-
-    responseHeaders[normalizedName] = value;
-  });
-
-  Object.assign(responseHeaders, getCorsHeaders(request, allowedOrigins));
-  return responseHeaders;
 }
 
 export async function proxyThirdPartyRequest(
@@ -197,7 +139,6 @@ export async function proxyThirdPartyRequest(
 ): Promise<void> {
   const requestUrl = new URL(request.url || '/', 'http://localhost');
   const upstreamPath = requestUrl.pathname.slice(OPENAI_PROXY_PREFIX.length) || '/';
-  const method = request.method || 'GET';
 
   const resolved = resolveRoute(request, config.thirdPartyRoutes);
   if (resolved.error) {
@@ -215,104 +156,60 @@ export async function proxyThirdPartyRequest(
   const upstreamUrl = `${targetBase}${upstreamPath}${requestUrl.search}`;
 
   // SSRF guard: only allow https + non-private hosts from the route table.
-  try {
-    const upstream = new URL(upstreamUrl);
-    if (upstream.protocol !== 'https:') {
-      sendJson(request, response, 400, { error: 'Third-party upstream must use HTTPS.' }, config.allowedOrigins);
-      return;
-    }
-    if (isPrivateNetworkHostname(upstream.hostname)) {
-      sendJson(
-        request,
-        response,
-        400,
-        { error: `Third-party upstream host "${upstream.hostname}" is not allowed.` },
-        config.allowedOrigins,
-      );
-      return;
-    }
-  } catch {
-    sendJson(request, response, 400, { error: 'Invalid third-party upstream URL.' }, config.allowedOrigins);
+  // Embedded credentials are NOT rejected here — this path has never checked
+  // them, so the shared guard's credential check stays off to preserve the
+  // behavior exactly (the Gemini override header does enable it).
+  const upstreamGuard = guardPublicHttpsUrl(upstreamUrl);
+  if (!upstreamGuard.ok) {
+    const detail =
+      upstreamGuard.rejection === 'invalid-url'
+        ? 'Invalid third-party upstream URL.'
+        : upstreamGuard.rejection === 'insecure-protocol'
+          ? 'Third-party upstream must use HTTPS.'
+          : `Third-party upstream host "${upstreamGuard.hostname}" is not allowed.`;
+    sendJson(request, response, 400, { error: detail }, config.allowedOrigins);
     return;
   }
 
-  const hasBody = !['GET', 'HEAD'].includes(method);
-  const abortController = new AbortController();
-  const abortUpstream = () => {
-    if (!abortController.signal.aborted) {
-      abortController.abort();
-    }
-  };
-
-  const requestInit: RequestInit & { duplex?: 'half' } = {
-    method,
-    headers: buildProxyHeaders(request, route, resolved.providerId),
-    signal: abortController.signal,
-    // redirect: 'manual' so a public third-party baseUrl cannot 302 into a
-    // private network host after the input URL passed validation.
-    redirect: 'manual',
-  };
-
-  if (hasBody) {
-    requestInit.body = request as unknown as BodyInit;
-    requestInit.duplex = 'half';
-  }
-
-  request.once('aborted', abortUpstream);
-  response.once('close', abortUpstream);
-
-  let upstreamResponse: Response;
-  try {
-    upstreamResponse = await fetchImpl(upstreamUrl, requestInit);
-  } catch (error) {
-    request.off('aborted', abortUpstream);
-    response.off('close', abortUpstream);
-    if (abortController.signal.aborted) {
-      if (!response.destroyed) {
-        response.destroy();
-      }
-      return;
-    }
-
-    console.error('[third-party] upstream request failed:', error);
-    sendJson(request, response, 502, { error: 'Third-party upstream request failed.' }, config.allowedOrigins);
+  // Stream journal: when the browser sends an x-amc-job-id header on a
+  // streaming request, the upstream is buffered independently of the browser
+  // connection so a page refresh can resume from the last seq — exactly like
+  // the Gemini path. No header → ordinary pass-through (today's behavior),
+  // fully reversible. The SSE split logic (\n\n boundaries, CRLF normalization)
+  // in pumpUpstreamBodyIntoJob is provider-agnostic: OpenAI's `data: {...}\n\n`
+  // frames, the trailing `[DONE]` marker, and Anthropic's `event:`/`data:`
+  // blocks all split cleanly on \n\n and buffer as whole events.
+  if (
+    await maybeStreamWithSharedJob(request, response, { allowedOrigins: config.allowedOrigins }, (job) => {
+      void runThirdPartyUpstream(job, request, upstreamUrl, route, resolved.providerId, fetchImpl);
+    })
+  ) {
     return;
   }
 
-  if (upstreamResponse.status >= 300 && upstreamResponse.status < 400) {
-    request.off('aborted', abortUpstream);
-    response.off('close', abortUpstream);
-    console.error('[third-party] upstream returned redirect:', upstreamResponse.status);
-    sendJson(
-      request,
-      response,
-      502,
-      { error: 'Third-party upstream returned an unexpected redirect.' },
-      config.allowedOrigins,
-    );
-    return;
-  }
-
-  response.writeHead(
-    upstreamResponse.status,
-    buildProxyResponseHeaders(request, upstreamResponse, config.allowedOrigins),
-  );
-
-  if (!upstreamResponse.body) {
-    request.off('aborted', abortUpstream);
-    response.off('close', abortUpstream);
-    response.end();
-    return;
-  }
-
-  try {
-    await pipeline(Readable.fromWeb(upstreamResponse.body as unknown as NodeReadableStream), response);
-  } catch (error) {
-    if (!abortController.signal.aborted && !response.destroyed) {
-      response.destroy(error instanceof Error ? error : undefined);
-    }
-  } finally {
-    request.off('aborted', abortUpstream);
-    response.off('close', abortUpstream);
-  }
+  await forwardUpstream(request, response, {
+    upstreamUrl,
+    allowedOrigins: config.allowedOrigins,
+    fetchImpl,
+    buildHeaders: () => buildProxyHeaders(request, route, resolved.providerId),
+    logTag: '[third-party]',
+    errorLabel: 'Third-party',
+  });
 }
+
+/**
+ * Detached upstream fetch for the third-party journal path. Mirrors the Gemini
+ * runUpstream: fires the fetch on the job's abort signal (so the stream-abort
+ * endpoint can kill it), pumps the SSE body into the job buffer, and finishes
+ * the job on completion or error. A browser disconnect does NOT abort this —
+ * only the stream-abort endpoint or the sweeper does.
+ */
+const runThirdPartyUpstream = (
+  job: StreamJob,
+  request: IncomingMessage,
+  upstreamUrl: string,
+  route: ResolvedRoute,
+  providerId: string,
+  fetchImpl: typeof fetch,
+): Promise<void> =>
+  runDetachedUpstream(job, request, upstreamUrl, () => buildProxyHeaders(request, route, providerId), fetchImpl);

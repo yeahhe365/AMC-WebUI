@@ -59,3 +59,14 @@ export const splitMarkdownSegments = (value: string): MarkdownSegment[] => {
 
   return segments.filter((segment) => segment.value.length > 0);
 };
+
+/**
+ * Split a value into literal (code) and text segments, then apply `transform`
+ * only to the text segments, leaving fenced/code segments untouched. Used to
+ * rewrite markdown (e.g. thinking-block markup, math normalization) without
+ * corrupting code blocks.
+ */
+export const transformMarkdownTextSegments = (value: string, transform: (segment: string) => string): string =>
+  splitMarkdownSegments(value)
+    .map((segment) => (segment.type === 'literal' ? segment.value : transform(segment.value)))
+    .join('');

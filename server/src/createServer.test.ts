@@ -36,7 +36,39 @@ describe('createServer', () => {
 
     expect(response.status).toBe(200);
     expect(body.status).toBe('ok');
+    expect(body.capabilities).toEqual({
+      liveWsProxy: expect.any(Boolean),
+      thirdPartyProxy: expect.any(Boolean),
+      mcpStdio: false,
+      mcpPrivateHttp: false,
+    });
     expect(typeof body.timestamp).toBe('string');
+  });
+
+  it('logs the error before returning 500 when a handler throws unexpectedly', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const app = createServer(
+      {
+        geminiApiBase: 'https://generativelanguage.googleapis.com',
+        geminiApiKey: 'server-key',
+      },
+      {
+        readLocalClipboardImage: async () => {
+          throw new Error('clipboard reader exploded');
+        },
+      },
+    );
+    const started = serverCleanup.track(await startHttpServer(app));
+
+    const response = await fetch(`${started.baseUrl}/api/local-clipboard-image`);
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(500);
+    expect(body).toEqual({ error: 'Internal server error' });
+    expect(errorSpy).toHaveBeenCalled();
+    const logged = errorSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(logged).toContain('clipboard reader exploded');
+    errorSpy.mockRestore();
   });
 
   it('does not expose a Live API token endpoint', async () => {

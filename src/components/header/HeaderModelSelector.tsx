@@ -1,27 +1,20 @@
 import { useMemo, type FC } from 'react';
-import { Zap } from 'lucide-react';
-import { type ModelOption, type ThinkingLevel } from '@/types';
+import { ChevronDown } from 'lucide-react';
+import { type ModelOption, type ChatProviderId } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
 import { GoogleSpinner } from '@/components/icons/GoogleSpinner';
 import { ModelPicker } from '@/components/shared/ModelPicker';
-import { getCachedModelCapabilities } from '@/stores/modelCapabilitiesStore';
 import { FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS } from '@/constants/focusClasses';
 
 const MODEL_TRIGGER_BUTTON_CLASS = `min-h-9 flex items-center gap-2 rounded-xl px-2 sm:px-3 bg-transparent hover:bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-primary)] font-medium text-base transition-all duration-200 ease-out ${FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS} disabled:opacity-70 disabled:cursor-not-allowed border border-transparent hover:border-[var(--theme-border-secondary)] active:bg-[var(--theme-bg-tertiary)]`;
-
-const THINKING_TOGGLE_BUTTON_CLASS = `h-9 w-9 flex items-center justify-center rounded-xl transition-all duration-200 ease-out ${FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS}`;
 
 interface HeaderModelSelectorProps {
   currentModelName?: string;
   availableModels: ModelOption[];
   selectedModelId: string;
-  onSelectModel: (modelId: string) => void;
+  onSelectModel: (modelId: string, providerId?: ChatProviderId) => void;
   isSwitchingModel: boolean;
   isLoading: boolean;
-  thinkingLevel?: ThinkingLevel;
-  onSetThinkingLevel: (level: ThinkingLevel) => void;
-  showThoughts?: boolean;
-  onToggleGemmaReasoning: () => void;
 }
 
 export const HeaderModelSelector: FC<HeaderModelSelectorProps> = ({
@@ -31,10 +24,6 @@ export const HeaderModelSelector: FC<HeaderModelSelectorProps> = ({
   onSelectModel,
   isSwitchingModel,
   isLoading,
-  thinkingLevel,
-  onSetThinkingLevel,
-  showThoughts,
-  onToggleGemmaReasoning,
 }) => {
   const { t } = useI18n();
 
@@ -51,27 +40,6 @@ export const HeaderModelSelector: FC<HeaderModelSelectorProps> = ({
   }, [currentModelName, t]);
 
   const isSelectorDisabled = availableModels.length === 0 || isLoading || isSwitchingModel;
-
-  const { supportsThinkingLevel, isImageGenerationModel, isGemmaModel, isFlashModel, isGeminiRoboticsModel } =
-    getCachedModelCapabilities(selectedModelId);
-  const supportsThinkingToggle = (supportsThinkingLevel && !isImageGenerationModel) || isGemmaModel;
-
-  // Determine the target "Fast" level based on model capabilities
-  // Gemini 3 Flash models support MINIMAL thinking for maximum speed
-  // Gemini Robotics-ER 1.6 matches Flash here; other Gemini 3 models
-  // (like Pro) typically bottom out at LOW.
-  const targetFastLevel = isFlashModel || isGeminiRoboticsModel ? 'MINIMAL' : 'LOW';
-
-  // Consider it "Fast Mode" active if the current level matches the target fast level
-  const isFastState = isGemmaModel ? !showThoughts : thinkingLevel === targetFastLevel;
-  const thinkingToggleTitle = isGemmaModel
-    ? isFastState
-      ? t('headerReasoningMinimalFastTitle')
-      : t('headerReasoningHighTitle')
-    : isFastState
-      ? t(targetFastLevel === 'MINIMAL' ? 'headerThinkingMinimalFastTitle' : 'headerThinkingLowFastTitle')
-      : t('headerThinkingHighTitle');
-  const thinkingToggleAriaLabel = isGemmaModel ? t('headerReasoningToggleAria') : t('headerThinkingToggleAria');
 
   return (
     <ModelPicker
@@ -99,29 +67,15 @@ export const HeaderModelSelector: FC<HeaderModelSelectorProps> = ({
             )}
 
             <span className="truncate max-w-[180px] font-semibold sm:max-w-[220px]">{abbreviatedModelName}</span>
-          </button>
-
-          {supportsThinkingToggle && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isGemmaModel) {
-                  onToggleGemmaReasoning();
-                  return;
-                }
-                onSetThinkingLevel(isFastState ? 'HIGH' : targetFastLevel);
-              }}
-              className={`${THINKING_TOGGLE_BUTTON_CLASS} ${
-                isFastState
-                  ? 'text-yellow-500 hover:bg-[var(--theme-bg-tertiary)]'
-                  : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)]'
+            <ChevronDown
+              size={15}
+              strokeWidth={2}
+              aria-hidden
+              className={`flex-shrink-0 text-[var(--theme-text-tertiary)] transition-transform duration-200 ${
+                isOpen ? 'rotate-180' : ''
               }`}
-              title={thinkingToggleTitle}
-              aria-label={thinkingToggleAriaLabel}
-            >
-              <Zap size={18} fill={isFastState ? 'currentColor' : 'none'} strokeWidth={2} />
-            </button>
-          )}
+            />
+          </button>
         </div>
       )}
     />

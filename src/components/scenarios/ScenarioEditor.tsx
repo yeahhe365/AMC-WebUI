@@ -76,7 +76,7 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({ initialScenario,
   };
 
   return (
-    <div className="flex flex-col h-full bg-[var(--theme-bg-primary)] rounded-xl sm:rounded-2xl overflow-hidden border border-[var(--theme-border-secondary)] shadow-sm">
+    <div className="flex flex-col h-full bg-[var(--theme-bg-primary)] rounded-xl overflow-hidden border border-[var(--theme-border-secondary)]">
       <ScenarioEditorHeader
         title={scenario.title}
         setTitle={(title) => setScenario((prev) => ({ ...prev, title }))}

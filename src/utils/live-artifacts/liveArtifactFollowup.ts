@@ -1,3 +1,5 @@
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
+
 export interface LiveArtifactFollowupPayload {
   instruction: string;
   state?: unknown;
@@ -5,7 +7,7 @@ export interface LiveArtifactFollowupPayload {
   source?: string;
 }
 
-type PromptLanguage = 'en' | 'zh';
+type PromptLanguage = SupportedLanguage;
 
 const MAX_INSTRUCTION_LENGTH = 2000;
 const MAX_OPTIONAL_TEXT_LENGTH = 500;
@@ -87,24 +89,24 @@ export const formatLiveArtifactFollowupPrompt = (payload: unknown, language: Pro
     return null;
   }
 
-  if (language === 'en') {
+  if (language === 'zh') {
     return [
-      'Please continue based on the interaction selected in the Live Artifact.',
-      normalizedPayload.title ? `Artifact title:\n${normalizedPayload.title}` : null,
-      `Instruction:\n${normalizedPayload.instruction}`,
-      stateJson ? `Interaction state:\n${stateJson}` : null,
-      normalizedPayload.source ? `Source:\n${normalizedPayload.source}` : null,
+      '请根据 Live Artifact 中的交互选择继续处理。',
+      normalizedPayload.title ? `Artifact 标题：\n${normalizedPayload.title}` : null,
+      `指令：\n${normalizedPayload.instruction}`,
+      stateJson ? `交互状态：\n${stateJson}` : null,
+      normalizedPayload.source ? `来源：\n${normalizedPayload.source}` : null,
     ]
       .filter(Boolean)
       .join('\n\n');
   }
 
   return [
-    '请根据 Live Artifact 中的交互选择继续处理。',
-    normalizedPayload.title ? `Artifact 标题：\n${normalizedPayload.title}` : null,
-    `指令：\n${normalizedPayload.instruction}`,
-    stateJson ? `交互状态：\n${stateJson}` : null,
-    normalizedPayload.source ? `来源：\n${normalizedPayload.source}` : null,
+    'Please continue based on the interaction selected in the Live Artifact.',
+    normalizedPayload.title ? `Artifact title:\n${normalizedPayload.title}` : null,
+    `Instruction:\n${normalizedPayload.instruction}`,
+    stateJson ? `Interaction state:\n${stateJson}` : null,
+    normalizedPayload.source ? `Source:\n${normalizedPayload.source}` : null,
   ]
     .filter(Boolean)
     .join('\n\n');

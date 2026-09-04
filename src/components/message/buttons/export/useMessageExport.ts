@@ -1,5 +1,5 @@
 import { logService } from '@/services/logService';
-import { getErrorMessage } from '@/utils/errorMessage';
+import { toastError } from '@/stores/toastStore';
 import { useState } from 'react';
 import { type ChatMessage } from '@/types';
 import { serializeMessageForPortableExport } from '@/utils/chat/session';
@@ -7,6 +7,7 @@ import { createManagedObjectUrl } from '@/services/objectUrlManager';
 import { triggerDownload } from '@/utils/export/core';
 import { buildMessageExportFilenameBase, createExportDateMeta, loadExportRuntime } from '@/utils/export/runtime';
 import { useI18n } from '@/contexts/I18nContext';
+import { interpolate, formatI18nErrorMessage } from '@/i18n/interpolate';
 
 interface UseMessageExportProps {
   message: ChatMessage;
@@ -72,6 +73,7 @@ export const useMessageExport = ({ message, sessionTitle, messageIndex, themeId 
         const cleanedContent = await prepareElementForExport(messageContentNode, {
           expandDetails: type === 'png',
           forPng: type === 'png',
+          themeId,
         });
 
         if (type === 'png') {
@@ -82,13 +84,13 @@ export const useMessageExport = ({ message, sessionTitle, messageIndex, themeId 
             {
               title: t('exportMessageTitle'),
               metaLeft: dateLabel,
-              metaRight: t('exportMessageId').replace('{id}', shortId),
+              metaRight: interpolate(t('exportMessageId'), { id: shortId }),
             },
             {
               scale: MESSAGE_PNG_EXPORT_SCALE,
               messages: {
                 imageTooLarge: t('exportImageTooLarge'),
-                exportFailed: (message) => t('exportFailedWithMessage').replace('{message}', message),
+                exportFailed: (message) => formatI18nErrorMessage(t, 'exportFailedWithMessage', message),
               },
             },
           );
@@ -102,9 +104,9 @@ export const useMessageExport = ({ message, sessionTitle, messageIndex, themeId 
           const chatHtml = wrapper.outerHTML;
 
           const fullHtml = await buildHtmlDocument({
-            title: t('exportMessageHtmlTitle').replace('{id}', shortId),
+            title: interpolate(t('exportMessageHtmlTitle'), { id: shortId }),
             date: dateLabel,
-            model: t('exportMessageId').replace('{id}', shortId),
+            model: interpolate(t('exportMessageId'), { id: shortId }),
             contentHtml: chatHtml,
             themeId,
             language,
@@ -115,7 +117,7 @@ export const useMessageExport = ({ message, sessionTitle, messageIndex, themeId 
       } else if (type === 'txt') {
         const { exportTextStringAsFile, buildTextDocument } = await loadExportRuntime();
         const txtContent = buildTextDocument({
-          title: t('exportMessageTextTitle').replace('{id}', shortId),
+          title: interpolate(t('exportMessageTextTitle'), { id: shortId }),
           date: dateLabel,
           model: t('exportNotApplicable'),
           messages: [
@@ -137,7 +139,7 @@ export const useMessageExport = ({ message, sessionTitle, messageIndex, themeId 
       onSuccess?.();
     } catch (exportError) {
       logService.error(`Failed to export message as ${type.toUpperCase()}:`, exportError);
-      alert(t('exportFailedWithMessage').replace('{message}', getErrorMessage(exportError)));
+      toastError(formatI18nErrorMessage(t, 'exportFailedWithMessage', exportError));
     } finally {
       setExportingType(null);
     }

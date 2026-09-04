@@ -160,7 +160,7 @@ describe('useMessageUpdates', () => {
       expect.objectContaining({
         role: 'model',
         content:
-          '\n\n<div class="tool-result outcome-outcome_ok"><strong>Execution Result (OUTCOME_OK):</strong><pre><code class="language-text">42\n</code></pre></div>\n\n',
+          '\n\n<div class="tool-result outcome-ok"><pre><code class="language-text">42&#10;&#10;</code></pre></div>\n\n',
         apiParts: [part],
         isLoading: true,
       }),
@@ -211,6 +211,47 @@ describe('useMessageUpdates', () => {
         isLoading: false,
       }),
     );
+
+    unmount();
+  });
+
+  it('does not stamp a zero first-token time on a live message that arrives without text', () => {
+    let sessions: SavedChatSession[] = [
+      createSavedChatSession({
+        id: 'session-1',
+        title: 'Live Session',
+        timestamp: Date.now(),
+        messages: [],
+      }),
+    ];
+
+    const updateAndPersistSessions = vi.fn(
+      (updater: typeof sessions | ((prev: typeof sessions) => typeof sessions)) => {
+        sessions =
+          typeof updater === 'function' ? (updater as (prev: typeof sessions) => typeof sessions)(sessions) : updater;
+        return sessions;
+      },
+    );
+
+    const { result, unmount } = renderHook(() =>
+      useMessageUpdates({
+        activeSessionId: 'session-1',
+        setActiveSessionId: vi.fn(),
+        appSettings: createAppSettings(),
+        currentChatSettings: createChatSettings(),
+        updateAndPersistSessions,
+        userScrolledUpRef: { current: false },
+      }),
+    );
+
+    // Audio-first live turn: no text payload yet, so firstTokenTimeMs must not
+    // be pinned to 0 (which would make the TTFT badge jump when text arrives).
+    act(() => {
+      result.current.handleLiveTranscript('', 'model', false, 'content', 'blob:audio');
+    });
+
+    expect(sessions[0].messages[0].firstTokenTimeMs).toBeUndefined();
+    expect(sessions[0].messages[0].audioSrc).toBe('blob:audio');
 
     unmount();
   });

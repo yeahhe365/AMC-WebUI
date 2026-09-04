@@ -149,6 +149,48 @@ describe('calculateApiUsageRecordPriceUsd', () => {
     expect(calculateApiUsageRecordPriceUsd(record)).toBeCloseTo(2.325, 6);
   });
 
+  it('prices Gemini 3.7 Flash exactly when modality evidence exists (mirrors 3.6 Flash)', () => {
+    const record: ApiUsageRecord = {
+      timestamp: Date.now(),
+      modelId: 'gemini-3.7-flash',
+      promptTokens: 1_000_000,
+      cachedPromptTokens: 500_000,
+      completionTokens: 100_000,
+      totalTokens: 1_100_000,
+      exactPricing: {
+        version: 1,
+        requestKind: 'chat',
+        promptTokensDetails: [{ modality: 'TEXT', tokenCount: 1_000_000 }],
+        cacheTokensDetails: [{ modality: 'TEXT', tokenCount: 500_000 }],
+        responseTokensDetails: [{ modality: 'TEXT', tokenCount: 100_000 }],
+      },
+    };
+
+    // 1.0 * 1.5 + 0.5 * 0.15 + 0.1 * 7.5 = 1.5 + 0.075 + 0.75 = 2.325
+    expect(calculateApiUsageRecordPriceUsd(record)).toBeCloseTo(2.325, 6);
+  });
+
+  it('prices Gemini 3.8 Flash exactly when modality evidence exists (mirrors 3.7 Flash)', () => {
+    const record: ApiUsageRecord = {
+      timestamp: Date.now(),
+      modelId: 'gemini-3.8-flash',
+      promptTokens: 1_000_000,
+      cachedPromptTokens: 500_000,
+      completionTokens: 100_000,
+      totalTokens: 1_100_000,
+      exactPricing: {
+        version: 1,
+        requestKind: 'chat',
+        promptTokensDetails: [{ modality: 'TEXT', tokenCount: 1_000_000 }],
+        cacheTokensDetails: [{ modality: 'TEXT', tokenCount: 500_000 }],
+        responseTokensDetails: [{ modality: 'TEXT', tokenCount: 100_000 }],
+      },
+    };
+
+    // 1.0 * 1.5 + 0.5 * 0.15 + 0.1 * 7.5 = 1.5 + 0.075 + 0.75 = 2.325
+    expect(calculateApiUsageRecordPriceUsd(record)).toBeCloseTo(2.325, 6);
+  });
+
   it('prices Gemini 3.5 Flash-Lite exactly when modality evidence exists', () => {
     const record: ApiUsageRecord = {
       timestamp: Date.now(),

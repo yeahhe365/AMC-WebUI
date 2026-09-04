@@ -65,13 +65,13 @@ export const ScenarioMessageInput: React.FC<ScenarioMessageInputProps> = ({
           onChange={(e) => setContent(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={t('scenariosEditorContentPlaceholder')}
-          className="w-full p-4 pr-14 bg-[var(--theme-bg-input)] border border-[var(--theme-border-secondary)] rounded-2xl focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)] focus:border-transparent text-sm text-[var(--theme-text-primary)] placeholder-[var(--theme-text-tertiary)] resize-none shadow-sm transition-all"
+          className="w-full p-4 pr-14 bg-[var(--theme-bg-input)] border border-[var(--theme-border-secondary)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)] focus:border-transparent text-sm text-[var(--theme-text-primary)] placeholder-[var(--theme-text-tertiary)] resize-none transition-colors"
           rows={2}
         />
         <button
           onClick={onAdd}
           disabled={!content.trim()}
-          className="absolute right-2 bottom-2 p-2 bg-[var(--theme-bg-accent)] hover:bg-[var(--theme-bg-accent-hover)] text-[var(--theme-text-accent)] rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+          className="absolute right-2 bottom-2 p-2 bg-[var(--theme-bg-accent)] hover:bg-[var(--theme-bg-accent-hover)] text-[var(--theme-text-accent)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Send size={18} strokeWidth={2.5} />
         </button>

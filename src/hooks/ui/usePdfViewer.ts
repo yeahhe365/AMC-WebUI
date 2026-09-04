@@ -4,6 +4,7 @@ import { type UploadedFile } from '@/types';
 import { MOBILE_BREAKPOINT_PX } from '@/constants/layout';
 import { ensurePdfWorkerConfigured } from '@/utils/pdfRuntime';
 import { useI18n } from '@/contexts/I18nContext';
+import { formatI18nErrorMessage } from '@/i18n/interpolate';
 
 const PDF_TABLET_BREAKPOINT_PX = 1024;
 const INITIAL_MOBILE_SCALE = 0.6;
@@ -86,16 +87,19 @@ export const usePdfViewer = (_file: UploadedFile) => {
 
   const onDocumentLoadError = (error: Error) => {
     setIsLoading(false);
-    setError(t('pdfLoadFailedWithMessage').replace('{message}', error.message));
+    setError(formatI18nErrorMessage(t, 'pdfLoadFailedWithMessage', error.message));
     logService.error('PDF Load Error:', error);
   };
 
-  const scrollToPage = (pageNumber: number) => {
+  /** Scrolls to a page; returns false when the page element is not mounted yet. */
+  const scrollToPage = (pageNumber: number): boolean => {
     const pageElement = pageRefs.current.get(pageNumber);
     if (pageElement) {
       pageElement.scrollIntoView({ behavior: 'auto', block: 'start' });
       setCurrentPage(pageNumber);
+      return true;
     }
+    return false;
   };
 
   const previousPage = () => {

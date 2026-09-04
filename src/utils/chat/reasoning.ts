@@ -1,13 +1,18 @@
-import { splitMarkdownSegments } from '@/utils/markdownSegments';
+import { splitMarkdownSegments, transformMarkdownTextSegments } from '@/utils/markdownSegments';
 import { escapeHtml } from '@/utils/escapeHtml';
 
 const GEMMA_THOUGHT_CHANNEL_REGEX = /<\|channel(?:\|thought>|>thought\s*)([\s\S]*?)\s*<channel\|>/gi;
 const GEMMA_THOUGHT_CHANNEL_PRESENCE_REGEX = /<\|channel(?:\|thought>|>thought\s*)([\s\S]*?)\s*<channel\|>/i;
-const THINKING_BLOCK_REGEX = /<thinking>([\s\S]*?)<\/[^>]+>/gi;
-const THINKING_BLOCK_PRESENCE_REGEX = /<thinking>([\s\S]*?)<\/[^>]+>/i;
-const RAW_THINKING_BLOCK_REGEX = /<thinking>([\s\S]*?)<\/thinking>/gi;
-const RAW_OPEN_THINKING_BLOCK_REGEX = /<thinking>([\s\S]*)$/i;
-const INCOMPLETE_THINKING_BLOCK_REGEX = /<thinking>([\s\S]*?)$/i;
+// Both <thinking> (DeepSeek) and <think> (OpenAI-compatible reasoning tags)
+// spell the same block; the streaming parser in inlineThinkingParser matches
+// the same variants so extraction and streaming never disagree. RAW_* requires
+// the full closer (</thinking>) or the short one (</think>) to treat a block as
+// closed; the loose THINKING_BLOCK closer also absorbs malformed closers.
+const THINKING_BLOCK_REGEX = /<think(?:ing)?>([\s\S]*?)<\/[^>]+>/gi;
+const THINKING_BLOCK_PRESENCE_REGEX = /<think(?:ing)?>([\s\S]*?)<\/[^>]+>/i;
+const RAW_THINKING_BLOCK_REGEX = /<think(?:ing)?>([\s\S]*?)<\/think(?:ing)?>/gi;
+const RAW_OPEN_THINKING_BLOCK_REGEX = /<think(?:ing)?>([\s\S]*)$/i;
+const INCOMPLETE_THINKING_BLOCK_REGEX = /<think(?:ing)?>([\s\S]*?)$/i;
 
 const normalizeReasoningWhitespace = (text: string): string =>
   text
@@ -121,11 +126,6 @@ const createThinkingBlockMarkup = (innerContent: string, isLoading: boolean, sum
 
   return `<details${openAttribute}><summary>${escapedSummaryLabel}</summary><div>${escapedContent}</div></details>`;
 };
-
-const transformMarkdownTextSegments = (value: string, transform: (segment: string) => string): string =>
-  splitMarkdownSegments(value)
-    .map((segment) => (segment.type === 'literal' ? segment.value : transform(segment.value)))
-    .join('');
 
 export const wrapReasoningMarkup = (value: string, isLoading: boolean, summaryLabel: string): string =>
   transformMarkdownTextSegments(value, (segment) => {

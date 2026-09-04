@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_APP_SETTINGS } from '@/constants/settingsDefaults';
-import type { AppSettings } from '@/types';
+import type { AppSettings, ChatProviderId } from '@/types';
 import {
   buildFileUploadPreflight,
   checkBatchNeedsApiKey,
@@ -27,6 +27,68 @@ const makeSettings = (overrides?: Partial<AppSettings>): AppSettings => ({
   ...overrides,
 });
 
+const THIRD_PARTY_PROVIDER: ChatProviderId = 'openai';
+
+describe('third-party sessions never use the Gemini Files API', () => {
+  it('inlines text even when the text-upload preference is on', () => {
+    const settings = makeSettings({
+      filesApiConfig: { images: false, pdfs: false, audio: false, video: false, text: true },
+    });
+
+    expect(shouldUseFileApi(createFile('notes.txt', 'text/plain', 1024), settings, THIRD_PARTY_PROVIDER)).toBe(false);
+  });
+
+  it('inlines oversized text with code execution on', () => {
+    const settings = makeSettings({
+      isCodeExecutionEnabled: true,
+      isLocalPythonEnabled: false,
+    });
+
+    expect(shouldUseFileApi(createFile('big.txt', 'text/plain', 3 * 1024 * 1024), settings, THIRD_PARTY_PROVIDER)).toBe(
+      false,
+    );
+  });
+
+  it('inlines files that would otherwise exceed the inline payload cap', () => {
+    const settings = makeSettings();
+
+    expect(
+      shouldUseFileApi(createFile('huge.mp4', 'video/mp4', 101 * 1024 * 1024), settings, THIRD_PARTY_PROVIDER),
+    ).toBe(false);
+    expect(
+      getFilesRequiringFileApi(
+        [createFile('huge.txt', 'text/plain', 101 * 1024 * 1024)],
+        settings,
+        THIRD_PARTY_PROVIDER,
+      ).size,
+    ).toBe(0);
+  });
+
+  it('never asks for an API key for a third-party batch', () => {
+    const settings = makeSettings();
+    const files = [createFile('huge.txt', 'text/plain', 101 * 1024 * 1024)];
+
+    expect(checkBatchNeedsApiKey(files, settings, THIRD_PARTY_PROVIDER)).toBe(false);
+  });
+
+  // Regression: the decision must follow the SESSION providerId, not a global
+  // appSettings mode. The new policy reads only the providerId argument, so
+  // this is structurally guaranteed; the test locks the contract.
+  it('regression: inlines when the session routes third-party', () => {
+    const settings = makeSettings();
+
+    expect(shouldUseFileApi(createFile('notes.txt', 'text/plain', 1024), settings, THIRD_PARTY_PROVIDER)).toBe(false);
+  });
+
+  it('leaves the Gemini-native path unchanged when no session providerId is given', () => {
+    const settings = makeSettings({
+      filesApiConfig: { images: false, pdfs: false, audio: false, video: false, text: true },
+    });
+
+    expect(shouldUseFileApi(createFile('notes.txt', 'text/plain', 1024), settings)).toBe(true);
+  });
+});
+
 describe('file upload strategy limits', () => {
   it('preserves specific text MIME types for structured text files', () => {
     const file = createFile('dataset.csv', 'text/csv', 1024);
@@ -38,6 +100,16 @@ describe('file upload strategy limits', () => {
     const file = createFile('script.py', '', 1024);
 
     expect(getEffectiveMimeType(file)).toBe('text/x-python');
+  });
+
+  it('imports extensionless files as text/plain when the browser leaves MIME empty or generic', () => {
+    expect(getEffectiveMimeType(createFile('Dockerfile', '', 1024))).toBe('text/plain');
+    expect(getEffectiveMimeType(createFile('LICENSE', 'application/octet-stream', 1024))).toBe('text/plain');
+    expect(getEffectiveMimeType(createFile('Gemini 3.8 Flash 专项核验', '', 1024))).toBe('text/plain');
+  });
+
+  it('keeps a real media MIME type even when the filename has no suffix', () => {
+    expect(getEffectiveMimeType(createFile('photo', 'image/png', 1024))).toBe('image/png');
   });
 
   it('forces text/code files onto the Files API earlier when server-side code execution is enabled', () => {
@@ -125,6 +197,16 @@ describe('buildFileUploadPreflight', () => {
 
     expect(result.filesToUpload).toEqual([unsupported]);
     expect(result.notice).toContain('Unsupported file types: archive.rar');
+  });
+
+  it('does not flag extensionless files as unsupported', () => {
+    const settings = makeSettings();
+    const makefile = createFile('Makefile', '', 4096);
+
+    const result = buildFileUploadPreflight([makefile], settings, []);
+
+    expect(result.filesToUpload).toEqual([makefile]);
+    expect(result.notice).toBeNull();
   });
 
   it('surfaces audio MIME types that Gemini does not support', () => {

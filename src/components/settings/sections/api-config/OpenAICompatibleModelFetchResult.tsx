@@ -16,8 +16,8 @@ export const OpenAICompatibleModelFetchResult: React.FC<OpenAICompatibleModelFet
 
   const resultClass =
     status === 'success'
-      ? 'border-green-500/20 bg-green-500/10 text-green-600'
-      : 'border-red-500/20 bg-red-500/10 text-red-600';
+      ? 'border-[var(--theme-text-success)]/25 bg-[var(--theme-bg-success)] text-[var(--theme-text-success)]'
+      : 'border-[var(--theme-text-danger)]/25 bg-[var(--theme-bg-danger)] text-[var(--theme-text-danger)]';
 
   return (
     <div

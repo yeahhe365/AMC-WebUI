@@ -86,11 +86,11 @@ describe('vite.config runtime ownership', () => {
     const config = fs.readFileSync(viteConfigPath, 'utf8');
     const staticAssets = fs.readFileSync(viteStaticAssetsPath, 'utf8');
 
-    expect(staticAssets).toContain(
+    expect(staticAssets).toContain("const PDF_WORKER_COPY_SOURCE = 'node_modules/pdfjs-dist/build/pdf.worker.min.mjs'");
+    expect(config).toContain('src: PDF_WORKER_COPY_SOURCE');
+    expect(staticAssets).not.toContain(
       "const PDF_WORKER_COPY_SOURCE = 'node_modules/react-pdf/node_modules/pdfjs-dist/build/pdf.worker.min.mjs'",
     );
-    expect(config).toContain('src: PDF_WORKER_COPY_SOURCE');
-    expect(staticAssets).not.toContain("src: 'node_modules/pdfjs-dist/build/pdf.worker.min.mjs'");
   });
 
   it('centralizes PDF worker runtime configuration', () => {
@@ -339,13 +339,7 @@ describe('Runtime loading boundaries', () => {
 
     expect(audioApiSource).not.toMatch(/import\s+\{\s*ThinkingLevel/);
     expect(localPythonToolSource).not.toMatch(/import\s+\{\s*Type/);
-    expectTypeImportFrom(audioApiSource, '@google/genai', [
-      'GenerateContentConfig',
-      'Part',
-      'ThinkingConfig',
-      'ThinkingLevel',
-      'UsageMetadata',
-    ]);
+    expectTypeImportFrom(audioApiSource, '@google/genai', ['GenerateContentResponse', 'Part', 'UsageMetadata']);
     expectTypeImportFrom(localPythonToolSource, '@google/genai', ['FunctionDeclaration', 'Type']);
   });
 

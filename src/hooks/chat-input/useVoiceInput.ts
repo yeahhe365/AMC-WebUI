@@ -4,14 +4,12 @@ import { prepareAudioForGeminiTranscription } from '@/features/audio/audioCompre
 import { useRecorder } from '@/hooks/core/useRecorder';
 import { useTextAreaInsert } from '@/hooks/useTextAreaInsert';
 import { useI18n } from '@/contexts/I18nContext';
+import { formatI18nErrorMessage } from '@/i18n/interpolate';
 
 interface UseVoiceInputProps {
   onTranscribeAudio: (file: File) => Promise<string | null>;
   setInputText: Dispatch<SetStateAction<string>>;
   setAppFileError?: (error: string | null) => void;
-  /** @deprecated Voice input always converts to a Gemini-supported format; kept for call-site compatibility. */
-  isAudioCompressionEnabled?: boolean;
-  isSystemAudioRecordingEnabled?: boolean;
   textareaRef: RefObject<HTMLTextAreaElement>;
 }
 
@@ -25,21 +23,12 @@ export const useVoiceInput = ({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isFinalizingRecording, setIsFinalizingRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [systemAudioWarning, setSystemAudioWarning] = useState<string | null>(null);
   const insertText = useTextAreaInsert(textareaRef, setInputText);
 
   const reportError = useCallback(
     (message: string | null) => {
       setError(message);
       setAppFileError?.(message);
-    },
-    [setAppFileError],
-  );
-
-  const reportSystemAudioWarning = useCallback(
-    (warning: string | null) => {
-      setSystemAudioWarning(warning);
-      setAppFileError?.(warning);
     },
     [setAppFileError],
   );
@@ -60,7 +49,7 @@ export const useVoiceInput = ({
         } catch (error) {
           logService.error('Error processing/transcribing audio:', error);
           const message = error instanceof Error ? error.message : t('voiceInputFailed');
-          reportError(t('voiceInputFailedWithMessage').replace('{message}', message));
+          reportError(formatI18nErrorMessage(t, 'voiceInputFailedWithMessage', message));
         } finally {
           setIsTranscribing(false);
           setIsFinalizingRecording(false);
@@ -75,8 +64,10 @@ export const useVoiceInput = ({
   const { status, isInitializing, startRecording, stopRecording, cancelRecording } = useRecorder({
     onStop: handleRecordingComplete,
     onError: reportError,
-    onSystemAudioWarning: reportSystemAudioWarning,
     permissionErrorMessage: t('voiceInputPermissionError'),
+    // The input-bar path predates the recorder's speech enhancement and its
+    // transcription prompts were tuned against the unprocessed signal.
+    enhanceSpeech: false,
   });
 
   const isRecording = status === 'recording';
@@ -88,14 +79,12 @@ export const useVoiceInput = ({
       stopRecording();
     } else {
       reportError(null);
-      reportSystemAudioWarning(null);
-      startRecording({ captureSystemAudio: false });
+      startRecording();
     }
   };
 
   const handleCancelRecording = () => {
     setIsFinalizingRecording(false);
-    reportSystemAudioWarning(null);
     cancelRecording();
   };
 
@@ -104,7 +93,6 @@ export const useVoiceInput = ({
     isTranscribing: isBusy,
     isMicInitializing: isInitializing,
     error,
-    systemAudioWarning,
     handleVoiceInputClick,
     handleCancelRecording,
   };

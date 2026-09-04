@@ -1,4 +1,5 @@
 import { logService } from '@/services/logService';
+import { toastError } from '@/stores/toastStore';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 
@@ -102,12 +103,12 @@ export const exportElementAsPng = async (
       return true;
     } else {
       logService.error('Canvas to Blob conversion failed (Result is null). The chat may be too long.');
-      alert(options.messages.imageTooLarge);
+      toastError(options.messages.imageTooLarge);
       return false;
     }
   } catch (error) {
     logService.error('html2canvas error:', error);
-    alert(options.messages.exportFailed(getErrorMessage(error)));
+    toastError(options.messages.exportFailed(getErrorMessage(error)));
     return false;
   }
 };

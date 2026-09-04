@@ -1,8 +1,10 @@
 import React from 'react';
 import { type ChatMessage, type UploadedFile, type SideViewContent } from '@/types';
+import type { OpenHtmlPreviewHandler } from '@/utils/html-preview/previewPrivilege';
 import { MessageContent } from './MessageContent';
 import { MessageActions } from './MessageActions';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { CHAT_USER_MESSAGE_INSET_CLASS } from '@/constants/layout';
 import type { LiveArtifactFollowupPayload } from '@/utils/live-artifacts/liveArtifactFollowup';
 import type { UserMessageCollapseController } from './content/userMessageCollapse';
 
@@ -15,7 +17,7 @@ interface MessageProps {
   onDeleteMessage: (messageId: string) => void;
   onRetryMessage: (messageId: string) => void;
   onImageClick: (file: UploadedFile) => void;
-  onOpenHtmlPreview: (html: string, options?: { initialTrueFullscreen?: boolean }) => void;
+  onOpenHtmlPreview: OpenHtmlPreviewHandler;
   onLiveArtifactFollowUp?: (payload: LiveArtifactFollowupPayload) => void;
   showThoughts: boolean;
   onContinueGeneration: (messageId: string) => void;
@@ -48,7 +50,7 @@ export const Message: React.FC<MessageProps> = React.memo((props) => {
 
   const widthConstraints =
     message.role === 'user'
-      ? 'max-w-[80%] sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl'
+      ? `${CHAT_USER_MESSAGE_INSET_CLASS} max-w-[80%] sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl`
       : 'max-w-[calc(100%-2.5rem)] sm:max-w-3xl lg:max-w-4xl xl:max-w-5xl';
 
   let bubbleClasses = `flex flex-col min-w-0 transition-all duration-200 ${widthConstraints} message-content-container `;

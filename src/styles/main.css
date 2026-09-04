@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 
+/* `dark:` utilities follow the in-app theme (dark class applied by themeDom.ts),
+   not the OS prefers-color-scheme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Base Variables & Reset */
 :root {
   /* Apple-style spring easing for premium feel */
@@ -119,6 +123,29 @@ body {
 .fade-mask-x {
   -webkit-mask-image: linear-gradient(to right, transparent, black 10px, black calc(100% - 10px), transparent);
   mask-image: linear-gradient(to right, transparent, black 10px, black calc(100% - 10px), transparent);
+}
+
+/* Directional fade masks for horizontal scroll lists — applied per active edge
+   so only the side that actually hides content fades (reads as "scrollable",
+   not "broken"). Deeper than the old static 10px mask. */
+.fade-mask-x-r {
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+}
+.fade-mask-x-l {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 24px);
+  mask-image: linear-gradient(to right, transparent, black 24px);
+}
+.fade-mask-x-both {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);
+}
+
+/* Fade Mask for vertical lists — bottom edge only, applied while content
+   remains below the fold (removed at scroll end so the last row stays crisp). */
+.fade-mask-y-b {
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 16px), transparent);
+  mask-image: linear-gradient(to bottom, black calc(100% - 16px), transparent);
 }
 
 /* Settings sidebar search — drop native search chrome */

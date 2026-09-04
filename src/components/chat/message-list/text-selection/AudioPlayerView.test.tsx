@@ -78,6 +78,35 @@ describe('AudioPlayerView', () => {
     expect(renderer.container.querySelector('[data-audio-time-group]')?.className).not.toContain('border');
   });
 
+  it('explicitly starts playback when metadata loads after async TTS', async () => {
+    const audioRef = { current: null } as React.RefObject<HTMLAudioElement>;
+    const play = vi.fn().mockResolvedValue(undefined);
+
+    await act(async () => {
+      renderer.render(
+        <AudioPlayerView
+          audioUrl="blob:quick-tts"
+          isLoading={false}
+          audioRef={audioRef}
+          onDragStart={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+    });
+
+    const audio = renderer.container.querySelector('audio');
+    expect(audio).not.toBeNull();
+    Object.defineProperty(audio, 'play', { configurable: true, value: play });
+    Object.defineProperty(audio, 'duration', { configurable: true, value: 12 });
+    Object.defineProperty(audio, 'paused', { configurable: true, value: true });
+
+    await act(async () => {
+      audio?.dispatchEvent(new Event('loadedmetadata'));
+    });
+
+    expect(play).toHaveBeenCalled();
+  });
+
   it('uses the same Google spinner as the thinking module while generating audio', async () => {
     const audioRef = { current: null } as React.RefObject<HTMLAudioElement>;
 

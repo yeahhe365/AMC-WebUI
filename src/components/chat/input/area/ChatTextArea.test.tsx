@@ -110,9 +110,47 @@ describe('ChatTextArea', () => {
       'textarea[data-chat-input-textarea="true"]',
     );
 
-    expect(shadowTextarea?.style.padding).toBe('2px 0.25rem 0px');
+    expect(shadowTextarea?.style.padding).toBe('2px 2.25rem 0px 0.25rem');
     expect(visibleTextarea?.style.height).toBe('26px');
     expect(visibleTextarea?.className).toContain('pt-0.5');
     expect(visibleTextarea?.className).toContain('pb-0');
+  });
+
+  it('preserves the caret when the parent writes a matching longer value back into the textarea', () => {
+    const textareaRef = { current: null } as React.RefObject<HTMLTextAreaElement>;
+    const renderTextArea = (value: string) =>
+      renderer.root.render(
+        <ChatTextArea
+          textareaRef={textareaRef}
+          value={value}
+          onChange={() => {}}
+          onKeyDown={() => {}}
+          onPaste={() => {}}
+          onCompositionStart={() => {}}
+          onCompositionEnd={() => {}}
+          placeholder="Ask anything"
+          disabled={false}
+          isFullscreen={false}
+          isMobile={false}
+          initialTextareaHeight={44}
+          isConverting={false}
+        />,
+      );
+
+    act(() => {
+      renderTextArea('hello world');
+    });
+
+    const textarea = renderer.container.querySelector<HTMLTextAreaElement>('textarea[data-chat-input-textarea="true"]');
+    expect(textarea).not.toBeNull();
+
+    act(() => {
+      textarea?.setSelectionRange(5, 5);
+      renderTextArea('hello world!');
+    });
+
+    expect(textarea?.selectionStart).toBe(5);
+    expect(textarea?.selectionEnd).toBe(5);
+    expect(textarea?.value).toBe('hello world!');
   });
 });

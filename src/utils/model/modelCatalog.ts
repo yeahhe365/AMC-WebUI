@@ -1,7 +1,7 @@
 import type { ApiMode, ModelOption } from '@/types';
 import { getModelCapabilities, isGeminiRoboticsModel } from './modelCapabilities';
 import { sortModels } from './modelSorting';
-import { THIRD_PARTY_PROVIDER_IDS, THIRD_PARTY_PROVIDER_LABELS } from '@/utils/thirdPartyApiProviders';
+import { THIRD_PARTY_PROVIDER_LABELS, THIRD_PARTY_TEMPLATE_LABELS } from '@/utils/thirdPartyApiProviders';
 
 type ModelCatalogGroup = 'pinned' | 'standard';
 type ModelCatalogCategory = 'text' | 'live' | 'tts' | 'image' | 'robotics' | 'other';
@@ -13,9 +13,11 @@ interface ModelCatalogSection {
   key: string;
   providerKey?: ModelCatalogProviderKey;
   label?: string;
+  unavailable?: boolean;
+  missingApiKey?: boolean;
 }
 
-interface ModelCatalogEntry {
+export interface ModelCatalogEntry {
   badgeKeys: ModelBadgeKey[];
   category: ModelCatalogCategory;
   group: ModelCatalogGroup;
@@ -119,7 +121,7 @@ export const buildModelCatalogSections = (entries: ModelCatalogEntry[]): ModelCa
   const hasProviderSections = entries.some((entry) => entry.model.apiMode);
   if (hasProviderSections) {
     const sections: ModelCatalogSection[] = [];
-    const baseProviderOrder: ModelCatalogProviderKey[] = ['gemini-native', 'openai-compatible'];
+    const baseProviderOrder: ModelCatalogProviderKey[] = ['gemini-native'];
 
     baseProviderOrder.forEach((providerKey) => {
       const providerEntries = entries.filter((entry) => entry.model.apiMode === providerKey);
@@ -132,23 +134,30 @@ export const buildModelCatalogSections = (entries: ModelCatalogEntry[]): ModelCa
     // Qwen ... stay distinguishable instead of collapsing into one merged bucket.
     const thirdPartyEntries = entries.filter((entry) => entry.model.apiMode === 'third-party');
     if (thirdPartyEntries.length > 0) {
-      THIRD_PARTY_PROVIDER_IDS.forEach((providerId) => {
-        const providerEntries = thirdPartyEntries.filter((entry) => entry.model.providerId === providerId);
-        if (providerEntries.length > 0) {
-          sections.push({
-            key: `third-party:${providerId}`,
-            providerKey: 'third-party',
-            label: THIRD_PARTY_PROVIDER_LABELS[providerId],
-            entries: providerEntries,
-          });
+      const seenConnectionIds = new Set<string>();
+      for (const entry of thirdPartyEntries) {
+        const connectionId = entry.model.providerId;
+        if (!connectionId || seenConnectionIds.has(connectionId)) {
+          continue;
         }
-      });
+        seenConnectionIds.add(connectionId);
+        const providerEntries = thirdPartyEntries.filter((candidate) => candidate.model.providerId === connectionId);
+        const label =
+          providerEntries[0]?.model.connectionName ||
+          THIRD_PARTY_PROVIDER_LABELS[connectionId as keyof typeof THIRD_PARTY_PROVIDER_LABELS] ||
+          THIRD_PARTY_TEMPLATE_LABELS[connectionId as keyof typeof THIRD_PARTY_TEMPLATE_LABELS] ||
+          connectionId;
+        sections.push({
+          key: `third-party:${connectionId}`,
+          providerKey: 'third-party',
+          label,
+          unavailable: providerEntries.every((candidate) => candidate.model.unavailable),
+          missingApiKey: providerEntries.some((candidate) => candidate.model.missingApiKey),
+          entries: providerEntries,
+        });
+      }
 
-      // Defensive: any third-party entries whose providerId is missing/unknown.
-      const knownProviders = new Set<string>(THIRD_PARTY_PROVIDER_IDS);
-      const orphanEntries = thirdPartyEntries.filter(
-        (entry) => !entry.model.providerId || !knownProviders.has(entry.model.providerId),
-      );
+      const orphanEntries = thirdPartyEntries.filter((entry) => !entry.model.providerId);
       if (orphanEntries.length > 0) {
         sections.push({ key: 'third-party', providerKey: 'third-party', entries: orphanEntries });
       }
@@ -177,10 +186,6 @@ export const buildModelCatalogSections = (entries: ModelCatalogEntry[]): ModelCa
 };
 
 export const getModelProviderSectionLabelKey = (providerKey: ModelCatalogProviderKey): string => {
-  if (providerKey === 'openai-compatible') {
-    return 'modelPickerProviderOpenAICompatible';
-  }
-
   if (providerKey === 'third-party') {
     return 'modelPickerProviderThirdParty';
   }
@@ -188,10 +193,19 @@ export const getModelProviderSectionLabelKey = (providerKey: ModelCatalogProvide
   return 'modelPickerProviderGemini';
 };
 
-export const getQuickSwitchModelIds = (models: ModelOption[]): string[] =>
-  buildModelCatalog(models).map((entry) => entry.id);
+/**
+ * Model ids for the Tab-cycle quick switch. Deduplicated by bare id keeping the
+ * first occurrence (Gemini models come first in the merged list, then providers
+ * in fixed order), matching the route-inference order. Known limitation: two
+ * providers exposing the same model id cannot be told apart in the Tab cycle —
+ * the cycle only reaches the first one. Point-to-point picks in the header
+ * carry an explicit providerId and are not affected.
+ */
+export const getQuickSwitchModelIds = (models: ModelOption[]): string[] => [
+  ...new Set(buildModelCatalog(models).map((entry) => entry.id)),
+];
 
-const DEFAULT_TAB_CYCLE_MODEL_IDS = ['gemini-3.1-pro-preview', 'gemini-3.6-flash'] as const;
+const DEFAULT_TAB_CYCLE_MODEL_IDS = ['gemini-3.1-pro-preview', 'gemini-3.8-flash'] as const;
 
 export const getTabCycleModelIds = (models: ModelOption[], configuredIds?: string[]): string[] => {
   const orderedIds = getQuickSwitchModelIds(models);

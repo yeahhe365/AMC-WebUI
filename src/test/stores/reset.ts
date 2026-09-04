@@ -5,6 +5,7 @@ import { useModelPreferencesStore } from '@/stores/modelPreferencesStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useSettingsUiStore } from '@/stores/settingsUiStore';
 import { useUIStore } from '@/stores/uiStore';
+import { useMcpRuntimeStore } from '@/stores/mcpRuntimeStore';
 
 const initialSettingsState = useSettingsStore.getState();
 const initialChatState = useChatStore.getState();
@@ -12,6 +13,7 @@ const initialChatDraftState = useChatDraftStore.getState();
 const initialSettingsUiState = useSettingsUiStore.getState();
 const initialModelPreferencesState = useModelPreferencesStore.getState();
 const initialUiState = useUIStore.getState();
+const initialMcpRuntimeState = useMcpRuntimeStore.getState();
 
 export const resetSettingsStoreState = () => {
   useSettingsStore.setState({
@@ -46,7 +48,6 @@ export const resetChatStoreState = () => {
     aspectRatio: initialChatState.aspectRatio,
     imageSize: initialChatState.imageSize,
     imageOutputMode: initialChatState.imageOutputMode,
-    personGeneration: initialChatState.personGeneration,
     isSwitchingModel: initialChatState.isSwitchingModel,
     _activeJobs: initialChatState._activeJobs,
     _userScrolledUp: initialChatState._userScrolledUp,
@@ -76,6 +77,10 @@ export const resetAllStoreState = () => {
     mobileHistorySidebarOpen: initialUiState.mobileHistorySidebarOpen,
     isLogViewerOpen: initialUiState.isLogViewerOpen,
     chatInputHeight: initialUiState.chatInputHeight,
+  });
+  useMcpRuntimeStore.setState({
+    masterEnabled: initialMcpRuntimeState.masterEnabled,
+    selectedServerIds: initialMcpRuntimeState.selectedServerIds,
   });
 };
 

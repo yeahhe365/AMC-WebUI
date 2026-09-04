@@ -2,6 +2,7 @@ import { logService } from '@/services/logService';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 import { triggerDownload } from '@/utils/export/core';
+import { normalizeConvertedMarkdown } from '@/utils/normalizeConvertedMarkdown';
 import {
   createInlineImagePlaceholder,
   extractInlineImagePlaceholders,
@@ -11,6 +12,9 @@ import { isImageMimeType } from '@/utils/file/fileTypeClassification';
 import { CREATE_TEXT_FILE_EDITOR_LAST_EXTENSION_KEY } from '@/constants/storageKeys';
 import { useI18n } from '@/contexts/I18nContext';
 import { CREATE_FILE_EXTENSION_OPTIONS } from './createFileExtensionOptions';
+import { composeCreateFileName } from './composeCreateFileName';
+import { deriveDefaultFilename } from './deriveDefaultFilename';
+import { getClipboardPastePlan } from './createFileClipboard';
 
 interface UseCreateFileEditorProps {
   initialContent: string;
@@ -22,6 +26,29 @@ interface UseCreateFileEditorProps {
 
 const EDITOR_CONTENT_DEBOUNCE_MS = 300;
 const EDITOR_FOCUS_DELAY_MS = 100;
+
+const readStoredCreateFileExtension = (): string | null => {
+  try {
+    if (typeof window === 'undefined') return null;
+    const storedExtension = window.localStorage.getItem(CREATE_TEXT_FILE_EDITOR_LAST_EXTENSION_KEY);
+    if (storedExtension && CREATE_FILE_EXTENSION_OPTIONS.includes(storedExtension)) {
+      return storedExtension;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+};
+
+const writeStoredCreateFileExtension = (nextExtension: string) => {
+  try {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(CREATE_TEXT_FILE_EDITOR_LAST_EXTENSION_KEY, nextExtension);
+  } catch {
+    // Ignore quota / private-mode failures; the in-memory selection still applies.
+  }
+};
 
 export const useCreateFileEditor = ({
   initialContent,
@@ -39,43 +66,44 @@ export const useCreateFileEditor = ({
   const [debouncedEditorContent, setDebouncedEditorContent] = useState(initialInlineImagesRef.current.editorContent);
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const [filenameBase, setFilenameBase] = useState(() => {
-    if (!initialFilename) return '';
-    const lastDotIndex = initialFilename.lastIndexOf('.');
-    if (lastDotIndex === -1) return initialFilename;
-    return initialFilename.substring(0, lastDotIndex);
-  });
+  const initialFilenameBase = !initialFilename
+    ? ''
+    : initialFilename.lastIndexOf('.') === -1
+      ? initialFilename
+      : initialFilename.substring(0, initialFilename.lastIndexOf('.'));
 
-  const [extension, setExtension] = useState(() => {
+  const [filenameBase, setFilenameBase] = useState(initialFilenameBase);
+
+  const initialExtension = useMemo(() => {
     if (!initialFilename) {
-      if (typeof window !== 'undefined') {
-        const storedExtension = window.localStorage.getItem(CREATE_TEXT_FILE_EDITOR_LAST_EXTENSION_KEY);
-        if (storedExtension && CREATE_FILE_EXTENSION_OPTIONS.includes(storedExtension)) {
-          return storedExtension;
-        }
-      }
-      return '.md';
+      return readStoredCreateFileExtension() || '.md';
     }
     const lastDotIndex = initialFilename.lastIndexOf('.');
     if (lastDotIndex === -1) return '.md';
-    const ext = initialFilename.substring(lastDotIndex);
-    return ext;
-  });
+    return initialFilename.substring(lastDotIndex);
+  }, [initialFilename]);
+
+  const [extension, setExtension] = useState(initialExtension);
 
   const handleSetExtension = useCallback((nextExtension: string) => {
     setExtension(nextExtension);
-
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(CREATE_TEXT_FILE_EDITOR_LAST_EXTENSION_KEY, nextExtension);
-    }
+    writeStoredCreateFileExtension(nextExtension);
   }, []);
 
   const isEditing = initialFilename !== '';
   const isPdf = extension === '.pdf';
   const supportsRichPreview = ['.md', '.markdown', '.pdf'].includes(extension);
+
+  const derivedFilename = useMemo(() => deriveDefaultFilename(textContent), [textContent]);
+
+  const isDirty =
+    textContent !== initialInlineImagesRef.current.editorContent ||
+    filenameBase !== initialFilenameBase ||
+    extension !== initialExtension;
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedEditorContent(textContent), EDITOR_CONTENT_DEBOUNCE_MS);
@@ -83,54 +111,67 @@ export const useCreateFileEditor = ({
   }, [textContent]);
 
   const debouncedContent = useMemo(
-    () => resolveInlineImagePlaceholders(debouncedEditorContent, imagePlaceholdersRef.current),
+    () =>
+      resolveInlineImagePlaceholders(normalizeConvertedMarkdown(debouncedEditorContent), imagePlaceholdersRef.current),
     [debouncedEditorContent],
   );
 
   const generatePdfBlob = async (filename: string): Promise<Blob> =>
     (await import('@/utils/export/markdownPdf')).createMarkdownPdfBlob(
-      resolveInlineImagePlaceholders(textContent, imagePlaceholdersRef.current),
+      resolveInlineImagePlaceholders(normalizeConvertedMarkdown(textContent), imagePlaceholdersRef.current),
       {
         filename,
         themeId,
       },
     );
 
-  const handleSave = async (isProcessing: boolean) => {
-    if (isProcessing) return;
+  const saveLockRef = useRef(false);
 
-    let finalName = filenameBase.trim() || `file-${Date.now()}`;
-    if (!finalName.endsWith(extension)) {
-      finalName += extension;
-    }
+  const handleSave = async () => {
+    if (saveLockRef.current || isExportingPdf) return;
+    if (!textContent.trim()) return;
+
+    saveLockRef.current = true;
+    const finalName = composeCreateFileName(filenameBase, derivedFilename, extension);
 
     if (isPdf) {
       setIsExportingPdf(true);
+      setPdfError(null);
       try {
         const pdfBlob = await generatePdfBlob(finalName);
         onConfirm(pdfBlob, finalName);
       } catch (error) {
         logService.error('PDF generation error:', error);
-        alert(t('createTextPdfError'));
+        setPdfError(t('createTextPdfError'));
+        saveLockRef.current = false;
       } finally {
         setIsExportingPdf(false);
       }
     } else {
-      onConfirm(resolveInlineImagePlaceholders(textContent, imagePlaceholdersRef.current), finalName);
+      onConfirm(
+        resolveInlineImagePlaceholders(normalizeConvertedMarkdown(textContent), imagePlaceholdersRef.current),
+        finalName,
+      );
     }
   };
 
   const handleDownloadPdf = async () => {
+    if (saveLockRef.current || isExportingPdf) return;
+    if (!textContent.trim()) return;
+
+    saveLockRef.current = true;
     setIsExportingPdf(true);
-    const finalName = `${filenameBase.trim() || 'document'}.pdf`;
+    setPdfError(null);
+    const finalName = composeCreateFileName(filenameBase, derivedFilename, '.pdf', 'document');
 
     try {
       const pdfBlob = await generatePdfBlob(finalName);
       triggerDownload(createManagedObjectUrl(pdfBlob), finalName);
     } catch (error) {
       logService.error('PDF Export failed:', error);
-      alert(t('createTextPdfError'));
+      setPdfError(t('createTextPdfError'));
     } finally {
+      saveLockRef.current = false;
       setIsExportingPdf(false);
     }
   };
@@ -160,60 +201,59 @@ export const useCreateFileEditor = ({
         }, 50);
       }
     };
+    reader.onerror = () => {
+      logService.error('Failed to read pasted image.');
+    };
     reader.readAsDataURL(file);
   }, []);
 
   const handlePaste = useCallback(
     (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
       const textarea = textareaRef.current;
-      const items = event.clipboardData?.items;
+      const plan = getClipboardPastePlan(event.clipboardData, isPasteRichTextAsMarkdownEnabled);
+      const start = textarea ? textarea.selectionStart : textContent.length;
+      const end = textarea ? textarea.selectionEnd : textContent.length;
 
-      if (items) {
-        for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
-          const item = items[itemIndex];
-          if (isImageMimeType(item.type)) {
-            const file = item.getAsFile();
-            if (file) {
-              event.preventDefault();
-              const start = textarea ? textarea.selectionStart : textContent.length;
-              const end = textarea ? textarea.selectionEnd : textContent.length;
-              insertImageFile(file, start, end);
-              return;
-            }
-          }
-        }
+      if (plan.kind === 'image') {
+        event.preventDefault();
+        insertImageFile(plan.file, start, end);
+        return;
       }
 
-      if (isPasteRichTextAsMarkdownEnabled !== false) {
-        const htmlContent = event.clipboardData.getData('text/html');
-        if (htmlContent && /<[a-z][\s\S]*>/i.test(htmlContent)) {
-          event.preventDefault();
-          const start = textarea ? textarea.selectionStart : textContent.length;
-          const end = textarea ? textarea.selectionEnd : textContent.length;
+      if (plan.kind !== 'html') return;
 
-          void (async () => {
-            const { convertHtmlToMarkdown } = await import('@/utils/htmlToMarkdown');
-            const markdown = convertHtmlToMarkdown(htmlContent);
-            if (markdown && textarea) {
-              const newValue = textContent.substring(0, start) + markdown + textContent.substring(end);
-              setTextContent(newValue);
-              setTimeout(() => {
-                textarea.focus();
-                textarea.setSelectionRange(start + markdown.length, start + markdown.length);
-              }, 0);
-            }
-          })();
-          return;
-        }
-      }
+      event.preventDefault();
+      const { html, plain } = plan;
+
+      void (async () => {
+        const { convertHtmlToMarkdown } = await import('@/utils/htmlToMarkdown');
+        const markdown = convertHtmlToMarkdown(html);
+        const insertion = markdown.trim() ? markdown : plain;
+        if (!insertion || !textarea) return;
+
+        const extracted = extractInlineImagePlaceholders(insertion, nextImageIndexRef.current);
+        extracted.placeholders.forEach((dataUrl, placeholder) => {
+          imagePlaceholdersRef.current.set(placeholder, dataUrl);
+        });
+        nextImageIndexRef.current = extracted.nextIndex;
+
+        setTextContent((previousContent) => {
+          const safeStart = Math.min(start, previousContent.length);
+          const safeEnd = Math.min(end, previousContent.length);
+          return previousContent.substring(0, safeStart) + extracted.editorContent + previousContent.substring(safeEnd);
+        });
+        setTimeout(() => {
+          textarea.focus();
+          const cursor = start + extracted.editorContent.length;
+          textarea.setSelectionRange(cursor, cursor);
+        }, 0);
+      })();
     },
     [isPasteRichTextAsMarkdownEnabled, insertImageFile, textContent],
   );
 
   const handleDrop = useCallback(
-    (event: React.DragEvent, isDragging: boolean) => {
-      if (!isDragging) return;
-
+    (event: React.DragEvent) => {
       const items = event.dataTransfer.items;
       let file: File | null = null;
 
@@ -278,6 +318,9 @@ export const useCreateFileEditor = ({
     isPreviewMode,
     setIsPreviewMode,
     isExportingPdf,
+    pdfError,
+    derivedFilename,
+    isDirty,
     textareaRef,
     isEditing,
     isPdf,

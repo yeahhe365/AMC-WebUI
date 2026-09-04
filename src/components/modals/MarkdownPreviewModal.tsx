@@ -5,6 +5,7 @@ import { IconMarkdown } from '@/components/icons';
 import { type UploadedFile } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
 import { Modal } from '@/components/shared/Modal';
+import { ConfirmationModal } from './ConfirmationModal';
 import { MarkdownFileViewer } from '@/components/shared/file-preview/MarkdownFileViewer';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
@@ -52,10 +53,32 @@ export const MarkdownPreviewModal: React.FC<MarkdownPreviewModalProps> = ({
   const savedName = file?.name || '';
   const hasUnsavedChanges = isEditing && (editedContent !== savedContent || editedName !== savedName);
 
-  const confirmDiscardChanges = useCallback(() => {
-    if (!hasUnsavedChanges) return true;
-    return window.confirm(t('filePreviewDiscardUnsavedChanges'));
-  }, [hasUnsavedChanges, t]);
+  const [pendingDiscardAction, setPendingDiscardAction] = useState<'close' | 'exit-edit' | null>(null);
+
+  const runDiscardAction = useCallback(
+    (action: 'close' | 'exit-edit') => {
+      if (action === 'close') {
+        onClose();
+        return;
+      }
+      setEditedName(file?.name ?? '');
+      setEditedContent(loadedContent || file?.textContent || '');
+      setIsEditing(false);
+    },
+    [file, loadedContent, onClose],
+  );
+
+  const requestDiscard = useCallback(
+    (action: 'close' | 'exit-edit') => {
+      if (pendingDiscardAction !== null) return;
+      if (!hasUnsavedChanges) {
+        runDiscardAction(action);
+        return;
+      }
+      setPendingDiscardAction(action);
+    },
+    [hasUnsavedChanges, pendingDiscardAction, runDiscardAction],
+  );
 
   const handleCopy = useCallback(async () => {
     try {
@@ -89,22 +112,18 @@ export const MarkdownPreviewModal: React.FC<MarkdownPreviewModalProps> = ({
     if (!file) return;
 
     if (isEditing) {
-      if (!confirmDiscardChanges()) return;
-      setEditedName(file.name);
-      setEditedContent(loadedContent || file.textContent || '');
-      setIsEditing(false);
+      requestDiscard('exit-edit');
       return;
     }
 
     setEditedContent(loadedContent || file.textContent || '');
     setEditedName(file.name);
     setIsEditing(true);
-  }, [confirmDiscardChanges, file, isEditing, loadedContent]);
+  }, [file, isEditing, loadedContent, requestDiscard]);
 
   const handleClose = useCallback(() => {
-    if (!confirmDiscardChanges()) return;
-    onClose();
-  }, [confirmDiscardChanges, onClose]);
+    requestDiscard('close');
+  }, [requestDiscard]);
 
   if (!file) return null;
 
@@ -113,10 +132,10 @@ export const MarkdownPreviewModal: React.FC<MarkdownPreviewModalProps> = ({
       isOpen={true}
       onClose={handleClose}
       noPadding
-      backdropClassName="bg-black/45 backdrop-blur-sm"
+      backdropClassName="bg-black/45"
       contentClassName="w-[min(1600px,98vw)] h-[min(1000px,96vh)]"
     >
-      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-secondary)] text-[var(--theme-text-primary)] shadow-2xl">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-secondary)] text-[var(--theme-text-primary)] shadow-2xl">
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--theme-bg-accent)]/10 text-[var(--theme-bg-accent)]">
@@ -161,7 +180,11 @@ export const MarkdownPreviewModal: React.FC<MarkdownPreviewModalProps> = ({
               className="rounded-lg border border-[var(--theme-border-secondary)] p-2 text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]"
               title={t('filePreviewCopyContent')}
             >
-              {isCopied ? <Check size={18} className="text-green-500" /> : <ClipboardCopy size={18} />}
+              {isCopied ? (
+                <Check size={18} className="text-[var(--theme-text-success)]" />
+              ) : (
+                <ClipboardCopy size={18} />
+              )}
             </button>
             <button
               type="button"
@@ -174,7 +197,7 @@ export const MarkdownPreviewModal: React.FC<MarkdownPreviewModalProps> = ({
             <button
               type="button"
               onClick={isEditing ? handleToggleEdit : handleClose}
-              className="rounded-lg border border-[var(--theme-border-secondary)] p-2 text-[var(--theme-text-secondary)] hover:border-red-400/60 hover:text-red-500"
+              className="rounded-lg border border-[var(--theme-border-secondary)] p-2 text-[var(--theme-text-secondary)] hover:border-[var(--theme-text-danger)]/60 hover:text-[var(--theme-text-danger)]"
               title={isEditing ? t('filePreviewCancelEdit') : t('imageZoomCloseTitle')}
             >
               <X size={18} />
@@ -196,6 +219,21 @@ export const MarkdownPreviewModal: React.FC<MarkdownPreviewModalProps> = ({
           />
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={pendingDiscardAction !== null}
+        onClose={() => setPendingDiscardAction(null)}
+        onConfirm={() => {
+          const action = pendingDiscardAction;
+          setPendingDiscardAction(null);
+          if (action) runDiscardAction(action);
+        }}
+        title={t('filePreviewDiscardUnsavedChanges')}
+        message={t('filePreviewDiscardUnsavedMessage')}
+        confirmLabel={t('filePreviewDiscardUnsavedConfirm')}
+        cancelLabel={t('cancel')}
+        isDanger
+      />
     </Modal>
   );
 };

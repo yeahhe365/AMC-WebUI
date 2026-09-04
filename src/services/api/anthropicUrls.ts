@@ -32,4 +32,7 @@ const buildAnthropicPath = (path: string, baseUrl?: string | null): string => {
 export const buildAnthropicMessagesUrl = (baseUrl?: string | null): string =>
   buildAnthropicPath('/v1/messages', baseUrl);
 
+export const buildAnthropicUpstreamMessagesUrl = (baseUrl?: string | null): string =>
+  `${normalizeAnthropicBaseUrl(baseUrl)}/v1/messages`;
+
 export const buildAnthropicModelsUrl = (baseUrl?: string | null): string => buildAnthropicPath('/v1/models', baseUrl);

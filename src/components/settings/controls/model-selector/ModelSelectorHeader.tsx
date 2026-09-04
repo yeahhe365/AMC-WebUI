@@ -12,7 +12,7 @@ export const ModelSelectorHeader: React.FC<ModelSelectorHeaderProps> = ({ isEdit
 
   return (
     <div className="flex items-center justify-between">
-      <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)] flex items-center gap-2">
+      <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-secondary)] flex items-center gap-2">
         <Bot size={14} strokeWidth={1.5} /> {t('settingsManageModelsTitle')}
       </h4>
 

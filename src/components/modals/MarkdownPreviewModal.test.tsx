@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { setupProviderTestRenderer } from '@/test/render/providerRenderer';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createUploadedFile } from '@/test/data/factories';
 
 const { mockMarkdownFileViewer, mockSettingsState } = vi.hoisted(() => ({
@@ -34,10 +34,6 @@ vi.mock('@/stores/settingsStore', () => ({
   useSettingsStore: (selector: (state: typeof mockSettingsState) => unknown) => selector(mockSettingsState),
 }));
 
-vi.mock('@/components/shared/Modal', () => ({
-  Modal: ({ children }: { children: React.ReactNode }) => <div data-testid="modal-shell">{children}</div>,
-}));
-
 vi.mock('@/components/shared/file-preview/MarkdownFileViewer', () => ({
   MarkdownFileViewer: mockMarkdownFileViewer,
 }));
@@ -50,7 +46,6 @@ import { MarkdownPreviewModal } from './MarkdownPreviewModal';
 
 describe('MarkdownPreviewModal', () => {
   const renderer = setupProviderTestRenderer();
-  let confirmSpy: ReturnType<typeof vi.spyOn>;
 
   const createMarkdownFile = () =>
     createUploadedFile({
@@ -61,58 +56,106 @@ describe('MarkdownPreviewModal', () => {
       textContent: '# Original',
     });
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-  });
-
-  afterEach(() => {
-    confirmSpy.mockRestore();
-  });
-
-  it('asks before discarding unsaved markdown edits when cancelling edit mode', () => {
-    const onClose = vi.fn();
-
+  const renderModal = (onClose: () => void) => {
     act(() => {
       renderer.root.render(
         <MarkdownPreviewModal file={createMarkdownFile()} onClose={onClose} onSaveText={vi.fn()} initialEditMode />,
       );
     });
+  };
 
-    const changeButton = Array.from(renderer.container.querySelectorAll('button')).find((button) =>
+  const makeDirty = () => {
+    const changeButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('change content'),
     );
     expect(changeButton).toBeDefined();
-
     act(() => {
       changeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
+  };
 
-    const closeButton = Array.from(renderer.container.querySelectorAll('button')).find(
-      (button) => button.getAttribute('title') === 'Cancel Edit',
-    );
-    expect(closeButton).toBeDefined();
+  const findDialogButton = (label: string) =>
+    Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent?.trim() === label);
 
+  const findTitledButton = (title: string) =>
+    Array.from(document.body.querySelectorAll('button')).find((button) => button.getAttribute('title') === title);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('asks before discarding unsaved markdown edits when leaving edit mode', () => {
+    const onClose = vi.fn();
+    renderModal(onClose);
+    makeDirty();
+
+    const cancelEditButton = findTitledButton('Cancel Edit');
+    expect(cancelEditButton).toBeDefined();
     act(() => {
-      closeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      cancelEditButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(findDialogButton('Discard')).toBeTruthy();
+    expect(onClose).not.toHaveBeenCalled();
     expect(mockMarkdownFileViewer).toHaveBeenLastCalledWith(
       expect.objectContaining({ isEditable: true, content: 'changed markdown' }),
       expect.anything(),
     );
-    expect(onClose).not.toHaveBeenCalled();
-
-    confirmSpy.mockReturnValue(true);
 
     act(() => {
-      closeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      findDialogButton('Discard')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
     expect(mockMarkdownFileViewer).toHaveBeenLastCalledWith(
       expect.objectContaining({ isEditable: false }),
       expect.anything(),
     );
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('keeps edits when the discard prompt is cancelled', () => {
+    const onClose = vi.fn();
+    renderModal(onClose);
+    makeDirty();
+
+    act(() => {
+      findTitledButton('Cancel Edit')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    const discardDialog = Array.from(document.body.querySelectorAll<HTMLElement>('[role="dialog"]')).find((dialog) =>
+      dialog.textContent?.includes('Discard unsaved changes?'),
+    );
+    expect(discardDialog).toBeTruthy();
+    act(() => {
+      findDialogButton('Cancel')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    act(() => {
+      discardDialog?.dispatchEvent(new Event('animationend', { bubbles: true }));
+    });
+
+    expect(findDialogButton('Discard')).toBeUndefined();
+    expect(mockMarkdownFileViewer).toHaveBeenLastCalledWith(
+      expect.objectContaining({ isEditable: true, content: 'changed markdown' }),
+      expect.anything(),
+    );
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('asks before closing the preview with unsaved edits via Escape', () => {
+    const onClose = vi.fn();
+    renderModal(onClose);
+    makeDirty();
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(findDialogButton('Discard')).toBeTruthy();
+
+    act(() => {
+      findDialogButton('Discard')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

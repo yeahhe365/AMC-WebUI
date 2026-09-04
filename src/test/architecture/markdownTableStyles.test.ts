@@ -2,17 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { readMarkdownCss } from './projectFiles';
 
 describe('markdown table styling', () => {
-  it('wraps wide markdown tables instead of forcing natural-width overflow', () => {
+  it('sizes columns to content and lets the wrapper scroll wide tables', () => {
     const css = readMarkdownCss();
 
     expect(css).toContain('.markdown-body table:not(.rich-html-table)');
-    expect(css).toContain('width: 100%;');
+    expect(css).toContain('table-layout: auto;');
     expect(css).toContain('min-width: 100%;');
-    expect(css).toContain('table-layout: fixed;');
-    expect(css).toContain('overflow-wrap: anywhere;');
-    expect(css).toContain('white-space: normal;');
+    // No forced even-width grid and no eager word-breaking: the Linear style
+    // relies on content-sized columns, with header nowrap driving overflow.
+    expect(css).not.toContain('table-layout: fixed;');
+    expect(css).toContain('overflow-wrap: break-word;');
     expect(css).not.toContain('width: max-content;');
-    expect(css).not.toContain('white-space: nowrap;');
     expect(css).not.toContain('.markdown-body tbody td:first-child');
   });
 

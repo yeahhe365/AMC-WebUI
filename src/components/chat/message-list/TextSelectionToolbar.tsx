@@ -1,11 +1,12 @@
 import { logService } from '@/services/logService';
 import React, { useEffect, useRef, useState, type RefObject } from 'react';
-import { type translations } from '@/i18n/translations';
+import { flushSync } from 'react-dom';
 import { useSettingsStore } from '@/stores/settingsStore';
 
 import { useSelectionPosition } from '@/hooks/text-selection/useSelectionPosition';
 import { useSelectionDrag } from '@/hooks/text-selection/useSelectionDrag';
 import { useSelectionAudio } from '@/hooks/text-selection/useSelectionAudio';
+import type { QuickTtsResult } from '@/hooks/chat/message/useTextToSpeechHandler';
 import { writeSelectionTextToClipboard } from '@/utils/text-selection/selectionClipboard';
 
 import { ToolbarContainer } from './text-selection/ToolbarContainer';
@@ -15,19 +16,24 @@ import { StandardActionsView } from './text-selection/StandardActionsView';
 interface TextSelectionToolbarProps {
   onQuote: (text: string) => void;
   onInsert?: (text: string) => void;
-  onTTS?: (text: string) => Promise<string | null>;
+  onAsk?: (text: string, rect: DOMRect | null) => void;
+  onTTS?: (text: string) => Promise<QuickTtsResult>;
   containerRef: RefObject<HTMLElement> | HTMLElement | null;
-  t?: (key: keyof typeof translations) => string;
 }
 
 export const TextSelectionToolbar: React.FC<TextSelectionToolbarProps> = ({
   onQuote,
   onInsert,
+  onAsk,
   onTTS,
   containerRef,
 }) => {
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const copyResetTimeoutRef = useRef<number | null>(null);
+  // Two independent timers: one resets the "Copied" feedback, the other hides
+  // the toolbar after a button copy. Sharing a ref used to cancel the feedback
+  // reset and leave the button stuck in the copied state.
+  const copyFeedbackTimeoutRef = useRef<number | null>(null);
+  const copyClearTimeoutRef = useRef<number | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const preserveFormattingOnCopy = useSettingsStore(
     (state) => state.appSettings.isCopySelectionFormattingEnabled ?? true,
@@ -35,32 +41,47 @@ export const TextSelectionToolbar: React.FC<TextSelectionToolbarProps> = ({
 
   const showCopiedFeedback = () => {
     setIsCopied(true);
-    if (copyResetTimeoutRef.current) {
-      window.clearTimeout(copyResetTimeoutRef.current);
+    if (copyFeedbackTimeoutRef.current) {
+      window.clearTimeout(copyFeedbackTimeoutRef.current);
     }
-    copyResetTimeoutRef.current = window.setTimeout(() => {
+    copyFeedbackTimeoutRef.current = window.setTimeout(() => {
       setIsCopied(false);
-      copyResetTimeoutRef.current = null;
+      copyFeedbackTimeoutRef.current = null;
     }, 1000);
   };
 
   useEffect(() => {
     return () => {
-      if (copyResetTimeoutRef.current) {
-        window.clearTimeout(copyResetTimeoutRef.current);
+      if (copyFeedbackTimeoutRef.current) {
+        window.clearTimeout(copyFeedbackTimeoutRef.current);
+      }
+      if (copyClearTimeoutRef.current) {
+        window.clearTimeout(copyClearTimeoutRef.current);
       }
     };
   }, []);
 
   const audioState = useSelectionAudio();
+  const ttsInFlightRef = useRef(false);
 
-  const { position, setPosition, selectedText, selectedCopyText, clearSelection } = useSelectionPosition({
-    containerRef,
-    isAudioActive: audioState.isPlaying || audioState.isLoading,
-    toolbarRef,
-    onCopySuccess: showCopiedFeedback,
-    preserveFormattingOnCopy,
-  });
+  const { position, setPosition, selectedText, selectedSpeechText, selectedCopyText, selectionRect, clearSelection } =
+    useSelectionPosition({
+      containerRef,
+      isAudioActive: audioState.isPlaying || audioState.isLoading,
+      isAudioActiveRef: audioState.isAudioActiveRef,
+      toolbarRef,
+      onCopySuccess: showCopiedFeedback,
+      preserveFormattingOnCopy,
+    });
+
+  // A pending post-copy clear must not wipe a selection the user starts inside
+  // the grace window; any toolbar reposition means new user activity, so drop it.
+  useEffect(() => {
+    if (position && copyClearTimeoutRef.current !== null) {
+      window.clearTimeout(copyClearTimeoutRef.current);
+      copyClearTimeoutRef.current = null;
+    }
+  }, [position]);
 
   const { handleDragStart, isDragging } = useSelectionDrag({
     toolbarRef,
@@ -87,10 +108,11 @@ export const TextSelectionToolbar: React.FC<TextSelectionToolbarProps> = ({
     e.stopPropagation();
     if (await writeSelectionTextToClipboard(selectedCopyText || selectedText)) {
       showCopiedFeedback();
-      if (copyResetTimeoutRef.current) {
-        window.clearTimeout(copyResetTimeoutRef.current);
+      if (copyClearTimeoutRef.current) {
+        window.clearTimeout(copyClearTimeoutRef.current);
       }
-      copyResetTimeoutRef.current = window.setTimeout(() => {
+      copyClearTimeoutRef.current = window.setTimeout(() => {
+        copyClearTimeoutRef.current = null;
         clearSelection();
       }, 1000);
     }
@@ -103,19 +125,38 @@ export const TextSelectionToolbar: React.FC<TextSelectionToolbarProps> = ({
     clearSelection();
   };
 
-  const handleTTSClick = async (e: React.MouseEvent) => {
+  const handleAskClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!onTTS || !selectedText) return;
+    if (onAsk) onAsk(selectedText, selectionRect);
+  };
 
-    audioState.setIsLoading(true);
+  const handleTTSClick = async (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (ttsInFlightRef.current || !onTTS) return;
+
+    const text = (selectedSpeechText || selectedText).trim();
+    if (!text) return;
+
+    ttsInFlightRef.current = true;
+    flushSync(() => {
+      audioState.setIsLoading(true);
+    });
+    audioState.armFromUserGesture();
+
     try {
-      const url = await onTTS(selectedText);
-      if (url) {
-        audioState.play(url);
+      const result = await onTTS(text);
+      if ('url' in result) {
+        audioState.play(result.url);
+      } else {
+        ttsInFlightRef.current = false;
+        audioState.fail(result.error);
       }
     } catch (ttsError) {
+      ttsInFlightRef.current = false;
       logService.error('TTS Failed:', ttsError);
+      audioState.fail(ttsError instanceof Error ? ttsError.message : 'TTS generation failed.');
     } finally {
       audioState.setIsLoading(false);
     }
@@ -124,6 +165,7 @@ export const TextSelectionToolbar: React.FC<TextSelectionToolbarProps> = ({
   const handleCloseAudio = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    ttsInFlightRef.current = false;
     audioState.stop();
     clearSelection();
   };
@@ -146,8 +188,10 @@ export const TextSelectionToolbar: React.FC<TextSelectionToolbarProps> = ({
           onInsert={onInsert ? handleInsertClick : undefined}
           onCopy={handleCopyClick}
           onSearch={handleSearchClick}
+          onAsk={onAsk ? handleAskClick : undefined}
           onTTS={onTTS ? handleTTSClick : undefined}
           isCopied={isCopied}
+          ttsError={audioState.errorMessage}
         />
       )}
     </ToolbarContainer>

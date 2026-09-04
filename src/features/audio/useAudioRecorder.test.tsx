@@ -24,6 +24,11 @@ describe('useAudioRecorder', () => {
     startRecording: vi.fn(),
     stopRecording: vi.fn(),
     cancelRecording: vi.fn(),
+    pauseRecording: vi.fn(),
+    resumeRecording: vi.fn(),
+    errorKind: null as 'permission' | 'device' | 'unsupported' | 'unknown' | null,
+    recordedMimeType: null as string | null,
+    hasHitDurationLimit: false,
     onStop: undefined as ((blob: Blob) => void) | undefined,
   };
 
@@ -35,10 +40,15 @@ describe('useAudioRecorder', () => {
     recorderState.isInitializing = false;
     recorderState.duration = 0;
     recorderState.error = null;
+    recorderState.errorKind = null;
+    recorderState.recordedMimeType = null;
+    recorderState.hasHitDurationLimit = false;
     recorderState.stream = null;
     recorderState.startRecording = vi.fn();
     recorderState.stopRecording = vi.fn();
     recorderState.cancelRecording = vi.fn();
+    recorderState.pauseRecording = vi.fn();
+    recorderState.resumeRecording = vi.fn();
     recorderState.onStop = undefined;
     mockCreateObjectURL
       .mockReturnValueOnce('blob:recording-url-1')
@@ -61,9 +71,14 @@ describe('useAudioRecorder', () => {
         isInitializing: recorderState.isInitializing,
         duration: recorderState.duration,
         error: recorderState.error,
+        errorKind: recorderState.errorKind,
+        recordedMimeType: recorderState.recordedMimeType,
+        hasHitDurationLimit: recorderState.hasHitDurationLimit,
         stream: recorderState.stream,
         startRecording: recorderState.startRecording,
         stopRecording: recorderState.stopRecording,
+        pauseRecording: recorderState.pauseRecording,
+        resumeRecording: recorderState.resumeRecording,
         cancelRecording: recorderState.cancelRecording,
       };
     });
@@ -92,6 +107,36 @@ describe('useAudioRecorder', () => {
     expect(result.current.viewState).toBe('review');
     expect(result.current.audioBlob).toBe(blob);
     expect(result.current.audioUrl).toBe('blob:recording-url-1');
+
+    unmount();
+  });
+
+  it('keeps the recording view while the session is paused', () => {
+    const { result, rerender, unmount } = renderHook(() => useAudioRecorder());
+
+    act(() => {
+      recorderState.status = 'paused';
+      rerender();
+    });
+
+    expect(result.current.viewState).toBe('recording');
+    expect(result.current.isPaused).toBe(true);
+
+    unmount();
+  });
+
+  it('starts recording on the selected input device', () => {
+    const { result, unmount } = renderHook(() => useAudioRecorder());
+
+    act(() => {
+      result.current.setSelectedDeviceId('mic-2');
+    });
+
+    act(() => {
+      result.current.startRecording();
+    });
+
+    expect(recorderState.startRecording).toHaveBeenCalledWith({ deviceId: 'mic-2' });
 
     unmount();
   });

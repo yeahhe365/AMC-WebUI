@@ -74,6 +74,37 @@ export function getThirdPartyProxyBaseUrl(): string | null {
   return readNullableString(getRuntimeConfig()?.thirdPartyProxyUrl) ?? null;
 }
 
+/**
+ * Whether the deployment provides an api container that can proxy /api/gemini
+ * requests. True only when the runtime config (Docker web-server.js) explicitly
+ * enables the proxy AND sets it to a relative path. False in static/Pages
+ * deploys where requests go directly from the browser to the upstream.
+ *
+ * Unlike appSettings.useApiProxy (which the user can toggle), this reads the
+ * original deployment-level runtime config before any user settings override it.
+ */
+export function hasDeploymentApiContainer(): boolean {
+  const config = getRuntimeConfig();
+  if (!config) return false;
+  const enabled = readBooleanValue(config.useApiProxy) === true;
+  const proxyUrl = readNullableString(config.apiProxyUrl);
+  return enabled && Boolean(proxyUrl && !/^https?:\/\//i.test(proxyUrl.trim()));
+}
+
+/**
+ * Returns the deployment-level Gemini API proxy URL (e.g. "/api/gemini") when
+ * the api container is available; null otherwise. Reads the raw runtime config,
+ * not user settings, so it survives changes to appSettings.apiProxyUrl.
+ *
+ * Use this when deciding the base URL the browser should send requests TO.
+ * When available, all Gemini requests route through the api container even if
+ * the user configured an absolute upstream address.
+ */
+export function getGeminiApiProxyBaseUrl(): string | null {
+  if (!hasDeploymentApiContainer()) return null;
+  return readNullableString(getRuntimeConfig()?.apiProxyUrl) ?? null;
+}
+
 export function getRuntimeConfigAppSettingsOverrides(): Partial<
   Pick<AppSettings, 'serverManagedApi' | 'useCustomApiConfig' | 'useApiProxy' | 'apiProxyUrl'>
 > {

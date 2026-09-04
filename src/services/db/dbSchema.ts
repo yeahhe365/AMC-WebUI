@@ -46,7 +46,10 @@ type StoreDef = {
  * Version 4: Add persisted session files store
  * Version 5: Add API usage store
  */
-const DB_STORE_DEFS: readonly StoreDef[] = [
+// Exported so consumers that cannot share the live IDBDatabase handle (e.g. the
+// E2E seed harness) serialize the exact same store shapes instead of keeping a
+// parallel hardcoded copy.
+export const DB_STORE_DEFS: readonly StoreDef[] = [
   { name: SESSIONS_STORE, sinceVersion: 1, options: { keyPath: 'id' } },
   { name: GROUPS_STORE, sinceVersion: 1, options: { keyPath: 'id' } },
   { name: SCENARIOS_STORE, sinceVersion: 1, options: { keyPath: 'id' } },

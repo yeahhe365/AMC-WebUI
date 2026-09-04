@@ -66,6 +66,6 @@ describe('developer experience detail boundaries', () => {
     expect(enReadme).not.toMatch(/^npm install$/m);
     expect(contributing).not.toContain('npm ci --legacy-peer-deps');
     expect(workflow).not.toContain('npm ci --legacy-peer-deps');
-    expect(workflow).toContain('npm ci');
+    expect(workflow).toContain('pnpm install --frozen-lockfile');
   });
 });

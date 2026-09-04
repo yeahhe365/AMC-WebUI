@@ -129,4 +129,42 @@ describe('openaiCompatibleMessages', () => {
       'max',
     );
   });
+
+  it('maps advanced generation parameters (max_tokens, stop, penalties, seed)', () => {
+    const body = buildOpenAICompatibleRequestBody(
+      'gpt-4o',
+      [],
+      [{ text: 'hello' }],
+      {
+        maxOutputTokens: 2048,
+        stopSequences: ['STOP', 'END'],
+        presencePenalty: 0.5,
+        frequencyPenalty: 0.8,
+        seed: 1234,
+      },
+      'user',
+      false,
+    );
+
+    expect(body.max_tokens).toBe(2048);
+    expect(body.stop).toEqual(['STOP', 'END']);
+    expect(body.presence_penalty).toBe(0.5);
+    expect(body.frequency_penalty).toBe(0.8);
+    expect(body.seed).toBe(1234);
+  });
+
+  it('maps single stop sequence as a string instead of an array', () => {
+    const body = buildOpenAICompatibleRequestBody(
+      'gpt-4o',
+      [],
+      [{ text: 'hello' }],
+      {
+        stopSequences: ['STOP'],
+      },
+      'user',
+      false,
+    );
+
+    expect(body.stop).toBe('STOP');
+  });
 });

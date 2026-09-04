@@ -24,7 +24,7 @@ export const VoiceControl: React.FC<VoiceControlProps> = ({
   const { t } = useI18n();
   return (
     <div className="space-y-4">
-      <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)] flex items-center gap-2">
+      <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-secondary)] flex items-center gap-2">
         <Mic size={14} strokeWidth={1.5} /> {t(titleKey)}
       </h4>
 
@@ -37,7 +37,7 @@ export const VoiceControl: React.FC<VoiceControlProps> = ({
             <span className="flex items-center">
               {t('chatBehaviorVoiceModelLabel')}
               <Tooltip text={t('chatBehaviorVoiceModelTooltip')}>
-                <Info size={14} className="ml-2 text-[var(--theme-text-tertiary)] cursor-help" strokeWidth={1.5} />
+                <Info size={14} className="ml-2 text-[var(--theme-text-secondary)] cursor-help" strokeWidth={1.5} />
               </Tooltip>
             </span>
           }

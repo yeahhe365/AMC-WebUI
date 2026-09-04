@@ -6,21 +6,17 @@ import { useI18n } from '@/contexts/I18nContext';
 import { DEFAULT_LIVE_ARTIFACTS_MODEL_ID } from '@/constants/modelConfiguration';
 import { CONNECTION_TEST_MODELS } from '@/constants/settingsModelOptions';
 import { getClient } from '@/services/api/apiClient';
-import { sendOpenAICompatibleMessageNonStream } from '@/services/api/openaiCompatibleApi';
-import { sendAnthropicMessageNonStream } from '@/services/api/anthropicApi';
 import {
   isServerManagedApiEnabledForProxyRequests,
   parseApiKeys,
   SERVER_MANAGED_API_KEY,
 } from '@/utils/apiKeySelection';
-import { getThirdPartyProviderConfig } from '@/utils/thirdPartyApiProviders';
 import { ApiConfigToggle } from './api-config/ApiConfigToggle';
 import { ApiKeyInput } from './api-config/ApiKeyInput';
 import { ApiProxySettings } from './api-config/ApiProxySettings';
 import { ApiConnectionTester } from './api-config/ApiConnectionTester';
 import { ThirdPartyApiSettingsPanel } from './api-config/ThirdPartyApiSettingsPanel';
 import { FileStrategyControl } from './appearance/FileStrategyControl';
-import { isThirdPartyApiActive } from '@/utils/thirdPartyApiActive';
 
 interface ApiConfigSectionProps {
   useCustomApiConfig: boolean;
@@ -55,19 +51,15 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
   const [testModelId, setTestModelId] = useState<string>(DEFAULT_LIVE_ARTIFACTS_MODEL_ID);
   const [allowOverflow, setAllowOverflow] = useState(useCustomApiConfig);
   const overflowTimerRef = useRef<number | null>(null);
-  const viteEnv = (import.meta as ImportMeta & { env?: { VITE_GEMINI_API_KEY?: string; VITE_OPENAI_API_KEY?: string } })
-    .env;
+  const viteEnv = (import.meta as ImportMeta & { env?: { VITE_GEMINI_API_KEY?: string } }).env;
 
   const hasEnvKey = !!viteEnv?.VITE_GEMINI_API_KEY;
-  const hasOpenAIEnvKey = !!viteEnv?.VITE_OPENAI_API_KEY;
   const canUseServerManagedTestKey = isServerManagedApiEnabledForProxyRequests({
     serverManagedApi,
     useCustomApiConfig,
     useApiProxy,
     apiProxyUrl,
   });
-  const isOpenAICompatibleMode = isThirdPartyApiActive(settings);
-  const activeProvider = getThirdPartyProviderConfig(settings);
 
   useEffect(() => {
     return () => {
@@ -97,28 +89,8 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
     setAllowOverflow(false);
   };
 
-  const handleApiProviderChange = (nextApiMode: AppSettings['apiMode']) => {
-    const isThirdParty = nextApiMode === 'third-party';
-    // Enable/disable the flag first so sanitizeAppSettings keeps apiMode='third-party'
-    // instead of resetting it to 'gemini-native' on the intermediate state.
-    onUpdate('isThirdPartyApiEnabled', isThirdParty);
-    onUpdate('apiMode', isThirdParty ? 'third-party' : 'gemini-native');
-    setTestStatus('idle');
-    setTestMessage(null);
-  };
-
-  const resetConnectionTest = () => {
-    setTestStatus('idle');
-    setTestMessage(null);
-  };
-
-  const resolveProviderKey = (): string | null => activeProvider.apiKey || viteEnv?.VITE_OPENAI_API_KEY || null;
-
   const handleTestConnection = async () => {
     const resolveKeyToTest = (): string | null => {
-      if (isOpenAICompatibleMode) {
-        return resolveProviderKey();
-      }
       if (apiKey) return apiKey;
       if (!useCustomApiConfig && hasEnvKey) {
         return viteEnv?.VITE_GEMINI_API_KEY || null;
@@ -129,7 +101,7 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
 
     const keyToTest = resolveKeyToTest();
 
-    if (!isOpenAICompatibleMode && !keyToTest && useCustomApiConfig && !canUseServerManagedTestKey) {
+    if (!keyToTest && useCustomApiConfig && !canUseServerManagedTestKey) {
       setTestStatus('error');
       setTestMessage(t('apiConfigNoKeyProvided'));
       return;
@@ -156,55 +128,12 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
     setTestMessage(null);
 
     try {
-      const modelIdToUse = isOpenAICompatibleMode
-        ? activeProvider.modelId
-        : testModelId || DEFAULT_LIVE_ARTIFACTS_MODEL_ID;
+      const ai = await getClient(firstKey, effectiveUrl);
 
-      if (isOpenAICompatibleMode) {
-        let providerError: Error | null = null;
-        const onError = (error: Error) => {
-          providerError = error;
-        };
-        const providerConfig = {
-          baseUrl: activeProvider.baseUrl,
-          temperature: 0,
-        };
-
-        if (activeProvider.protocol === 'anthropic') {
-          await sendAnthropicMessageNonStream(
-            firstKey,
-            modelIdToUse,
-            [],
-            [{ text: 'Hello' }],
-            providerConfig,
-            new AbortController().signal,
-            onError,
-            () => undefined,
-          );
-        } else {
-          await sendOpenAICompatibleMessageNonStream(
-            firstKey,
-            modelIdToUse,
-            [],
-            [{ text: 'Hello' }],
-            providerConfig,
-            new AbortController().signal,
-            onError,
-            () => undefined,
-          );
-        }
-
-        if (providerError) {
-          throw providerError;
-        }
-      } else {
-        const ai = await getClient(firstKey, effectiveUrl);
-
-        await ai.models.generateContent({
-          model: modelIdToUse,
-          contents: 'Hello',
-        });
-      }
+      await ai.models.generateContent({
+        model: testModelId || DEFAULT_LIVE_ARTIFACTS_MODEL_ID,
+        contents: 'Hello',
+      });
 
       setTestStatus('success');
     } catch (error) {
@@ -213,139 +142,104 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
     }
   };
 
-  const modeButtonClass = (isActive: boolean) =>
-    `relative flex-1 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200 focus:outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--theme-bg-secondary)] ${
-      isActive
-        ? 'bg-[var(--theme-bg-input)] text-[var(--theme-text-primary)] shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-        : 'text-[var(--theme-text-tertiary)] hover:bg-[var(--theme-bg-tertiary)]/60 hover:text-[var(--theme-text-primary)]'
-    }`;
-
   return (
     <div className="space-y-6">
-      <div>
-        <div className="space-y-3 pb-4">
-          <div className="space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)]">
-              {t('settingsApiModeLabel')}
-            </div>
-            <div
-              role="group"
-              aria-label={t('settingsApiModeLabel')}
-              className="grid grid-cols-2 gap-1 rounded-lg border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-tertiary)]/35 p-1 shadow-sm"
-            >
-              <button
-                type="button"
-                className={modeButtonClass(!isOpenAICompatibleMode)}
-                aria-pressed={!isOpenAICompatibleMode}
-                onClick={() => handleApiProviderChange('gemini-native')}
-              >
-                {t('settingsApiModeGeminiNative')}
-              </button>
-              <button
-                type="button"
-                className={modeButtonClass(isOpenAICompatibleMode)}
-                aria-pressed={isOpenAICompatibleMode}
-                onClick={() => handleApiProviderChange('third-party')}
-              >
-                {t('settingsApiModeOpenAICompatible')}
-              </button>
-            </div>
-          </div>
-          {isOpenAICompatibleMode && (
-            <ThirdPartyApiSettingsPanel
-              settings={settings}
-              onUpdateSettings={(partial) => {
-                (Object.entries(partial) as Array<[keyof AppSettings, AppSettings[keyof AppSettings]]>).forEach(
-                  ([key, value]) => {
-                    onUpdate(key, value);
-                  },
-                );
+      <div className="space-y-3 pb-4" data-settings-item="api-config">
+        <ApiConfigToggle
+          useCustomApiConfig={useCustomApiConfig}
+          setUseCustomApiConfig={handleUseCustomApiConfigChange}
+          hasEnvKey={hasEnvKey}
+        />
+
+        <div
+          className={`transition-all duration-300 ease-in-out ${useCustomApiConfig ? 'opacity-100 max-h-[1000px] pt-4' : 'opacity-50 max-h-0'} ${allowOverflow ? 'overflow-visible' : 'overflow-hidden'}`}
+        >
+          <div className="space-y-5">
+            <ApiKeyInput
+              inputId="gemini-api-key-input"
+              apiKey={apiKey}
+              setApiKey={(nextApiKey) => {
+                setApiKey(nextApiKey);
+                setTestStatus('idle');
               }}
-              onResetConnectionTest={resetConnectionTest}
-              onTestConnection={handleTestConnection}
-              testStatus={testStatus}
-              testMessage={testMessage}
-              hasEnvKey={hasOpenAIEnvKey}
-            />
-          )}
-        </div>
-
-        {!isOpenAICompatibleMode && (
-          <>
-            <ApiConfigToggle
-              useCustomApiConfig={useCustomApiConfig}
-              setUseCustomApiConfig={handleUseCustomApiConfigChange}
-              hasEnvKey={hasEnvKey}
             />
 
-            <div
-              className={`transition-all duration-300 ease-in-out ${useCustomApiConfig ? 'opacity-100 max-h-[1000px] pt-4' : 'opacity-50 max-h-0'} ${allowOverflow ? 'overflow-visible' : 'overflow-hidden'}`}
-            >
-              <div className="space-y-5">
-                <ApiKeyInput
-                  apiKey={apiKey}
-                  setApiKey={(nextApiKey) => {
-                    setApiKey(nextApiKey);
-                    setTestStatus('idle');
-                  }}
-                />
+            <ApiProxySettings
+              useApiProxy={useApiProxy}
+              setUseApiProxy={(nextUseApiProxy) => {
+                setUseApiProxy(nextUseApiProxy);
+                setTestStatus('idle');
+              }}
+              apiProxyUrl={apiProxyUrl}
+              setApiProxyUrl={(nextApiProxyUrl) => {
+                setApiProxyUrl(nextApiProxyUrl);
+                setTestStatus('idle');
+              }}
+            />
 
-                <ApiProxySettings
-                  useApiProxy={useApiProxy}
-                  setUseApiProxy={(nextUseApiProxy) => {
-                    setUseApiProxy(nextUseApiProxy);
-                    setTestStatus('idle');
-                  }}
-                  apiProxyUrl={apiProxyUrl}
-                  setApiProxyUrl={(nextApiProxyUrl) => {
-                    setApiProxyUrl(nextApiProxyUrl);
-                    setTestStatus('idle');
-                  }}
-                />
-
-                <div className="space-y-3 pt-2">
-                  <div className="rounded-lg border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-tertiary)]/20 p-3">
-                    <div className="flex items-start gap-3">
-                      <RadioTower
-                        size={16}
-                        className="mt-0.5 flex-shrink-0 text-[var(--theme-text-link)]"
-                        strokeWidth={1.5}
-                      />
-                      <div className="min-w-0 flex-1 space-y-1.5">
-                        <p className="text-sm font-medium text-[var(--theme-text-primary)]">
-                          {t('settingsLiveAutomaticTitle')}
-                        </p>
-                        <p className="text-xs leading-relaxed text-[var(--theme-text-tertiary)]">
-                          {t('settingsLiveAutomaticHelp')}
-                        </p>
-                        {useApiProxy && (
-                          <p className="text-xs leading-relaxed text-[var(--theme-text-tertiary)]">
-                            {t('settingsLiveProxyCompatibilityHelp')}
-                          </p>
-                        )}
-                      </div>
-                    </div>
+            <div className="space-y-3 pt-2">
+              <div className="rounded-lg border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-tertiary)]/20 p-3 space-y-3">
+                <div className="flex items-start gap-3">
+                  <RadioTower
+                    size={16}
+                    className="mt-0.5 flex-shrink-0 text-[var(--theme-text-link)]"
+                    strokeWidth={1.5}
+                  />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <p className="text-sm font-medium text-[var(--theme-text-primary)]">
+                      {t('settingsLiveAutomaticTitle')}
+                    </p>
+                    <p className="text-xs leading-relaxed text-[var(--theme-text-secondary)]">
+                      {t('settingsLiveAutomaticHelp')}
+                    </p>
+                    {useApiProxy && (
+                      <p className="text-xs leading-relaxed text-[var(--theme-text-secondary)]">
+                        {t('settingsLiveProxyCompatibilityHelp')}
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <ApiConnectionTester
-                  onTest={handleTestConnection}
-                  testStatus={testStatus}
-                  testMessage={testMessage}
-                  isTestDisabled={
-                    testStatus === 'testing' || (!apiKey && useCustomApiConfig && !canUseServerManagedTestKey)
-                  }
-                  availableModels={CONNECTION_TEST_MODELS}
-                  testModelId={testModelId}
-                  onModelChange={setTestModelId}
-                />
+                <div className="pt-2 border-t border-[var(--theme-border-secondary)]/40">
+                  <ApiKeyInput
+                    inputId="live-api-key-input"
+                    label={t('settingsLiveApiKey')}
+                    apiKey={settings.liveApiKey ?? null}
+                    setApiKey={(nextKey) => onUpdate('liveApiKey', nextKey)}
+                    placeholder={t('settingsLiveApiKeyPlaceholder')}
+                    helpText={t('settingsLiveApiKeyHelp')}
+                  />
+                </div>
               </div>
             </div>
-          </>
-        )}
+
+            <ApiConnectionTester
+              onTest={handleTestConnection}
+              testStatus={testStatus}
+              testMessage={testMessage}
+              isTestDisabled={
+                testStatus === 'testing' || (!apiKey && useCustomApiConfig && !canUseServerManagedTestKey)
+              }
+              availableModels={CONNECTION_TEST_MODELS}
+              testModelId={testModelId}
+              onModelChange={setTestModelId}
+            />
+          </div>
+        </div>
       </div>
 
-      {!isOpenAICompatibleMode && <FileStrategyControl settings={settings} onUpdate={onUpdate} />}
+      <ThirdPartyApiSettingsPanel
+        settings={settings}
+        onUpdateSettings={(partial) => {
+          (Object.entries(partial) as Array<[keyof AppSettings, AppSettings[keyof AppSettings]]>).forEach(
+            ([key, value]) => {
+              onUpdate(key, value);
+            },
+          );
+        }}
+      />
+
+      <FileStrategyControl settings={settings} onUpdate={onUpdate} />
     </div>
   );
 };

@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { type UploadedFile, type VideoMetadata, type MediaResolution } from '@/types';
 import { lazyNamedComponent } from '@/utils/lazyNamedComponent';
 import type { LiveArtifactFollowupPayload } from '@/utils/live-artifacts/liveArtifactFollowup';
+import type { HtmlPreviewRequest } from '@/utils/html-preview/previewPrivilege';
 
 const LazyHtmlPreviewModal = lazyNamedComponent(
   () => import('@/components/modals/HtmlPreviewModal'),
@@ -31,8 +32,7 @@ interface MessageListModalsProps {
   currentImageIndex: number;
   imageCount: number;
   isHtmlPreviewModalOpen: boolean;
-  htmlToPreview: string | null;
-  initialTrueFullscreenRequest: boolean;
+  htmlPreview: HtmlPreviewRequest | null;
   handleCloseHtmlPreview: () => void;
   handleLiveArtifactFollowUp: (payload: LiveArtifactFollowupPayload) => void;
   configuringFile: MessageListConfiguringFile | null;
@@ -53,8 +53,7 @@ export const MessageListModals: React.FC<MessageListModalsProps> = ({
   currentImageIndex,
   imageCount,
   isHtmlPreviewModalOpen,
-  htmlToPreview,
-  initialTrueFullscreenRequest,
+  htmlPreview,
   handleCloseHtmlPreview,
   handleLiveArtifactFollowUp,
   configuringFile,
@@ -82,14 +81,17 @@ export const MessageListModals: React.FC<MessageListModalsProps> = ({
       </Suspense>
     )}
 
-    {isHtmlPreviewModalOpen && htmlToPreview !== null && (
+    {isHtmlPreviewModalOpen && htmlPreview !== null && (
       <Suspense fallback={null}>
         <LazyHtmlPreviewModal
           isOpen={isHtmlPreviewModalOpen}
           onClose={handleCloseHtmlPreview}
-          htmlContent={htmlToPreview}
-          initialTrueFullscreenRequest={initialTrueFullscreenRequest}
-          onLiveArtifactFollowUp={handleLiveArtifactFollowUp}
+          htmlContent={htmlPreview.html}
+          initialTrueFullscreenRequest={htmlPreview.initialTrueFullscreen}
+          privilege={htmlPreview.privilege}
+          themeId={htmlPreview.themeId}
+          baseFontSize={htmlPreview.baseFontSize}
+          onLiveArtifactFollowUp={htmlPreview.privilege === 'sanitized' ? handleLiveArtifactFollowUp : undefined}
         />
       </Suspense>
     )}

@@ -1,10 +1,11 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createMcpClientBridge } from './mcpClient';
+import { createMcpClientBridge, mcpConfigFingerprint } from './mcpClient';
 
 interface MockClientInstance {
   connect: ReturnType<typeof vi.fn>;
   close: ReturnType<typeof vi.fn>;
+  ping?: ReturnType<typeof vi.fn>;
   listTools: ReturnType<typeof vi.fn>;
   callTool: ReturnType<typeof vi.fn>;
   listResources: ReturnType<typeof vi.fn>;
@@ -20,7 +21,8 @@ const sdkMocks = vi.hoisted(() => {
     const instance: MockClientInstance = {
       connect: vi.fn(async () => undefined),
       close: vi.fn(async () => undefined),
-      listTools: vi.fn(),
+      ping: vi.fn(async () => undefined),
+      listTools: vi.fn(async () => ({ tools: [] })),
       callTool: vi.fn(),
       listResources: vi.fn(),
       listResourceTemplates: vi.fn(),
@@ -98,6 +100,34 @@ describe('createMcpClientBridge', () => {
     bridges.push(bridge);
     return bridge;
   };
+
+  it('fingerprints server configs without retaining secrets in plaintext', () => {
+    const baseHttp = {
+      id: 'remote',
+      name: 'Remote',
+      enabled: true,
+      transport: 'http' as const,
+      url: 'https://mcp.example.com/mcp',
+    };
+    const withToken = { ...baseHttp, auth: { type: 'bearer' as const, token: 'secret-token-value' } };
+
+    const fingerprintA = mcpConfigFingerprint(withToken);
+    const fingerprintB = mcpConfigFingerprint({ ...baseHttp, auth: { type: 'bearer', token: 'other-token' } });
+
+    expect(fingerprintA).not.toContain('secret-token-value');
+    expect(fingerprintA).not.toBe(fingerprintB);
+    expect(mcpConfigFingerprint(withToken)).toBe(fingerprintA);
+
+    const stdioSecret = {
+      id: 'local',
+      name: 'Local',
+      enabled: true,
+      transport: 'stdio' as const,
+      command: 'npx',
+      env: { API_TOKEN: 'env-secret-value' },
+    };
+    expect(mcpConfigFingerprint(stdioSecret)).not.toContain('env-secret-value');
+  });
 
   it('lists all MCP tools across paginated SDK responses and reuses the pooled session', async () => {
     const bridge = createBridge();
@@ -377,5 +407,140 @@ describe('createMcpClientBridge', () => {
 
     expect(sdkMocks.streamableHttpTransportConstructor).not.toHaveBeenCalled();
     expect(sdkMocks.sseTransportConstructor).toHaveBeenCalledOnce();
+  });
+
+  describe('ServerLogBuffer', () => {
+    it('retains last 200 and evicts oldest', () => {
+      const bridge = createBridge({ allowPrivateHttp: true } as any);
+      for (let i = 0; i < 210; i++) (bridge as any).appendLog('s1', 'info', `msg-${i}`);
+      const logs = (bridge as any).getLogs('s1');
+      expect(logs.length).toBe(200);
+      expect(logs[0].message).toBe('msg-10');
+      expect(logs[199].message).toBe('msg-209');
+    });
+
+    it('returns empty array for unknown server and isolates per serverId', () => {
+      const bridge = createBridge({ allowPrivateHttp: true } as any);
+      expect((bridge as any).getLogs('unknown')).toEqual([]);
+      (bridge as any).appendLog('sA', 'info', 'hello-A');
+      (bridge as any).appendLog('sB', 'error', 'hello-B');
+      expect((bridge as any).getLogs('sA')).toHaveLength(1);
+      expect((bridge as any).getLogs('sB')[0].message).toBe('hello-B');
+    });
+
+    it('appends error log when listTools fails', async () => {
+      const bridge = createBridge();
+      const server = {
+        id: 'remote',
+        name: 'Remote',
+        enabled: true,
+        transport: 'http' as const,
+        url: 'https://mcp.example.com/mcp',
+      };
+      sdkMocks.clientConstructor.mockImplementationOnce(function MockFailClient() {
+        const instance: MockClientInstance = {
+          connect: vi.fn(async () => undefined),
+          close: vi.fn(async () => undefined),
+          listTools: vi.fn(async () => {
+            throw new Error('boom');
+          }),
+          callTool: vi.fn(),
+          listResources: vi.fn(),
+          listResourceTemplates: vi.fn(),
+          readResource: vi.fn(),
+          listPrompts: vi.fn(),
+          getPrompt: vi.fn(),
+        };
+        sdkMocks.clientInstances.push(instance);
+        return instance;
+      });
+
+      await expect(bridge.listTools(server)).rejects.toThrow('boom');
+      const logs = (bridge as any).getLogs('remote');
+      expect(logs).toHaveLength(1);
+      expect(logs[0].level).toBe('error');
+      expect(logs[0].message).toBe('boom');
+    });
+  });
+
+  describe('per-server tool call timeouts', () => {
+    const httpServer = { id: 'r', name: 'R', enabled: true, transport: 'http' as const, url: 'https://m.example.com' };
+
+    it('passes default 60s timeout for servers without config', async () => {
+      const bridge = createBridge();
+      await bridge.callTool(httpServer, 't', {});
+      const client = sdkMocks.clientInstances[0];
+      expect(client.callTool).toHaveBeenCalledWith({ name: 't', arguments: {} }, undefined, {
+        timeout: 60_000,
+        resetTimeoutOnProgress: false,
+        maxTotalTimeout: undefined,
+      });
+    });
+
+    it('honors configured timeout seconds and longRunning progress resets', async () => {
+      const bridge = createBridge();
+      await bridge.callTool({ ...httpServer, timeout: 120, longRunning: true }, 't', {});
+      const client = sdkMocks.clientInstances[0];
+      expect(client.callTool).toHaveBeenCalledWith({ name: 't', arguments: {} }, undefined, {
+        timeout: 120_000,
+        resetTimeoutOnProgress: true,
+        maxTotalTimeout: 600_000,
+      });
+    });
+
+    it('raises the connect timeout floor when a larger per-server timeout is set', async () => {
+      const bridge = createBridge();
+      await bridge.listTools({ ...httpServer, timeout: 300 });
+      const client = sdkMocks.clientInstances[0];
+      expect(client.connect).toHaveBeenCalledWith(expect.anything(), { timeout: 300_000 });
+    });
+
+    it('forwards progress notifications to the onProgress callback', async () => {
+      const updates: Array<{ progress?: number; total?: number; message?: string }> = [];
+      const bridge = createBridge();
+      await bridge.callTool(httpServer, 't', {}, (update) => updates.push(update));
+      const client = sdkMocks.clientInstances[0];
+      const options = client.callTool.mock.calls[0][2] as { onprogress?: (n: unknown) => void };
+      expect(typeof options.onprogress).toBe('function');
+      options.onprogress?.({ progress: 3, total: 9, message: 'step 3' });
+      options.onprogress?.({ progress: 4 });
+      expect(updates).toEqual([{ progress: 3, total: 9, message: 'step 3' }, { progress: 4 }]);
+    });
+  });
+
+  describe('log redaction', () => {
+    it('masks secrets captured in error logs', async () => {
+      const server = {
+        id: 'leaky',
+        name: 'Leaky',
+        enabled: true,
+        transport: 'http' as const,
+        url: 'https://l.example.com',
+      };
+      sdkMocks.clientConstructor.mockImplementationOnce(function MockLeakClient() {
+        const instance: MockClientInstance = {
+          connect: vi.fn(async () => undefined),
+          close: vi.fn(async () => undefined),
+          ping: vi.fn(async () => undefined),
+          listTools: vi.fn(async () => {
+            throw new Error('401 unauthorized for Bearer supersecret-token-value');
+          }),
+          callTool: vi.fn(),
+          listResources: vi.fn(),
+          listResourceTemplates: vi.fn(),
+          readResource: vi.fn(),
+          listPrompts: vi.fn(),
+          getPrompt: vi.fn(),
+        };
+        sdkMocks.clientInstances.push(instance);
+        return instance;
+      });
+      const bridge = createBridge();
+
+      await expect(bridge.listTools(server)).rejects.toThrow();
+      const logs = (bridge as any).getLogs('leaky') as Array<{ message: string }>;
+      expect(logs[0].message).not.toContain('supersecret-token-value');
+      expect(logs[0].message).toContain('Bearer ***');
+    });
   });
 });

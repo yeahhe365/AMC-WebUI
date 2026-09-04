@@ -12,7 +12,8 @@ interface ModelSelectorProps {
   setAvailableModels: (models: ModelOption[]) => void;
   defaultModels?: ModelOption[];
   defaultApiMode?: ApiMode;
-  extraModelListContent?: React.ReactNode;
+  /** Badge text for the selected model; see ModelCatalogList.activeBadgeLabel. */
+  activeBadgeLabel?: string;
 }
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({
@@ -23,12 +24,12 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
   setAvailableModels,
   defaultModels,
   defaultApiMode,
-  extraModelListContent,
+  activeBadgeLabel,
 }) => {
   const [isEditingList, setIsEditingList] = useState(false);
   const isProviderAwareList =
-    availableModels.some((model) => model.apiMode === 'openai-compatible') ||
-    !!defaultModels?.some((model) => model.apiMode === 'openai-compatible');
+    availableModels.some((model) => model.apiMode === 'third-party') ||
+    !!defaultModels?.some((model) => model.apiMode === 'third-party');
 
   return (
     <div className="space-y-4">
@@ -49,7 +50,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({
           selectedModelId={selectedModelId}
           selectedApiMode={selectedApiMode}
           onSelectModel={onSelectModel}
-          extraContent={extraModelListContent}
+          activeBadgeLabel={activeBadgeLabel}
         />
       )}
     </div>

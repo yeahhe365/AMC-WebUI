@@ -7,6 +7,8 @@ interface TextEditorModalShellProps {
   header: React.ReactNode;
   body: React.ReactNode;
   footer?: React.ReactNode;
+  ariaLabel?: string;
+  ariaLabelledBy?: string;
 }
 
 export const TextEditorModalShell: React.FC<TextEditorModalShellProps> = ({
@@ -15,9 +17,18 @@ export const TextEditorModalShell: React.FC<TextEditorModalShellProps> = ({
   header,
   body,
   footer,
+  ariaLabel,
+  ariaLabelledBy,
 }) => {
   return (
-    <Modal isOpen={true} onClose={onClose} noPadding contentClassName={contentClassName}>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      noPadding
+      contentClassName={contentClassName}
+      ariaLabel={ariaLabel}
+      ariaLabelledBy={ariaLabelledBy}
+    >
       {header}
       {body}
       {footer}

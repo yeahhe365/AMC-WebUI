@@ -1,4 +1,5 @@
-import { type Dispatch, type SetStateAction, useCallback, useEffect, useState } from 'react';
+import { type Dispatch, type SetStateAction, useCallback, useEffect, useRef, useState } from 'react';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 
 import {
   isBboxSystemInstruction,
@@ -9,6 +10,7 @@ import {
   loadHdGuideSystemPrompt,
 } from '@/features/prompts/promptRegistry';
 import { DEFAULT_SYSTEM_INSTRUCTION } from '@/constants/settingsDefaults';
+import { logService } from '@/services/logService';
 import { focusChatInput } from '@/utils/chat-input/focus';
 import { getLiveArtifactsSystemPromptOverride } from '@/utils/live-artifacts/liveArtifactsPromptSettings';
 import type { AppSettings, ChatSettings, InputCommand, SavedChatSession } from '@/types';
@@ -24,7 +26,7 @@ interface LiveArtifactsPromptOverrideState {
 }
 
 interface UseAppPromptModesOptions {
-  language?: 'en' | 'zh';
+  language?: SupportedLanguage;
   appSettings: {
     systemInstruction?: string | null;
     liveArtifactsPromptMode?: AppSettings['liveArtifactsPromptMode'];
@@ -56,6 +58,12 @@ export const useAppPromptModes = ({
   const [liveArtifactsPromptBusySessionId, setLiveArtifactsPromptBusySessionId] = useState<string | null>(null);
   const [liveArtifactsPromptOverrideState, setLiveArtifactsPromptOverrideState] =
     useState<LiveArtifactsPromptOverrideState | null>(null);
+  // The session/app system prompt captured when Live Artifacts was enabled, so
+  // disabling restores what the user had before (instead of clobbering it with
+  // an empty default). Mirrors the app-level prompt state so a toggle-off on the
+  // homepage (no active session) can restore the previous app prompt.
+  const previousAppSystemInstructionRef = useRef<string | null>(null);
+  const previousSessionSystemInstructionRef = useRef<string | null>(null);
   const liveArtifactsPromptMode = appSettings.liveArtifactsPromptMode ?? 'inline';
   const configuredLiveArtifactsSystemPrompt = getLiveArtifactsSystemPromptOverride(
     appSettings,
@@ -92,9 +100,19 @@ export const useAppPromptModes = ({
     }
 
     const { systemInstruction, targetSessionId } = pendingLiveArtifactsPromptActivation;
-    const targetMatches = targetSessionId === null || targetSessionId === activeSessionId;
-
-    if (!targetMatches) {
+    // A null target (homepage toggle) only mirrors the app-level prompt for new
+    // chats; it must NOT write into whatever session happens to be active when
+    // the effect fires later. An explicit session target requires an exact match
+    // so a pending activation cannot leak into an unrelated session.
+    if (targetSessionId === null) {
+      queueMicrotask(() => {
+        setPendingLiveArtifactsPromptActivation((current) =>
+          current === pendingLiveArtifactsPromptActivation ? null : current,
+        );
+      });
+      return;
+    }
+    if (targetSessionId !== activeSessionId) {
       return;
     }
 
@@ -187,39 +205,55 @@ export const useAppPromptModes = ({
 
     const isCurrentlyLiveArtifactsPrompt = liveArtifactsPromptOverrideActive ?? persistedLiveArtifactsPromptActive;
 
+    // Capture the pre-enable prompt so toggling off can restore it instead of
+    // permanently wiping a user's custom system prompt.
+    if (!isCurrentlyLiveArtifactsPrompt) {
+      previousAppSystemInstructionRef.current = appSettings.systemInstruction ?? null;
+      previousSessionSystemInstructionRef.current = currentChatSettings.systemInstruction ?? null;
+    }
+
     setLiveArtifactsPromptBusySessionId(targetSessionId);
     setLiveArtifactsPromptOverrideState({
       active: !isCurrentlyLiveArtifactsPrompt,
       targetSessionId,
     });
 
-    try {
-      if (isCurrentlyLiveArtifactsPrompt) {
-        setPendingLiveArtifactsPromptActivation(null);
-        setAppSettings((prev) => ({ ...prev, systemInstruction: DEFAULT_SYSTEM_INSTRUCTION }));
-        if (activeSessionId) {
-          setCurrentChatSettings((prev) => ({
-            ...prev,
-            systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
-          }));
-        }
-      } else {
-        await activateLiveArtifactsPrompt(targetSessionId);
+    if (isCurrentlyLiveArtifactsPrompt) {
+      setPendingLiveArtifactsPromptActivation(null);
+      setAppSettings((prev) => ({
+        ...prev,
+        systemInstruction: previousAppSystemInstructionRef.current ?? DEFAULT_SYSTEM_INSTRUCTION,
+      }));
+      if (activeSessionId) {
+        setCurrentChatSettings((prev) => ({
+          ...prev,
+          systemInstruction: previousSessionSystemInstructionRef.current ?? DEFAULT_SYSTEM_INSTRUCTION,
+        }));
       }
-    } catch (error) {
-      setLiveArtifactsPromptOverrideState((current) =>
-        current?.targetSessionId === targetSessionId
-          ? { active: isCurrentlyLiveArtifactsPrompt, targetSessionId }
-          : current,
-      );
-      setLiveArtifactsPromptBusySessionId((current) => (current === targetSessionId ? null : current));
-      throw error;
+    } else {
+      try {
+        await activateLiveArtifactsPrompt(targetSessionId);
+      } catch (error) {
+        // Restore the button state so a failed prompt load does not leave the
+        // toggle stuck busy. Do not rethrow: this runs from an onClick that
+        // ignores the returned promise, so a rejection would surface as an
+        // unhandled promise rejection.
+        setLiveArtifactsPromptOverrideState((current) =>
+          current?.targetSessionId === targetSessionId
+            ? { active: isCurrentlyLiveArtifactsPrompt, targetSessionId }
+            : current,
+        );
+        setLiveArtifactsPromptBusySessionId((current) => (current === targetSessionId ? null : current));
+        logService.error('Failed to activate Live Artifacts prompt:', error);
+      }
     }
 
     focusChatInput();
   }, [
     activateLiveArtifactsPrompt,
     activeSessionId,
+    appSettings.systemInstruction,
+    currentChatSettings.systemInstruction,
     liveArtifactsPromptBusy,
     liveArtifactsPromptOverrideActive,
     persistedLiveArtifactsPromptActive,

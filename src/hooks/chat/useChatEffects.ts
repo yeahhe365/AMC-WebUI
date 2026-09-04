@@ -10,6 +10,9 @@ import {
 } from '@/utils/model/modelCapabilities';
 import { getTranslator } from '@/i18n/translations';
 import { readPendingStreamJob } from '@/features/stream-jobs/amcStreamJobs';
+import { isGenerationLeaseHeldByTab } from '@/features/message-sender/generationLease';
+import { hasActiveGenerationJobForSession } from '@/features/message-sender/activeGenerationJobs';
+import { useChatStore } from '@/stores/chatStore';
 
 interface UseChatEffectsProps {
   activeSessionId: string | null;
@@ -88,6 +91,14 @@ export const useChatEffects = ({
 
   useEffect(() => {
     if (!hasLoadedInitialData || !activeSessionId) {
+      return;
+    }
+
+    // If the metadata list is still empty, initial load has not yet populated
+    // it (e.g. the DB read for the active session just failed and we kept the
+    // restored session). Do not conclude the active session is gone — that
+    // would switch away and blank the user's conversation on a refresh.
+    if (savedSessions.length === 0) {
       return;
     }
 
@@ -170,7 +181,7 @@ export const useChatEffects = ({
     if (prevModelIdRef.current !== currentChatSettings.modelId) {
       const modelId = currentChatSettings.modelId;
       const capabilities = getModelCapabilities(modelId);
-      const isBananaModel = capabilities.isFlashImageModel || capabilities.isGemini3ImageModel;
+      const isBananaModel = capabilities.isGemini3ImageModel;
 
       if (capabilities.supportedAspectRatios?.length) {
         const preferredAspectRatio = isBananaModel ? 'Auto' : aspectRatio;
@@ -209,17 +220,40 @@ export const useChatEffects = ({
       return;
     }
 
+    // If THIS tab still holds the generation lease AND has a live in-memory
+    // generation job, the send is still running in this tab
+    // (runMessageLifecycle holds the lease for the whole turn). Resuming would
+    // attach a second stream handler to the same job and the buffered events
+    // would be delivered to both, doubling the output. The live send already
+    // re-attaches on its own after transient disconnects, so skipping the
+    // resume here is safe.
+    //
+    // The in-memory check is what distinguishes a live send from a page
+    // refresh: after a refresh the lease is stale (belongs to the old page)
+    // but the memory Map is empty, so resume proceeds and reacquires the lease.
+    // A lease alone must NOT block resume — it survives a refresh (sessionStorage
+    // TAB_ID is stable, localStorage is not cleared) for up to the TTL.
+    const activeJobs = useChatStore.getState()._activeJobs;
+    if (isGenerationLeaseHeldByTab(activeSessionId) && hasActiveGenerationJobForSession(activeJobs, activeSessionId)) {
+      return;
+    }
+
     // Only resume when the loaded session still shows the generation as in
     // flight; otherwise the job already completed (or was persisted done) and
     // resuming would replay a finished stream.
-    const session = savedSessions.find((candidate) => candidate.id === activeSessionId);
-    const loadingMessage = session?.messages.find(
-      (message) => message.id === pending.generationId && message.isLoading,
-    );
+    //
+    // Look in chatStore.activeMessages, not savedSessions[id].messages: the
+    // latter is metadata-only after a fresh load (getAllSessionMetadata and
+    // toSessionMetadata both strip messages to []), so the isLoading lookup
+    // would never match and resume would be permanently skipped.
+    const activeMessages = useChatStore.getState().activeMessages;
+    const loadingMessage = activeMessages.find((message) => message.id === pending.generationId && message.isLoading);
     if (!loadingMessage) {
       resumedSessionsRef.current.add(activeSessionId);
       return;
     }
+
+    const session = savedSessions.find((candidate) => candidate.id === activeSessionId);
 
     resumedSessionsRef.current.add(activeSessionId);
     logService.info('Resuming buffered stream after page load.', {

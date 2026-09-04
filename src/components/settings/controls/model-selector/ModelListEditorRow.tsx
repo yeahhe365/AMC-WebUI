@@ -15,7 +15,7 @@ interface ModelListEditorRowProps {
 
 const providerOptions: Array<{ apiMode: ApiMode; labelKey: string; shortLabel: string }> = [
   { apiMode: 'gemini-native', labelKey: 'modelPickerProviderGemini', shortLabel: 'Gemini' },
-  { apiMode: 'openai-compatible', labelKey: 'modelPickerProviderOpenAICompatible', shortLabel: 'OpenAI' },
+  { apiMode: 'third-party', labelKey: 'modelPickerProviderThirdParty', shortLabel: 'Third-party' },
 ];
 
 export const ModelListEditorRow: React.FC<ModelListEditorRowProps> = ({
@@ -30,7 +30,7 @@ export const ModelListEditorRow: React.FC<ModelListEditorRowProps> = ({
   return (
     <div className="group rounded-lg border border-transparent bg-[var(--theme-bg-primary)]/35 p-2">
       <div className="flex items-center gap-2">
-        <div className="w-9 flex justify-center items-center text-[var(--theme-text-tertiary)]">
+        <div className="w-9 flex justify-center items-center text-[var(--theme-text-secondary)]">
           {getModelIcon(model)}
         </div>
         <input
@@ -54,7 +54,7 @@ export const ModelListEditorRow: React.FC<ModelListEditorRowProps> = ({
           className={`p-1.5 rounded transition-colors ${
             model.isPinned
               ? 'text-[var(--theme-text-link)] bg-[var(--theme-bg-accent)]/10'
-              : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)]'
+              : 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)]'
           }`}
           title={model.isPinned ? t('settingsPinnedModel') : t('settingsPinModel')}
         >
@@ -84,7 +84,7 @@ export const ModelListEditorRow: React.FC<ModelListEditorRowProps> = ({
                 className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
                   isActive
                     ? 'bg-[var(--theme-bg-accent)] text-[var(--theme-text-accent)]'
-                    : 'text-[var(--theme-text-tertiary)] hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)]'
+                    : 'text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)]'
                 }`}
               >
                 {option.shortLabel}

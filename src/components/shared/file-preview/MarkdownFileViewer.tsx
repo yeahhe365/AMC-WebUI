@@ -1,4 +1,3 @@
-import { logService } from '@/services/logService';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Code2, Eye, List, Loader2 } from 'lucide-react';
 import { type UploadedFile } from '@/types';
@@ -8,6 +7,9 @@ import { LARGE_FILE_PREVIEW_LENGTH_THRESHOLD, shouldDeferMarkdownPreview } from 
 import { extractMarkdownToc, type MarkdownTocItem } from './markdownToc';
 import { getMarkdownDocumentStats } from './markdownDocumentStats';
 import { VirtualSourceViewer } from './VirtualSourceViewer';
+import { interpolate } from '@/i18n/interpolate';
+import { isEditableElement } from '@/utils/chat-input/focus';
+import { useTextFileContent } from './useTextFileContent';
 
 const TOGGLE_BUTTON_BASE_CLASS =
   'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors';
@@ -97,7 +99,6 @@ export const MarkdownFileViewer: React.FC<MarkdownFileViewerProps> = ({
   const { t } = useI18n();
   const storageKey = useMemo(() => `${MARKDOWN_VIEW_MODE_STORAGE_PREFIX}${file.id}:${file.name}`, [file.id, file.name]);
   const tocStorageKey = useMemo(() => `${MARKDOWN_TOC_STORAGE_PREFIX}${file.id}:${file.name}`, [file.id, file.name]);
-  const [localContent, setLocalContent] = useState<string | null>(null);
   const [modeState, setModeState] = useState<{ storageKey: string; mode: MarkdownViewMode }>(() => ({
     storageKey,
     mode: readStoredMarkdownViewMode(storageKey),
@@ -111,47 +112,17 @@ export const MarkdownFileViewer: React.FC<MarkdownFileViewerProps> = ({
     value: readStoredTocVisibility(tocStorageKey),
   }));
   const [highlightedSourceLine, setHighlightedSourceLine] = useState<number | null>(null);
-  const hasProvidedContent = content !== undefined && content !== null;
-  const [isLoading, setIsLoading] = useState(() => !hasProvidedContent && !!file.dataUrl);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { localContent, isLoading, textareaRef } = useTextFileContent(file, content, onLoad, {
+    isEditable,
+    errorLogLabel: 'Failed to load markdown content',
+    ignoreStaleResponses: true,
+    fetchTrigger: 'dataUrl',
+  });
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const mode = modeState.storageKey === storageKey ? modeState.mode : readStoredMarkdownViewMode(storageKey);
   const forcePreview = forcePreviewState.storageKey === storageKey && forcePreviewState.value;
   const tocVisible =
     tocVisibleState.storageKey === tocStorageKey ? tocVisibleState.value : readStoredTocVisibility(tocStorageKey);
-
-  useEffect(() => {
-    if (hasProvidedContent) return;
-
-    let cancelled = false;
-
-    if (file.dataUrl) {
-      fetch(file.dataUrl)
-        .then((response) => response.text())
-        .then((text) => {
-          if (cancelled) return;
-          setLocalContent(text);
-          onLoad?.(text);
-          setIsLoading(false);
-        })
-        .catch((error) => {
-          if (cancelled) return;
-          logService.error('Failed to load markdown content', error);
-          setLocalContent(t('filePreviewFailedTextContent'));
-          setIsLoading(false);
-        });
-    }
-
-    return () => {
-      cancelled = true;
-    };
-  }, [file.dataUrl, hasProvidedContent, onLoad, t]);
-
-  useEffect(() => {
-    if (isEditable && textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [isEditable]);
 
   const updateMode = useCallback(
     (nextMode: MarkdownViewMode) => {
@@ -203,9 +174,7 @@ export const MarkdownFileViewer: React.FC<MarkdownFileViewerProps> = ({
       if (isEditable) return;
 
       const activeElement = document.activeElement as HTMLElement | null;
-      const isEditingFieldFocused =
-        !!activeElement &&
-        (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable);
+      const isEditingFieldFocused = !!activeElement && isEditableElement(activeElement);
 
       if (isEditingFieldFocused) return;
 
@@ -310,10 +279,11 @@ export const MarkdownFileViewer: React.FC<MarkdownFileViewerProps> = ({
           )}
 
           <p className="text-xs text-[var(--theme-text-tertiary)]">
-            {t('markdownPreviewStats')
-              .replace('{lines}', String(documentStats.lines))
-              .replace('{words}', String(documentStats.words))
-              .replace('{characters}', String(documentStats.characters))}
+            {interpolate(t('markdownPreviewStats'), {
+              lines: String(documentStats.lines),
+              words: String(documentStats.words),
+              characters: String(documentStats.characters),
+            })}
           </p>
         </div>
       </div>

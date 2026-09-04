@@ -40,17 +40,15 @@ describe('promptRegistry', () => {
   });
 
   it('keeps Live Artifacts prompts independent from the current page theme', async () => {
-    const zhDefaultPrompt = await loadLiveArtifactsSystemPrompt('zh', 'inline');
-    const zhDarkPrompt = await loadLiveArtifactsSystemPrompt('zh', 'inline', 'dark');
-    const enLightPrompt = await loadLiveArtifactsSystemPrompt('en', 'inline', 'light');
+    const zhPrompt = await loadLiveArtifactsSystemPrompt('zh', 'inline');
+    const enPrompt = await loadLiveArtifactsSystemPrompt('en', 'inline');
 
-    expect(zhDarkPrompt).toBe(zhDefaultPrompt);
-    expect(zhDarkPrompt).not.toContain('当前页面主题');
-    expect(zhDarkPrompt).not.toContain('深色主题');
-    expect(zhDarkPrompt).not.toContain('color-scheme: dark');
-    expect(enLightPrompt).not.toContain('Current Page Theme');
-    expect(enLightPrompt).not.toContain('light theme');
-    expect(enLightPrompt).not.toContain('color-scheme: light');
+    expect(zhPrompt).not.toContain('当前页面主题');
+    expect(zhPrompt).not.toContain('深色主题');
+    expect(zhPrompt).not.toContain('color-scheme: dark');
+    expect(enPrompt).not.toContain('Current Page Theme');
+    expect(enPrompt).not.toContain('light theme');
+    expect(enPrompt).not.toContain('color-scheme: light');
   });
 
   it('emphasizes HTML artifacts instead of traditional Markdown output', async () => {
@@ -93,13 +91,50 @@ describe('promptRegistry', () => {
     const zhPrompt = await loadLiveArtifactsSystemPrompt('zh');
     const enPrompt = await loadLiveArtifactsSystemPrompt('en');
 
-    // Protocol + aesthetics + golden examples + semantic colors; cap growth so it stays operational.
-    expect(zhPrompt.length).toBeLessThan(16000);
-    expect(enPrompt.length).toBeLessThan(24000);
+    // Protocol + aesthetics + golden examples + semantic colors + chart DSL +
+    // graphviz DSL; cap growth so it stays operational.
+    expect(zhPrompt.length).toBeLessThan(18000);
+    expect(enPrompt.length).toBeLessThan(26000);
     expect(zhPrompt).not.toContain('信息设计原则');
     expect(zhPrompt).not.toContain('完整 HTML 页面能力');
     expect(enPrompt).not.toContain('Information Design Principles');
     expect(enPrompt).not.toContain('Full HTML Page Capabilities');
+  });
+
+  it('teaches Live Artifacts graphviz clusters and a small shape whitelist', async () => {
+    const zhPrompt = await loadLiveArtifactsSystemPrompt('zh');
+    const enPrompt = await loadLiveArtifactsSystemPrompt('en');
+
+    expect(zhPrompt).toContain('subgraph cluster_');
+    expect(zhPrompt).toContain('shape=diamond');
+    expect(zhPrompt).toContain('style=dashed');
+    expect(zhPrompt).toContain('fillcolor 与 color');
+    expect(zhPrompt).toContain('不要硬套泳道');
+    expect(zhPrompt).not.toContain('样式一律不写');
+
+    expect(enPrompt).toContain('subgraph cluster_');
+    expect(enPrompt).toContain('shape=diamond');
+    expect(enPrompt).toContain('style=dashed');
+    expect(enPrompt).toContain('Do not wrap a straight pipeline in lanes');
+    expect(enPrompt).not.toContain('Never write style attributes');
+  });
+
+  it('keeps Live Artifacts graphviz examples complete and under DOT limits', async () => {
+    const { isProbablyCompleteDot } = await import('@/utils/html-preview/graphvizRendererScript');
+    const { countDotEdges, countDotNodes, DOT_MAX_CHARS, DOT_MAX_EDGES, DOT_MAX_NODES } =
+      await import('@/features/graphviz/graphvizLimits');
+
+    for (const language of ['zh', 'en'] as const) {
+      const prompt = await loadLiveArtifactsSystemPrompt(language);
+      const examples = [...prompt.matchAll(/data-amc-graphviz='([^']+)'/g)].map((match) => match[1]);
+      expect(examples.length).toBeGreaterThanOrEqual(2);
+      for (const dot of examples) {
+        expect(isProbablyCompleteDot(dot)).toBe(true);
+        expect(dot.length).toBeLessThanOrEqual(DOT_MAX_CHARS);
+        expect(countDotNodes(dot)).toBeLessThanOrEqual(DOT_MAX_NODES);
+        expect(countDotEdges(dot)).toBeLessThanOrEqual(DOT_MAX_EDGES);
+      }
+    }
   });
 
   it('tells Live Artifacts inline fragments not to emit mislabeled css or markdown code blocks', async () => {
@@ -455,6 +490,32 @@ describe('promptRegistry', () => {
     expect(enPrompt).toContain('box-shadow:0 1px 2px');
     expect(enPrompt).toContain('linear-gradient');
     expect(enPrompt).toContain('## Pre-output checklist');
+  });
+
+  it('teaches the declarative chart DSL in Live Artifacts prompts', async () => {
+    const zhPrompt = await loadLiveArtifactsSystemPrompt('zh');
+    const enPrompt = await loadLiveArtifactsSystemPrompt('en');
+
+    expect(zhPrompt).toContain('data-amc-chart');
+    expect(zhPrompt).toContain('禁止手写 SVG 图表');
+    expect(zhPrompt).toContain('grouped-bar');
+    expect(zhPrompt).toContain('stacked-bar');
+    expect(zhPrompt).toContain('slices');
+    expect(zhPrompt).toContain('x 与 y 长度必须一致');
+    expect(enPrompt).toContain('data-amc-chart');
+    expect(enPrompt).toContain('never hand-write SVG charts');
+    expect(enPrompt).toContain('grouped-bar');
+    expect(enPrompt).toContain('stacked-bar');
+    expect(enPrompt).toContain('slices');
+    expect(enPrompt).toContain('x and y lengths must match');
+  });
+
+  it('includes chart DSL coverage in the pre-output checklist', async () => {
+    const zhPrompt = await loadLiveArtifactsSystemPrompt('zh');
+    const enPrompt = await loadLiveArtifactsSystemPrompt('en');
+
+    expect(zhPrompt).toContain('数值图表用了 data-amc-chart 而非手写 SVG');
+    expect(enPrompt).toContain('Numeric charts use data-amc-chart instead of hand-written SVG');
   });
 
   it('teaches semantic colors with border exceptions for tags cards and callouts (option B)', async () => {

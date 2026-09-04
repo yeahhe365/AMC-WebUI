@@ -1,3 +1,6 @@
+import { resolveAppLanguage, type SupportedLanguage } from '@/i18n/languageRegistry';
+import type { AppLanguage } from '@/types';
+
 export type PwaInstallState = 'available' | 'manual' | 'installed';
 
 interface PwaInstallSnapshot {
@@ -5,13 +8,8 @@ interface PwaInstallSnapshot {
   canInstall: boolean;
 }
 
-const resolveLanguage = (language: 'en' | 'zh' | 'system', navigatorLanguage?: string) => {
-  if (language !== 'system') {
-    return language;
-  }
-
-  return navigatorLanguage?.toLowerCase().startsWith('zh') ? 'zh' : 'en';
-};
+const resolveLanguage = (language: AppLanguage, navigatorLanguage?: string): SupportedLanguage =>
+  resolveAppLanguage(language, navigatorLanguage);
 
 const isStandaloneMode = (win: Window = window) => {
   const displayModeStandalone = win.matchMedia?.('(display-mode: standalone)').matches ?? false;
@@ -48,12 +46,25 @@ export const getPwaInstallState = ({
 };
 
 export const getManualInstallMessage = (
-  language: 'en' | 'zh' | 'system' = 'en',
+  language: AppLanguage = 'en',
   navigatorLanguage = typeof navigator !== 'undefined' ? navigator.language : 'en',
 ) => {
   const resolvedLanguage = resolveLanguage(language, navigatorLanguage);
 
-  return resolvedLanguage === 'zh'
-    ? '请使用浏览器菜单将此应用安装到设备。'
-    : 'Use your browser menu to install this app.';
+  switch (resolvedLanguage) {
+    case 'zh':
+      return '请使用浏览器菜单将此应用安装到设备。';
+    case 'ja':
+      return 'ブラウザのメニューからこのアプリをインストールしてください。';
+    case 'ko':
+      return '브라우저 메뉴에서 이 앱을 설치하세요.';
+    case 'es':
+      return 'Usa el menú de tu navegador para instalar esta aplicación.';
+    case 'fr':
+      return 'Utilisez le menu de votre navigateur pour installer cette application.';
+    case 'de':
+      return 'Installieren Sie diese App über das Menü Ihres Browsers.';
+    default:
+      return 'Use your browser menu to install this app.';
+  }
 };

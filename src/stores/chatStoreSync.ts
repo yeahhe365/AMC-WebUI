@@ -11,7 +11,7 @@ import { getChatSyncChannel } from './chatSyncChannel';
 import type { UpdaterOrValue } from './stateUpdaters';
 
 /** How often to sweep remote loading flags that lost their lease. */
-export const SESSION_LOADING_STALE_CHECK_MS = 30_000;
+const SESSION_LOADING_STALE_CHECK_MS = 30_000;
 
 interface ChatSyncStore {
   getState: () => {
@@ -21,6 +21,7 @@ interface ChatSyncStore {
     setActiveMessages: (messages: SavedChatSession['messages']) => void;
     setSavedSessions: (updater: UpdaterOrValue<SavedChatSession[]>) => void;
     setLoadingSessionIds: (updater: UpdaterOrValue<Set<string>>) => void;
+    setCompletedSessions: (updater: UpdaterOrValue<Record<string, 'success' | 'error'>>) => void;
   };
 }
 
@@ -141,10 +142,17 @@ export function setupChatStoreSync({
           break;
         }
 
+        // 本 tab 持有该会话有效租约时，远端 false 不得覆盖本地 loading。
+        // 持有方完成时租约已先释放，不受影响；崩溃残留由 clearStaleRemoteLoading（30s 间隔）兜底。
+        const ownLease = readGenerationLease(syncMessage.sessionId);
+        const ownsFreshLease = Boolean(
+          ownLease && ownLease.tabId === TAB_ID && now() - ownLease.ts < GENERATION_LEASE_TTL_MS,
+        );
+
         store.getState().setLoadingSessionIds((previousLoadingSessionIds) => {
           const nextLoadingSessionIds = new Set(previousLoadingSessionIds);
           if (syncMessage.isLoading) nextLoadingSessionIds.add(syncMessage.sessionId);
-          else nextLoadingSessionIds.delete(syncMessage.sessionId);
+          else if (!ownsFreshLease) nextLoadingSessionIds.delete(syncMessage.sessionId);
           return nextLoadingSessionIds;
         });
         break;
@@ -162,6 +170,30 @@ export function setupChatStoreSync({
             `[Sync] Aborted ${aborted} local generation job(s) for session ${syncMessage.sessionId} (remote request)`,
           );
         }
+        break;
+      }
+      // 完成标记:只直接改本地 state,绝不调用 markSessionCompleted /
+      // markSessionViewed(那会再次广播,形成广播循环)。
+      case 'SESSION_COMPLETED': {
+        const { activeSessionId, setCompletedSessions } = store.getState();
+        if (syncMessage.sessionId === activeSessionId) {
+          break; // 本标签页正在观看该会话,不显示。
+        }
+        setCompletedSessions((previous) => ({
+          ...previous,
+          [syncMessage.sessionId]: syncMessage.outcome,
+        }));
+        break;
+      }
+      case 'SESSION_VIEWED': {
+        store.getState().setCompletedSessions((previous) => {
+          if (!(syncMessage.sessionId in previous)) {
+            return previous;
+          }
+          const next = { ...previous };
+          delete next[syncMessage.sessionId];
+          return next;
+        });
         break;
       }
     }

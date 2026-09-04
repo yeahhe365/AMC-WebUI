@@ -12,6 +12,7 @@ const mockCapabilities = vi.hoisted(() => ({
     isGemini3ImageModel: false,
     isTtsModel: false,
     isNativeAudioModel: false,
+    isTranscribeModel: false,
     supportedAspectRatios: [] as string[],
     supportedImageSizes: [] as string[],
   },
@@ -66,6 +67,7 @@ describe('ChatInputToolbar', () => {
       isGemini3ImageModel: false,
       isTtsModel: false,
       isNativeAudioModel: false,
+      isTranscribeModel: false,
       supportedAspectRatios: [],
       supportedImageSizes: [],
     };
@@ -83,15 +85,14 @@ describe('ChatInputToolbar', () => {
     expect(renderer.container.querySelector('[data-testid="image-settings-cluster"]')).not.toBeNull();
   });
 
-  it('hides image output mode selector for non-image models', () => {
+  it('shows transcribe cluster for transcribe models', () => {
     mockCapabilities.value = {
       ...mockCapabilities.value,
-      isImageGenerationModel: false,
+      isTranscribeModel: true,
     };
 
     renderToolbar();
 
-    expect(imageOutputModeSelectorMock).not.toHaveBeenCalled();
-    expect(renderer.container.querySelector('[data-testid="image-settings-cluster"]')).toBeNull();
+    expect(renderer.container.querySelector('[data-testid="transcribe-settings-cluster"]')).not.toBeNull();
   });
 });

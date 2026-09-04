@@ -2,6 +2,7 @@ import React from 'react';
 import { Globe } from 'lucide-react';
 import { getDomain, getFavicon } from './groundingSources';
 import { useI18n } from '@/contexts/I18nContext';
+import { SETTINGS_SECTION_LABEL_CLASS } from '@/constants/designTokens';
 
 interface SearchSourcesProps {
   sources: Array<{ uri: string; title: string }>;
@@ -16,9 +17,7 @@ export const SearchSources: React.FC<SearchSourcesProps> = ({ sources }) => {
     <div className="mt-3 pt-2 border-t border-[var(--theme-border-secondary)]/30 animate-in fade-in slide-in-from-top-1 duration-200">
       <div className="flex items-center gap-2 mb-2">
         <Globe size={11} className="text-[var(--theme-text-tertiary)]" strokeWidth={2} />
-        <h4 className="text-xs font-bold uppercase text-[var(--theme-text-tertiary)] tracking-widest">
-          {t('searchSourcesTitle')}
-        </h4>
+        <h4 className={SETTINGS_SECTION_LABEL_CLASS}>{t('searchSourcesTitle')}</h4>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
         {sources.map((source, i) => {

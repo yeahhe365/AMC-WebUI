@@ -10,10 +10,8 @@ import { ApiUsageTab } from './ApiUsageTab';
 import { ConfirmationModal } from '@/components/modals/ConfirmationModal';
 import { UsageOverviewTab } from './UsageOverviewTab';
 import { useI18n } from '@/contexts/I18nContext';
-import {
-  FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS,
-  FOCUS_VISIBLE_RING_SECONDARY_OFFSET_CLASS,
-} from '@/constants/focusClasses';
+import { MODAL_CLOSE_BUTTON_CLASS } from '@/constants/buttonClasses';
+import { FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS } from '@/constants/focusClasses';
 
 export interface LogViewerProps {
   isOpen: boolean;
@@ -138,19 +136,17 @@ export const LogViewer: React.FC<LogViewerProps> = ({
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        backdropClassName="bg-black/70"
-        contentClassName="w-full max-w-6xl h-[95vh]"
+        noPadding
+        ariaLabel={t('logViewerTitle')}
+        contentClassName="w-full h-[100dvh] sm:h-[85vh] sm:max-h-[800px] sm:w-[90vw] max-w-6xl sm:rounded-xl overflow-hidden flex flex-col shadow-2xl bg-[var(--theme-bg-primary)]"
       >
-        <div className="bg-[var(--theme-bg-primary)] w-full h-full shadow-2xl flex flex-col overflow-hidden rounded-xl border border-[var(--theme-border-primary)]">
-          <header className="py-2 px-4 border-b border-[var(--theme-border-secondary)] flex justify-between items-center bg-[var(--theme-bg-secondary)] flex-shrink-0">
-            <h2 className="text-lg font-semibold text-[var(--theme-text-link)] flex items-center gap-2">
-              <Terminal size={20} /> {t('logViewerTitle')}
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+          <header className="flex flex-shrink-0 items-center justify-between border-b border-[var(--theme-border-secondary)] bg-[var(--theme-bg-secondary)] px-4 py-2">
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--theme-text-primary)]">
+              <Terminal size={18} className="text-[var(--theme-text-tertiary)]" /> {t('logViewerTitle')}
             </h2>
-            <button
-              onClick={onClose}
-              className={`p-1.5 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] rounded-full transition-colors ${FOCUS_VISIBLE_RING_SECONDARY_OFFSET_CLASS}`}
-            >
-              <X size={22} />
+            <button onClick={onClose} className={MODAL_CLOSE_BUTTON_CLASS} aria-label={t('close')}>
+              <X size={20} />
             </button>
           </header>
 
@@ -179,6 +175,7 @@ export const LogViewer: React.FC<LogViewerProps> = ({
                 hasMore={hasMore}
                 onFetchMore={() => fetchLogs(false)}
                 onClear={() => setIsConfirmOpen(true)}
+                loggingDisabled={!appSettings.isLoggingEnabled}
               />
             )}
 

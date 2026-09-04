@@ -10,16 +10,16 @@ import {
   MediaResolution,
   type ChatSettings,
   type ImageOutputMode,
-  type ImagePersonGeneration,
   type SafetySetting,
   type ThinkingLevel,
 } from '@/types';
 import { logService } from '@/services/logService';
+import { toApiSafetySettings } from '@/constants/safetySettings';
 import {
-  getModelCapabilities,
   isGemini3Model,
   isGeminiRoboticsModel,
   isGemmaModel,
+  isTranscribeModel,
   normalizeThinkingLevelForModel,
   normalizeAspectRatioForModel,
   normalizeImageSizeForModel,
@@ -27,7 +27,9 @@ import {
 import { normalizeModelId } from '@/utils/model/modelId';
 import { isServerCodeExecutionMode } from '@/utils/codeExecution';
 
-const IMAGE_TEXT_MODALITIES = ['IMAGE', 'TEXT'];
+// Docs examples always list TEXT before IMAGE; the set order is what the API
+// expects on the wire.
+const IMAGE_TEXT_MODALITIES = ['TEXT', 'IMAGE'];
 const IMAGE_ONLY_MODALITIES = ['IMAGE'];
 const THINKING_LEVEL_FOR_SDK = {
   MINIMAL: GenAIThinkingLevel.MINIMAL,
@@ -43,7 +45,16 @@ type GenerationConfig = Omit<GenerateContentConfig, 'mediaResolution' | 'safetyS
 
 type BuildGenerationConfigInput = Pick<
   GenerationConfig,
-  'temperature' | 'topP' | 'topK' | 'responseMimeType' | 'responseSchema'
+  | 'temperature'
+  | 'topP'
+  | 'topK'
+  | 'maxOutputTokens'
+  | 'stopSequences'
+  | 'presencePenalty'
+  | 'frequencyPenalty'
+  | 'seed'
+  | 'responseMimeType'
+  | 'responseSchema'
 >;
 
 type GenerationConfigSettings = Pick<
@@ -53,6 +64,11 @@ type GenerationConfigSettings = Pick<
   | 'temperature'
   | 'topP'
   | 'topK'
+  | 'maxOutputTokens'
+  | 'stopSequences'
+  | 'presencePenalty'
+  | 'frequencyPenalty'
+  | 'seed'
   | 'showThoughts'
   | 'thinkingBudget'
   | 'isGoogleSearchEnabled'
@@ -75,7 +91,6 @@ interface BuildGenerationConfigOptions {
   imageSize?: string;
   isLocalPythonEnabled?: boolean;
   imageOutputMode?: ImageOutputMode;
-  personGeneration?: ImagePersonGeneration;
 }
 
 type InternalBuildGenerationConfigOptions = {
@@ -96,7 +111,6 @@ type InternalBuildGenerationConfigOptions = {
   mediaResolution?: MediaResolution;
   isLocalPythonEnabled?: boolean;
   imageOutputMode?: ImageOutputMode;
-  personGeneration?: ImagePersonGeneration;
 };
 
 const buildGoogleSearchToolForModel = (modelId: string): Tool =>
@@ -130,6 +144,11 @@ const toInternalBuildGenerationConfigOptions = (
       temperature: settings.temperature,
       topP: settings.topP,
       topK: settings.topK,
+      maxOutputTokens: settings.maxOutputTokens,
+      stopSequences: settings.stopSequences,
+      presencePenalty: settings.presencePenalty,
+      frequencyPenalty: settings.frequencyPenalty,
+      seed: settings.seed,
       ...options.config,
     },
     showThoughts: settings.showThoughts,
@@ -146,7 +165,6 @@ const toInternalBuildGenerationConfigOptions = (
     mediaResolution: settings.mediaResolution,
     isLocalPythonEnabled: options.isLocalPythonEnabled ?? settings.isLocalPythonEnabled,
     imageOutputMode: options.imageOutputMode,
-    personGeneration: options.personGeneration,
   };
 };
 
@@ -172,24 +190,6 @@ async function buildGenerationConfigFromOptions({
   const normalizedAspectRatio = normalizeAspectRatioForModel(modelId, aspectRatio);
   const normalizedImageSize = normalizeImageSizeForModel(modelId, imageSize);
   const googleSearchTool = buildGoogleSearchToolForModel(modelId);
-
-  if (
-    normalizeModelId(modelId) === 'gemini-2.5-flash-image-preview' ||
-    normalizeModelId(modelId) === 'gemini-2.5-flash-image'
-  ) {
-    const imageConfig: NonNullable<GenerationConfig['imageConfig']> = {};
-    if (normalizedAspectRatio && normalizedAspectRatio !== 'Auto') {
-      imageConfig.aspectRatio = normalizedAspectRatio;
-    }
-
-    const generationConfig: GenerationConfig = {
-      responseModalities: imageOutputMode === 'IMAGE_ONLY' ? IMAGE_ONLY_MODALITIES : IMAGE_TEXT_MODALITIES,
-    };
-    if (Object.keys(imageConfig).length > 0) {
-      generationConfig.imageConfig = imageConfig;
-    }
-    return generationConfig;
-  }
 
   if (
     normalizeModelId(modelId) === 'gemini-3-pro-image-preview' ||
@@ -220,10 +220,10 @@ async function buildGenerationConfigFromOptions({
     }
 
     const tools: NonNullable<GenerationConfig['tools']> = [];
-    // gemini-3.1-flash-lite-image does not support Google Search or Maps grounding.
+    // gemini-3.1-flash-lite-image does not support Google Search or Maps grounding;
+    // Maps grounding is not documented for any image-generation model.
     if (normalizeModelId(modelId) !== 'gemini-3.1-flash-lite-image') {
       if (isGoogleSearchEnabled) tools.push(googleSearchTool);
-      if (isGoogleMapsEnabled) tools.push(buildGoogleMapsTool());
     }
     if (tools.length > 0) generationConfig.tools = tools;
 
@@ -232,8 +232,12 @@ async function buildGenerationConfigFromOptions({
     return generationConfig;
   }
 
+  const isGemma = isGemmaModel(modelId);
+
   let finalSystemInstruction = systemInstruction;
-  if (isDeepSearchEnabled) {
+  // Deep Search = googleSearch tool + search-directive prompt; Gemma supports
+  // neither the tool (unsupported by the API) nor the round-trip, so skip both.
+  if (isDeepSearchEnabled && !isGemma) {
     const deepSearchPrompt = await loadDeepSearchSystemPrompt();
     finalSystemInstruction = finalSystemInstruction
       ? `${finalSystemInstruction}\n\n${deepSearchPrompt}`
@@ -247,32 +251,47 @@ async function buildGenerationConfigFromOptions({
       : localPythonPrompt;
   }
 
-  const isGemma = isGemmaModel(modelId);
   const gemmaThinkingLevel = isGemma ? (showThoughts ? 'HIGH' : 'MINIMAL') : undefined;
 
   const generationConfig: GenerationConfig = {
     ...config,
     systemInstruction: finalSystemInstruction || undefined,
-    safetySettings: safetySettings || undefined,
+    safetySettings: toApiSafetySettings(safetySettings),
   };
 
   const isGemini3 = isGemini3Model(modelId);
+  const isTranscribe = isTranscribeModel(modelId);
   const normalizedMediaResolution =
-    !isGemini3 && mediaResolution === MediaResolution.MEDIA_RESOLUTION_ULTRA_HIGH
+    !isGemini3 && !isTranscribe && mediaResolution === MediaResolution.MEDIA_RESOLUTION_ULTRA_HIGH
       ? MediaResolution.MEDIA_RESOLUTION_HIGH
       : mediaResolution;
-  if (!isGemini3 && normalizedMediaResolution) {
+  if (!isGemini3 && !isTranscribe && normalizedMediaResolution) {
     generationConfig.mediaResolution = normalizedMediaResolution;
   }
 
   if (!generationConfig.systemInstruction) {
     delete generationConfig.systemInstruction;
   }
+  if (typeof generationConfig.maxOutputTokens !== 'number' || generationConfig.maxOutputTokens <= 0) {
+    delete generationConfig.maxOutputTokens;
+  }
+  if (!Array.isArray(generationConfig.stopSequences) || generationConfig.stopSequences.length === 0) {
+    delete generationConfig.stopSequences;
+  }
+  if (typeof generationConfig.presencePenalty !== 'number') {
+    delete generationConfig.presencePenalty;
+  }
+  if (typeof generationConfig.frequencyPenalty !== 'number') {
+    delete generationConfig.frequencyPenalty;
+  }
+  if (typeof generationConfig.seed !== 'number') {
+    delete generationConfig.seed;
+  }
 
   const supportsThinkingLevel = isGemini3 || isGeminiRoboticsModel(modelId);
 
   if (supportsThinkingLevel) {
-    // Gemini 3 series (incl. 3.6 Flash / 3.5 Flash-Lite): official API is thinkingLevel + includeThoughts.
+    // Gemini 3 series (incl. 3.8 Flash / 3.7 Flash / 3.6 Flash / 3.5 Flash-Lite): official API is thinkingLevel + includeThoughts.
     // Do not send thinkingBudget alone — it is a 2.5-era parameter and can omit thought summaries on 3.x.
     // includeThoughts stays true so summaries are available; UI visibility is gated by showThoughts.
     generationConfig.thinkingConfig = {
@@ -290,28 +309,19 @@ async function buildGenerationConfigFromOptions({
       includeThoughts: true,
       thinkingLevel: gemmaThinkingLevel ? toSdkThinkingLevel(gemmaThinkingLevel, 'MINIMAL') : undefined,
     };
-  } else {
-    const modelSupportsThinking = getModelCapabilities(modelId).supportsThinkingBudgetConfig;
-
-    if (modelSupportsThinking) {
-      generationConfig.thinkingConfig = {
-        thinkingBudget,
-        includeThoughts: true,
-      };
-    }
   }
 
   const tools: NonNullable<GenerationConfig['tools']> = [];
-  if (isGoogleSearchEnabled || isDeepSearchEnabled) {
+  if (!isTranscribe && !isGemma && (isGoogleSearchEnabled || isDeepSearchEnabled)) {
     tools.push(googleSearchTool);
   }
-  if (isGoogleMapsEnabled) {
+  if (!isTranscribe && !isGemma && isGoogleMapsEnabled) {
     tools.push(buildGoogleMapsTool());
   }
-  if (!isGemma && isServerCodeExecutionMode({ isCodeExecutionEnabled, isLocalPythonEnabled })) {
+  if (!isTranscribe && !isGemma && isServerCodeExecutionMode({ isCodeExecutionEnabled, isLocalPythonEnabled })) {
     tools.push({ codeExecution: {} });
   }
-  if (!isGemma && isUrlContextEnabled) {
+  if (!isTranscribe && !isGemma && isUrlContextEnabled) {
     tools.push({ urlContext: {} });
   }
 

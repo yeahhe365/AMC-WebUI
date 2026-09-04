@@ -18,7 +18,50 @@ function createDropEvent(dataTransfer: Partial<DataTransfer>): React.DragEvent<H
   } as unknown as React.DragEvent<HTMLDivElement>;
 }
 
+function createWindowFileDragEvent(type: string, types: string[]): Event {
+  const event = new Event(type, { cancelable: true });
+  Object.defineProperty(event, 'dataTransfer', {
+    configurable: true,
+    value: { types },
+  });
+  return event;
+}
+
+function renderDragDropHook() {
+  return renderHookWithProviders(
+    () =>
+      useFileDragDrop({
+        onFilesDropped: vi.fn<(_files: FileList | File[]) => Promise<void>>(async () => {}),
+        onAddTempFile: vi.fn(),
+        onRemoveTempFile: vi.fn(),
+      }),
+    { language: 'en' },
+  );
+}
+
 describe('useFileDragDrop', () => {
+  it('cancels the browser default for file drags that bubble to the window', () => {
+    const { unmount } = renderDragDropHook();
+
+    const fileDragOver = createWindowFileDragEvent('dragover', ['Files']);
+    const fileDrop = createWindowFileDragEvent('drop', ['Files']);
+    const textDrag = createWindowFileDragEvent('dragover', ['text/plain']);
+
+    window.dispatchEvent(fileDragOver);
+    window.dispatchEvent(fileDrop);
+    window.dispatchEvent(textDrag);
+
+    expect(fileDragOver.defaultPrevented).toBe(true);
+    expect(fileDrop.defaultPrevented).toBe(true);
+    expect(textDrag.defaultPrevented).toBe(false);
+
+    unmount();
+
+    const afterUnmount = createWindowFileDragEvent('drop', ['Files']);
+    window.dispatchEvent(afterUnmount);
+    expect(afterUnmount.defaultPrevented).toBe(false);
+  });
+
   it('falls back to DataTransfer files when dropped items are unavailable', async () => {
     const file = new File(['plain text\n'], 'notes.txt', { type: 'text/plain' });
     const files = [file] as unknown as FileList;

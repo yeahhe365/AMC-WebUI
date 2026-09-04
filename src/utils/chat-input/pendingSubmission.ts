@@ -1,5 +1,9 @@
 import type { UploadedFile } from '@/types';
+import { generateUniqueId } from '@/utils/chat/ids';
 import { buildChatInputSubmitText } from './chatInputContent';
+
+/** Hard cap on queued messages per session — guards against accidental spam and caps UI height. */
+export const MAX_QUEUED_SUBMISSIONS = 20;
 
 export type PendingChatInputSubmission =
   | {
@@ -71,6 +75,7 @@ export const buildPendingChatInputSubmission = ({
 };
 
 export interface QueuedChatInputSubmission {
+  id: string;
   sessionId: string;
   inputText: string;
   textToSend: string;
@@ -89,8 +94,8 @@ export const buildQueuedChatInputSubmission = ({
   files,
   isFastMode,
 }: BuildQueuedChatInputSubmissionParams): QueuedChatInputSubmission => ({
+  id: generateUniqueId(),
   sessionId,
-  inputText,
   textToSend: buildChatInputSubmitText({
     inputText,
     quotes,
@@ -99,6 +104,7 @@ export const buildQueuedChatInputSubmission = ({
   }),
   files: [...files],
   quotes: [...quotes],
+  inputText,
   isFastMode,
   createdAt: Date.now(),
 });

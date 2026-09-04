@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseThoughtProcess, createUploadedFileFromBytes } from './parsing';
+import { getThinkingStreamTail, createUploadedFileFromBytes, parseThinkingSections } from './parsing';
 
 describe('createUploadedFileFromBytes', () => {
   it('builds an UploadedFile directly from an ArrayBuffer without base64 decoding', () => {
@@ -18,89 +18,117 @@ describe('createUploadedFileFromBytes', () => {
   });
 });
 
-describe('parseThoughtProcess', () => {
-  it('returns null for undefined input', () => {
-    expect(parseThoughtProcess(undefined)).toBeNull();
+describe('getThinkingStreamTail', () => {
+  it('returns empty string for undefined input', () => {
+    expect(getThinkingStreamTail(undefined, 5)).toBe('');
   });
 
-  it('returns null for empty string', () => {
-    expect(parseThoughtProcess('')).toBeNull();
+  it('returns empty string for empty input', () => {
+    expect(getThinkingStreamTail('', 5)).toBe('');
   });
 
-  it('returns fallback for whitespace-only string', () => {
-    const result = parseThoughtProcess('   \n  ');
-    expect(result?.isFallback).toBe(true);
-    expect(result?.content).toBe('');
+  it('returns empty string for whitespace-only input', () => {
+    expect(getThinkingStreamTail('   \n  ', 5)).toBe('');
   });
 
-  it('extracts content after ## heading', () => {
-    const result = parseThoughtProcess('## Step 1\nFirst thought\n## Step 2\nSecond thought');
-    expect(result).toEqual({
-      title: 'Step 2',
-      content: 'Second thought',
-      isFallback: false,
-    });
+  it('strips ## and ### heading markers down to plain text lines', () => {
+    const result = getThinkingStreamTail('## Step 1\nFirst thought\n### Analysis\nDeep analysis here', 5);
+    expect(result).toBe('Step 1\nFirst thought\nAnalysis\nDeep analysis here');
   });
 
-  it('extracts content after ### heading', () => {
-    const result = parseThoughtProcess('### Analysis\nDeep analysis here');
-    expect(result).toEqual({
-      title: 'Analysis',
-      content: 'Deep analysis here',
-      isFallback: false,
-    });
+  it('strips full-line **bold** markers', () => {
+    const result = getThinkingStreamTail('**Reasoning**\nSome reasoning text', 5);
+    expect(result).toBe('Reasoning\nSome reasoning text');
   });
 
-  it('extracts content after **bold** heading', () => {
-    const result = parseThoughtProcess('**Reasoning**\nSome reasoning text');
-    expect(result).toEqual({
-      title: 'Reasoning',
-      content: 'Some reasoning text',
-      isFallback: false,
-    });
+  it('strips full-line __underline__ markers', () => {
+    const result = getThinkingStreamTail('__Planning__\nPlan details', 5);
+    expect(result).toBe('Planning\nPlan details');
   });
 
-  it('extracts content after __underline__ heading', () => {
-    const result = parseThoughtProcess('__Planning__\nPlan details');
-    expect(result).toEqual({
-      title: 'Planning',
-      content: 'Plan details',
-      isFallback: false,
-    });
+  it('filters blank lines and joins the rest with a single newline', () => {
+    const result = getThinkingStreamTail('## Title\n  \n  Content line  \n  \nSecond', 5);
+    expect(result).toBe('Title\nContent line\nSecond');
   });
 
-  it('uses fallback when no heading found', () => {
-    const result = parseThoughtProcess('Line 1\nLine 2\nLine 3\nLine 4\nLine 5');
-    expect(result?.isFallback).toBe(true);
-    expect(result?.title).toBe('Latest thought');
-    // Fallback takes last 5 lines
-    expect(result?.content).toContain('Line 1');
+  it('keeps only the last maxLines source lines', () => {
+    const lines = Array.from({ length: 30 }, (_, index) => `Line ${index + 1}`);
+    const result = getThinkingStreamTail(lines.join('\n'), 24);
+    const resultLines = result.split('\n');
+    expect(resultLines.length).toBe(24);
+    // 30 lines, keep last 24 → the first kept line is Line 7.
+    expect(resultLines[0]).toBe('Line 7');
+    expect(resultLines[resultLines.length - 1]).toBe('Line 30');
+  });
+});
+
+describe('parseThinkingSections', () => {
+  it('returns null for undefined or empty input', () => {
+    expect(parseThinkingSections(undefined)).toBeNull();
+    expect(parseThinkingSections('')).toBeNull();
+    expect(parseThinkingSections('   \n  ')).toBeNull();
   });
 
-  it('returns empty content when heading is the last line', () => {
-    const result = parseThoughtProcess('Some text\n## Final Heading');
-    expect(result).toEqual({
-      title: 'Final Heading',
-      content: '',
-      isFallback: false,
-    });
+  it('returns null for flat text with no full-line bold markers', () => {
+    expect(parseThinkingSections('Plan carefully\nThen answer')).toBeNull();
   });
 
-  it('uses the LAST heading when multiple headings exist', () => {
-    const result = parseThoughtProcess('## First\nContent A\n## Second\nContent B\n## Third\nContent C');
-    expect(result?.title).toBe('Third');
-    expect(result?.content).toBe('Content C');
+  it('returns null for inline bold that is not a standalone title', () => {
+    expect(parseThinkingSections('some **bold** text')).toBeNull();
+    expect(parseThinkingSections('**not closed title')).toBeNull();
   });
 
-  it('handles bold heading with internal ** correctly (not treated as heading)', () => {
-    // A line like "**bold **inner** text**" has internal ** so it should NOT match
-    const result = parseThoughtProcess('**bold **inner** text**\nSome content');
-    // Falls back because the bold check fails due to internal **
-    expect(result?.isFallback).toBe(true);
+  it('parses a full Gemini-style sectioned stream', () => {
+    const thoughts = [
+      '**Interpreting the Query**',
+      '',
+      'The user asks about X.',
+      '',
+      '**Adding Follow-up Integration**',
+      '',
+      'We can extend Y.',
+      '',
+      '**Final Answer**',
+      '',
+      'Done.',
+    ].join('\n');
+
+    const sections = parseThinkingSections(thoughts);
+
+    expect(sections).not.toBeNull();
+    expect(sections).toHaveLength(3);
+    expect(sections![0]).toEqual({ title: 'Interpreting the Query', body: 'The user asks about X.' });
+    expect(sections![1]).toEqual({ title: 'Adding Follow-up Integration', body: 'We can extend Y.' });
+    expect(sections![2]).toEqual({ title: 'Final Answer', body: 'Done.' });
   });
 
-  it('trims whitespace from content lines', () => {
-    const result = parseThoughtProcess('## Title\n  \n  Content line  \n  \n');
-    expect(result?.content).toBe('Content line');
+  it('puts loose preamble before the first title into a null-titled section', () => {
+    const thoughts = 'Intro line.\n**Step One**\nBody.';
+
+    const sections = parseThinkingSections(thoughts);
+
+    expect(sections).not.toBeNull();
+    expect(sections).toHaveLength(2);
+    expect(sections![0]).toEqual({ title: null, body: 'Intro line.' });
+    expect(sections![1]).toEqual({ title: 'Step One', body: 'Body.' });
+  });
+
+  it('ignores an unclosed trailing title so the previous section keeps its body', () => {
+    const thoughts = '**Step One**\nBody text\n**Partial tit';
+
+    const sections = parseThinkingSections(thoughts);
+
+    expect(sections).not.toBeNull();
+    expect(sections).toHaveLength(1);
+    expect(sections![0]).toEqual({ title: 'Step One', body: 'Body text\n**Partial tit' });
+  });
+
+  it('trims the title and body whitespace', () => {
+    const thoughts = '**  Spaced Title  **\n  padded body  \n';
+
+    const sections = parseThinkingSections(thoughts);
+
+    expect(sections).toHaveLength(1);
+    expect(sections![0]).toEqual({ title: 'Spaced Title', body: 'padded body' });
   });
 });

@@ -155,7 +155,37 @@ describe('appSettingsSchema', () => {
     ]);
   });
 
-  it('drops invalid MCP server entries from imported settings', () => {
+  it('preserves MCP timeout and longRunning fields', () => {
+    const settings = sanitizeImportedAppSettings({
+      mcpServers: [
+        {
+          id: 'long-task',
+          name: 'Long Task',
+          enabled: true,
+          transport: 'http',
+          url: 'https://mcp.example.com/mcp',
+          timeout: 300,
+          longRunning: true,
+        },
+        {
+          id: 'bad-timeout',
+          name: 'Bad Timeout',
+          enabled: true,
+          transport: 'http',
+          url: 'https://mcp.example.com/mcp',
+          timeout: '120',
+          longRunning: 'yes',
+        },
+      ],
+    });
+
+    expect(settings.mcpServers[0].timeout).toBe(300);
+    expect(settings.mcpServers[0].longRunning).toBe(true);
+    expect(settings.mcpServers[1].timeout).toBeUndefined();
+    expect(settings.mcpServers[1].longRunning).toBeUndefined();
+  });
+
+  it('drops identity-invalid MCP entries but keeps incomplete in-progress configs', () => {
     const settings = sanitizeImportedAppSettings({
       mcpServers: [
         {
@@ -190,6 +220,13 @@ describe('appSettingsSchema', () => {
           transport: 'http',
           url: 'file:///tmp/mcp',
         },
+        {
+          id: 'no-command',
+          name: 'No Command Yet',
+          enabled: true,
+          transport: 'stdio',
+          command: '',
+        },
       ],
     });
 
@@ -205,6 +242,51 @@ describe('appSettingsSchema', () => {
           KEEP: 'yes',
         },
       },
+      {
+        id: 'file-url',
+        name: 'File URL',
+        enabled: true,
+        transport: 'http',
+        url: 'file:///tmp/mcp',
+      },
+      {
+        id: 'no-command',
+        name: 'No Command Yet',
+        enabled: true,
+        transport: 'stdio',
+        command: '',
+      },
     ]);
+  });
+
+  it('defaults a missing isLoggingEnabled field to false', () => {
+    const settings = sanitizeImportedAppSettings({});
+
+    expect(settings.isLoggingEnabled).toBe(false);
+  });
+
+  it('preserves an explicit isLoggingEnabled true from imported settings', () => {
+    const settings = sanitizeImportedAppSettings({ isLoggingEnabled: true });
+
+    expect(settings.isLoggingEnabled).toBe(true);
+  });
+
+  it('migrates the legacy autoFullscreenHtml key to autoOpenHtmlPreview', () => {
+    const settings = sanitizeImportedAppSettings({ autoFullscreenHtml: true });
+
+    expect(settings.autoOpenHtmlPreview).toBe(true);
+    expect((settings as { autoFullscreenHtml?: boolean }).autoFullscreenHtml).toBeUndefined();
+  });
+
+  it('defaults a migrated legacy autoFullscreenHtml false to false', () => {
+    const settings = sanitizeImportedAppSettings({ autoFullscreenHtml: false });
+
+    expect(settings.autoOpenHtmlPreview).toBe(false);
+  });
+
+  it('keeps an explicit autoOpenHtmlPreview when a legacy key is also present', () => {
+    const settings = sanitizeImportedAppSettings({ autoFullscreenHtml: true, autoOpenHtmlPreview: false });
+
+    expect(settings.autoOpenHtmlPreview).toBe(false);
   });
 });

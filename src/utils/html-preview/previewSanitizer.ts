@@ -1,4 +1,5 @@
 const DANGEROUS_PREVIEW_SELECTOR = 'script, iframe, object, embed';
+const CODE_BLOCK_SELECTOR = 'pre, code';
 const DANGEROUS_PREVIEW_URL_ATTRIBUTES = ['src', 'href'] as const;
 const DANGEROUS_PREVIEW_URL_PROTOCOLS = ['javascript:', 'vbscript:', 'file:'];
 const DANGEROUS_PREVIEW_DATA_PROTOCOL = 'data:';
@@ -40,7 +41,23 @@ const removeDangerousPreviewAttribute = (element: Element, attribute: Attr) => {
   }
 };
 
+/**
+ * Code examples (pre/code blocks) legitimately display <script>/<iframe>/…
+ * markup. Removing those elements would silently erase the example, so turn
+ * them into plain text first (their inner content becomes inert text). Blocks
+ * outside pre/code are still removed outright below.
+ */
+const textifyCodeBlockDangerousElements = (root: ParentNode) => {
+  root.querySelectorAll(CODE_BLOCK_SELECTOR).forEach((block) => {
+    block.querySelectorAll(DANGEROUS_PREVIEW_SELECTOR).forEach((element) => {
+      element.replaceWith(element.ownerDocument.createTextNode(element.textContent ?? ''));
+    });
+  });
+};
+
 export const sanitizeElementTree = (root: ParentNode) => {
+  textifyCodeBlockDangerousElements(root);
+
   root.querySelectorAll(DANGEROUS_PREVIEW_SELECTOR).forEach((element) => {
     element.remove();
   });
@@ -54,6 +71,7 @@ export const sanitizeElementTree = (root: ParentNode) => {
 
 export const STREAM_SANITIZER_SCRIPT = `
   const dangerousSelector = ${JSON.stringify(DANGEROUS_PREVIEW_SELECTOR)};
+  const codeBlockSelector = ${JSON.stringify(CODE_BLOCK_SELECTOR)};
   const dangerousUrlAttributes = ${JSON.stringify(DANGEROUS_PREVIEW_URL_ATTRIBUTES)};
   const dangerousUrlProtocols = ${JSON.stringify(DANGEROUS_PREVIEW_URL_PROTOCOLS)};
   const dangerousDataProtocol = ${JSON.stringify(DANGEROUS_PREVIEW_DATA_PROTOCOL)};
@@ -85,6 +103,11 @@ export const STREAM_SANITIZER_SCRIPT = `
   };
 
   const sanitizeElementTree = (parent) => {
+    parent.querySelectorAll(codeBlockSelector).forEach((block) => {
+      block.querySelectorAll(dangerousSelector).forEach((element) => {
+        element.replaceWith(document.createTextNode(element.textContent || ''));
+      });
+    });
     parent.querySelectorAll(dangerousSelector).forEach((element) => element.remove());
     parent.querySelectorAll('*').forEach((element) => {
       Array.from(element.attributes).forEach((attribute) => {

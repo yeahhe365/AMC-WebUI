@@ -1,23 +1,11 @@
 import type { Part } from '@google/genai';
 import type { ChatHistoryItem, ThinkingLevel } from '@/types';
 import { isAudioMimeType, isImageMimeType } from '@/utils/file/fileTypeClassification';
+import { isGlmModel, isKimiK3Model, isOpenAIGpt5FamilyModel } from '@/utils/model/modelCapabilities';
 import type { OpenAICompatibleChatConfig, OpenAIMessage, OpenAIMessageContent } from './openaiCompatibleTypes';
+import { appendSamplingParameters } from './requestFactory';
 
 const OPENAI_COMPATIBLE_FILE_DATA_ERROR = 'OpenAI-compatible mode cannot send Gemini Files API file references.';
-
-const isGlmModel = (modelId: string): boolean => modelId.toLowerCase().startsWith('glm-');
-
-/** OpenAI GPT-5 family (incl. gpt-5.6-sol/terra/luna) supports chat-completions reasoning_effort. */
-const isOpenAIGpt5FamilyModel = (modelId: string): boolean => {
-  const lower = modelId.toLowerCase();
-  return lower.startsWith('gpt-5') || lower.includes('/gpt-5');
-};
-
-/** Kimi K3 configures reasoning via top-level reasoning_effort (low | high | max). */
-const isKimiK3Model = (modelId: string): boolean => {
-  const lower = modelId.toLowerCase();
-  return lower === 'kimi-k3' || lower.startsWith('kimi-k3-') || lower.includes('kimi-k3');
-};
 
 const mapThinkingLevelToOpenAIReasoningEffort = (level: ThinkingLevel | undefined): string => {
   switch (level) {
@@ -170,17 +158,29 @@ export const buildOpenAICompatibleRequestBody = (
     stream,
   };
 
-  if (typeof config.temperature === 'number') {
-    body.temperature = config.temperature;
-  }
+  appendSamplingParameters(body, config);
 
-  if (typeof config.topP === 'number') {
-    body.top_p = config.topP;
+  if (typeof config.maxOutputTokens === 'number' && config.maxOutputTokens > 0) {
+    body.max_tokens = config.maxOutputTokens;
+  }
+  if (Array.isArray(config.stopSequences) && config.stopSequences.length > 0) {
+    const validStops = config.stopSequences.map((s) => s.trim()).filter(Boolean);
+    if (validStops.length > 0) {
+      body.stop = validStops.length === 1 ? validStops[0] : validStops;
+    }
+  }
+  if (typeof config.presencePenalty === 'number') {
+    body.presence_penalty = config.presencePenalty;
+  }
+  if (typeof config.frequencyPenalty === 'number') {
+    body.frequency_penalty = config.frequencyPenalty;
+  }
+  if (typeof config.seed === 'number') {
+    body.seed = config.seed;
   }
 
   // GLM-5 series supports a thinking parameter for chain-of-thought reasoning.
-  // The header Zap button toggles thinkingLevel between LOW (fast/disabled) and HIGH.
-  // Map HIGH/MEDIUM to enabled, LOW/MINIMAL to disabled.
+  // Map HIGH/MEDIUM to enabled, LOW/MINIMAL to disabled (controlled via ThinkingSpeedControl slider).
   if (isGlmModel(modelId)) {
     const thinkingEnabled = config.thinkingLevel === 'HIGH' || config.thinkingLevel === 'MEDIUM';
     body.thinking = { type: thinkingEnabled ? 'enabled' : 'disabled' };

@@ -111,4 +111,47 @@ describe('useLiveFrameCapture', () => {
     unmount();
     vi.useRealTimers();
   });
+
+  it('skips duplicate identical frames when screen sharing, but sends a heartbeat after 10s', async () => {
+    const sendRealtimeInput = vi.fn();
+    const sessionRef = createLiveSessionRef(createLiveSessionStub({ sendRealtimeInput }));
+
+    const videoStream = {} as MediaStream;
+
+    const { unmount } = renderHook(() =>
+      useLiveFrameCapture({
+        isConnected: true,
+        videoStream,
+        videoSource: 'screen',
+        volume: 0,
+        isMuted: false,
+        captureFrame: () => 'static-screen-frame',
+        sessionRef,
+      }),
+    );
+
+    // First second: first frame sent
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+    expect(sendRealtimeInput).toHaveBeenCalledTimes(1);
+
+    // Second second: identical frame skipped
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+    expect(sendRealtimeInput).toHaveBeenCalledTimes(1);
+
+    // 10 seconds later: heartbeat triggers a send even if identical
+    await act(async () => {
+      vi.advanceTimersByTime(9000);
+      await Promise.resolve();
+    });
+    expect(sendRealtimeInput).toHaveBeenCalledTimes(2);
+
+    unmount();
+    vi.useRealTimers();
+  });
 });

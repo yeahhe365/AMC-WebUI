@@ -2,14 +2,16 @@ import { type ChatMessage, type ChatSettings } from '@/types';
 import type { UsageMetadata } from '@google/genai';
 import { getTranslator } from '@/i18n/translations';
 import { calculateTokenStats } from '@/utils/model/modelUsageStats';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 
 interface FinalizeMessagesOptions {
   messages: ChatMessage[];
   generationStartTime: Date;
   newModelMessageIds: Set<string>;
   currentChatSettings: ChatSettings;
-  language: 'en' | 'zh';
+  language: SupportedLanguage;
   firstContentPartTime: Date | null;
+  lastThoughtChunkTimeMs?: number;
   usageMetadata?: UsageMetadata;
   groundingMetadata?: unknown;
   urlContextMetadata?: unknown;
@@ -23,6 +25,7 @@ export const finalizeMessages = ({
   currentChatSettings: _currentChatSettings,
   language,
   firstContentPartTime,
+  lastThoughtChunkTimeMs,
   usageMetadata,
   groundingMetadata,
   urlContextMetadata,
@@ -48,8 +51,19 @@ export const finalizeMessages = ({
       message.isLoading
     ) {
       let thinkingTime = message.thinkingTimeMs;
-      if (thinkingTime === undefined && firstContentPartTime) {
-        thinkingTime = firstContentPartTime.getTime() - generationStartTime.getTime();
+      if (thinkingTime === undefined) {
+        if (lastThoughtChunkTimeMs !== undefined) {
+          // Last thought chunk: most accurate for a reply that never produced
+          // visible content (interleaved thought after code execution), or for
+          // an aborted run that only thought.
+          thinkingTime = lastThoughtChunkTimeMs;
+        } else if (firstContentPartTime) {
+          thinkingTime = firstContentPartTime.getTime() - generationStartTime.getTime();
+        } else if (message.thoughts) {
+          // Only thoughts, never any content part (e.g. a pure-reasoning turn
+          // finished as a live reply): the whole run was thinking time.
+          thinkingTime = new Date().getTime() - generationStartTime.getTime();
+        }
       }
       const isLastMessageOfRun = message.id === Array.from(newModelMessageIds).pop();
 
@@ -66,7 +80,8 @@ export const finalizeMessages = ({
         content: message.content,
         thoughts: message.thoughts,
         generationEndTime: new Date(),
-        thinkingTimeMs: thinkingTime,
+        thinkingTimeMs: message.thoughts ? thinkingTime : undefined,
+        thinkingActive: message.thoughts ? message.thinkingActive : undefined,
         groundingMetadata: isLastMessageOfRun ? groundingMetadata : undefined,
         urlContextMetadata: isLastMessageOfRun ? urlContextMetadata : undefined,
         promptTokens: isLastMessageOfRun ? promptTokens : undefined,
@@ -89,7 +104,7 @@ export const finalizeMessages = ({
         completedMessage.content = t('emptyResponseError');
       }
 
-      if (isLastMessageOfRun) {
+      if (isLastMessageOfRun && !isAborted) {
         completedMessageForNotification = completedMessage;
       }
       return completedMessage;
@@ -98,10 +113,16 @@ export const finalizeMessages = ({
   });
 
   if (!isAborted) {
+    // Prune empty model messages from THIS run only. A global prune would also
+    // delete empty internal/historical model messages (e.g. a message stuck in
+    // the DB from a crashed resume that never produced output), silently
+    // discarding data unrelated to this turn. Scoping to this run's
+    // generationStartTime keeps the cleanup to exactly what this finalize owns.
     finalMessages = finalMessages.filter(
       (message) =>
         message.role !== 'model' ||
         message.isInternalToolMessage ||
+        message.generationStartTime?.getTime() !== generationStartTime.getTime() ||
         (message.apiParts && message.apiParts.length > 0) ||
         message.content?.trim() !== '' ||
         (message.files && message.files.length > 0) ||

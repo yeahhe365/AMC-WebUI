@@ -1,14 +1,19 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { createPersistedStateStorage, readPersistentStorageItem } from './persistentStorage';
+import { readPersistentStorageItem } from './persistentStorage';
+import { createSyncedPersist } from './syncedPersist';
 
 export type SettingsTab = 'models' | 'interface' | 'api' | 'mcp' | 'data' | 'shortcuts' | 'about';
 export type SettingsTabDescriptor = { id: SettingsTab; labelKey: string };
 
 const SETTINGS_UI_STORE_STORAGE_KEY = 'all_model_chat_settings_ui_v1';
+const { storage: settingsUiSyncedStorage } = createSyncedPersist(SETTINGS_UI_STORE_STORAGE_KEY, {
+  debounceMs: 150,
+  enableCrossTabSync: false,
+});
 
 const LEGACY_SETTINGS_TAB_STORAGE_KEY = 'chatSettingsLastTab';
-const SETTINGS_TABS: SettingsTab[] = ['models', 'interface', 'api', 'mcp', 'data', 'shortcuts', 'about'];
+export const SETTINGS_TABS: SettingsTab[] = ['models', 'interface', 'api', 'mcp', 'data', 'shortcuts', 'about'];
 
 interface SettingsUiState {
   activeTab: SettingsTab;
@@ -119,7 +124,7 @@ export const useSettingsUiStore = create<SettingsUiState & SettingsUiActions>()(
     {
       name: SETTINGS_UI_STORE_STORAGE_KEY,
       // Tab-private UI chrome (active tab, scroll, advanced toggle).
-      storage: createJSONStorage(() => createPersistedStateStorage({ debounceMs: 150, notifyUpdate: () => {} })),
+      storage: createJSONStorage(() => settingsUiSyncedStorage),
       partialize: (state) => ({
         activeTab: state.activeTab,
         scrollPositions: state.scrollPositions,

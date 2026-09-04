@@ -85,4 +85,28 @@ describe('CreateTextFileEditor extension preference', () => {
     const select = document.body.querySelector('select') as HTMLSelectElement | null;
     expect(select?.value).toBe('.py');
   });
+
+  it('still changes the extension when localStorage cannot persist the preference', async () => {
+    const setItem = vi.fn(() => {
+      throw new Error('quota exceeded');
+    });
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        ...storage,
+        setItem,
+      },
+    });
+
+    await renderEditor();
+
+    const select = document.body.querySelector('select') as HTMLSelectElement | null;
+    await act(async () => {
+      select!.value = '.json';
+      select!.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    expect(select?.value).toBe('.json');
+    expect(setItem).toHaveBeenCalled();
+  });
 });

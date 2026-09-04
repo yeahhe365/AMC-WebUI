@@ -3,9 +3,9 @@ const INLINE_IMAGE_PLACEHOLDER_PATTERN = /!\[([^\]]*)\]\((内嵌图片-\d+)\)/g;
 
 export const createInlineImagePlaceholder = (index: number) => `内嵌图片-${index}`;
 
-export const extractInlineImagePlaceholders = (content: string) => {
+export const extractInlineImagePlaceholders = (content: string, startIndex = 1) => {
   const placeholders = new Map<string, string>();
-  let nextIndex = 1;
+  let nextIndex = startIndex;
 
   const editorContent = content.replace(INLINE_IMAGE_DATA_URL_PATTERN, (_match, alt: string, dataUrl: string) => {
     const placeholder = createInlineImagePlaceholder(nextIndex++);

@@ -3,11 +3,11 @@ FROM node:24-slim
 WORKDIR /app
 
 COPY docker/web-server.js /app/web-server.js
-COPY dist /usr/share/nginx/html
+COPY dist /app/public
 
 ENV PORT=80
 ENV API_UPSTREAM=http://api:3001
-ENV WEB_ROOT=/usr/share/nginx/html
+ENV WEB_ROOT=/app/public
 
 EXPOSE 80
 

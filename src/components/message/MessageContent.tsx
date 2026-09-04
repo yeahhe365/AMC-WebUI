@@ -1,5 +1,6 @@
 import React from 'react';
 import { type ChatMessage, type UploadedFile, type AppSettings, type SideViewContent } from '@/types';
+import type { OpenHtmlPreviewHandler } from '@/utils/html-preview/previewPrivilege';
 import { MessageFiles } from './content/MessageFiles';
 import { MessageThoughts } from './content/MessageThoughts';
 import { MessageText } from './content/MessageText';
@@ -10,7 +11,7 @@ import type { UserMessageCollapseController } from './content/userMessageCollaps
 interface MessageContentProps {
   message: ChatMessage;
   onImageClick: (file: UploadedFile) => void;
-  onOpenHtmlPreview: (html: string, options?: { initialTrueFullscreen?: boolean }) => void;
+  onOpenHtmlPreview: OpenHtmlPreviewHandler;
   onLiveArtifactFollowUp?: (payload: LiveArtifactFollowupPayload) => void;
   showThoughts: boolean;
   baseFontSize: number;
@@ -25,6 +26,7 @@ interface MessageContentProps {
   onConfigureFile?: (file: UploadedFile, messageId: string) => void;
   isGemini3?: boolean;
   userMessageCollapse?: UserMessageCollapseController;
+  diagramLoadMode?: 'deferred' | 'eager';
 }
 
 export const MessageContent: React.FC<MessageContentProps> = React.memo((props) => {

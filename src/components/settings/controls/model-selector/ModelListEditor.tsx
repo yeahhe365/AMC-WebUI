@@ -129,7 +129,7 @@ export const ModelListEditor: React.FC<ModelListEditorProps> = ({
   return (
     <>
       <div className="border border-[var(--theme-border-secondary)] rounded-xl bg-[var(--theme-bg-input)]/50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-        <div className="max-h-[400px] overflow-y-auto custom-scrollbar p-2 space-y-2">
+        <div className="max-h-[400px] overflow-y-auto custom-scrollbar overscroll-contain p-2 space-y-2">
           {tempModels.map((model, modelIndex) => (
             <ModelListEditorRow
               key={model._rowId}
@@ -142,7 +142,7 @@ export const ModelListEditor: React.FC<ModelListEditorProps> = ({
           ))}
 
           {tempModels.length === 0 && (
-            <div className="p-4 text-center text-xs text-[var(--theme-text-tertiary)] italic">
+            <div className="p-4 text-center text-xs text-[var(--theme-text-secondary)] italic">
               {t('settingsNoModelsInList')}
             </div>
           )}
@@ -159,7 +159,7 @@ export const ModelListEditor: React.FC<ModelListEditorProps> = ({
               </button>
               <button
                 onClick={() => setIsResetConfirmOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] rounded transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] rounded transition-colors"
               >
                 <RotateCcw size={14} /> {t('settingsResetModelList')}
               </button>
@@ -170,7 +170,7 @@ export const ModelListEditor: React.FC<ModelListEditorProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleCancelEdit}
-              className="px-4 py-1.5 text-xs font-medium text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] rounded transition-colors"
+              className="px-4 py-1.5 text-xs font-medium text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] rounded transition-colors"
             >
               {t('cancel')}
             </button>

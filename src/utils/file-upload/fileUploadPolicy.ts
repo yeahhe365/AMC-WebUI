@@ -6,10 +6,17 @@ import {
   SUPPORTED_VIDEO_MIME_TYPES,
   SUPPORTED_UPLOAD_MIME_TYPES,
 } from '@/constants/fileTypeSupport';
-import { type AppSettings, type FilesApiConfig, type UploadedFile } from '@/types';
+import {
+  type AppSettings,
+  type ChatProviderId,
+  type FilesApiConfig,
+  type UploadedFile,
+  GEMINI_PROVIDER_ID,
+} from '@/types';
 import { CODE_EXECUTION_TEXT_FILE_LIMIT_BYTES, isServerCodeExecutionMode } from '@/utils/codeExecution';
 import { isTextFile } from '@/utils/file/fileTypeClassification';
 import { getTranslator } from '@/i18n/translations';
+import { interpolate } from '@/i18n/interpolate';
 
 type Translator = ReturnType<typeof getTranslator>;
 
@@ -117,9 +124,18 @@ export const getUploadLifecycleForGeminiState = (
   return { uploadState: 'processing_api', isProcessing: true };
 };
 
-export const shouldUseFileApi = (file: File, appSettings: AppSettings): boolean => {
+// A session routes to a third-party provider when its providerId is set to one.
+// ProviderIds are the derived routing key; gemini-native (or absent) is Gemini.
+const isThirdPartyRoute = (providerId?: ChatProviderId): boolean =>
+  providerId !== undefined && providerId !== GEMINI_PROVIDER_ID;
+
+export const shouldUseFileApi = (file: File, appSettings: AppSettings, providerId?: ChatProviderId): boolean => {
   const effectiveMimeType = getEffectiveMimeType(file);
   if (!SUPPORTED_UPLOAD_MIME_TYPES.includes(effectiveMimeType)) return false;
+
+  // Third-party providers cannot consume Gemini Files API references; always inline.
+  if (isThirdPartyRoute(providerId)) return false;
+
   const isServerCodeExecutionEnabled = isServerCodeExecutionMode(appSettings);
   const isTextLike = isTextFile(file);
 
@@ -142,8 +158,16 @@ export const shouldUseFileApi = (file: File, appSettings: AppSettings): boolean 
   return userPrefersFileApi || getEstimatedInlinePayloadBytes(file, appSettings) > inlineLimitBytes;
 };
 
-export const getFilesRequiringFileApi = (files: File[], appSettings: AppSettings): Set<File> => {
+export const getFilesRequiringFileApi = (
+  files: File[],
+  appSettings: AppSettings,
+  providerId?: ChatProviderId,
+): Set<File> => {
   const filesRequiringApi = new Set<File>();
+
+  // Third-party providers cannot consume Gemini Files API references; always inline.
+  if (isThirdPartyRoute(providerId)) return filesRequiringApi;
+
   const inlineCandidates: File[] = [];
   let inlinePayloadBytes = 0;
 
@@ -151,7 +175,7 @@ export const getFilesRequiringFileApi = (files: File[], appSettings: AppSettings
     const effectiveMimeType = getEffectiveMimeType(file);
     if (!SUPPORTED_UPLOAD_MIME_TYPES.includes(effectiveMimeType)) continue;
 
-    if (shouldUseFileApi(file, appSettings)) {
+    if (shouldUseFileApi(file, appSettings, providerId)) {
       filesRequiringApi.add(file);
       continue;
     }
@@ -167,8 +191,12 @@ export const getFilesRequiringFileApi = (files: File[], appSettings: AppSettings
   return filesRequiringApi;
 };
 
-export const checkBatchNeedsApiKey = (files: File[], appSettings: AppSettings): boolean => {
-  return getFilesRequiringFileApi(files, appSettings).size > 0;
+export const checkBatchNeedsApiKey = (
+  files: File[],
+  appSettings: AppSettings,
+  providerId?: ChatProviderId,
+): boolean => {
+  return getFilesRequiringFileApi(files, appSettings, providerId).size > 0;
 };
 
 interface FileUploadPreflightResult {
@@ -211,14 +239,14 @@ export const buildFileUploadPreflight = (
 
   const noticeParts: string[] = [];
   if (emptyNames.length > 0) {
-    noticeParts.push(t('uploadSkippedEmpty').replace('{filenames}', emptyNames.join(', ')));
+    noticeParts.push(interpolate(t('uploadSkippedEmpty'), { filenames: emptyNames.join(', ') }));
   }
   if (duplicateNames.length > 0) {
-    noticeParts.push(t('uploadSkippedDuplicates').replace('{filenames}', duplicateNames.join(', ')));
+    noticeParts.push(interpolate(t('uploadSkippedDuplicates'), { filenames: duplicateNames.join(', ') }));
   }
 
   if (unsupportedNames.length > 0) {
-    noticeParts.push(t('uploadUnsupportedTypes').replace('{filenames}', unsupportedNames.join(', ')));
+    noticeParts.push(interpolate(t('uploadUnsupportedTypes'), { filenames: unsupportedNames.join(', ') }));
   }
 
   return {

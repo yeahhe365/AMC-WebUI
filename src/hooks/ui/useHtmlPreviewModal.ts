@@ -4,23 +4,19 @@ import { useWindowContext } from '@/contexts/WindowContext';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 import { sanitizeFilename, triggerDownload } from '@/utils/export/core';
 import { useFullscreen } from './useFullscreen';
+import { useHtmlPreviewGraphvizRelay } from './useHtmlPreviewGraphvizRelay';
 import {
-  buildUnrestrictedHtmlPreviewSrcDoc,
   createStaticPreviewSnapshotContainer,
   HTML_PREVIEW_CLEAR_SELECTION_EVENT,
-  HTML_PREVIEW_DIAGNOSTIC_EVENT,
   HTML_PREVIEW_MESSAGE_CHANNEL,
 } from '@/utils/html-preview/previewDocument';
+import { DEFAULT_HTML_PREVIEW_PRIVILEGE, type HtmlPreviewPrivilege } from '@/utils/html-preview/previewPrivilege';
 import { useI18n } from '@/contexts/I18nContext';
-import {
-  normalizeLiveArtifactFollowupPayload,
-  type LiveArtifactFollowupPayload,
-} from '@/utils/live-artifacts/liveArtifactFollowup';
-import {
-  createRelayedLiveArtifactSelectionDetail,
-  dispatchLiveArtifactSelection,
-  LIVE_ARTIFACT_CLEAR_SELECTION_EVENT,
-} from '@/utils/text-selection/liveArtifactSelection';
+import { toastError } from '@/stores/toastStore';
+import { type LiveArtifactFollowupPayload } from '@/utils/live-artifacts/liveArtifactFollowup';
+import { LIVE_ARTIFACT_CLEAR_SELECTION_EVENT } from '@/utils/text-selection/liveArtifactSelection';
+import { useHtmlPreviewBridge } from './useHtmlPreviewBridge';
+import { formatI18nErrorMessage } from '@/i18n/interpolate';
 
 const ZOOM_STEP = 0.1;
 const MIN_ZOOM = 0.25;
@@ -32,6 +28,8 @@ interface UseHtmlPreviewModalProps {
   onClose: () => void;
   htmlContent: string | null;
   initialTrueFullscreenRequest?: boolean;
+  privilege?: HtmlPreviewPrivilege;
+  themeId?: string;
   iframeRef: RefObject<HTMLIFrameElement>;
   onLiveArtifactFollowUp?: (payload: LiveArtifactFollowupPayload) => void;
 }
@@ -40,17 +38,15 @@ type DocumentWithWebkitFullscreen = Document & {
   webkitFullscreenElement?: Element | null;
 };
 
-type HtmlPreviewBridgeMessage = {
-  channel?: string;
-  event?: 'ready' | 'escape' | 'followup' | 'selection' | 'diagnostic';
-  payload?: unknown;
-};
+const MAX_PREVIEW_CONTENT_HEIGHT = 200_000;
 
 export const useHtmlPreviewModal = ({
   isOpen,
   onClose,
   htmlContent,
   initialTrueFullscreenRequest,
+  privilege = DEFAULT_HTML_PREVIEW_PRIVILEGE,
+  themeId,
   iframeRef,
   onLiveArtifactFollowUp,
 }: UseHtmlPreviewModalProps) => {
@@ -62,9 +58,19 @@ export const useHtmlPreviewModal = ({
   const [isPreviewReady, setIsPreviewReady] = useState(false);
 
   const [isDirectFullscreenLaunch, setIsDirectFullscreenLaunch] = useState(initialTrueFullscreenRequest);
+  const [contentHeight, setContentHeight] = useState(0);
+  // Bumped by handleRefresh to remount the iframe (via a key), re-running the
+  // preview script from scratch without the hook fighting React's srcDoc prop.
+  const [iframeRefreshKey, setIframeRefreshKey] = useState(0);
 
   const { document: targetDocument, window: targetWindow } = useWindowContext();
   const { enterFullscreen, exitFullscreen } = useFullscreen();
+  useHtmlPreviewGraphvizRelay({
+    iframeRef,
+    privilege,
+    themeId,
+    enabled: isOpen,
+  });
   const postClearSelection = useCallback(() => {
     iframeRef.current?.contentWindow?.postMessage(
       {
@@ -79,6 +85,7 @@ export const useHtmlPreviewModal = ({
     if (isOpen) {
       setIsActuallyOpen(true);
       setScale(1);
+      setContentHeight(0);
       setIsPreviewReady(false);
       setIsDirectFullscreenLaunch(initialTrueFullscreenRequest);
     } else {
@@ -135,68 +142,37 @@ export const useHtmlPreviewModal = ({
     };
   }, [isTrueFullscreen, iframeRef, initialTrueFullscreenRequest, onClose, targetDocument]);
 
-  useEffect(() => {
-    if (!isOpen) {
-      return undefined;
+  const handleBridgeReady = useCallback(() => {
+    setContentHeight(0);
+    setIsPreviewReady(true);
+  }, []);
+
+  const handleBridgeResize = useCallback((height: number) => {
+    const nextHeight = Math.min(Math.ceil(height), MAX_PREVIEW_CONTENT_HEIGHT);
+    setContentHeight((current) => (current === nextHeight ? current : nextHeight));
+  }, []);
+
+  // Escape only closes the overlay when the browser is not already managing
+  // true fullscreen (the browser exits fullscreen itself in that case).
+  const handleBridgeEscape = useCallback(() => {
+    if (!isTrueFullscreen) {
+      onClose();
     }
+  }, [isTrueFullscreen, onClose]);
 
-    const handleMessage = (event: MessageEvent<HtmlPreviewBridgeMessage>) => {
-      const data = event.data;
-      if (!data || data.channel !== HTML_PREVIEW_MESSAGE_CHANNEL) {
-        return;
-      }
-
-      // Accept opaque-origin (no allow-same-origin) or same-origin posts from our iframe.
-      // Unrestricted code-block preview uses allow-same-origin so demos can use storage APIs.
-      const iframeWindow = iframeRef.current?.contentWindow;
-      if (!iframeWindow || event.source !== iframeWindow) {
-        return;
-      }
-
-      const allowedOrigin = event.origin === 'null' || event.origin === targetWindow.location.origin;
-      if (!allowedOrigin) {
-        return;
-      }
-
-      if (data.event === 'ready') {
-        setIsPreviewReady(true);
-        return;
-      }
-
-      if (data.event === 'escape' && !isTrueFullscreen) {
-        onClose();
-        return;
-      }
-
-      if (data.event === 'selection') {
-        dispatchLiveArtifactSelection(
-          targetWindow,
-          createRelayedLiveArtifactSelectionDetail(iframeRef.current, data.payload, scale),
-        );
-        return;
-      }
-
-      if (data.event === 'followup') {
-        const payload = normalizeLiveArtifactFollowupPayload(data.payload);
-        if (!payload) {
-          logService.warn('Ignored invalid Live Artifact follow-up payload.');
-          return;
-        }
-
-        onLiveArtifactFollowUp?.(payload);
-        return;
-      }
-
-      if (data.event === HTML_PREVIEW_DIAGNOSTIC_EVENT) {
-        logService.warn('Live Artifact preview diagnostic:', data.payload);
-      }
-    };
-
-    targetWindow.addEventListener('message', handleMessage);
-    return () => {
-      targetWindow.removeEventListener('message', handleMessage);
-    };
-  }, [iframeRef, isOpen, isTrueFullscreen, onClose, onLiveArtifactFollowUp, scale, targetWindow]);
+  useHtmlPreviewBridge({
+    iframeRef,
+    targetWindow,
+    privilege,
+    enabled: isOpen,
+    selectionScale: scale,
+    handlers: {
+      onReady: handleBridgeReady,
+      onResize: handleBridgeResize,
+      onEscape: handleBridgeEscape,
+      onFollowUp: onLiveArtifactFollowUp,
+    },
+  });
 
   useEffect(() => {
     const handleClearSelection = () => {
@@ -264,33 +240,37 @@ export const useHtmlPreviewModal = ({
     if (!htmlContent || !isPreviewReady || isScreenshotting) return;
 
     setIsScreenshotting(true);
-    let cleanup = () => {};
+    let snapshotCleanup: (() => void) | null = null;
     try {
       const { exportElementAsPng } = await import('@/utils/export/image');
       const target = getCurrentPreviewScreenshotTarget();
-      const screenshotTarget =
-        target ??
-        (() => {
-          const snapshot = createStaticPreviewSnapshotContainer(htmlContent, targetDocument);
-          cleanup = snapshot.cleanup;
-          return snapshot.container;
-        })();
+      let exportTarget = target;
+      if (!exportTarget) {
+        // The iframe is not readable (sandboxed / not mounted): build a static
+        // snapshot from the source HTML instead. Async so graphviz nodes can be
+        // hydrated before the frame is exported.
+        const snapshot = await createStaticPreviewSnapshotContainer(htmlContent, targetDocument, {
+          sanitize: privilege !== 'unrestricted',
+        });
+        snapshotCleanup = snapshot.cleanup;
+        exportTarget = snapshot.container;
+      }
       const title = getPreviewTitle();
       const filename = `${sanitizeFilename(title)}-screenshot.png`;
 
-      await exportElementAsPng(screenshotTarget, filename, {
+      await exportElementAsPng(exportTarget, filename, {
         backgroundColor: null,
         scale: 2,
         messages: {
           imageTooLarge: t('exportImageTooLarge'),
-          exportFailed: (message) => t('exportFailedWithMessage').replace('{message}', message),
+          exportFailed: (message) => formatI18nErrorMessage(t, 'exportFailedWithMessage', message),
         },
       });
     } catch (screenshotError) {
       logService.error('Failed to take screenshot of iframe content:', screenshotError);
-      alert(t('htmlPreviewScreenshotFailed'));
+      toastError(t('htmlPreviewScreenshotFailed'));
     } finally {
-      cleanup();
+      snapshotCleanup?.();
       setIsScreenshotting(false);
     }
   }, [
@@ -301,17 +281,16 @@ export const useHtmlPreviewModal = ({
     isScreenshotting,
     t,
     targetDocument,
+    privilege,
   ]);
 
   const handleRefresh = useCallback(() => {
     if (iframeRef.current && htmlContent) {
       setIsPreviewReady(false);
-      iframeRef.current.srcdoc = ' ';
-      requestAnimationFrame(() => {
-        if (iframeRef.current) {
-          iframeRef.current.srcdoc = buildUnrestrictedHtmlPreviewSrcDoc(htmlContent);
-        }
-      });
+      // Remount the iframe by bumping the key. The old imperative srcdoc write
+      // desynced from React's srcDoc prop (the refresh relied on the prop being
+      // unchanged). A remount restarts the preview script cleanly.
+      setIframeRefreshKey((key) => key + 1);
     }
   }, [htmlContent, iframeRef]);
 
@@ -321,12 +300,14 @@ export const useHtmlPreviewModal = ({
     isDirectFullscreenLaunch,
     scale,
     isPreviewReady,
+    contentHeight,
     isScreenshotting,
     handleZoomIn,
     handleZoomOut,
     handleDownload,
     handleScreenshot,
     handleRefresh,
+    iframeRefreshKey,
     enterTrueFullscreen,
     exitTrueFullscreen,
     getPreviewTitle,

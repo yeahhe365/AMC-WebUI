@@ -85,6 +85,12 @@ const setElementTop = (element: Element, top: number) => {
   }));
 };
 
+// jsdom does not implement Element.prototype.scrollTo; stub it so the
+// scroller behaves like a real browser element for imperative scrolls.
+const stubScrollTo = (element: HTMLElement) => {
+  element.scrollTo = vi.fn();
+};
+
 const readStoredScrollSnapshot = (sessionId: string) => {
   const rawSnapshot = localStorage.getItem(`chat_scroll_pos_${sessionId}`);
   expect(rawSnapshot).not.toBeNull();
@@ -120,6 +126,7 @@ describe('useMessageListScroll', () => {
       clientHeight: { value: 200, writable: true },
     });
     setElementTop(scroller, 100);
+    stubScrollTo(scroller);
 
     const firstRenderedMessage = document.createElement('div');
     firstRenderedMessage.dataset.messageId = 'message-1';
@@ -178,6 +185,7 @@ describe('useMessageListScroll', () => {
       clientHeight: { value: 200, writable: true },
     });
     setElementTop(scroller, 100);
+    stubScrollTo(scroller);
 
     const sessionAMessage = document.createElement('div');
     sessionAMessage.dataset.messageId = 'session-a-message';
@@ -239,6 +247,7 @@ describe('useMessageListScroll', () => {
       clientHeight: { value: 630, writable: true },
     });
     setElementTop(scroller, 100);
+    stubScrollTo(scroller);
 
     const visibleUserMessage = document.createElement('div');
     visibleUserMessage.dataset.messageId = 'message-3';
@@ -463,6 +472,135 @@ describe('useMessageListScroll', () => {
     unmount();
   });
 
+  it('scrolls the real scroller element to its full height when jumping to bottom', () => {
+    const { result, unmount } = renderHook(() =>
+      useMessageListScroll({
+        messages: createMessages(),
+        setScrollContainerRef: vi.fn(),
+        activeSessionId: 'session-real-bottom',
+      }),
+    );
+
+    const scroller = document.createElement('div');
+    Object.defineProperties(scroller, {
+      scrollTop: { value: 0, writable: true },
+      scrollHeight: { value: 4200, writable: true },
+      clientHeight: { value: 630, writable: true },
+    });
+    const scrollTo = vi.fn();
+    scroller.scrollTo = scrollTo;
+
+    act(() => {
+      result.current.handleScrollerRef(scroller);
+    });
+
+    act(() => {
+      result.current.scrollToBottom();
+    });
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 4200, behavior: 'smooth' });
+
+    unmount();
+  });
+
+  it('restores bottom snapshots against the real scroller height', () => {
+    localStorage.setItem('chat_scroll_pos_session-bottom-real', JSON.stringify({ atBottom: true, scrollTop: 946 }));
+
+    const { result, unmount } = renderHook(() =>
+      useMessageListScroll({
+        messages: createMessages(),
+        setScrollContainerRef: vi.fn(),
+        activeSessionId: 'session-bottom-real',
+      }),
+    );
+
+    const scroller = document.createElement('div');
+    Object.defineProperties(scroller, {
+      scrollTop: { value: 946, writable: true },
+      scrollHeight: { value: 4200, writable: true },
+      clientHeight: { value: 630, writable: true },
+    });
+    const scrollTo = vi.fn();
+    scroller.scrollTo = scrollTo;
+
+    act(() => {
+      result.current.handleScrollerRef(scroller);
+      vi.advanceTimersByTime(50);
+    });
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 4200 });
+
+    unmount();
+  });
+
+  it('re-asserts the bottom while the list height settles after a bottom jump', () => {
+    const { result, unmount } = renderHook(() =>
+      useMessageListScroll({
+        messages: createMessages(),
+        setScrollContainerRef: vi.fn(),
+        activeSessionId: 'session-bottom-lock',
+      }),
+    );
+
+    const scroller = document.createElement('div');
+    Object.defineProperties(scroller, {
+      scrollTop: { value: 0, writable: true },
+      scrollHeight: { value: 4200, writable: true },
+      clientHeight: { value: 630, writable: true },
+    });
+    const scrollTo = vi.fn();
+    scroller.scrollTo = scrollTo;
+
+    act(() => {
+      result.current.handleScrollerRef(scroller);
+    });
+
+    act(() => {
+      result.current.scrollToBottom();
+    });
+    expect(scrollTo).toHaveBeenCalledWith({ top: 4200, behavior: 'smooth' });
+    scrollTo.mockClear();
+
+    // Virtuoso re-measures after the jump; the bottom lock corrects the drift.
+    Object.defineProperty(scroller, 'scrollHeight', { value: 4400, writable: true });
+    act(() => {
+      result.current.handleTotalListHeightChanged();
+    });
+    expect(scrollTo).toHaveBeenCalledWith({ top: 4400 });
+
+    // The lock stops once the user scrolls away from the bottom.
+    scrollTo.mockClear();
+    act(() => {
+      scroller.dispatchEvent(new Event('wheel'));
+    });
+    Object.defineProperty(scroller, 'scrollHeight', { value: 4600, writable: true });
+    act(() => {
+      result.current.handleTotalListHeightChanged();
+    });
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    // Re-arm the lock, then move away from the bottom programmatically: the
+    // upward scroll escape cancels the lock just like a wheel event.
+    scrollTo.mockClear();
+    Object.defineProperty(scroller, 'scrollHeight', { value: 4800, writable: true });
+    Object.defineProperty(scroller, 'scrollTop', { value: 4300, writable: true });
+    act(() => {
+      result.current.scrollToBottom();
+    });
+    scrollTo.mockClear();
+    Object.defineProperty(scroller, 'scrollTop', { value: 2800, writable: true });
+    act(() => {
+      scroller.dispatchEvent(new Event('scroll'));
+    });
+    Object.defineProperty(scroller, 'scrollHeight', { value: 5000, writable: true });
+    act(() => {
+      result.current.handleTotalListHeightChanged();
+    });
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
   it('cancels pending scroll restoration when the hook unmounts', () => {
     localStorage.setItem('chat_scroll_pos_session-restore', '144');
 
@@ -589,6 +727,197 @@ describe('useMessageListScroll', () => {
     unmount();
   });
 
+  it('does not anchor newly appended turns while the user is reading history', () => {
+    let messages = createMessages().slice(0, 2);
+    const { result, rerender, unmount } = renderHook(() =>
+      useMessageListScroll({
+        messages,
+        setScrollContainerRef: vi.fn(),
+        activeSessionId: 'session-reading-history',
+      }),
+    );
+
+    const scrollToIndex = vi.fn();
+    const virtuosoRef = result.current.virtuosoRef as unknown as { current: VirtuosoHandle | null };
+    virtuosoRef.current = {
+      scrollTo: vi.fn(),
+      scrollToIndex,
+    } as unknown as VirtuosoHandle;
+
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+    scrollToIndex.mockClear();
+
+    // User scrolled away from the bottom to read history.
+    act(() => {
+      result.current.setAtBottom(false);
+    });
+
+    messages = [
+      ...messages,
+      {
+        id: 'message-3',
+        role: 'user',
+        content: 'Second turn',
+        timestamp: new Date('2026-04-15T00:00:02.000Z'),
+      },
+      {
+        id: 'message-4',
+        role: 'model',
+        content: '',
+        timestamp: new Date('2026-04-15T00:00:03.000Z'),
+      },
+    ];
+
+    act(() => {
+      rerender();
+    });
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+
+    expect(scrollToIndex).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('re-anchors newly appended turns once the user returns to the bottom', () => {
+    let messages = createMessages().slice(0, 2);
+    const { result, rerender, unmount } = renderHook(() =>
+      useMessageListScroll({
+        messages,
+        setScrollContainerRef: vi.fn(),
+        activeSessionId: 'session-back-to-bottom',
+      }),
+    );
+
+    const scrollToIndex = vi.fn();
+    const virtuosoRef = result.current.virtuosoRef as unknown as { current: VirtuosoHandle | null };
+    virtuosoRef.current = {
+      scrollTo: vi.fn(),
+      scrollToIndex,
+    } as unknown as VirtuosoHandle;
+
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+    scrollToIndex.mockClear();
+
+    // New turn arrives while reading history: not anchored.
+    act(() => {
+      result.current.setAtBottom(false);
+    });
+    messages = [
+      ...messages,
+      {
+        id: 'message-3',
+        role: 'user',
+        content: 'Second turn',
+        timestamp: new Date('2026-04-15T00:00:02.000Z'),
+      },
+      {
+        id: 'message-4',
+        role: 'model',
+        content: '',
+        timestamp: new Date('2026-04-15T00:00:03.000Z'),
+      },
+    ];
+    act(() => {
+      rerender();
+      vi.advanceTimersByTime(50);
+    });
+    expect(scrollToIndex).not.toHaveBeenCalled();
+
+    // User returns to the bottom; a later appended turn is anchored again.
+    scrollToIndex.mockClear();
+    act(() => {
+      result.current.setAtBottom(true);
+    });
+    messages = [
+      ...messages,
+      {
+        id: 'message-5',
+        role: 'user',
+        content: 'Third turn',
+        timestamp: new Date('2026-04-15T00:00:04.000Z'),
+      },
+      {
+        id: 'message-6',
+        role: 'model',
+        content: 'Third response',
+        timestamp: new Date('2026-04-15T00:00:05.000Z'),
+      },
+    ];
+    act(() => {
+      rerender();
+    });
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+
+    expect(scrollToIndex).toHaveBeenCalledWith({
+      index: 5,
+      align: 'start',
+      behavior: 'smooth',
+    });
+
+    unmount();
+  });
+
+  it('cancels a pending new-turn anchor when the user scrolls away during the debounce', () => {
+    let messages = createMessages().slice(0, 2);
+    const { result, rerender, unmount } = renderHook(() =>
+      useMessageListScroll({
+        messages,
+        setScrollContainerRef: vi.fn(),
+        activeSessionId: 'session-anchor-debounce-cancel',
+      }),
+    );
+
+    const scrollToIndex = vi.fn();
+    const virtuosoRef = result.current.virtuosoRef as unknown as { current: VirtuosoHandle | null };
+    virtuosoRef.current = {
+      scrollTo: vi.fn(),
+      scrollToIndex,
+    } as unknown as VirtuosoHandle;
+
+    act(() => {
+      vi.advanceTimersByTime(50);
+    });
+    scrollToIndex.mockClear();
+
+    // New turn arrives while at the bottom: the 50ms anchor is scheduled.
+    messages = [
+      ...messages,
+      {
+        id: 'message-3',
+        role: 'user',
+        content: 'Second turn',
+        timestamp: new Date('2026-04-15T00:00:02.000Z'),
+      },
+      {
+        id: 'message-4',
+        role: 'model',
+        content: '',
+        timestamp: new Date('2026-04-15T00:00:03.000Z'),
+      },
+    ];
+    act(() => {
+      rerender();
+    });
+
+    // User scrolls away before the timer fires.
+    act(() => {
+      result.current.setAtBottom(false);
+      vi.advanceTimersByTime(50);
+    });
+
+    expect(scrollToIndex).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
   it('keeps the current streaming message in place when only its content changes', () => {
     let messages = createMessages();
     const { result, rerender, unmount } = renderHook(() =>
@@ -640,6 +969,7 @@ describe('useMessageListScroll', () => {
       scrollHeight: { value: 1000, writable: true },
       clientHeight: { value: 200, writable: true },
     });
+    stubScrollTo(scroller);
 
     act(() => {
       result.current.handleScrollerRef(scroller);

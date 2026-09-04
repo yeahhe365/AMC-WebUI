@@ -19,7 +19,7 @@ describe('CodeHeader', () => {
           onCopy={vi.fn()}
           onDownload={vi.fn()}
           onOpenSide={vi.fn()}
-          onFullscreen={vi.fn()}
+          onOpenPreview={vi.fn()}
           canRun
           isRunning={false}
           onRun={vi.fn()}
@@ -43,8 +43,8 @@ describe('CodeHeader', () => {
     expect(toolbar?.className).not.toContain('border');
     expect(renderer.container.querySelector('[title="Run Python Code"]')).not.toBeNull();
     expect(renderer.container.querySelector('[title="Open in Side Panel"]')).not.toBeNull();
-    expect(renderer.container.querySelector('[title="Monitor Fullscreen"]')).not.toBeNull();
-    expect(renderer.container.querySelector('[title="Preview Overlay"]')).not.toBeNull();
+    expect(renderer.container.querySelector('[title="Monitor Fullscreen"]')).toBeNull();
+    expect(renderer.container.querySelector('[title="Open preview"]')).not.toBeNull();
     expect(renderer.container.querySelector('[title="Download PYTHON"]')).not.toBeNull();
     expect(renderer.container.querySelector('[title="Copy content"]')).not.toBeNull();
     expect(renderer.container.querySelector('[title="Expand"]')).not.toBeNull();
@@ -71,7 +71,7 @@ describe('CodeHeader', () => {
           onCopy={vi.fn()}
           onDownload={vi.fn()}
           onOpenSide={vi.fn()}
-          onFullscreen={vi.fn()}
+          onOpenPreview={vi.fn()}
         />,
       );
     });

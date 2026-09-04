@@ -1,5 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react';
-import { streamingStore } from '@/services/streamingStore';
+import { streamingStore } from '@/stores/streamingStore';
 
 export const useMessageStream = (messageId: string, isStreaming: boolean) => {
   const isActive = isStreaming && !!messageId;

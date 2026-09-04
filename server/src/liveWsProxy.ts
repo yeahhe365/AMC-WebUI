@@ -3,18 +3,22 @@ import { WebSocket, WebSocketServer } from 'ws';
 import type { ApiServerConfig } from './config.js';
 
 // Sentinel the browser sends when Live should use the server-managed key
-// (mirrors src/utils/apiKeySelection.SERVER_MANAGED_API_KEY — duplicated here
-// because the server bundle does not import from src/).
-const SERVER_MANAGED_API_KEY_SENTINEL = '__SERVER_MANAGED_API_KEY__';
+// (single-sourced in shared/, mirrored by src/utils/apiKeySelection).
+import { SERVER_MANAGED_API_KEY as SERVER_MANAGED_API_KEY_SENTINEL } from '../../shared/serverManagedApiKey.js';
 
 const LIVE_WS_PATH_PREFIX = '/api/live';
-const UPSTREAM_WS_HOST = 'generativelanguage.googleapis.com';
+// Full upstream base (scheme + host). Production always bridges to the public
+// Gemini Live API; the host can be overridden in tests to point the bridge at a
+// local WS server.
+const UPSTREAM_WS_BASE = 'wss://generativelanguage.googleapis.com';
 const MAX_MESSAGE_BYTES = 4 * 1024 * 1024;
 
 interface LiveWsProxyConfig {
   enableLiveWsProxy: boolean;
   liveWsIdleTimeoutMs: number;
   geminiApiKey?: string;
+  upstreamBase: string;
+  allowedOrigins: string[];
 }
 
 // Log only non-secret context. The key and full upstream URL are never printed.
@@ -25,7 +29,9 @@ const logLiveEvent = (event: string, context: Record<string, unknown> = {}) => {
 const resolveLiveWsProxyConfig = (config: ApiServerConfig): LiveWsProxyConfig => ({
   enableLiveWsProxy: config.enableLiveWsProxy,
   liveWsIdleTimeoutMs: config.liveWsIdleTimeoutMs,
-  geminiApiKey: config.geminiApiKey,
+  geminiApiKey: config.liveGeminiApiKey || config.geminiApiKey,
+  upstreamBase: config.liveWsUpstreamBase || UPSTREAM_WS_BASE,
+  allowedOrigins: config.allowedOrigins,
 });
 
 const isPathHandled = (request: IncomingMessage): boolean => {
@@ -42,7 +48,7 @@ interface ResolvedUpstream {
 // key falls back to the server-managed GEMINI_API_KEY.
 export const resolveUpstream = (
   requestUrl: URL,
-  upstreamHost: string,
+  upstreamBase: string,
   serverApiKey?: string,
 ): ResolvedUpstream | null => {
   const restPath = requestUrl.pathname.slice(LIVE_WS_PATH_PREFIX.length) || '/';
@@ -76,7 +82,7 @@ export const resolveUpstream = (
     searchParams.set('key', resolvedKey);
   }
 
-  const upstreamUrl = `wss://${upstreamHost}${restPath}?${searchParams.toString()}`;
+  const upstreamUrl = `${upstreamBase}${restPath}?${searchParams.toString()}`;
   return { url: upstreamUrl, hadBrowserKey };
 };
 
@@ -113,6 +119,18 @@ const bridge = (clientWs: WebSocket, request: IncomingMessage, upstreamHost: str
 
   let settled = false;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  // Client frames can arrive as soon as the browser's socket is open, while the
+  // TLS/WS handshake to the upstream is still in flight. The Live SDK sends its
+  // setup frame immediately; dropping those frames (the old behavior) hung the
+  // session until the idle timeout. Buffer them until the upstream opens, then
+  // flush in order.
+  const pendingUpstreamMessages: { data: WebSocket.RawData; isBinary: boolean }[] = [];
+  const flushPendingUpstreamMessages = () => {
+    while (pendingUpstreamMessages.length > 0) {
+      const { data, isBinary } = pendingUpstreamMessages.shift()!;
+      upstreamWs.send(data, { binary: isBinary });
+    }
+  };
   const resetIdle = () => {
     if (idleTimer) clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
@@ -140,13 +158,19 @@ const bridge = (clientWs: WebSocket, request: IncomingMessage, upstreamHost: str
       return;
     }
     resetIdle();
+    flushPendingUpstreamMessages();
   });
 
   // client -> upstream
   clientWs.on('message', (data, isBinary) => {
-    if (upstreamWs.readyState !== WebSocket.OPEN) return;
     resetIdle();
-    upstreamWs.send(data, { binary: isBinary });
+    if (upstreamWs.readyState === WebSocket.OPEN) {
+      upstreamWs.send(data, { binary: isBinary });
+    } else if (upstreamWs.readyState === WebSocket.CONNECTING) {
+      // Not open yet — hold the frame and flush it once the handshake lands.
+      pendingUpstreamMessages.push({ data, isBinary });
+    }
+    // Any other state (CLOSING/CLOSED) silently drops, matching prior behavior.
   });
 
   // upstream -> client
@@ -159,13 +183,18 @@ const bridge = (clientWs: WebSocket, request: IncomingMessage, upstreamHost: str
   const forwardClose = (source: 'client' | 'upstream', ws: WebSocket, other: WebSocket | null) => {
     ws.on('close', (code, reasonBuf) => {
       teardown(`${source}-close`);
-      if (other && other.readyState === WebSocket.OPEN) {
+      if (!other) return;
+      if (other.readyState === WebSocket.OPEN) {
         const reason = reasonBuf?.toString('utf8') ?? '';
         try {
           other.close(code || 1000, reason || undefined);
         } catch {
           other.close();
         }
+      } else if (other.readyState === WebSocket.CONNECTING) {
+        // close() is a no-op while the handshake is in flight; terminate forces
+        // the socket down so the peer's connection isn't leaked.
+        other.terminate();
       }
     });
     ws.on('error', (error) => {
@@ -187,13 +216,26 @@ const bridge = (clientWs: WebSocket, request: IncomingMessage, upstreamHost: str
   });
 };
 
+// Origin check mirrors the HTTP CORS layer (cors.ts): no allowlist configured →
+// allow; non-browser clients send no Origin header → allow; otherwise the
+// origin must match. WebSockets bypass CORS, so without this check any webpage
+// could open a cross-site WS and consume the server-managed key (CSWSH).
+const isOriginAllowed = (request: IncomingMessage, allowedOrigins: string[]): boolean => {
+  if (!allowedOrigins.length) return true;
+  const origin = request.headers.origin;
+  if (!origin) return true;
+  if (allowedOrigins.includes('*')) return true;
+  return allowedOrigins.includes(origin);
+};
+
 export function attachLiveWsUpgrade(server: Server, config: ApiServerConfig): void {
   const liveConfig = resolveLiveWsProxyConfig(config);
 
   if (!liveConfig.enableLiveWsProxy) {
-    // Still own the path so unconfigured upgrades don't hang; reject firmly.
-    server.on('upgrade', (request, socket) => {
-      if (!isPathHandled(request)) return;
+    // Owning the 'upgrade' event disables Node's default destroy-on-upgrade
+    // behavior, so every non-matching request must be destroyed explicitly or
+    // its socket leaks.
+    server.on('upgrade', (_request, socket) => {
       socket.destroy();
     });
     return;
@@ -203,11 +245,20 @@ export function attachLiveWsUpgrade(server: Server, config: ApiServerConfig): vo
 
   server.on('upgrade', (request, socket, head) => {
     if (!isPathHandled(request)) {
+      // Same as above: an upgrade listener takes over the event, so unhandled
+      // paths must not leave the socket hanging.
+      socket.destroy();
+      return;
+    }
+
+    if (!isOriginAllowed(request, liveConfig.allowedOrigins)) {
+      logLiveEvent('rejected', { reason: 'origin-not-allowed' });
+      socket.destroy();
       return;
     }
 
     wss.handleUpgrade(request, socket, head, (clientWs) => {
-      bridge(clientWs, request, UPSTREAM_WS_HOST, liveConfig);
+      bridge(clientWs, request, liveConfig.upstreamBase, liveConfig);
     });
   });
 }

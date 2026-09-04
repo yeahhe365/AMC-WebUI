@@ -1,7 +1,9 @@
 import { act } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createAppSettings, createChatSettings } from '@/test/data/factories';
+import { createAppSettings, createChatSettings, createUploadedFile } from '@/test/data/factories';
 import { renderHook } from '@/test/render/renderer';
+import { useChatStore } from '@/stores/chatStore';
+import type { UploadedFile } from '@/types';
 import { useChatInputSubmission } from './useChatInputSubmission';
 
 const createSubmissionParams = () => {
@@ -11,7 +13,7 @@ const createSubmissionParams = () => {
     activeSessionId: 'session-1',
     appSettings: createAppSettings(),
     currentChatSettings: createChatSettings(),
-    selectedFiles: [],
+    selectedFiles: [] as UploadedFile[],
     setSelectedFiles: vi.fn(),
     setAppFileError: vi.fn(),
     uploadFailureMessage: 'Attachment upload failed.',
@@ -73,5 +75,30 @@ describe('useChatInputSubmission', () => {
     });
 
     expect(params.submissionState.stopSendAnimation).not.toHaveBeenCalled();
+  });
+
+  it('sends the submission optimistically immediately even while files are uploading', () => {
+    const processingFile = createUploadedFile({
+      id: 'file-uploading',
+      isProcessing: true,
+      uploadState: 'uploading',
+    });
+
+    const params = createSubmissionParams();
+    params.selectedFiles = [processingFile];
+    useChatStore.setState({ selectedFiles: [processingFile] });
+
+    const { result } = renderHook(() => useChatInputSubmission(params));
+
+    act(() => {
+      result.current.handleSubmit();
+    });
+
+    // The send is dispatched immediately for optimistic display in chat timeline.
+    expect(params.onSendMessage).toHaveBeenCalledWith('Hello', expect.objectContaining({ isFastMode: false }));
+    expect(params.submissionState.clearCurrentDraft).toHaveBeenCalled();
+    expect(params.submissionState.setInputText).toHaveBeenCalledWith('');
+
+    useChatStore.setState({ selectedFiles: [] });
   });
 });

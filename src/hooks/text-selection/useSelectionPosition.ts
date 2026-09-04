@@ -13,6 +13,8 @@ type SelectionBounds = Pick<DOMRect, 'top' | 'left' | 'width' | 'height' | 'bott
 interface UseSelectionPositionProps {
   containerRef: ContainerRefLike;
   isAudioActive: boolean;
+  /** Synchronous hold flag so TTS can pin the toolbar before React re-renders. */
+  isAudioActiveRef?: RefObject<boolean>;
   toolbarRef: RefObject<HTMLDivElement>;
   onCopySuccess?: (text: string) => void;
   preserveFormattingOnCopy?: boolean;
@@ -77,12 +79,14 @@ const isCodeSelection = (range: Range): boolean => {
 export const useSelectionPosition = ({
   containerRef,
   isAudioActive,
+  isAudioActiveRef,
   toolbarRef,
   onCopySuccess,
   preserveFormattingOnCopy = true,
 }: UseSelectionPositionProps) => {
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const [selectedText, setSelectedText] = useState('');
+  const [selectedSpeechText, setSelectedSpeechText] = useState('');
   const [selectedCopyText, setSelectedCopyText] = useState('');
   const [toolbarElement, setToolbarElement] = useState<HTMLDivElement | null>(null);
   const [toolbarSize, setToolbarSize] = useState<{ width: number; height: number } | null>(null);
@@ -93,6 +97,11 @@ export const useSelectionPosition = ({
   const toolbarNode = toolbarRef.current;
   const { document: targetDocument, window: targetWindow } = useWindowContext();
 
+  const isSelectionHeld = useCallback(
+    () => Boolean(isAudioActive || isAudioActiveRef?.current),
+    [isAudioActive, isAudioActiveRef],
+  );
+
   const clearSelectionState = useCallback(() => {
     selectionRequestIdRef.current += 1;
     setPosition(null);
@@ -100,22 +109,19 @@ export const useSelectionPosition = ({
     selectedTextRef.current = '';
     selectedPlainTextRef.current = '';
     setSelectedText('');
+    setSelectedSpeechText('');
     setSelectedCopyText('');
   }, []);
 
   // Monitor selection changes
   useEffect(() => {
-    const handleSelectionChange = () => {
-      const requestId = (selectionRequestIdRef.current += 1);
-
-      if (isAudioActive) {
-        return;
-      }
-
+    // Validate the current selection within the message container. Returns the
+    // range when a toolbar-worthy selection exists, null otherwise (caller
+    // decides whether to clear the toolbar state).
+    const getValidSelectionRange = (): Range | null => {
       const selection = targetWindow.getSelection();
       if (!selection || selection.isCollapsed || !selection.rangeCount) {
-        clearSelectionState();
-        return;
+        return null;
       }
 
       const range = selection.getRangeAt(0);
@@ -124,23 +130,47 @@ export const useSelectionPosition = ({
       // Context checks
       const containerEl = resolveContainerElement(containerRef);
       if (containerEl && !containerEl.contains(commonAncestor)) {
-        clearSelectionState();
-        return;
+        return null;
       }
 
       const targetElement =
         commonAncestor.nodeType === 1 ? (commonAncestor as HTMLElement) : commonAncestor.parentElement;
       if (isEditableElement(targetElement)) {
-        clearSelectionState();
+        return null;
+      }
+
+      return range;
+    };
+
+    const selectionVersionRef = { current: -1 };
+
+    // Extract the selection content (clone subtree, strip .select-none, convert
+    // to markdown). Coalesced with a rAF so a per-frame `selectionchange` burst
+    // during a long drag runs it exactly once per frame, and the position-only
+    // pass below (which re-renders the toolbar per frame) keeps the heavy clone
+    // off the hot path.
+    const runSelectionExtraction = () => {
+      const range = getValidSelectionRange();
+      if (!range) {
+        if (!isSelectionHeld()) {
+          clearSelectionState();
+        }
         return;
       }
 
-      // Extract content
+      if (isSelectionHeld()) {
+        return;
+      }
+
+      const requestId = (selectionRequestIdRef.current += 1);
+
       const container = cloneSelectionContent(range, targetDocument);
       const html = container.innerHTML;
       const rangeIsCodeSelection = isCodeSelection(range);
       const cleanedPlainText = getPlainSelectionText(container);
-      const plainText = rangeIsCodeSelection ? (selection.toString() || cleanedPlainText).trim() : cleanedPlainText;
+      const plainText = rangeIsCodeSelection
+        ? (targetWindow.getSelection()?.toString() || cleanedPlainText).trim()
+        : cleanedPlainText;
 
       if (!plainText) {
         clearSelectionState();
@@ -153,21 +183,23 @@ export const useSelectionPosition = ({
           return;
         }
 
-        if (!text) {
+        const nextText = text || plainText;
+        if (!nextText) {
           clearSelectionState();
           return;
         }
 
         selectionBoundsRef.current = rect;
-        selectedTextRef.current = text;
+        selectedTextRef.current = nextText;
         selectedPlainTextRef.current = plainText;
 
         setPosition({
           top: rect.top - 50,
           left: rect.left + rect.width / 2,
         });
-        setSelectedText(text);
-        setSelectedCopyText(preserveFormattingOnCopy ? text : plainText || text);
+        setSelectedText(nextText);
+        setSelectedSpeechText(plainText);
+        setSelectedCopyText(preserveFormattingOnCopy ? nextText : plainText || nextText);
       };
 
       if (rangeIsCodeSelection) {
@@ -181,20 +213,85 @@ export const useSelectionPosition = ({
       })();
     };
 
+    let extractionFrame: number | null = null;
+    const scheduleSelectionExtraction = () => {
+      if (extractionFrame !== null) {
+        return;
+      }
+      extractionFrame = targetWindow.requestAnimationFrame(() => {
+        extractionFrame = null;
+        runSelectionExtraction();
+      });
+    };
+    const cancelScheduledExtraction = () => {
+      if (extractionFrame !== null) {
+        targetWindow.cancelAnimationFrame(extractionFrame);
+        extractionFrame = null;
+      }
+    };
+
+    // Live, lightweight pass: the toolbar position follows the selection on
+    // every change, but the content extraction is coalesced (rAF) and cached by
+    // version — dragging within the same selected range re-runs the cheap
+    // position pass without re-cloning the DOM.
+    const seedImmediateSelectionText = (range: Range) => {
+      const immediatePlain = (targetWindow.getSelection()?.toString() || range.toString() || '').trim();
+      if (!immediatePlain) {
+        return;
+      }
+
+      selectedPlainTextRef.current = immediatePlain;
+      if (!selectedTextRef.current) {
+        selectedTextRef.current = immediatePlain;
+        setSelectedText(immediatePlain);
+        setSelectedCopyText(immediatePlain);
+      }
+      setSelectedSpeechText(immediatePlain);
+    };
+
+    const handleSelectionChange = () => {
+      selectionVersionRef.current += 1;
+      const version = selectionVersionRef.current;
+
+      if (isSelectionHeld()) {
+        return;
+      }
+
+      const range = getValidSelectionRange();
+      if (!range) {
+        clearSelectionState();
+        return;
+      }
+
+      const rect = range.getBoundingClientRect();
+      selectionBoundsRef.current = rect;
+      setPosition({
+        top: rect.top - 50,
+        left: rect.left + rect.width / 2,
+      });
+      seedImmediateSelectionText(range);
+
+      scheduleSelectionExtraction();
+      if (version !== selectionVersionRef.current) {
+        return;
+      }
+    };
+
     targetDocument.addEventListener('selectionchange', handleSelectionChange);
-    targetDocument.addEventListener('mouseup', handleSelectionChange);
-    targetDocument.addEventListener('keyup', handleSelectionChange);
+    targetDocument.addEventListener('mouseup', scheduleSelectionExtraction);
+    targetDocument.addEventListener('keyup', scheduleSelectionExtraction);
 
     return () => {
       targetDocument.removeEventListener('selectionchange', handleSelectionChange);
-      targetDocument.removeEventListener('mouseup', handleSelectionChange);
-      targetDocument.removeEventListener('keyup', handleSelectionChange);
+      targetDocument.removeEventListener('mouseup', scheduleSelectionExtraction);
+      targetDocument.removeEventListener('keyup', scheduleSelectionExtraction);
+      cancelScheduledExtraction();
     };
-  }, [clearSelectionState, containerRef, isAudioActive, preserveFormattingOnCopy, targetDocument, targetWindow]);
+  }, [clearSelectionState, containerRef, isSelectionHeld, preserveFormattingOnCopy, targetDocument, targetWindow]);
 
   useEffect(() => {
     const handleLiveArtifactSelection = (event: Event) => {
-      if (isAudioActive) {
+      if (isSelectionHeld()) {
         return;
       }
 
@@ -213,16 +310,17 @@ export const useSelectionPosition = ({
         left: detail.rect.left + detail.rect.width / 2,
       });
       setSelectedText(detail.text);
+      setSelectedSpeechText(copyText || detail.text);
       setSelectedCopyText(copyText);
     };
 
     targetWindow.addEventListener(LIVE_ARTIFACT_SELECTION_EVENT, handleLiveArtifactSelection);
     return () => targetWindow.removeEventListener(LIVE_ARTIFACT_SELECTION_EVENT, handleLiveArtifactSelection);
-  }, [clearSelectionState, isAudioActive, targetWindow]);
+  }, [clearSelectionState, isSelectionHeld, targetWindow]);
 
   useEffect(() => {
     const handleCopy = (e: ClipboardEvent) => {
-      if (isAudioActive) {
+      if (isSelectionHeld()) {
         return;
       }
 
@@ -241,7 +339,7 @@ export const useSelectionPosition = ({
 
     targetDocument.addEventListener('copy', handleCopy);
     return () => targetDocument.removeEventListener('copy', handleCopy);
-  }, [isAudioActive, onCopySuccess, preserveFormattingOnCopy, targetDocument]);
+  }, [isSelectionHeld, onCopySuccess, preserveFormattingOnCopy, targetDocument]);
 
   useLayoutEffect(() => {
     if (!position) {
@@ -343,5 +441,39 @@ export const useSelectionPosition = ({
     clearSelectionState();
   };
 
-  return { position: clampedPosition, setPosition, selectedText, selectedCopyText, clearSelection };
+  const selectionRect = (() => {
+    const bounds = selectionBoundsRef.current;
+    if (!bounds) return null;
+    try {
+      const DomRectCtor = (targetWindow as Window & typeof globalThis).DOMRect;
+      if (typeof DomRectCtor === 'function') {
+        return new DomRectCtor(bounds.left, bounds.top, bounds.width, bounds.height);
+      }
+    } catch {
+      // fall through to plain object
+    }
+    return {
+      top: bounds.top,
+      left: bounds.left,
+      width: bounds.width,
+      height: bounds.height,
+      bottom: bounds.bottom,
+      right: bounds.left + bounds.width,
+      x: bounds.left,
+      y: bounds.top,
+      toJSON() {
+        return bounds;
+      },
+    } as DOMRect;
+  })();
+
+  return {
+    position: clampedPosition,
+    setPosition,
+    selectedText,
+    selectedSpeechText,
+    selectedCopyText,
+    selectionRect,
+    clearSelection,
+  };
 };

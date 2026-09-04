@@ -64,7 +64,15 @@ describe('GroundedResponse', () => {
     expect(surface?.shadowRoot?.querySelector('[data-testid="search-entry-widget"]')?.textContent).toContain(
       'Suggested follow-up search',
     );
-    expect(renderer.container.querySelector('[data-testid="search-entry-google-logo"]')).not.toBeNull();
+    const logoWrapper = renderer.container.querySelector(
+      '[data-testid="search-entry-google-logo"]',
+    ) as HTMLElement | null;
+    expect(logoWrapper).not.toBeNull();
+    expect(logoWrapper?.className).toContain('items-center');
+    expect(logoWrapper?.className).toContain('flex');
+    // Surface centers the shadow content and drops the asymmetric pb-2 padding.
+    expect(surface?.className).toContain('items-center');
+    expect(surface?.className).not.toContain('pb-2');
     expect(renderer.container.textContent).not.toContain('.container { display: flex; }');
     expect(surface?.shadowRoot?.querySelector('.google-logo')).toBeNull();
     expect(surface?.shadowRoot?.querySelector('.secondary-logo')).toBeNull();
@@ -72,6 +80,10 @@ describe('GroundedResponse', () => {
     expect(surface?.shadowRoot?.querySelector('.leading-slot')).toBeNull();
     expect(surface?.shadowRoot?.querySelector('style')?.textContent).toContain('.container::before');
     expect(surface?.shadowRoot?.querySelector('style')?.textContent).not.toContain('.container > *::before');
+    // Override resets margins so the shadow chips stay vertically centered.
+    const overrideText = surface?.shadowRoot?.querySelector('style')?.textContent ?? '';
+    expect(overrideText).toContain('margin: 0 !important');
+    expect(overrideText).toContain('line-height: 1.4');
     expect(surface?.className).toContain('custom-scrollbar');
   });
 

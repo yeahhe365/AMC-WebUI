@@ -10,7 +10,7 @@ import { useLiveFrameCapture } from './useLiveFrameCapture';
 import { resolveLiveErrorText } from '@/utils/live-api/liveErrorState';
 import { useBackgroundKeepAlive } from '@/hooks/core/useBackgroundKeepAlive';
 import { useI18n } from '@/contexts/I18nContext';
-import { getGeminiKeyForRequest, SERVER_MANAGED_API_KEY } from '@/utils/apiKeySelection';
+import { getLiveApiKey } from '@/utils/apiKeySelection';
 import { useStateWithRef } from '@/hooks/useStateWithRef';
 
 interface UseLiveApiProps {
@@ -25,6 +25,8 @@ interface UseLiveApiProps {
     targetLanguageCode: string;
     echoTargetLanguage: boolean;
   };
+  isPushToTalk?: boolean;
+  allowBargeIn?: boolean;
 }
 
 export const useLiveApi = ({
@@ -36,6 +38,8 @@ export const useLiveApi = ({
   onGeneratedFiles,
   clientFunctions,
   liveTranslateConfig,
+  isPushToTalk,
+  allowBargeIn,
 }: UseLiveApiProps) => {
   const { t } = useI18n();
   const sessionRef = useRef<Promise<LiveSession> | null>(null);
@@ -53,17 +57,11 @@ export const useLiveApi = ({
     sessionHandle,
     clientFunctions,
     liveTranslateConfig,
+    isPushToTalk,
+    allowBargeIn,
   });
   const liveApiKeyForConnection = useMemo(() => {
-    const keyResult = getGeminiKeyForRequest(appSettings, chatSettings, {
-      skipIncrement: true,
-      skipUsageLogging: true,
-    });
-    if ('error' in keyResult || keyResult.key === SERVER_MANAGED_API_KEY) {
-      return null;
-    }
-
-    return keyResult.key;
+    return getLiveApiKey(appSettings, chatSettings);
   }, [appSettings, chatSettings]);
 
   const { handleMessage, clearBufferedAudio } = useLiveMessageProcessing({
@@ -78,24 +76,35 @@ export const useLiveApi = ({
     sessionHandleRef,
   });
 
-  const { isConnected, isReconnecting, errorState, connect, handleGoAway, disconnect, sendText, sendContent } =
-    useLiveConnection({
-      appSettings,
-      modelId,
-      liveConfig,
-      liveApiKeyForConnection,
-      tools,
-      initializeAudio,
-      cleanupAudio,
-      clearBufferedAudio,
-      stopVideo,
-      handleMessage,
-      onClose,
-      onTranscript,
-      setSessionHandle,
-      sessionHandleRef,
-      sessionRef,
-    });
+  const {
+    isConnected,
+    isReconnecting,
+    errorState,
+    connect,
+    handleGoAway,
+    disconnect,
+    sendText,
+    sendContent,
+    signalActivityStart,
+    signalActivityEnd,
+    sendAudioStreamEnd,
+  } = useLiveConnection({
+    appSettings,
+    modelId,
+    liveConfig,
+    liveApiKeyForConnection,
+    tools,
+    initializeAudio,
+    cleanupAudio,
+    clearBufferedAudio,
+    stopVideo,
+    handleMessage,
+    onClose,
+    onTranscript,
+    setSessionHandle,
+    sessionHandleRef,
+    sessionRef,
+  });
   useEffect(() => {
     goAwayHandlerRef.current = handleGoAway;
   }, [handleGoAway]);
@@ -126,6 +135,9 @@ export const useLiveApi = ({
       disconnect,
       sendText,
       sendContent,
+      signalActivityStart,
+      signalActivityEnd,
+      sendAudioStreamEnd,
       videoStream,
       videoSource,
       startCamera,
@@ -145,6 +157,9 @@ export const useLiveApi = ({
       disconnect,
       sendText,
       sendContent,
+      signalActivityStart,
+      signalActivityEnd,
+      sendAudioStreamEnd,
       videoStream,
       videoSource,
       startCamera,

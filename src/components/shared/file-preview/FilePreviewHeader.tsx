@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { type UploadedFile } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
+import { toastError } from '@/stores/toastStore';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 import { triggerDownload } from '@/utils/export/core';
 import { copyFileToClipboard } from '@/utils/file/fileClipboard';
@@ -79,7 +80,7 @@ export const FilePreviewHeader = React.forwardRef<FilePreviewHeaderHandle, FileP
         showCopyFeedback();
       } catch (copyError) {
         logService.error('Failed to copy content:', copyError);
-        alert(t('filePreviewCopyFailed'));
+        toastError(t('filePreviewCopyFailed'));
       }
     }, [file, isCopied, showCopyFeedback, t]);
 

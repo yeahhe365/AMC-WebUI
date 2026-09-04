@@ -4,20 +4,6 @@ import { base64ToBlob } from '@/utils/file/fileEncoding';
 import { getExtensionFromMimeType } from '@/utils/file/fileMime';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 
-const getThoughtHeadingTitle = (line: string): string | null => {
-  if (line.startsWith('## ') || line.startsWith('### ')) {
-    return line.replace(/^[#]+\s*/, '').trim();
-  }
-
-  for (const marker of ['**', '__']) {
-    if (line.startsWith(marker) && line.endsWith(marker) && !line.slice(2, -2).includes(marker)) {
-      return line.substring(2, line.length - 2).trim();
-    }
-  }
-
-  return null;
-};
-
 const buildGeneratedFileName = (baseName: string, extension: string): string => {
   if (baseName.toLowerCase().endsWith(extension)) {
     return baseName;
@@ -28,36 +14,6 @@ const buildGeneratedFileName = (baseName: string, extension: string): string => 
   }
 
   return `${baseName}${extension}`;
-};
-
-export const parseThoughtProcess = (thoughts: string | undefined) => {
-  if (!thoughts) return null;
-
-  const lines = thoughts.trim().split('\n');
-  let lastHeadingIndex = -1;
-  let lastHeading = '';
-
-  for (let lineIndex = lines.length - 1; lineIndex >= 0; lineIndex--) {
-    const headingTitle = getThoughtHeadingTitle(lines[lineIndex].trim());
-    if (headingTitle !== null) {
-      lastHeadingIndex = lineIndex;
-      lastHeading = headingTitle;
-      break;
-    }
-  }
-
-  if (lastHeadingIndex === -1) {
-    const content = lines.slice(-5).join('\n').trim();
-    return { title: 'Latest thought', content, isFallback: true };
-  }
-
-  const contentLines = lines.slice(lastHeadingIndex + 1);
-  const content = contentLines
-    .filter((line) => line.trim() !== '')
-    .join('\n')
-    .trim();
-
-  return { title: lastHeading, content, isFallback: false };
 };
 
 /**
@@ -112,4 +68,69 @@ export const createUploadedFileFromBytes = (
     rawFile: file,
     uploadState: 'active',
   };
+};
+
+/**
+ * Extracts a plain-text tail of the thought stream for the ThinkingStrip.
+ * Strips markdown heading markers (`## `) and full-line bold markers (`**x**` / `__x__`)
+ * because the strip is a plain-text preview (Gemini heading streams would otherwise
+ * show literal `## ` characters). Bounded to the last `maxLines` source lines.
+ */
+export const getThinkingStreamTail = (thoughts: string | undefined, maxLines: number): string => {
+  if (!thoughts) {
+    return '';
+  }
+
+  return thoughts
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) =>
+      line
+        .replace(/^#{1,6}\s+/, '')
+        .replace(/^\*\*(.+)\*\*$/, '$1')
+        .replace(/^__(.+)__$/, '$1'),
+    )
+    .slice(-maxLines)
+    .join('\n');
+};
+
+export interface ThinkingSection {
+  /** Section title; the loose preamble before the first title is null. */
+  title: string | null;
+  body: string;
+}
+
+// A section title is a full line of the form `**Title**` (optionally with
+// trailing spaces). Inline bold like `some **bold** text` must not count, and an
+// unclosed trailing `**Partial` must not either — the `$` anchor requires the
+// closing `**` at the end of the line, so a stream mid-title keeps showing the
+// previous section until the opener completes.
+const THINKING_SECTION_TITLE_REGEX = /^\*\*([^*\n]+)\*\*[ \t]*$/gm;
+
+/** Returns null when the stream is flat (or empty) — callers fall back to the
+ *  existing tail-window rendering, so third-party paths stay byte-identical. */
+export const parseThinkingSections = (thoughts: string | undefined): ThinkingSection[] | null => {
+  if (!thoughts) {
+    return null;
+  }
+
+  const matches = Array.from(thoughts.matchAll(THINKING_SECTION_TITLE_REGEX));
+  if (matches.length === 0) {
+    return null;
+  }
+
+  const sections: ThinkingSection[] = [];
+  const preamble = thoughts.slice(0, matches[0].index).trim();
+  if (preamble) {
+    sections.push({ title: null, body: preamble });
+  }
+
+  matches.forEach((match, i) => {
+    const bodyStart = match.index! + match[0].length;
+    const bodyEnd = i + 1 < matches.length ? matches[i + 1].index! : thoughts.length;
+    sections.push({ title: match[1].trim(), body: thoughts.slice(bodyStart, bodyEnd).trim() });
+  });
+
+  return sections;
 };

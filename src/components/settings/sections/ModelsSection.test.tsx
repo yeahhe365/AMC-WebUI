@@ -1,11 +1,10 @@
-import { act, type ComponentProps, type ReactNode, useState } from 'react';
+import { act, type ComponentProps, useState } from 'react';
 import { setupProviderTestRenderer as setupTestRenderer } from '@/test/render/providerRenderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { setupStoreStateReset } from '@/test/stores/reset';
 import { ModelsSection } from './ModelsSection';
-import { createDefaultThirdPartyApiSettings } from '@/utils/thirdPartyApiProviders';
-import type { AppSettings } from '@/types';
+import type { ApiMode, AppSettings } from '@/types';
 import type { ModelSelector } from '@/components/settings/controls/ModelSelector';
 import type { LanguageVoiceSection } from './LanguageVoiceSection';
 import type { SafetySection } from './SafetySection';
@@ -27,21 +26,11 @@ const mockModelSelector = vi.hoisted(() => ({
   lastProps: null as ModelSelectorProps | null,
 }));
 
-const { fetchOpenAICompatibleModelsMock } = vi.hoisted(() => ({
-  fetchOpenAICompatibleModelsMock: vi.fn(),
-}));
-
 vi.mock('@/components/settings/controls/ModelSelector', () => ({
   ModelSelector: (props: ModelSelectorProps) => {
     mockModelSelector.lastProps = props;
-    const extraModelListContent = (props as ModelSelectorProps & { extraModelListContent?: ReactNode })
-      .extraModelListContent;
-    return <div data-testid="model-selector">model selector{extraModelListContent}</div>;
+    return <div data-testid="model-selector">model selector</div>;
   },
-}));
-
-vi.mock('@/services/api/openaiCompatibleApi', () => ({
-  fetchOpenAICompatibleModels: fetchOpenAICompatibleModelsMock,
 }));
 
 vi.mock('./LanguageVoiceSection', () => ({
@@ -58,34 +47,6 @@ vi.mock('./SafetySection', () => ({
     return <div data-testid="safety-section">safety section</div>;
   },
 }));
-
-const buildOpenaiProviderSettings = (
-  overrides: {
-    apiKey?: string | null;
-    baseUrl?: string | null;
-    modelId?: string;
-    models?: Array<{ id: string; name: string; isPinned?: boolean }>;
-  } = {},
-) => {
-  const defaults = createDefaultThirdPartyApiSettings();
-  return {
-    isThirdPartyApiEnabled: true,
-    apiMode: 'third-party' as const,
-    thirdPartyApi: {
-      activeProvider: 'openai' as const,
-      providers: {
-        ...defaults.providers,
-        openai: {
-          apiKey: overrides.apiKey ?? null,
-          baseUrl: overrides.baseUrl ?? defaults.providers.openai.baseUrl,
-          modelId: overrides.modelId ?? defaults.providers.openai.modelId,
-          models: overrides.models ?? defaults.providers.openai.models,
-          protocol: 'openai-compatible' as const,
-        },
-      },
-    },
-  };
-};
 
 describe('ModelsSection', () => {
   const renderer = setupTestRenderer({ providers: { language: 'en' } });
@@ -337,11 +298,11 @@ describe('ModelsSection', () => {
     expect(onUpdateSettings).toHaveBeenCalledWith({ thoughtTranslationModelId: 'gemini-3.1-pro-preview' });
   });
 
-  it('keeps OpenAI-compatible models out of Gemini language and voice controls', async () => {
+  it('keeps third-party models out of Gemini language and voice controls', async () => {
     await renderModelsSection({
       availableModels: [
         { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', apiMode: 'gemini-native' },
-        { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', apiMode: 'openai-compatible' },
+        { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', apiMode: 'third-party' as ApiMode },
       ],
     });
 
@@ -350,137 +311,7 @@ describe('ModelsSection', () => {
     ]);
   });
 
-  it('manages active provider model IDs inside the models settings screen', async () => {
-    const onUpdateSettings = vi.fn();
-
-    await renderModelsSection({
-      currentSettings: {
-        ...useSettingsStore.getState().appSettings,
-        ...buildOpenaiProviderSettings({
-          modelId: 'gpt-5.6-sol',
-          models: [
-            { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', isPinned: true },
-            { id: 'gpt-4.1', name: 'GPT-4.1' },
-          ],
-        }),
-      },
-      onUpdateSettings,
-    });
-
-    const modelSelector = renderer.container.querySelector('[data-testid="model-selector"]');
-    expect(modelSelector).not.toBeNull();
-    expect(modelSelector!.textContent).toContain('OpenAI-Compatible Model IDs');
-
-    const modelIdInputs = Array.from(
-      modelSelector!.querySelectorAll<HTMLInputElement>('input[data-openai-compatible-model-id-input="true"]'),
-    );
-    expect(modelIdInputs.map((input) => input.value)).toEqual(['gpt-5.6-sol', 'gpt-4.1']);
-
-    await act(async () => {
-      const addButton = Array.from(renderer.container.querySelectorAll('button')).find((button) =>
-        button.textContent?.includes('Add Model'),
-      );
-      addButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    const updatedModelIdInputs = Array.from(
-      modelSelector!.querySelectorAll<HTMLInputElement>('input[data-openai-compatible-model-id-input="true"]'),
-    );
-
-    await act(async () => {
-      const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
-      descriptor?.set?.call(updatedModelIdInputs[2], 'deepseek-chat');
-      updatedModelIdInputs[2].dispatchEvent(new Event('input', { bubbles: true }));
-      updatedModelIdInputs[2].dispatchEvent(new Event('change', { bubbles: true }));
-    });
-
-    const thirdPartyUpdate = onUpdateSettings.mock.calls
-      .map((call) => call[0])
-      .find(
-        (partial): partial is { thirdPartyApi: AppSettings['thirdPartyApi'] } =>
-          typeof partial === 'object' && partial !== null && 'thirdPartyApi' in partial,
-      ) as { thirdPartyApi: AppSettings['thirdPartyApi'] } | undefined;
-
-    expect(thirdPartyUpdate).toBeDefined();
-    expect(thirdPartyUpdate!.thirdPartyApi.providers.openai.models).toEqual([
-      { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', isPinned: true },
-      { id: 'gpt-4.1', name: 'GPT-4.1' },
-      { id: 'deepseek-chat', name: 'deepseek-chat' },
-    ]);
-  });
-
-  it('fetches active provider models from the models settings screen', async () => {
-    const onUpdateSettings = vi.fn();
-    fetchOpenAICompatibleModelsMock.mockResolvedValue([
-      { id: 'gpt-5.6-sol', name: 'gpt-5.6-sol' },
-      { id: 'deepseek-chat', name: 'deepseek-chat' },
-    ]);
-
-    await renderModelsSection({
-      currentSettings: {
-        ...useSettingsStore.getState().appSettings,
-        ...buildOpenaiProviderSettings({
-          apiKey: 'openai-compatible-key',
-          baseUrl: 'https://api.openai.com/v1',
-          modelId: 'missing-model',
-          models: [{ id: 'gpt-5.6-sol', name: 'My GPT', isPinned: true }],
-        }),
-      },
-      onUpdateSettings,
-    });
-
-    const modelSelector = renderer.container.querySelector('[data-testid="model-selector"]');
-    expect(modelSelector).not.toBeNull();
-
-    const fetchButton = Array.from(modelSelector!.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Fetch Models'),
-    );
-
-    expect(fetchButton).toBeDefined();
-
-    await act(async () => {
-      fetchButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    await vi.waitFor(() => {
-      expect(fetchOpenAICompatibleModelsMock).toHaveBeenCalledWith(
-        'openai-compatible-key',
-        'https://api.openai.com/v1',
-        expect.any(AbortSignal),
-        'openai',
-      );
-    });
-
-    await vi.waitFor(() => {
-      expect(document.body.textContent).toContain('deepseek-chat');
-      expect(document.body.textContent).toContain('Fetched 2 models.');
-    });
-
-    const importButton = Array.from(document.body.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Import Selected'),
-    );
-
-    expect(importButton).toBeDefined();
-
-    await act(async () => {
-      importButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    const thirdPartyFetchUpdate = onUpdateSettings.mock.calls
-      .map((call) => call[0])
-      .find(
-        (partial): partial is { thirdPartyApi: AppSettings['thirdPartyApi'] } =>
-          typeof partial === 'object' && partial !== null && 'thirdPartyApi' in partial,
-      ) as { thirdPartyApi: AppSettings['thirdPartyApi'] } | undefined;
-
-    expect(thirdPartyFetchUpdate).toBeDefined();
-    expect(thirdPartyFetchUpdate!.thirdPartyApi.providers.openai.models).toEqual([
-      { id: 'gpt-5.6-sol', name: 'My GPT', isPinned: true },
-      { id: 'deepseek-chat', name: 'deepseek-chat' },
-    ]);
-  });
-
-  it('shows only GPT-compatible model and chat controls in OpenAI-compatible mode', async () => {
+  it('shows only third-party model and chat controls in a third-party session', async () => {
     const onUpdateSettings = vi.fn();
     const defaultModels = [
       { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', isPinned: true },
@@ -491,11 +322,10 @@ describe('ModelsSection', () => {
       modelId: 'gpt-5.6-sol',
       availableModels: defaultModels,
       defaultModels,
-      isOpenAICompatibleMode: true,
+      isThirdPartyMode: true,
       currentSettings: {
         ...useSettingsStore.getState().appSettings,
-        isOpenAICompatibleApiEnabled: true,
-        apiMode: 'openai-compatible',
+        providerId: 'openai',
       },
       onUpdateSettings,
     });

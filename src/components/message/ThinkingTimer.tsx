@@ -1,30 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { useI18n } from '@/contexts/I18nContext';
 import { formatDuration } from '@/utils/durationFormat';
 
 interface ThinkingTimerProps {
-  startTime: Date;
+  startTimeMs: number;
 }
 
-const THINKING_TIMER_POLL_INTERVAL_MS = 100;
+const THINKING_TIMER_POLL_INTERVAL_MS = 1000;
 
-export const ThinkingTimer: React.FC<ThinkingTimerProps> = ({ startTime }) => {
-  const { t } = useI18n();
-  const [seconds, setSeconds] = useState(() => Math.floor((Date.now() - new Date(startTime).getTime()) / 1000));
+export const ThinkingTimer: React.FC<ThinkingTimerProps> = ({ startTimeMs }) => {
+  const [seconds, setSeconds] = useState(() => Math.floor((Date.now() - startTimeMs) / 1000));
 
   useEffect(() => {
-    const start = new Date(startTime).getTime();
-
     const interval = setInterval(() => {
-      setSeconds(Math.floor((Date.now() - start) / 1000));
+      setSeconds(Math.floor((Date.now() - startTimeMs) / 1000));
     }, THINKING_TIMER_POLL_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [startTime]);
+  }, [startTimeMs]);
 
-  return (
-    <span>
-      {t('thinkingText')} ({formatDuration(seconds)})
-    </span>
-  );
+  return <span>({formatDuration(seconds)})</span>;
 };

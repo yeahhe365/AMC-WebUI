@@ -1,6 +1,10 @@
+/**
+ * @vitest-environment node
+ */
 import fs from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
+import { SUPPORTED_LANGUAGES } from './languageRegistry';
 import { ensureAllFeatureTranslations, getTranslator, translations } from './translations';
 
 const projectRoot = path.resolve(__dirname, '../..');
@@ -42,6 +46,9 @@ describe('translation coverage for protected UI surfaces', () => {
     expect(t('fileProcessingZip').replace('{filename}', 'demo.zip')).toBe('正在处理 demo.zip…');
     expect(t('uploadCancelledByUser')).toBe('用户已取消上传。');
     expect(t('voiceInputFailedWithMessage').replace('{message}', 'X')).toBe('语音输入失败：X');
+    expect(t('fileProcessingBackendFailedWithMessage').replace('{message}', 'X')).toBe('后端处理失败：X');
+    expect(t('uploadApiProcessingFailedWithMessage').replace('{message}', 'X')).toBe('文件 API 处理失败：X');
+    expect(t('fileIdAdderProcessingFailedWithMessage').replace('{message}', 'X')).toBe('文件 API 处理失败：X');
     expect(t('diagramGraphvizTitle')).toBe('Graphviz 图表');
     expect(t('diagramMermaidTitle')).toBe('Mermaid 图表');
     expect(t('scenariosTitleRequired')).toBe('场景标题不能为空。');
@@ -52,6 +59,10 @@ describe('translation coverage for protected UI surfaces', () => {
     expect(t('assistantAvatarAlt')).toBe('助手头像');
     expect(t('messageSenderErrorWithPrefix').replace('{prefix}', '错误').replace('{message}', 'X')).toBe('错误：X');
     expect(t('messageSenderApiKeyNotConfigured')).toBe('未在设置中配置 API 密钥。');
+    expect(t('messageSenderEmptyReply')).toBe('模型结束了这一轮，但没有给出可见回复。请重试。');
+    expect(t('messageSenderEmptyReplyWithThoughts')).toBe(
+      '模型结束了这一轮，但没有给出可见回复（只有思考过程）。可以重试，或调低思考等级后再试。',
+    );
     expect(t('messageSenderTtsErrorPrefix')).toBe('语音生成错误');
     expect(t('messageSenderImageEditErrorPrefix')).toBe('图像编辑错误');
     expect(t('messageSenderAudioReadyTitle')).toBe('音频已生成');
@@ -63,6 +74,114 @@ describe('translation coverage for protected UI surfaces', () => {
       '文件格式无效。应为 A，实际为 B。',
     );
     expect(t('exportMessageDialogTitle')).toBe('导出消息');
+  });
+
+  it('uses real Japanese copy for protected translation keys', async () => {
+    await ensureAllFeatureTranslations();
+    const t = getTranslator('ja');
+
+    expect(t('fillInput')).toBe('挿入');
+    expect(t('cancel')).toBe('キャンセル');
+    expect(t('save')).toBe('保存');
+    expect(t('delete')).toBe('削除');
+    expect(t('newChat')).toBe('新しいチャット');
+    expect(t('search')).toBe('検索');
+    expect(t('copy')).toBe('コピー');
+    expect(t('download')).toBe('ダウンロード');
+    expect(t('loading')).toBe('読み込み中…');
+    expect(t('close')).toBe('閉じる');
+    expect(t('expand')).toBe('展開');
+    expect(t('refresh')).toBe('更新');
+    expect(t('pipEnter')).toBe('ピクチャーインピクチャーに入る');
+    expect(t('pipExit')).toBe('ピクチャーインピクチャーを終了');
+    expect(t('settingsTitle')).toBe('設定');
+    expect(t('settingsTheme')).toBe('テーマ');
+    expect(t('settingsLanguage')).toBe('言語');
+    expect(t('settingsLanguageJa')).toBe('日本語');
+    expect(t('mediaResolutionLow')).toBe('低（高速）');
+    expect(t('pwaUpdateLater')).toBe('後で');
+    expect(t('historyTitle')).toBe('履歴');
+    expect(t('settingsDefaultModel')).toBe('プライマリチャットモデル');
+    expect(t('safetyTitle')).toBe('安全性設定');
+    expect(t('shortcutsNewChat')).toBe('新規チャットを開始');
+    expect(t('back')).toBe('戻る');
+    expect(t('unknown')).toBe('不明');
+  });
+
+  it('uses real Korean copy for protected translation keys', async () => {
+    await ensureAllFeatureTranslations();
+    const t = getTranslator('ko');
+
+    expect(t('cancel')).toBe('취소');
+    expect(t('save')).toBe('저장');
+    expect(t('delete')).toBe('삭제');
+    expect(t('newChat')).toBe('새 채팅');
+    expect(t('search')).toBe('검색');
+    expect(t('copy')).toBe('복사');
+    expect(t('download')).toBe('다운로드');
+    expect(t('settingsTitle')).toBe('설정');
+    expect(t('settingsTheme')).toBe('테마');
+    expect(t('settingsLanguage')).toBe('언어');
+    expect(t('settingsLanguageKo')).toBe('한국어');
+    expect(t('historyTitle')).toBe('기록');
+    expect(t('back')).toBe('뒤로');
+  });
+
+  it('uses real Spanish copy for protected translation keys', async () => {
+    await ensureAllFeatureTranslations();
+    const t = getTranslator('es');
+
+    expect(t('cancel')).toBe('Cancelar');
+    expect(t('save')).toBe('Guardar');
+    expect(t('delete')).toBe('Eliminar');
+    expect(t('newChat')).toBe('Nuevo chat');
+    expect(t('search')).toBe('Buscar');
+    expect(t('copy')).toBe('Copiar');
+    expect(t('download')).toBe('Descargar');
+    expect(t('settingsTitle')).toBe('Ajustes');
+    expect(t('settingsTheme')).toBe('Tema');
+    expect(t('settingsLanguage')).toBe('Idioma');
+    expect(t('settingsLanguageEs')).toBe('Español');
+    expect(t('historyTitle')).toBe('Historial');
+    expect(t('back')).toBe('Atrás');
+  });
+
+  it('uses real French copy for protected translation keys', async () => {
+    await ensureAllFeatureTranslations();
+    const t = getTranslator('fr');
+
+    expect(t('cancel')).toBe('Annuler');
+    expect(t('save')).toBe('Enregistrer');
+    expect(t('delete')).toBe('Supprimer');
+    expect(t('newChat')).toBe('Nouvelle discussion');
+    expect(t('search')).toBe('Rechercher');
+    expect(t('copy')).toBe('Copier');
+    expect(t('download')).toBe('Télécharger');
+    expect(t('settingsTitle')).toBe('Paramètres');
+    expect(t('settingsTheme')).toBe('Thème');
+    expect(t('settingsLanguage')).toBe('Langue');
+    expect(t('settingsLanguageFr')).toBe('Français');
+    expect(t('historyTitle')).toBe('Historique');
+    expect(t('back')).toBe('Retour');
+  });
+
+  it('uses real German copy for protected translation keys', async () => {
+    await ensureAllFeatureTranslations();
+    const t = getTranslator('de');
+
+    expect(t('cancel')).toBe('Abbrechen');
+    expect(t('save')).toBe('Speichern');
+    expect(t('delete')).toBe('Löschen');
+    expect(t('newChat')).toBe('Neuer Chat');
+    expect(t('search')).toBe('Suchen');
+    expect(t('copy')).toBe('Kopieren');
+    expect(t('download')).toBe('Herunterladen');
+    expect(t('settingsTitle')).toBe('Einstellungen');
+    expect(t('settingsTheme')).toBe('Design');
+    expect(t('settingsLanguage')).toBe('Sprache');
+    expect(t('settingsLanguageDe')).toBe('Deutsch');
+    expect(t('historyTitle')).toBe('Verlauf');
+    expect(t('back')).toBe('Zurück');
   });
 
   it('keeps Chinese UI copy on full-width punctuation where applicable', async () => {
@@ -78,6 +197,24 @@ describe('translation coverage for protected UI surfaces', () => {
       ].filter(Boolean);
 
       return issues.map((issue) => `${key}: ${issue} -> ${zh}`);
+    });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('keeps Japanese UI copy on full-width punctuation where applicable', async () => {
+    await ensureAllFeatureTranslations();
+    const offenders = Object.entries(translations).flatMap(([key, value]) => {
+      const ja = (value as { ja?: string }).ja;
+      if (!ja) return [];
+
+      const issues = [
+        ja.includes('...') ? 'ASCII ellipsis' : '',
+        /[\u3040-\u30ff\u4e00-\u9fff]:/.test(ja) ? 'ASCII colon after Japanese text' : '',
+        /[()]/.test(ja) && /[\u3040-\u30ff\u4e00-\u9fff]/.test(ja) ? 'ASCII parentheses in Japanese text' : '',
+      ].filter(Boolean);
+
+      return issues.map((issue) => `${key}: ${issue} -> ${ja}`);
     });
 
     expect(offenders).toEqual([]);
@@ -134,7 +271,7 @@ describe('translation coverage for protected UI surfaces', () => {
       },
       {
         file: 'src/components/message/buttons/export/ExportModal.tsx',
-        snippets: ['Close export dialog', 'Processing message content...'],
+        snippets: ['Close export dialog', 'Processing message content...', 'Export Message', 'Exporting {type}...'],
       },
       {
         file: 'src/components/message/buttons/export/ExportOptions.tsx',
@@ -226,12 +363,13 @@ describe('translation coverage for protected UI surfaces', () => {
       {
         file: 'src/components/modals/html-preview/HtmlPreviewHeader.tsx',
         snippets: [
-          '"React App"',
           '"HTML Preview"',
+          '"Unrestricted demo"',
+          '"Live Artifact"',
           '"Zoom Out"',
           '"Zoom In"',
           '"Reload"',
-          '"Download HTML"',
+          '"Download source HTML"',
           '"Screenshot"',
           '"Exit Fullscreen"',
           '"Fullscreen"',
@@ -241,6 +379,10 @@ describe('translation coverage for protected UI surfaces', () => {
       {
         file: 'src/components/modals/html-preview/HtmlPreviewContent.tsx',
         snippets: ['"HTML Content Preview"'],
+      },
+      {
+        file: 'src/components/message/blocks/ArtifactFrame.tsx',
+        snippets: ['Open larger preview'],
       },
       {
         file: 'src/components/header/Header.tsx',
@@ -483,10 +625,6 @@ describe('translation coverage for protected UI surfaces', () => {
         snippets: ['Scenario deleted.'],
       },
       {
-        file: 'src/components/message/buttons/export/ExportModal.tsx',
-        snippets: ['Export Message', 'Exporting {type}...'],
-      },
-      {
         file: 'src/hooks/chat/history/useGroupActions.ts',
         snippets: ['Untitled'],
       },
@@ -636,6 +774,10 @@ describe('translation coverage for protected UI surfaces', () => {
         snippets: ['"Pause"', '"Play"', '"Playback Speed"', '"Download Audio"'],
       },
       {
+        file: 'src/features/message-sender/useChatStreamHandler.ts',
+        snippets: ['The model returned no reply (only reasoning was produced).', '模型没有返回任何回答'],
+      },
+      {
         file: 'src/features/message-sender/useMessageSender.ts',
         snippets: [
           '"Wait for files to finish processing."',
@@ -659,6 +801,22 @@ describe('translation coverage for protected UI surfaces', () => {
         expect(source).not.toContain(snippet);
       });
     });
+  });
+
+  it('every key has every supported language', async () => {
+    await ensureAllFeatureTranslations();
+    const missing = Object.entries(translations).flatMap(([key, value]) =>
+      SUPPORTED_LANGUAGES.filter((lang) => !(value as Record<string, string>)[lang]).map((lang) => `${key}:${lang}`),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it('does not miss any language for any key', async () => {
+    await ensureAllFeatureTranslations();
+    const missing = Object.entries(translations).flatMap(([key, value]) =>
+      SUPPORTED_LANGUAGES.filter((lang) => !(value as Record<string, string>)[lang]).map((lang) => `${key}:${lang}`),
+    );
+    expect(missing).toEqual([]);
   });
 
   it('defines translations for every t() key used in source files', async () => {

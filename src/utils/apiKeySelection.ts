@@ -1,10 +1,14 @@
-import { type AppSettings, type ChatSettings, type ThirdPartyProviderConfig } from '@/types';
-import { API_KEY_LAST_USED_INDEX_KEY } from '@/constants/storageKeys';
+import { type AppSettings, type ChatSettings, type ThirdPartyConnection } from '@/types';
+import { API_KEY_LAST_USED_INDEX_BY_TARGET_KEY, API_KEY_LAST_USED_INDEX_KEY } from '@/constants/storageKeys';
 import { logService } from '@/services/logService';
-import { isThirdPartyApiActive } from './thirdPartyApiActive';
-import { getThirdPartyProviderConfig } from './thirdPartyApiProviders';
+import { isUnavailableThirdPartyRoute, resolveChatApiRoute } from './chatApiRoute';
+import { SERVER_MANAGED_API_KEY } from '../../shared/serverManagedApiKey';
 
-export const SERVER_MANAGED_API_KEY = '__SERVER_MANAGED_API_KEY__';
+export { SERVER_MANAGED_API_KEY };
+const GEMINI_API_KEY_ROTATION_TARGET = '__gemini__';
+
+export const THIRD_PARTY_CONNECTION_MISSING_ERROR = 'Third-party connection is unavailable.';
+export const THIRD_PARTY_CONNECTION_DISABLED_ERROR = 'Third-party connection is disabled.';
 
 type ServerManagedProxyEligibility = Pick<
   AppSettings,
@@ -25,19 +29,41 @@ type GetKeyForRequestOptions = {
   skipIncrement?: boolean;
   skipUsageLogging?: boolean;
   apiMode?: ApiKeyRequestMode;
-  provider?: ThirdPartyProviderConfig;
+  provider?: ThirdPartyConnection;
 };
 
-const resolveApiKeyRequestMode = (appSettings: AppSettings, apiMode: ApiKeyRequestMode = 'active') => {
+const resolveApiKeyRequestMode = (
+  appSettings: AppSettings,
+  currentChatSettings: ChatSettings,
+  apiMode: ApiKeyRequestMode = 'active',
+) => {
   if (apiMode !== 'active') {
     return apiMode;
   }
 
-  return isThirdPartyApiActive(appSettings) ? 'third-party' : 'gemini-native';
+  return resolveChatApiRoute(appSettings, currentChatSettings).apiMode === 'third-party'
+    ? 'third-party'
+    : 'gemini-native';
+};
+
+const resolveProviderForKey = (
+  appSettings: AppSettings,
+  currentChatSettings: ChatSettings,
+  options: GetKeyForRequestOptions,
+): ThirdPartyConnection | undefined => {
+  if (options.provider) {
+    return options.provider;
+  }
+  const route = resolveChatApiRoute(appSettings, currentChatSettings);
+  if (route.provider) {
+    return route.provider;
+  }
+  return undefined;
 };
 
 const getActiveApiConfig = (
   appSettings: AppSettings,
+  currentChatSettings: ChatSettings,
   options: GetKeyForRequestOptions = {},
 ): { apiKeysString: string | null } => {
   const importEnv = (
@@ -49,10 +75,10 @@ const getActiveApiConfig = (
     }
   ).env;
 
-  if (resolveApiKeyRequestMode(appSettings, options.apiMode) === 'third-party') {
-    const provider = options.provider ?? getThirdPartyProviderConfig(appSettings);
-    const envFallback = provider.protocol === 'openai-compatible' ? importEnv?.VITE_OPENAI_API_KEY : null;
-    return { apiKeysString: provider.apiKey || envFallback || null };
+  if (resolveApiKeyRequestMode(appSettings, currentChatSettings, options.apiMode) === 'third-party') {
+    const provider = resolveProviderForKey(appSettings, currentChatSettings, options);
+    const envFallback = provider?.protocol === 'openai-compatible' ? importEnv?.VITE_OPENAI_API_KEY : null;
+    return { apiKeysString: provider?.apiKey || envFallback || null };
   }
 
   if (appSettings.useCustomApiConfig) {
@@ -73,6 +99,39 @@ export const parseApiKeys = (apiKeysString: string | null): string[] => {
     .filter((apiKey) => apiKey.length > 0);
 };
 
+const readRotationMap = (): Record<string, number> => {
+  try {
+    const storedMap = localStorage.getItem(API_KEY_LAST_USED_INDEX_BY_TARGET_KEY);
+    if (storedMap) {
+      const parsed: unknown = JSON.parse(storedMap);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, number>;
+      }
+    }
+
+    const legacyIndex = localStorage.getItem(API_KEY_LAST_USED_INDEX_KEY);
+    if (legacyIndex !== null) {
+      const parsed = parseInt(legacyIndex, 10);
+      if (!Number.isNaN(parsed)) {
+        return { [GEMINI_API_KEY_ROTATION_TARGET]: parsed };
+      }
+    }
+  } catch (storageError) {
+    logService.error('Could not parse last used API key index', storageError);
+  }
+
+  return {};
+};
+
+const writeRotationIndex = (targetId: string, index: number) => {
+  try {
+    const nextMap = { ...readRotationMap(), [targetId]: index };
+    localStorage.setItem(API_KEY_LAST_USED_INDEX_BY_TARGET_KEY, JSON.stringify(nextMap));
+  } catch (storageError) {
+    logService.error('Could not save last used API key index', storageError);
+  }
+};
+
 export const getKeyForRequest = (
   appSettings: AppSettings,
   currentChatSettings: ChatSettings,
@@ -80,17 +139,27 @@ export const getKeyForRequest = (
 ): { key: string; isNewKey: boolean } | { error: string } => {
   const { skipIncrement = false } = options;
   const { skipUsageLogging = false } = options;
-  const apiKeyRequestMode = resolveApiKeyRequestMode(appSettings, options.apiMode);
+  const apiKeyRequestMode = resolveApiKeyRequestMode(appSettings, currentChatSettings, options.apiMode);
+  const route = resolveChatApiRoute(appSettings, currentChatSettings);
+
+  if ((options.apiMode ?? 'active') === 'active' && isUnavailableThirdPartyRoute(route)) {
+    return {
+      error:
+        route.unavailable === 'disabled' ? THIRD_PARTY_CONNECTION_DISABLED_ERROR : THIRD_PARTY_CONNECTION_MISSING_ERROR,
+    };
+  }
+
   const shouldUseServerManagedMarker =
     apiKeyRequestMode !== 'third-party' && isServerManagedApiEnabledForProxyRequests(appSettings);
+  const shouldLogUsage = !skipUsageLogging && (apiKeyRequestMode === 'third-party' || appSettings.useCustomApiConfig);
 
   const logUsage = (key: string) => {
-    if (appSettings.useCustomApiConfig && !skipUsageLogging) {
+    if (shouldLogUsage) {
       logService.recordApiKeyUsage(key);
     }
   };
 
-  const { apiKeysString } = getActiveApiConfig(appSettings, options);
+  const { apiKeysString } = getActiveApiConfig(appSettings, currentChatSettings, options);
   if (!apiKeysString) {
     if (shouldUseServerManagedMarker) {
       return { key: SERVER_MANAGED_API_KEY, isNewKey: false };
@@ -122,15 +191,12 @@ export const getKeyForRequest = (
     return { key, isNewKey };
   }
 
-  let lastUsedIndex = -1;
-  try {
-    const storedIndex = localStorage.getItem(API_KEY_LAST_USED_INDEX_KEY);
-    if (storedIndex !== null) {
-      lastUsedIndex = parseInt(storedIndex, 10);
-    }
-  } catch (storageError) {
-    logService.error('Could not parse last used API key index', storageError);
-  }
+  const rotationTarget =
+    apiKeyRequestMode === 'third-party'
+      ? (options.provider?.id ?? route.providerId ?? GEMINI_API_KEY_ROTATION_TARGET)
+      : GEMINI_API_KEY_ROTATION_TARGET;
+  const rotationMap = readRotationMap();
+  let lastUsedIndex = rotationMap[rotationTarget] ?? -1;
 
   if (isNaN(lastUsedIndex) || lastUsedIndex < 0 || lastUsedIndex >= availableKeys.length) {
     lastUsedIndex = -1;
@@ -142,11 +208,7 @@ export const getKeyForRequest = (
     targetIndex = lastUsedIndex === -1 ? 0 : lastUsedIndex;
   } else {
     targetIndex = (lastUsedIndex + 1) % availableKeys.length;
-    try {
-      localStorage.setItem(API_KEY_LAST_USED_INDEX_KEY, targetIndex.toString());
-    } catch (storageError) {
-      logService.error('Could not save last used API key index', storageError);
-    }
+    writeRotationIndex(rotationTarget, targetIndex);
   }
 
   const nextKey = availableKeys[targetIndex];
@@ -159,14 +221,36 @@ export const getGeminiKeyForRequest = (
   currentChatSettings: ChatSettings,
   options: Omit<GetKeyForRequestOptions, 'apiMode'> = {},
 ): { key: string; isNewKey: boolean } | { error: string } => {
-  const keySettings = isThirdPartyApiActive(appSettings)
-    ? { ...currentChatSettings, lockedApiKey: null }
-    : currentChatSettings;
+  const keySettings =
+    resolveChatApiRoute(appSettings, currentChatSettings).apiMode === 'third-party'
+      ? { ...currentChatSettings, lockedApiKey: null }
+      : currentChatSettings;
 
   return getKeyForRequest(appSettings, keySettings, {
     ...options,
     apiMode: 'gemini-native',
   });
+};
+
+export const getLiveApiKey = (appSettings: AppSettings, currentChatSettings?: ChatSettings): string | null => {
+  if (appSettings.liveApiKey && appSettings.liveApiKey.trim()) {
+    const parsedKeys = parseApiKeys(appSettings.liveApiKey);
+    if (parsedKeys.length > 0) {
+      return parsedKeys[0];
+    }
+  }
+
+  const fallbackSettings = currentChatSettings ?? ({ modelId: 'gemini-3.1-flash-live-preview' } as ChatSettings);
+  const keyResult = getGeminiKeyForRequest(appSettings, fallbackSettings, {
+    skipIncrement: true,
+    skipUsageLogging: true,
+  });
+
+  if ('error' in keyResult || keyResult.key === SERVER_MANAGED_API_KEY) {
+    return null;
+  }
+
+  return keyResult.key;
 };
 
 const getApiKeyErrorTranslationKey = (error: string): string | null => {
@@ -175,6 +259,10 @@ const getApiKeyErrorTranslationKey = (error: string): string | null => {
       return 'apiRuntimeKeyNotConfigured';
     case 'No valid API keys found.':
       return 'apiRuntimeNoValidKeysFound';
+    case THIRD_PARTY_CONNECTION_MISSING_ERROR:
+      return 'apiRuntimeThirdPartyConnectionMissing';
+    case THIRD_PARTY_CONNECTION_DISABLED_ERROR:
+      return 'apiRuntimeThirdPartyConnectionDisabled';
     default:
       return null;
   }

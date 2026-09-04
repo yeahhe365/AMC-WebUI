@@ -9,6 +9,7 @@ import { isDarkThemeId } from '@/utils/themeMode';
 
 const LazyHistorySidebar = lazyNamedComponent(() => import('@/components/sidebar/HistorySidebar'), 'HistorySidebar');
 const LazySidePanel = lazyNamedComponent(() => import('./SidePanel'), 'SidePanel');
+const LazyMediaNavPanel = lazyNamedComponent(() => import('@/components/media-nav/MediaNavPanel'), 'MediaNavPanel');
 
 interface MainContentProps {
   app: AppViewModel;
@@ -39,7 +40,13 @@ export const MainContent: React.FC<MainContentProps> = ({ app }) => {
     <>
       <div
         onClick={closeHistorySidebar}
-        className={`fixed inset-0 z-40 bg-black/60 transition-opacity duration-300 md:hidden ${
+        onTouchEnd={(e) => {
+          if (overlayVisible) {
+            e.preventDefault();
+            closeHistorySidebar();
+          }
+        }}
+        className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-xs transition-opacity duration-300 md:hidden ${
           overlayVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         aria-hidden="true"
@@ -51,6 +58,10 @@ export const MainContent: React.FC<MainContentProps> = ({ app }) => {
       <ChatRuntimeProvider app={app}>
         <ChatArea />
       </ChatRuntimeProvider>
+
+      <Suspense fallback={null}>
+        <LazyMediaNavPanel />
+      </Suspense>
 
       {sidePanelContent && (
         <Suspense fallback={null}>

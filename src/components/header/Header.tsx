@@ -4,19 +4,21 @@ import { Wand2, PictureInPicture, PictureInPicture2 } from 'lucide-react';
 import { IconNewChat, IconSidebarToggle, IconScenarios } from '@/components/icons';
 import { useI18n } from '@/contexts/I18nContext';
 import { getCachedModelCapabilities } from '@/stores/modelCapabilitiesStore';
-import { type ModelOption, type ThinkingLevel } from '@/types';
+import { type ModelOption, type ChatProviderId } from '@/types';
 
 import { HeaderModelSelector } from './HeaderModelSelector';
 
 interface HeaderProps {
   onNewChat: () => void;
+  /** 新聊天链接（携带 ?from 来源会话）；Cmd/Ctrl+点击以新标签页打开时继承设置。 */
+  newChatHref: string;
   onOpenScenariosModal: () => void;
   onToggleHistorySidebar: () => void;
   isLoading: boolean;
   currentModelName: string;
   availableModels: ModelOption[];
   selectedModelId: string;
-  onSelectModel: (modelId: string) => void;
+  onSelectModel: (modelId: string, providerId?: ChatProviderId) => void;
   isSwitchingModel: boolean;
   isHistorySidebarOpen: boolean;
   onLoadLiveArtifactsPrompt: () => void;
@@ -26,16 +28,13 @@ interface HeaderProps {
   isPipActive: boolean;
   onTogglePip: () => void;
   themeId: string;
-  thinkingLevel?: ThinkingLevel;
-  onSetThinkingLevel: (level: ThinkingLevel) => void;
-  showThoughts: boolean;
-  onToggleGemmaReasoning: () => void;
   newChatShortcut: string;
   pipShortcut: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onNewChat,
+  newChatHref,
   onOpenScenariosModal,
   onToggleHistorySidebar,
   isLoading,
@@ -52,10 +51,6 @@ export const Header: React.FC<HeaderProps> = ({
   isPipActive,
   onTogglePip,
   themeId,
-  thinkingLevel,
-  onSetThinkingLevel,
-  showThoughts,
-  onToggleGemmaReasoning,
   newChatShortcut,
   pipShortcut,
 }) => {
@@ -103,10 +98,6 @@ export const Header: React.FC<HeaderProps> = ({
           onSelectModel={onSelectModel}
           isSwitchingModel={isSwitchingModel}
           isLoading={isLoading}
-          thinkingLevel={thinkingLevel}
-          onSetThinkingLevel={onSetThinkingLevel}
-          showThoughts={showThoughts}
-          onToggleGemmaReasoning={onToggleGemmaReasoning}
         />
       </div>
 
@@ -148,7 +139,7 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         <a
-          href="/"
+          href={newChatHref}
           onClick={(e) => {
             if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
               e.preventDefault();

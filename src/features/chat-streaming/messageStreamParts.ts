@@ -38,6 +38,34 @@ export const appendApiPart = (parts: Part[] = [], newPart: Part) => {
   return newParts;
 };
 
+// Server code execution round-trips are emitted as single-line raw HTML blocks:
+// CommonMark ends an HTML block at the first blank line, so real newlines inside
+// code/output would break the block apart and leak the remainder as plain text.
+// Newlines are encoded as &#10; (decoded by rehype-raw inside <pre>) and blank
+// lines additionally keep a &#10;-only line so the block never sees a blank line.
+const toPreSafeHtmlText = (value: string): string => {
+  const escaped = escapeHtml(value);
+  return escaped
+    .split(/\r\n|\r|\n/)
+    .map((line) => (line.trim() === '' ? '&#10;' : line))
+    .join('&#10;');
+};
+
+const CODE_EXEC_CODE_CLASS = 'code-exec-code';
+const CODE_EXEC_RESULT_CLASS = 'tool-result';
+
+// While streaming, the model's executableCode part lands before the sandbox
+// has produced its codeExecutionResult part. The content string then ends with
+// a code-exec block that has no following tool-result block — that's the
+// "sandbox is running" signal for the renderer's live status strip.
+export const isCodeExecutionPendingInContent = (content: string): boolean => {
+  const lastCodeBlock = content.lastIndexOf(`<pre class="${CODE_EXEC_CODE_CLASS}"`);
+  if (lastCodeBlock === -1) {
+    return false;
+  }
+  return content.lastIndexOf(`class="${CODE_EXEC_RESULT_CLASS} outcome-`) < lastCodeBlock;
+};
+
 export const getContentDeltaFromPart = (part: Part): string => {
   const anyPart = part as Part & {
     text?: string;
@@ -51,17 +79,19 @@ export const getContentDeltaFromPart = (part: Part): string => {
 
   if (anyPart.executableCode) {
     const language = anyPart.executableCode.language?.toLowerCase() || 'python';
-    return `\n\n\`\`\`${language}\n${anyPart.executableCode.code || ''}\n\`\`\`\n\n`;
+    const code = toPreSafeHtmlText(anyPart.executableCode.code || '');
+    return `\n\n<pre class="${CODE_EXEC_CODE_CLASS}"><code class="language-${language}">${code}</code></pre>\n\n`;
   }
 
   if (anyPart.codeExecutionResult) {
-    const outcome = anyPart.codeExecutionResult.outcome || 'UNKNOWN';
-    let toolContent = `\n\n<div class="tool-result outcome-${outcome.toLowerCase()}"><strong>Execution Result (${outcome}):</strong>`;
-    if (anyPart.codeExecutionResult.output) {
-      toolContent += `<pre><code class="language-text">${escapeHtml(anyPart.codeExecutionResult.output)}</code></pre>`;
-    }
-    toolContent += '</div>\n\n';
-    return toolContent;
+    // The API serializes the proto enum ("OUTCOME_OK"), so strip the prefix to
+    // match the outcome-ok/outcome-failed/outcome-dead CSS classes.
+    const outcome = (anyPart.codeExecutionResult.outcome || 'UNKNOWN').toLowerCase().replace(/^outcome_/, '');
+    // The localized outcome header is rendered by ToolResultBlock from the
+    // outcome class; the content only carries the raw output text.
+    const output = anyPart.codeExecutionResult.output;
+    const outputHtml = output ? `<pre><code class="language-text">${toPreSafeHtmlText(output)}</code></pre>` : '';
+    return `\n\n<div class="${CODE_EXEC_RESULT_CLASS} outcome-${outcome}">${outputHtml}</div>\n\n`;
   }
 
   return '';

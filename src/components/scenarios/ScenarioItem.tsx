@@ -1,14 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React from 'react';
+import { createPortal } from 'react-dom';
 import { useI18n } from '@/contexts/I18nContext';
 import { type SavedScenario } from '@/types';
-import { Download, Edit3, Trash2, Eye, Copy, Sparkles, MoreVertical, Play } from 'lucide-react';
+import { Download, Edit3, Trash2, Eye, Copy, MoreHorizontal } from 'lucide-react';
 import { SMALL_ICON_BUTTON_CLASS } from '@/constants/buttonClasses';
-import { getCategoryMeta } from '@/features/scenarios/scenarioCategories';
 import {
   MENU_ITEM_BUTTON_CLASS,
   MENU_ITEM_DEFAULT_STATE_CLASS,
   MENU_ITEM_DANGER_STATE_CLASS,
 } from '@/constants/menuClasses';
+import { interpolate } from '@/i18n/interpolate';
+import { usePortaledMenu } from '@/hooks/ui/usePortaledMenu';
 
 interface ScenarioItemProps {
   scenario: SavedScenario;
@@ -34,34 +36,9 @@ export const ScenarioItem: React.FC<ScenarioItemProps> = ({
   const { t } = useI18n();
   const messageCount = scenario.messages.length;
   const hasSystemPrompt = !!scenario.systemInstruction;
+  const { isOpen, menuPosition, containerRef, buttonRef, menuRef, targetWindow, closeMenu, toggleMenu } =
+    usePortaledMenu({ menuWidth: 176 });
 
-  const meta = getCategoryMeta(scenario.category);
-  const CategoryIcon = meta.icon;
-  // Show the scenario emoji when provided, otherwise fall back to the category icon.
-  const displayGlyph = scenario.emoji ? null : <CategoryIcon size={18} strokeWidth={2} />;
-
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isMenuOpen) return undefined;
-    const handlePointerDown = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsMenuOpen(false);
-      }
-    };
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsMenuOpen(false);
-    };
-    document.addEventListener('mousedown', handlePointerDown);
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isMenuOpen]);
-
-  // Card preview prefers a human description; only fall back to content when absent.
   const previewText =
     scenario.description ||
     (scenario.messages.length > 0
@@ -87,7 +64,7 @@ export const ScenarioItem: React.FC<ScenarioItemProps> = ({
   if (!isSystem && onEdit) {
     secondaryActions.push({
       key: 'edit',
-      label: t('scenariosEditTitle'),
+      label: t('scenariosEditScenarioTitle'),
       icon: Edit3,
       onSelect: () => onEdit(scenario),
     });
@@ -107,7 +84,7 @@ export const ScenarioItem: React.FC<ScenarioItemProps> = ({
   if (!isSystem && onDelete) {
     secondaryActions.push({
       key: 'delete',
-      label: t('scenariosDeleteTitle'),
+      label: t('scenariosDeleteScenarioTitle'),
       icon: Trash2,
       onSelect: () => onDelete(scenario.id),
       danger: true,
@@ -117,133 +94,87 @@ export const ScenarioItem: React.FC<ScenarioItemProps> = ({
   const editAction = !isSystem && onEdit ? () => onEdit(scenario) : null;
 
   return (
-    <div
-      className="
-        group relative flex flex-col h-full overflow-hidden
-        bg-[var(--theme-bg-secondary)] border border-[var(--theme-border-secondary)]
-        rounded-xl transition-all duration-200
-        hover:border-[var(--theme-border-focus)] hover:shadow-md
-      "
-    >
-      <div
-        className={`absolute inset-y-0 left-0 w-1 ${meta.barClass} opacity-70 group-hover:opacity-100 transition-opacity`}
-        aria-hidden="true"
-      />
+    <li className="group relative flex items-center gap-1 rounded-lg px-2.5 py-2 hover:bg-[var(--theme-bg-tertiary)]/70">
+      <button
+        type="button"
+        onClick={() => onLoad(scenario)}
+        className="min-w-0 flex-1 rounded-md text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-border-focus)]"
+        aria-label={`${scenario.title}. ${t('scenariosUseButtonTitle')}`}
+        title={t('scenariosUseButtonTitle')}
+      >
+        <span className="block truncate text-sm font-medium text-[var(--theme-text-primary)]">{scenario.title}</span>
+        <span className="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-[var(--theme-text-tertiary)]">
+          <span className="min-w-0 truncate">{previewText}</span>
+          <span className="flex-shrink-0 tabular-nums">
+            {interpolate(t('scenariosMessageCount'), { count: String(messageCount) })}
+          </span>
+          {hasSystemPrompt && <span className="flex-shrink-0">{t('scenariosSystemPromptLabel')}</span>}
+        </span>
+      </button>
 
-      <div className="flex flex-col h-full pl-5 pr-4 py-4">
-        <div className="flex items-start gap-3 mb-3">
-          <div
-            className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-lg ${meta.chipClass}`}
-          >
-            {scenario.emoji ? <span aria-hidden="true">{scenario.emoji}</span> : displayGlyph}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h3
-              className="font-semibold text-sm text-[var(--theme-text-primary)] truncate leading-snug"
-              title={scenario.title}
-            >
-              {scenario.title}
-            </h3>
-            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-[var(--theme-text-tertiary)] mt-1">
-              <span>{t('scenariosMessageCount').replace('{count}', String(messageCount))}</span>
-              {hasSystemPrompt && (
-                <span className="flex items-center gap-1 text-[var(--theme-text-secondary)]">
-                  <Sparkles size={11} /> {t('scenariosHasSystemPrompt')}
-                </span>
-              )}
-              {isSystem && (
-                <span
-                  className={`px-1.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide ${meta.chipClass}`}
-                >
-                  {t(meta.labelKey)}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
+      {editAction && (
         <button
           type="button"
-          onClick={() => onLoad(scenario)}
-          className="flex-grow text-left mb-3 cursor-pointer"
-          title={t('scenariosUseButtonTitle')}
-          aria-label={`${t('scenariosUseButton')} ${scenario.title}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            editAction();
+          }}
+          className={`${SMALL_ICON_BUTTON_CLASS} opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus:opacity-100 focus:pointer-events-auto`}
+          title={t('scenariosEditScenarioTitle')}
+          aria-label={t('scenariosEditScenarioTitle')}
         >
-          <p className="text-xs text-[var(--theme-text-secondary)] leading-relaxed line-clamp-3 opacity-80 group-hover:opacity-100 transition-opacity">
-            {previewText}
-          </p>
+          <Edit3 size={15} />
         </button>
+      )}
 
-        <div className="flex items-center gap-2 pt-3 mt-auto border-t border-[var(--theme-border-secondary)]/50">
-          <button
-            type="button"
-            onClick={() => onLoad(scenario)}
-            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[var(--theme-bg-accent)] hover:bg-[var(--theme-bg-accent-hover)] text-[var(--theme-text-accent)] rounded-lg font-semibold text-xs transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
-            title={t('scenariosUseButtonTitle')}
-          >
-            <Play size={13} strokeWidth={2.5} />
-            {t('scenariosUseButton')}
-          </button>
-
-          {editAction && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                editAction();
-              }}
-              className={SMALL_ICON_BUTTON_CLASS}
-              title={t('scenariosEditTitle')}
-              aria-label={t('scenariosEditTitle')}
+      <div className="relative" ref={containerRef}>
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            toggleMenu();
+          }}
+          className={SMALL_ICON_BUTTON_CLASS}
+          title={t('scenariosMoreActions')}
+          aria-label={t('scenariosActionsAria')}
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
+        >
+          <MoreHorizontal size={15} />
+        </button>
+        {isOpen &&
+          targetWindow &&
+          createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              className="fixed z-[9999] w-44 rounded-lg border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] py-1"
+              style={menuPosition}
             >
-              <Edit3 size={15} />
-            </button>
+              {secondaryActions.map((action) => {
+                const ActionIcon = action.icon;
+                return (
+                  <button
+                    key={action.key}
+                    type="button"
+                    role="menuitem"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      closeMenu();
+                      action.onSelect();
+                    }}
+                    className={`${MENU_ITEM_BUTTON_CLASS} ${action.danger ? MENU_ITEM_DANGER_STATE_CLASS : MENU_ITEM_DEFAULT_STATE_CLASS}`}
+                  >
+                    <ActionIcon size={14} />
+                    <span>{action.label}</span>
+                  </button>
+                );
+              })}
+            </div>,
+            targetWindow.document.body,
           )}
-
-          <div className="relative" ref={menuRef}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsMenuOpen((open) => !open);
-              }}
-              className={SMALL_ICON_BUTTON_CLASS}
-              title={t('scenariosMoreActions')}
-              aria-label={t('scenariosActionsAria')}
-              aria-haspopup="menu"
-              aria-expanded={isMenuOpen}
-            >
-              <MoreVertical size={15} />
-            </button>
-            {isMenuOpen && (
-              <div
-                role="menu"
-                className="absolute right-0 bottom-full mb-1 z-20 w-44 bg-[var(--theme-bg-primary)] border border-[var(--theme-border-secondary)] rounded-lg shadow-lg py-1 animate-in fade-in zoom-in-95 duration-150"
-              >
-                {secondaryActions.map((action) => {
-                  const ActionIcon = action.icon;
-                  return (
-                    <button
-                      key={action.key}
-                      type="button"
-                      role="menuitem"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsMenuOpen(false);
-                        action.onSelect();
-                      }}
-                      className={`${MENU_ITEM_BUTTON_CLASS} ${action.danger ? MENU_ITEM_DANGER_STATE_CLASS : MENU_ITEM_DEFAULT_STATE_CLASS}`}
-                    >
-                      <ActionIcon size={14} />
-                      <span>{action.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
-    </div>
+    </li>
   );
 };

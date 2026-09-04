@@ -1,3 +1,5 @@
+import { CHART_RENDERER_SCRIPT } from './chartRendererScript';
+import { GRAPHVIZ_RENDERER_SCRIPT } from './graphvizRendererScript';
 import {
   HTML_PREVIEW_COPY_EVENT,
   HTML_PREVIEW_DIAGNOSTIC_EVENT,
@@ -100,12 +102,17 @@ export const PREVIEW_BRIDGE_SCRIPT = `<script>
 
         const style = window.getComputedStyle(el);
         if (style.display === 'none' || style.visibility === 'hidden') continue;
-        // Fixed elements are viewport-relative and must not inflate document height.
-        if (style.position === 'fixed') continue;
 
         const rect = el.getBoundingClientRect();
         const marginBottom = parseFloat(style.marginBottom) || 0;
-        const bottom = rect.bottom + (window.scrollY || window.pageYOffset || 0) + marginBottom;
+        let bottom;
+        if (style.position === 'fixed') {
+          // Fixed fullscreen shell (inset:0 + overflow:hidden) clips content.
+          // Use scrollHeight so the parent stretches the iframe past the clip zone.
+          bottom = rect.top + (window.scrollY || 0) + Math.max(el.scrollHeight, rect.height) + marginBottom;
+        } else {
+          bottom = rect.bottom + (window.scrollY || 0) + marginBottom;
+        }
         if (bottom > contentBottom) contentBottom = bottom;
       }
 
@@ -165,7 +172,13 @@ export const PREVIEW_BRIDGE_SCRIPT = `<script>
   }
 
   if ('MutationObserver' in window) {
-    const observer = new MutationObserver(scheduleResize);
+    const observer = new MutationObserver((mutations) => {
+      // Skip style-only attribute mutations: measuring temporarily writes inline
+      // styles and restoring them would re-trigger → infinite loop.
+      if (mutations.some((m) => !(m.type === 'attributes' && m.attributeName === 'style'))) {
+        scheduleResize();
+      }
+    });
     observer.observe(document.documentElement || document, { childList: true, subtree: true, attributes: true });
   }
 
@@ -396,6 +409,13 @@ export const PREVIEW_BRIDGE_SCRIPT = `<script>
   };
 
   document.addEventListener('click', (event) => {
+    // Only honor real user gestures. A preview's own script can dispatch a
+    // synthetic click (element.click()) — without this check it could trigger a
+    // followup/copy on the parent page without the user touching anything.
+    if (!event.isTrusted) {
+      return;
+    }
+
     const copyText = readCopyText(event.target);
     if (copyText) {
       event.preventDefault();
@@ -409,5 +429,7 @@ export const PREVIEW_BRIDGE_SCRIPT = `<script>
     event.preventDefault();
     notify('followup', payload);
   });
+${CHART_RENDERER_SCRIPT}
+${GRAPHVIZ_RENDERER_SCRIPT}
 })();
 </script>`;

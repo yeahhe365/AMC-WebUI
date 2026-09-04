@@ -1,6 +1,6 @@
 export const CJK_FONT_NAME = 'NotoSansCJKsc';
 export const CJK_FONT_FILE = 'NotoSansCJKsc-VF.ttf';
-export const CJK_TEXT_PATTERN = /[\u3400-\u9fff\uf900-\ufaff]/;
+export const CJK_TEXT_PATTERN = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff]/;
 
 const CJK_FONT_PART_URLS = [`/fonts/${CJK_FONT_FILE}.part-00`, `/fonts/${CJK_FONT_FILE}.part-01`];
 

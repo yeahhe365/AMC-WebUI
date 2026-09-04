@@ -28,15 +28,42 @@ export const useChatInputRuntimeValues = ({
     handleSuggestionClick,
   } = app;
 
+  // Destructure the chatState members used below into local constants. The
+  // members are stable useCallback references (their deps — activeMessages,
+  // selectedFiles, currentChatSettings, appSettings, store actions — do not
+  // change while a background session churns the savedSessions array). Keeping
+  // the destructured members as the only deps prevents the whole chatState
+  // object (a new literal every render) from invalidating this context value
+  // and, downstream, the markdown renderer's components map.
+  const {
+    handleSendMessage,
+    handleStopGenerating,
+    handleCancelEdit,
+    handleProcessAndAddFiles,
+    handleAddFileById,
+    handleCancelFileUpload,
+    handleTranscribeAudio,
+    handleClearCurrentChat,
+    startNewChat,
+    handleTogglePinCurrentSession,
+    handleRetryLastTurn,
+    handleEditLastUserMessage,
+    setCurrentChatSettings,
+    handleAddUserMessage,
+    handleLiveTranscript,
+    liveClientFunctions,
+    handleUpdateMessageContent,
+  } = chatState;
+
   const onMessageSent = useCallback(() => {
     useChatStore.getState().setCommandedInput(null);
   }, []);
 
   const onSendMessage = useCallback(
     (text: string, options?: { isFastMode?: boolean; files?: UploadedFile[] }) => {
-      chatState.handleSendMessage({ text, ...options });
+      handleSendMessage({ text, ...options });
     },
-    [chatState],
+    [handleSendMessage],
   );
 
   const onToggleQuadImages = useCallback(() => {
@@ -64,40 +91,53 @@ export const useChatInputRuntimeValues = ({
     () => ({
       onMessageSent,
       onSendMessage,
-      onStopGenerating: chatState.handleStopGenerating,
-      onCancelEdit: chatState.handleCancelEdit,
-      onProcessFiles: chatState.handleProcessAndAddFiles,
-      onAddFileById: chatState.handleAddFileById,
-      onCancelUpload: chatState.handleCancelFileUpload,
-      onTranscribeAudio: chatState.handleTranscribeAudio,
-      onClearChat: chatState.handleClearCurrentChat,
-      onNewChat: chatState.startNewChat,
+      onStopGenerating: handleStopGenerating,
+      onCancelEdit: handleCancelEdit,
+      onProcessFiles: handleProcessAndAddFiles,
+      onAddFileById: handleAddFileById,
+      onCancelUpload: handleCancelFileUpload,
+      onTranscribeAudio: handleTranscribeAudio,
+      onClearChat: handleClearCurrentChat,
+      onNewChat: startNewChat,
       onOpenSettings,
       onToggleLiveArtifactsPrompt: handleLoadLiveArtifactsPromptAndSave,
-      onTogglePinCurrentSession: chatState.handleTogglePinCurrentSession,
-      onRetryLastTurn: chatState.handleRetryLastTurn,
+      onTogglePinCurrentSession: handleTogglePinCurrentSession,
+      onRetryLastTurn: handleRetryLastTurn,
       onSelectModel,
       availableModels,
-      onEditLastUserMessage: chatState.handleEditLastUserMessage,
+      onEditLastUserMessage: handleEditLastUserMessage,
       onTogglePip: pipState.togglePip,
       isPipActive: pipState.isPipActive,
       onToggleQuadImages,
-      setCurrentChatSettings: chatState.setCurrentChatSettings,
+      setCurrentChatSettings,
       onSuggestionClick,
       onOrganizeInfoClick,
-      onAddUserMessage: chatState.handleAddUserMessage,
-      onLiveTranscript: chatState.handleLiveTranscript,
-      liveClientFunctions: chatState.liveClientFunctions,
-      onEditMessageContent: chatState.handleUpdateMessageContent,
+      onAddUserMessage: handleAddUserMessage,
+      onLiveTranscript: handleLiveTranscript,
+      liveClientFunctions,
+      onEditMessageContent: handleUpdateMessageContent,
       onToggleBBox: handleToggleBBoxMode,
       onToggleGuide: handleToggleGuideMode,
     }),
     [
-      chatState,
       availableModels,
+      handleAddFileById,
+      handleAddUserMessage,
+      handleCancelEdit,
+      handleCancelFileUpload,
+      handleClearCurrentChat,
+      handleEditLastUserMessage,
+      handleLiveTranscript,
       handleLoadLiveArtifactsPromptAndSave,
+      handleProcessAndAddFiles,
+      handleRetryLastTurn,
+      handleStopGenerating,
       handleToggleBBoxMode,
       handleToggleGuideMode,
+      handleTogglePinCurrentSession,
+      handleTranscribeAudio,
+      handleUpdateMessageContent,
+      liveClientFunctions,
       onMessageSent,
       onOpenSettings,
       onOrganizeInfoClick,
@@ -107,6 +147,8 @@ export const useChatInputRuntimeValues = ({
       onToggleQuadImages,
       pipState.isPipActive,
       pipState.togglePip,
+      setCurrentChatSettings,
+      startNewChat,
     ],
   );
 };

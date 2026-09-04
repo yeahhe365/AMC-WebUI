@@ -3,6 +3,7 @@ import { MapPin, ChevronDown, ChevronUp, ExternalLink, Maximize2, X } from 'luci
 import { useI18n } from '@/contexts/I18nContext';
 import { buildMapsEmbedUrl, type MapsPlace } from '@/utils/groundingMetadata';
 import { Modal } from '@/components/shared/Modal';
+import { SETTINGS_SECTION_LABEL_CLASS } from '@/constants/designTokens';
 
 interface MapsWidgetProps {
   places: MapsPlace[];
@@ -88,9 +89,7 @@ export const MapsWidget: React.FC<MapsWidgetProps> = ({ places }) => {
         aria-expanded={expanded}
       >
         <MapPin size={11} className="text-[var(--theme-text-tertiary)]" strokeWidth={2} />
-        <h4 className="text-xs font-bold uppercase text-[var(--theme-text-tertiary)] tracking-widest">
-          {t('mapsSourcesTitle')}
-        </h4>
+        <h4 className={SETTINGS_SECTION_LABEL_CLASS}>{t('mapsSourcesTitle')}</h4>
         <ChevronDown
           size={14}
           className={`ml-auto text-[var(--theme-text-tertiary)] transition-transform ${expanded ? 'rotate-180' : ''}`}
@@ -153,7 +152,7 @@ export const MapsWidget: React.FC<MapsWidgetProps> = ({ places }) => {
         isOpen={isFullscreen}
         onClose={() => setIsFullscreen(false)}
         noPadding
-        contentClassName="w-[95vw] h-[90vh] max-w-[1400px] bg-[var(--theme-bg-primary)] rounded-2xl overflow-hidden flex flex-col"
+        contentClassName="w-[95vw] h-[90vh] max-w-[1400px] bg-[var(--theme-bg-primary)] rounded-xl overflow-hidden flex flex-col"
         ariaLabel={t('mapsSourcesTitle')}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--theme-border-secondary)]/40 flex-shrink-0">

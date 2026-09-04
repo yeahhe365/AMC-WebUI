@@ -1,27 +1,78 @@
-import React, { useRef, useEffect } from 'react';
-import { CornerDownLeft } from 'lucide-react';
+import React, { useRef, useEffect, useState } from 'react';
+import { Check, CornerDownLeft } from 'lucide-react';
 import { CommandIcon } from '@/components/icons/CommandIcon';
 import type { SlashCommand as SlashMenuItem } from '@/types/slashCommands';
 import { useI18n } from '@/contexts/I18nContext';
+import { SETTINGS_KBD_KEY_CLASS, SETTINGS_NAV_ACTIVE_CLASS } from '@/constants/designTokens';
 
 interface SlashCommandMenuProps {
   isOpen: boolean;
   commands: SlashMenuItem[];
   onSelect: (command: SlashMenuItem) => void;
   selectedIndex: number;
+  query?: string;
   className?: string;
 }
 
-export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
+const SESSION_GROUP = new Set(['clear', 'new', 'pin', 'retry', 'model']);
+const TOOLS_GROUP = new Set(['deep', 'online', 'maps', 'code', 'url', 'file']);
+
+const getCommandGroup = (name: string): 'session' | 'tools' | 'system' => {
+  if (SESSION_GROUP.has(name)) return 'session';
+  if (TOOLS_GROUP.has(name)) return 'tools';
+  return 'system';
+};
+
+const GROUP_LABEL_KEY: Record<'session' | 'tools' | 'system', string> = {
+  session: 'slashGroupSession',
+  tools: 'slashGroupTools',
+  system: 'slashGroupSystem',
+};
+
+const QUICK_PANEL_ROW_HEIGHT = 28;
+
+const SlashCommandMenuComponent: React.FC<SlashCommandMenuProps> = ({
   isOpen,
   commands,
   onSelect,
   selectedIndex,
+  query,
   className,
 }) => {
   const { t } = useI18n();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const selectedItemRef = useRef<HTMLLIElement>(null);
+  const [isAssistivePressed, setIsAssistivePressed] = useState(false);
+  const [isMouseOver, setIsMouseOver] = useState(false);
+
+  const isModelPanel = query === 'model';
+
+  // Cherry-style grouped display: Session / Tools / System, keep original relative order inside each group
+  // Model panel is flat (no group headers) to avoid wrong "System" header.
+  const groupedCommands = (() => {
+    if (isModelPanel) {
+      return [{ key: 'model' as const, items: commands }];
+    }
+    const groups: Record<'session' | 'tools' | 'system', typeof commands> = {
+      session: [],
+      tools: [],
+      system: [],
+    };
+    for (const cmd of commands) {
+      groups[getCommandGroup(cmd.name)].push(cmd);
+    }
+    return [
+      { key: 'session' as const, items: groups.session },
+      { key: 'tools' as const, items: groups.tools },
+      { key: 'system' as const, items: groups.system },
+    ].filter((g) => g.items.length > 0) as Array<{ key: string; items: typeof commands }>;
+  })();
+  const flatGrouped = groupedCommands.flatMap((g) => g.items);
+  const selectedCommand = commands[selectedIndex];
+  const displaySelectedIndex = selectedCommand ? flatGrouped.findIndex((c) => c.name === selectedCommand.name) : -1;
+
+  const hasResults = commands.length > 0;
+  const collapsed = !hasResults;
 
   useEffect(() => {
     if (isOpen && selectedItemRef.current && scrollContainerRef.current) {
@@ -32,99 +83,149 @@ export const SlashCommandMenu: React.FC<SlashCommandMenuProps> = ({
     }
   }, [selectedIndex, isOpen]);
 
-  if (!isOpen || commands.length === 0) {
+  useEffect(() => {
+    if (!isOpen) {
+      setIsAssistivePressed(false);
+      return;
+    }
+    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+    const check = (e: KeyboardEvent) => setIsAssistivePressed(isMac ? e.metaKey : e.ctrlKey);
+    const clear = () => setIsAssistivePressed(false);
+    window.addEventListener('keydown', check);
+    window.addEventListener('keyup', check);
+    window.addEventListener('blur', clear);
+    return () => {
+      window.removeEventListener('keydown', check);
+      window.removeEventListener('keyup', check);
+      window.removeEventListener('blur', clear);
+    };
+  }, [isOpen]);
+
+  if (!isOpen) {
     return null;
   }
 
-  const defaultClasses = 'absolute bottom-full left-0 right-0 mb-2 w-full max-w-3xl mx-auto px-2 sm:px-4 z-30';
+  // Anchored to the composer <form> (relative) — spanning it edge-to-edge keeps
+  // the panel visually flush with the input shell instead of inset by padding.
+  const defaultClasses = 'absolute bottom-full left-0 right-0 mb-2 z-30';
   const finalClassName = className || defaultClasses;
+  const isMac =
+    typeof navigator !== 'undefined' &&
+    (/Mac|iPhone|iPad|iPod/.test(navigator.platform) || /Mac/.test(navigator.userAgent));
+  const assistiveKey = isMac ? '⌘' : 'Ctrl';
 
   return (
     <div className={finalClassName} style={{ animation: 'fadeInUp 0.15s cubic-bezier(0.16, 1, 0.3, 1) both' }}>
       <div
         data-slash-command-frame="true"
-        className="bg-[var(--theme-bg-secondary)] border border-[var(--theme-border-secondary)] rounded-xl shadow-2xl max-h-80 overflow-hidden flex flex-col"
+        className="flex max-h-80 flex-col overflow-hidden rounded-xl border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-secondary)] shadow-premium"
       >
         <div
           ref={scrollContainerRef}
           data-slash-command-scroll="true"
-          className="max-h-80 overflow-y-auto custom-scrollbar flex flex-col scroll-pt-10"
+          role="listbox"
+          aria-label={t('quickPanelTitle' as never)}
+          className="custom-scrollbar flex max-h-80 flex-col overflow-y-auto"
+          onMouseMove={() => setIsMouseOver(true)}
+          onMouseLeave={() => setIsMouseOver(false)}
         >
-          <div className="sticky top-0 z-10 bg-[var(--theme-bg-secondary)] border-b border-[var(--theme-border-secondary)] px-3 py-2 flex justify-between items-center">
-            <span className="text-xs font-bold text-[var(--theme-text-tertiary)] uppercase tracking-widest">
-              {t('slashCommandsTitle')}
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-[var(--theme-text-tertiary)] bg-[var(--theme-bg-primary)] px-1.5 py-0.5 rounded border border-[var(--theme-border-secondary)]">
-                {t('slashCommandsNavigateHint')}
-              </span>
-              <span className="text-xs text-[var(--theme-text-tertiary)] bg-[var(--theme-bg-primary)] px-1.5 py-0.5 rounded border border-[var(--theme-border-secondary)]">
-                {t('slashCommandsSelectHint')}
-              </span>
+          {collapsed ? (
+            <div className="p-4 text-center text-[13px] text-[var(--theme-text-tertiary)]">
+              {t('quickPanelNoResult' as never)}
             </div>
-          </div>
-
-          <ul className="p-1.5 space-y-0.5">
-            {commands.map((command, index) => {
-              const isSelected = selectedIndex === index;
-              return (
-                <li key={command.name} ref={isSelected ? selectedItemRef : null} className="relative">
-                  <button
-                    type="button"
-                    onClick={() => onSelect(command)}
-                    className={`
-                                        group relative w-full text-left px-3 py-2.5 flex items-center gap-3 rounded-lg transition-all duration-150
-                                        ${
-                                          isSelected
-                                            ? 'bg-[var(--theme-bg-tertiary)]'
-                                            : 'hover:bg-[var(--theme-bg-tertiary)]/50'
-                                        }
-                                    `}
-                    aria-selected={isSelected}
-                    role="option"
-                  >
-                    {isSelected && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-[var(--theme-bg-accent)] rounded-r-full" />
-                    )}
-
-                    <div
-                      className={`
-                                        flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-md transition-colors duration-200
-                                        ${
-                                          isSelected
-                                            ? 'bg-[var(--theme-bg-primary)] text-[var(--theme-text-primary)] shadow-sm ring-1 ring-[var(--theme-border-secondary)]'
-                                            : 'bg-[var(--theme-bg-input)] text-[var(--theme-text-secondary)] border border-[var(--theme-border-secondary)]'
-                                        }
-                                    `}
-                    >
-                      <CommandIcon icon={command.icon} />
+          ) : (
+            <ul className="space-y-0.5 p-1.5">
+              {groupedCommands.map((group) => (
+                <li key={group.key} className="space-y-0.5">
+                  {!isModelPanel ? (
+                    <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--theme-text-secondary)]">
+                      {t(GROUP_LABEL_KEY[group.key as 'session' | 'tools' | 'system'] as never)}
                     </div>
-
-                    <div className="flex-grow min-w-0 flex flex-col justify-center gap-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-bold tracking-tight text-[var(--theme-text-primary)]">
-                          /{command.name}
-                        </span>
-                      </div>
-                      <p
-                        className={`text-xs truncate ${isSelected ? 'text-[var(--theme-text-secondary)]' : 'text-[var(--theme-text-tertiary)]'}`}
-                      >
-                        {command.description}
-                      </p>
-                    </div>
-
-                    {isSelected && (
-                      <div className="flex-shrink-0 hidden sm:flex items-center gap-1 text-xs font-medium text-[var(--theme-text-secondary)] animate-in fade-in slide-in-from-left-1 duration-200">
-                        <CornerDownLeft size={12} />
-                      </div>
-                    )}
-                  </button>
+                  ) : null}
+                  <ul className="space-y-0.5">
+                    {group.items.map((command) => {
+                      const displayIndex = flatGrouped.findIndex((c) => c.name === command.name);
+                      const isSelected = displayIndex === displaySelectedIndex;
+                      return (
+                        <li key={command.name} ref={isSelected ? selectedItemRef : null}>
+                          <button
+                            type="button"
+                            onClick={() => onSelect(command)}
+                            style={{ height: QUICK_PANEL_ROW_HEIGHT }}
+                            className={`mx-[5px] flex w-[calc(100%-10px)] items-center justify-between gap-3 rounded-md px-2 py-1 text-left transition-colors duration-100 ${
+                              isSelected ? SETTINGS_NAV_ACTIVE_CLASS : ''
+                            } ${!isSelected && isMouseOver ? 'hover:bg-[var(--theme-bg-accent)]' : ''} ${isSelected && isMouseOver ? 'hover:bg-[var(--theme-bg-accent)]' : ''}`}
+                            aria-selected={isSelected}
+                            role="option"
+                            data-active={isSelected ? 'true' : undefined}
+                          >
+                            <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                              <span className="flex items-center justify-center text-[13px] text-[var(--theme-text-tertiary)] [&>svg]:size-[1em]">
+                                <CommandIcon icon={command.icon} />
+                              </span>
+                              <span className="min-w-0 flex-1 truncate text-[13px] leading-4 text-[var(--theme-text-primary)]">
+                                /{command.name}
+                              </span>
+                            </span>
+                            <span className="flex min-w-[20%] items-center justify-end gap-1 text-[12px] leading-4 text-[var(--theme-text-tertiary)]">
+                              <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+                                {command.description}
+                              </span>
+                              {command.isSelected ? (
+                                <Check size={12} className="shrink-0 text-[var(--theme-text-tertiary)]" />
+                              ) : isSelected ? (
+                                <CornerDownLeft
+                                  size={12}
+                                  className="hidden flex-shrink-0 text-[var(--theme-text-tertiary)] sm:block"
+                                />
+                              ) : null}
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </li>
-              );
-            })}
-          </ul>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div
+          data-testid="quick-panel-footer"
+          className="flex w-full items-center justify-between gap-4 border-t border-[var(--theme-border-secondary)] bg-[var(--theme-bg-secondary)] px-3 pt-2 pb-[5px]"
+        >
+          <div className="overflow-hidden text-ellipsis whitespace-nowrap text-[12px] text-[var(--theme-text-tertiary)]">
+            {t('quickPanelTitle' as never)}
+          </div>
+          <div className="flex shrink-0 items-center justify-end gap-4 text-[12px] text-[var(--theme-text-tertiary)]">
+            <span className="inline-flex items-center gap-1">
+              <kbd className={SETTINGS_KBD_KEY_CLASS}>Esc</kbd>
+              <span>{t('quickPanelClose' as never)}</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <kbd className={SETTINGS_KBD_KEY_CLASS}>▲▼</kbd>
+              <span>{t('quickPanelSelect' as never)}</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <kbd
+                className={`${SETTINGS_KBD_KEY_CLASS} ${isAssistivePressed ? '!text-[var(--theme-text-primary)]' : ''}`}
+              >
+                {assistiveKey}
+              </kbd>
+              <span>+</span>
+              <kbd className={SETTINGS_KBD_KEY_CLASS}>▲▼</kbd>
+              <span>{t('quickPanelPage' as never)}</span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <kbd className={SETTINGS_KBD_KEY_CLASS}>Tab/↩︎</kbd>
+              <span>{t('quickPanelConfirm' as never)}</span>
+            </span>
+          </div>
         </div>
       </div>
     </div>
   );
 };
+
+export const SlashCommandMenu = React.memo(SlashCommandMenuComponent);

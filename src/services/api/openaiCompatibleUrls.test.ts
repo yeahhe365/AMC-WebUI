@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   buildOpenAICompatibleChatCompletionsUrl,
   buildOpenAICompatibleModelsUrl,
+  buildOpenAICompatibleUpstreamChatCompletionsUrl,
   getOpenAICompatibleBaseUrlWarning,
 } from './openaiCompatibleUrls';
 
@@ -42,5 +43,8 @@ describe('openaiCompatibleUrls', () => {
 
     expect(buildOpenAICompatibleChatCompletionsUrl('https://api.openai.com/v1')).toBe('/api/openai/chat/completions');
     expect(buildOpenAICompatibleModelsUrl('https://api.openai.com/v1')).toBe('/api/openai/models');
+    expect(buildOpenAICompatibleUpstreamChatCompletionsUrl('https://api.openai.com/v1')).toBe(
+      'https://api.openai.com/v1/chat/completions',
+    );
   });
 });

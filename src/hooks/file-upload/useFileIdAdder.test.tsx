@@ -22,12 +22,6 @@ vi.mock('@/utils/apiKeySelection', () => ({
   ),
 }));
 
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
 vi.mock('@/services/api/fileApi', () => ({
   getFileMetadataApi: getFileMetadataMock,
 }));
@@ -45,6 +39,7 @@ describe('useFileIdAdder', () => {
       mimeType: 'video/mp4',
       sizeBytes: '123',
       displayName: 'clip.mp4',
+      expirationTime: '2026-08-16T09:00:00.000Z',
     });
   });
 
@@ -86,6 +81,7 @@ describe('useFileIdAdder', () => {
         name: 'clip.mp4',
         fileApiName: 'files/test-file',
         fileUri: 'https://generativelanguage.googleapis.com/v1beta/files/test-file',
+        fileApiExpirationTime: '2026-08-16T09:00:00.000Z',
         uploadState: 'processing_api',
         isProcessing: true,
         error: undefined,
@@ -120,6 +116,50 @@ describe('useFileIdAdder', () => {
     });
 
     expect(appFileError).toBe('无效的文件 ID 格式。');
+    unmount();
+  });
+
+  it('surfaces File.error.message when the backend reports FAILED', async () => {
+    getFileMetadataMock.mockResolvedValue({
+      name: 'files/test-file',
+      uri: 'https://generativelanguage.googleapis.com/v1beta/files/test-file',
+      mimeType: 'video/mp4',
+      sizeBytes: '123',
+      displayName: 'clip.mp4',
+      state: 'FAILED',
+      error: { code: 3, message: 'Video codec is not supported.' },
+    });
+
+    let selectedFiles: UploadedFile[] = [];
+    const setSelectedFiles = (updater: UploadedFile[] | ((prev: UploadedFile[]) => UploadedFile[])) => {
+      selectedFiles = typeof updater === 'function' ? updater(selectedFiles) : updater;
+    };
+
+    const { result, unmount } = renderHookWithProviders(
+      () =>
+        useFileIdAdder({
+          appSettings: DEFAULT_APP_SETTINGS,
+          setSelectedFiles,
+          setAppFileError: vi.fn(),
+          currentChatSettings: DEFAULT_APP_SETTINGS,
+          setCurrentChatSettings: vi.fn(),
+          selectedFiles,
+        }),
+      { language: 'en' },
+    );
+
+    await act(async () => {
+      await result.current.addFileById('files/test-file');
+    });
+
+    expect(selectedFiles[0]).toEqual(
+      expect.objectContaining({
+        uploadState: 'failed',
+        isProcessing: false,
+        error: 'File API processing failed: Video codec is not supported.',
+      }),
+    );
+
     unmount();
   });
 });

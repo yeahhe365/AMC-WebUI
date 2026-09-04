@@ -159,6 +159,7 @@ describe('useHtmlPreviewModal', () => {
           onClose: vi.fn(),
           htmlContent: '<html><body>Hello</body></html>',
           iframeRef,
+          privilege: 'sanitized',
           onLiveArtifactFollowUp,
         }),
       { attachToDocument: true, wrapper: HtmlPreviewWrapper },
@@ -197,6 +198,48 @@ describe('useHtmlPreviewModal', () => {
       instruction: 'Continue',
       state: { selected: 'B' },
     });
+
+    unmount();
+  });
+
+  it('does not forward Live Artifact follow-up payloads from unrestricted demo previews', () => {
+    const onLiveArtifactFollowUp = vi.fn();
+    const iframe = document.createElement('iframe');
+    const contentWindowStub = {} as Window;
+    Object.defineProperty(iframe, 'contentWindow', {
+      value: contentWindowStub,
+      configurable: true,
+    });
+    const iframeRef = { current: iframe } as RefObject<HTMLIFrameElement>;
+
+    const { unmount } = renderHook(
+      () =>
+        useHtmlPreviewModal({
+          isOpen: true,
+          onClose: vi.fn(),
+          htmlContent: '<html><body>Hello</body></html>',
+          iframeRef,
+          privilege: 'unrestricted',
+          onLiveArtifactFollowUp,
+        }),
+      { attachToDocument: true, wrapper: HtmlPreviewWrapper },
+    );
+
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: {
+            channel: HTML_PREVIEW_MESSAGE_CHANNEL,
+            event: 'followup',
+            payload: { instruction: 'Continue', state: { selected: 'B' } },
+          },
+          origin: 'null',
+          source: contentWindowStub,
+        }),
+      );
+    });
+
+    expect(onLiveArtifactFollowUp).not.toHaveBeenCalled();
 
     unmount();
   });

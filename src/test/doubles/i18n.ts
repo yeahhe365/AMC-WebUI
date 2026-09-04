@@ -1,6 +1,7 @@
 import { getTranslator } from '@/i18n/translations';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 
-type Language = 'en' | 'zh';
+type Language = SupportedLanguage;
 type Translator = ReturnType<typeof getTranslator>;
 
 interface I18nMockOptions {

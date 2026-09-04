@@ -6,10 +6,16 @@ import { LanguageIcon } from './LanguageIcon';
 describe('LanguageIcon', () => {
   const renderer = setupTestRenderer();
 
-  it('renders a branded Python badge with a normalized display label', () => {
+  const renderIcon = (language: string) => {
     act(() => {
-      renderer.root.render(<LanguageIcon language="py" />);
+      renderer.root.render(<LanguageIcon language={language} />);
     });
+  };
+
+  const svgPaths = (icon: Element | null) => icon?.querySelectorAll('path').length ?? 0;
+
+  it('renders a branded Python badge with a normalized display label', () => {
+    renderIcon('py');
 
     const badge = renderer.container.querySelector('[data-language-badge="python"]');
     const icon = renderer.container.querySelector('[data-language-icon="python"]');
@@ -21,27 +27,24 @@ describe('LanguageIcon', () => {
     expect(badge?.className.split(/\s+/)).toContain('gap-1.5');
     expect(icon).not.toBeNull();
     expect(icon?.className.split(/\s+/)).toContain('h-5');
-    // Slot is height-fixed only; SVG icons keep intrinsic 20×20, TextGlyph may grow wider
+    // Slot is height-fixed only; SVG icons keep intrinsic 20×20
     expect(icon?.className.split(/\s+/)).not.toContain('w-5');
     expect(svg?.getAttribute('width')).toBe('20');
     expect(svg?.getAttribute('height')).toBe('20');
-    // Square viewBox so the tall logo is not letterboxed smaller than peers
-    expect(svg?.getAttribute('viewBox')).toBe('-15 0 140 140');
-    expect(icon?.querySelector('[stop-color="#5a9fd4"]')).not.toBeNull();
-    expect(icon?.querySelector('[stop-color="#ffd43b"]')).not.toBeNull();
+    // Material-icon-theme python icon is a 24×24 monochrome SVG
+    expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
+    expect(svgPaths(icon)).toBeGreaterThan(0);
     expect(meta).not.toBeNull();
     expect(meta?.className.split(/\s+/)).toContain('inline-flex');
     expect(meta?.className.split(/\s+/)).toContain('items-center');
     expect(meta?.textContent).not.toContain('PY');
   });
 
-  it('renders a single TSX label without a redundant compact tag', () => {
-    act(() => {
-      renderer.root.render(<LanguageIcon language="tsx" />);
-    });
+  it('renders a single TSX label with the react-ts material icon', () => {
+    renderIcon('tsx');
 
     const badge = renderer.container.querySelector('[data-language-badge="tsx"]');
-    const icon = renderer.container.querySelector('[data-language-icon="tsx"]');
+    const icon = renderer.container.querySelector('[data-language-icon="react-ts"]');
     const meta = renderer.container.querySelector('[data-language-meta]');
 
     expect(badge).not.toBeNull();
@@ -52,9 +55,7 @@ describe('LanguageIcon', () => {
   });
 
   it('renders a single React label without a redundant JSX compact tag', () => {
-    act(() => {
-      renderer.root.render(<LanguageIcon language="jsx" />);
-    });
+    renderIcon('jsx');
 
     const meta = renderer.container.querySelector('[data-language-meta]');
     const icon = renderer.container.querySelector('[data-language-icon="react"]');
@@ -75,9 +76,7 @@ describe('LanguageIcon', () => {
     ];
 
     cases.forEach(({ language, expected, forbidden }) => {
-      act(() => {
-        renderer.root.render(<LanguageIcon language={language} />);
-      });
+      renderIcon(language);
 
       const meta = renderer.container.querySelector('[data-language-meta]');
       expect(meta?.textContent?.replace(/\s+/g, '')).toBe(expected);
@@ -87,38 +86,28 @@ describe('LanguageIcon', () => {
     });
   });
 
-  it('lets TextGlyph badges grow with content instead of clipping at 20px', () => {
-    act(() => {
-      renderer.root.render(<LanguageIcon language="css" />);
-    });
+  it('renders material SVG icons for JavaScript and CSS instead of text glyphs', () => {
+    renderIcon('css');
 
-    const icon = renderer.container.querySelector('[data-language-icon="css"]');
-    const glyph = icon?.querySelector('span');
+    const cssIcon = renderer.container.querySelector('[data-language-icon="css"]');
 
-    expect(glyph).not.toBeNull();
-    expect(glyph?.className.split(/\s+/)).toContain('min-w-5');
-    expect(glyph?.className.split(/\s+/)).toContain('text-[9px]');
-    expect(glyph?.className.split(/\s+/)).not.toContain('max-w-5');
-    expect(icon?.className.split(/\s+/)).not.toContain('w-5');
+    expect(cssIcon).not.toBeNull();
+    expect(cssIcon?.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 32 32');
+    expect(cssIcon?.querySelector('svg')).not.toBeNull();
+    expect(cssIcon?.querySelector('span')).toBeNull(); // no TextGlyph
 
-    act(() => {
-      renderer.root.render(<LanguageIcon language="js" />);
-    });
+    renderIcon('js');
 
     const jsIcon = renderer.container.querySelector('[data-language-icon="javascript"]');
-    const jsGlyph = jsIcon?.querySelector('span');
 
-    expect(jsGlyph).not.toBeNull();
-    expect(jsGlyph?.className.split(/\s+/)).toContain('min-w-5');
-    expect(jsGlyph?.className.split(/\s+/)).toContain('text-xs');
-    expect(jsGlyph?.className.split(/\s+/)).not.toContain('max-w-5');
-    expect(jsIcon?.className.split(/\s+/)).not.toContain('w-5');
+    expect(jsIcon).not.toBeNull();
+    expect(jsIcon?.querySelector('svg')?.getAttribute('viewBox')).toBe('0 0 24 24');
+    expect(jsIcon?.querySelector('svg')).not.toBeNull();
+    expect(jsIcon?.querySelector('span')).toBeNull(); // no TextGlyph
   });
 
   it('renders TypeScript code blocks with the SVG language icon', () => {
-    act(() => {
-      renderer.root.render(<LanguageIcon language="typescript" />);
-    });
+    renderIcon('typescript');
 
     const badge = renderer.container.querySelector('[data-language-badge="typescript"]');
     const icon = renderer.container.querySelector('[data-language-icon="typescript"]');
@@ -150,19 +139,18 @@ describe('LanguageIcon', () => {
       ['c', 'c', 'C'],
       ['cpp', 'cpp', 'C++'],
       ['c++', 'cpp', 'C++'],
-      ['sql', 'sql', 'SQL'],
-      ['postgresql', 'sql', 'SQL'],
-      ['bash', 'shell', 'Shell'],
-      ['powershell', 'shell', 'Shell'],
+      ['sql', 'database', 'SQL'],
+      ['postgresql', 'database', 'SQL'],
+      ['bash', 'console', 'Shell'],
+      ['powershell', 'powershell', 'PowerShell'],
+      ['ps1', 'powershell', 'PowerShell'],
       ['yaml', 'yaml', 'YAML'],
       ['toml', 'toml', 'TOML'],
-      ['ini', 'ini', 'INI'],
+      ['ini', 'settings', 'INI'],
     ];
 
     cases.forEach(([language, iconId, label]) => {
-      act(() => {
-        renderer.root.render(<LanguageIcon language={language} />);
-      });
+      renderIcon(language);
 
       const icon = renderer.container.querySelector(`[data-language-icon="${iconId}"]`);
       const badge = renderer.container.querySelector('[data-language-badge]');
@@ -174,9 +162,7 @@ describe('LanguageIcon', () => {
   });
 
   it('falls back to a generic code badge for unknown languages', () => {
-    act(() => {
-      renderer.root.render(<LanguageIcon language="brainfuck" />);
-    });
+    renderIcon('brainfuck');
 
     const badge = renderer.container.querySelector('[data-language-badge="brainfuck"]');
     const icon = renderer.container.querySelector('[data-language-icon="generic"]');

@@ -46,6 +46,9 @@ export const buildOpenAICompatibleChatCompletionsUrl = (baseUrl?: string | null)
   return `${normalizeOpenAICompatibleBaseUrl(resolved)}/chat/completions`;
 };
 
+export const buildOpenAICompatibleUpstreamChatCompletionsUrl = (baseUrl?: string | null): string =>
+  `${normalizeOpenAICompatibleBaseUrl(baseUrl)}/chat/completions`;
+
 export const buildOpenAICompatibleModelsUrl = (baseUrl?: string | null): string => {
   const resolved = resolveOpenAICompatibleBaseUrl(baseUrl);
   if (resolved) {

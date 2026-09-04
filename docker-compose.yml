@@ -6,6 +6,7 @@ services:
     environment:
       PORT: 3001
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      LIVE_GEMINI_API_KEY: ${LIVE_GEMINI_API_KEY:-}
       GEMINI_API_BASE: ${GEMINI_API_BASE:-https://generativelanguage.googleapis.com}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       ENABLE_MCP_STDIO: ${ENABLE_MCP_STDIO:-false}

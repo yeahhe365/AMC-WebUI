@@ -37,7 +37,6 @@ export const editImageApi = async (
     aspectRatio,
     imageSize,
     imageOutputMode: requestConfig?.imageOutputMode,
-    personGeneration: requestConfig?.personGeneration,
   });
 
   return new Promise((resolve, reject) => {

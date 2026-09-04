@@ -1,7 +1,7 @@
 import type { UploadedFile } from '@/types';
 import { logService } from '@/services/logService';
 import { CODE_EXECUTION_TEXT_FILE_LIMIT_BYTES } from '@/utils/codeExecution';
-import { isImageMimeType, isPdfMimeType, isTextFile } from '@/utils/file/fileTypeClassification';
+import { isAudioMimeType, isImageMimeType, isPdfMimeType, isTextFile } from '@/utils/file/fileTypeClassification';
 import { normalizeModelId } from '@/utils/model/modelId';
 import type { MessageSenderTranslator } from './messageSenderTypes';
 
@@ -16,8 +16,8 @@ interface ValidateMessageBeforeSendOptions {
   permissions: MessageSendPermissions;
   isContinueMode: boolean;
   isServerCodeExecutionEnabled: boolean;
-  isImageEditModel: boolean;
   isGemini3Image: boolean;
+  isTranscribeModel?: boolean;
   activeModelId: string;
   t: MessageSenderTranslator;
 }
@@ -35,29 +35,27 @@ export const validateMessageBeforeSend = ({
   permissions,
   isContinueMode,
   isServerCodeExecutionEnabled,
-  isImageEditModel,
   isGemini3Image,
+  isTranscribeModel,
   activeModelId,
   t,
 }: ValidateMessageBeforeSendOptions): MessageSendValidationResult => {
   const trimmedText = text.trim();
 
-  if (
-    !trimmedText &&
-    !permissions.requiresTextPrompt &&
-    !isContinueMode &&
-    files.filter((file) => file.uploadState === 'active').length === 0
-  ) {
+  const hasUsableFiles = files.some(
+    (file) =>
+      file.uploadState === 'active' ||
+      file.uploadState === 'uploading' ||
+      file.uploadState === 'processing_api' ||
+      file.isProcessing,
+  );
+
+  if (!trimmedText && !permissions.requiresTextPrompt && !isContinueMode && !hasUsableFiles) {
     return { ok: false };
   }
 
   if (permissions.requiresTextPrompt && !trimmedText) {
     return { ok: false };
-  }
-
-  if (files.some((file) => file.isProcessing || (file.uploadState !== 'active' && !file.error))) {
-    logService.warn('Send message blocked: files are still processing.');
-    return { ok: false, fileError: t('messageSenderWaitForFiles') };
   }
 
   if (files.some((file) => file.uploadState === 'failed' || file.uploadState === 'cancelled' || !!file.error)) {
@@ -67,7 +65,7 @@ export const validateMessageBeforeSend = ({
 
   if (isServerCodeExecutionEnabled) {
     const oversizedTextFile = files.find(
-      (file) => file.uploadState === 'active' && isTextFile(file) && file.size > CODE_EXECUTION_TEXT_FILE_LIMIT_BYTES,
+      (file) => isTextFile(file) && file.size > CODE_EXECUTION_TEXT_FILE_LIMIT_BYTES,
     );
 
     if (oversizedTextFile) {
@@ -79,7 +77,7 @@ export const validateMessageBeforeSend = ({
     }
   }
 
-  if (isImageEditModel || isGemini3Image) {
+  if (isGemini3Image) {
     const allowsPdfReferences = normalizeModelId(activeModelId) === 'gemini-3.1-flash-image-preview';
     const hasUnsupportedAttachments = files.some((file) => {
       if (isImageMimeType(file.type)) return false;
@@ -118,6 +116,26 @@ export const validateMessageBeforeSend = ({
         attachmentTypes: files.map((file) => file.type),
       });
       return { ok: false, fileError: t('messageSenderGemma4TextImageOnly') };
+    }
+  }
+
+  if (isTranscribeModel) {
+    const usableFiles = files.filter(
+      (file) => !file.error && file.uploadState !== 'failed' && file.uploadState !== 'cancelled',
+    );
+    const hasAudioAttachment = usableFiles.some((file) => isAudioMimeType(file.type));
+    if (!hasAudioAttachment && !isContinueMode) {
+      logService.warn('Send message blocked: transcribe model requires at least one audio attachment.');
+      return { ok: false, fileError: t('messageSenderTranscribeRequiresAudio') };
+    }
+
+    const hasUnsupportedAttachment = files.some((file) => !isAudioMimeType(file.type));
+    if (hasUnsupportedAttachment) {
+      logService.warn('Send message blocked: transcribe model received non-audio attachment types.', {
+        activeModelId,
+        attachmentTypes: files.map((file) => file.type),
+      });
+      return { ok: false, fileError: t('messageSenderTranscribeSupportsAudioOnly') };
     }
   }
 

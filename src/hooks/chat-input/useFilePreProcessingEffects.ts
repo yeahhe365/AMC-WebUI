@@ -6,6 +6,7 @@ import { readDirectoryHandle } from '@/utils/import-context/directoryHandleReade
 import { captureScreenImage } from '@/utils/screenCapture';
 import { useI18n } from '@/contexts/I18nContext';
 import { createProcessingPlaceholderFile, DIRECTORY_PLACEHOLDER_MIME_TYPE } from '@/utils/file-upload/fileUploadPolicy';
+import { formatI18nErrorMessage } from '@/i18n/interpolate';
 
 type SetSelectedFiles = (files: UploadedFile[] | ((prevFiles: UploadedFile[]) => UploadedFile[])) => void;
 
@@ -45,7 +46,7 @@ export const useFilePreProcessingEffects = ({
     try {
       const blob = await captureScreenImage({
         unsupported: t('screenCaptureUnsupported'),
-        startFailed: (message) => t('screenCaptureStartFailed').replace('{message}', message),
+        startFailed: (message) => formatI18nErrorMessage(t, 'screenCaptureStartFailed', message),
       });
 
       if (!blob) {

@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
+import { useCallback, useState, useEffect, useRef, useLayoutEffect, useMemo } from 'react';
 import { type AppSettings } from '@/types';
 import { DEFAULT_APP_SETTINGS } from '@/constants/settingsDefaults';
 import { logService } from '@/services/logService';
 import { resolveModelSwitchSettings } from '@/utils/model/modelSwitchSettings';
 import { type translations } from '@/i18n/translations';
 import { useSettingsUiStore, type SettingsTabDescriptor } from '@/stores/settingsUiStore';
+import { SETTINGS_TAB_IDS, SETTINGS_TAB_LABEL_KEYS } from '@/constants/settingsTabs';
 
 interface UseSettingsLogicProps {
   isOpen: boolean;
@@ -15,6 +16,28 @@ interface UseSettingsLogicProps {
   onImportHistory: (file: File) => void;
   t: (key: keyof typeof translations) => string;
 }
+
+/**
+ * Window during which a programmatic anchor scroll (settings search
+ * "navigate + highlight") owns the scroll container. Saving or restoring the
+ * per-tab scroll position inside this window would write `scrollTop`
+ * mid-animation, which cancels the smooth `scrollIntoView` and leaves the
+ * highlighted row off-screen.
+ */
+export const ANCHOR_SCROLL_LOCK_MS = 1200;
+
+/** Connection, credential, and integration data that "Reset Settings Only"
+ * carries over: resetting app preferences must not wipe API keys, deployment
+ * flags, third-party providers, or MCP servers. */
+const SETTINGS_RESET_PRESERVED_KEYS: ReadonlyArray<keyof AppSettings> = [
+  'apiKey',
+  'useCustomApiConfig',
+  'serverManagedApi',
+  'useApiProxy',
+  'apiProxyUrl',
+  'mcpServers',
+  'thirdPartyApi',
+];
 
 export const useSettingsLogic = ({
   isOpen,
@@ -50,11 +73,26 @@ export const useSettingsLogic = ({
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const anchorScrollLockUntilRef = useRef(0);
+
+  /** Begin the lock window for a programmatic anchor scroll (search jump). */
+  const beginAnchorScroll = useCallback(() => {
+    anchorScrollLockUntilRef.current = Date.now() + ANCHOR_SCROLL_LOCK_MS;
+  }, []);
+
+  /** Persist the container's current scrollTop for the active tab. */
+  const saveActiveScrollPosition = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      setScrollPosition(activeTab, container.scrollTop);
+    }
+  }, [activeTab, setScrollPosition]);
 
   useLayoutEffect(() => {
     if (isOpen && scrollContainerRef.current) {
       requestAnimationFrame(() => {
-        if (scrollContainerRef.current) {
+        // Skip the restore while an anchor scroll owns the container.
+        if (scrollContainerRef.current && Date.now() >= anchorScrollLockUntilRef.current) {
           scrollContainerRef.current.scrollTop = activeTabScrollTop;
         }
       });
@@ -62,6 +100,12 @@ export const useSettingsLogic = ({
   }, [activeTab, activeTabScrollTop, isOpen]);
 
   const handleContentScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    // Skip saving while an anchor scroll animates: writing the intermediate
+    // position re-triggers the restore effect, whose scrollTop write cancels
+    // the smooth scrollIntoView before it reaches the target row.
+    if (Date.now() < anchorScrollLockUntilRef.current) {
+      return;
+    }
     setScrollPosition(activeTab, e.currentTarget.scrollTop);
   };
 
@@ -70,7 +114,12 @@ export const useSettingsLogic = ({
       isOpen: true,
       title: t('settingsReset'),
       message: t('settingsResetConfirm'),
-      onConfirm: () => onSave(DEFAULT_APP_SETTINGS),
+      onConfirm: () => {
+        const preserved = Object.fromEntries(
+          SETTINGS_RESET_PRESERVED_KEYS.map((key) => [key, latestSettingsRef.current[key]]),
+        ) as Pick<AppSettings, (typeof SETTINGS_RESET_PRESERVED_KEYS)[number]>;
+        onSave({ ...DEFAULT_APP_SETTINGS, ...preserved });
+      },
       isDanger: true,
       confirmLabel: t('settingsReset'),
     });
@@ -153,15 +202,7 @@ export const useSettingsLogic = ({
   };
 
   const tabs = useMemo<SettingsTabDescriptor[]>(
-    () => [
-      { id: 'models', labelKey: 'settingsTabModels' },
-      { id: 'interface', labelKey: 'settingsTabInterface' },
-      { id: 'api', labelKey: 'settingsTabApi' },
-      { id: 'mcp', labelKey: 'settingsTabMcp' },
-      { id: 'data', labelKey: 'settingsTabData' },
-      { id: 'shortcuts', labelKey: 'settingsTabShortcuts' },
-      { id: 'about', labelKey: 'settingsTabAbout' },
-    ],
+    () => SETTINGS_TAB_IDS.map((id) => ({ id, labelKey: SETTINGS_TAB_LABEL_KEYS[id] })),
     [],
   );
 
@@ -174,6 +215,8 @@ export const useSettingsLogic = ({
     closeConfirm,
     scrollContainerRef,
     handleContentScroll,
+    beginAnchorScroll,
+    saveActiveScrollPosition,
     handleResetToDefaults,
     handleClearLogs,
     handleRequestClearHistory,

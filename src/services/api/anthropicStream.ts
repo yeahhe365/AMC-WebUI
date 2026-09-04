@@ -1,5 +1,5 @@
 import type { AnthropicStreamEvent } from './anthropicTypes';
-import { appendSseChunk } from './sseBuffer';
+import { readSseStream } from './sseReader';
 
 export const parseAnthropicSseEvents = (buffer: string): { events: AnthropicStreamEvent[]; rest: string } => {
   const events: AnthropicStreamEvent[] = [];
@@ -30,44 +30,9 @@ export const parseAnthropicSseEvents = (buffer: string): { events: AnthropicStre
   return { events, rest: buffer.slice(searchStart) };
 };
 
-export const readAnthropicStreamEvents = async (
+export const readAnthropicStreamEvents = (
   response: Response,
   abortSignal: AbortSignal,
   onEvent: (event: AnthropicStreamEvent) => void,
-): Promise<void> => {
-  if (!response.body) {
-    return;
-  }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done || abortSignal.aborted) break;
-
-      buffer = appendSseChunk(buffer, decoder.decode(value, { stream: true }));
-      const parsed = parseAnthropicSseEvents(buffer);
-      buffer = parsed.rest;
-      for (const event of parsed.events) {
-        onEvent(event);
-        if (event.type === 'message_stop') {
-          return;
-        }
-      }
-    }
-
-    const tail = decoder.decode();
-    if (tail) {
-      buffer = appendSseChunk(buffer, tail);
-    }
-    const parsed = parseAnthropicSseEvents(`${buffer}\n\n`);
-    for (const event of parsed.events) {
-      onEvent(event);
-    }
-  } finally {
-    // Release the reader so the underlying HTTP/TLS connection is returned to the pool.
-    await reader.cancel().catch(() => undefined);
-  }
-};
+): Promise<void> =>
+  readSseStream(response, abortSignal, parseAnthropicSseEvents, onEvent, (event) => event.type === 'message_stop');

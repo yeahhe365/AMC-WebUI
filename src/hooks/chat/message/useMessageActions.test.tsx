@@ -3,61 +3,89 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatMessage, SavedChatSession } from '@/types';
 import { createChatSettings } from '@/test/data/factories';
 
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
 import { useMessageActions } from './useMessageActions';
 import { finishActiveGenerationJob, startActiveGenerationJob } from '@/features/message-sender/activeGenerationJobs';
+import { useChatStore } from '@/stores/chatStore';
 import { createDeferred, renderHook } from '@/test/render/renderer';
+
+type MessageActionsOptions = Parameters<typeof useMessageActions>[0];
+
+/**
+ * Mirrors the production wiring in useChat.ts: every dependency the hook used
+ * to receive as a closure now comes straight from the chat store, because
+ * handleStopGenerating/handleCancelEdit delegate to the store actions.
+ */
+const createStoreWiredOptions = (overrides: Partial<MessageActionsOptions> = {}): MessageActionsOptions => {
+  const store = useChatStore.getState();
+  return {
+    messages: store.activeMessages,
+    isLoading: store.activeSessionId ? store.loadingSessionIds.has(store.activeSessionId) : false,
+    activeSessionId: store.activeSessionId,
+    editingMessageId: null,
+    activeJobs: store._activeJobs,
+    setCommandedInput: store.setCommandedInput,
+    setSelectedFiles: store.setSelectedFiles,
+    setEditingMessageId: store.setEditingMessageId,
+    setEditMode: store.setEditMode,
+    setAppFileError: store.setAppFileError,
+    updateAndPersistSessions: store.updateAndPersistSessions,
+    setActiveSessionId: store.setActiveSessionId,
+    userScrolledUpRef: { current: false },
+    handleSendMessage: vi.fn(),
+    setSessionLoading: store.setSessionLoading,
+    ...overrides,
+  };
+};
 
 describe('useMessageActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    const storeState = useChatStore.getState();
+    storeState._activeJobs.current.clear();
+    useChatStore.setState({
+      savedSessions: [],
+      savedGroups: [],
+      activeSessionId: null,
+      activeMessages: [],
+      editingMessageId: null,
+      editMode: 'resend',
+      commandedInput: null,
+      loadingSessionIds: new Set(),
+      generatingTitleSessionIds: new Set(),
+      selectedFiles: [],
+      appFileError: null,
+      completedSessions: {},
+    });
   });
 
   it('does not abort unrelated active jobs when the current session has no loading message', () => {
     const otherAbort = vi.fn();
-    const activeJobs = {
-      current: new Map<string, AbortController>([['job-other', { abort: otherAbort } as unknown as AbortController]]),
-    };
-    const setSessionLoading = vi.fn();
+    const activeJobs = useChatStore.getState()._activeJobs;
+    startActiveGenerationJob(activeJobs, 'session-other', 'job-other', {
+      abort: otherAbort,
+    } as unknown as AbortController);
+    useChatStore.setState({ activeSessionId: 'session-current', loadingSessionIds: new Set(['session-current']) });
 
-    const { result, unmount } = renderHook(() =>
-      useMessageActions({
-        messages: [],
-        isLoading: true,
-        activeSessionId: 'session-current',
-        editingMessageId: null,
-        activeJobs,
-        setCommandedInput: vi.fn(),
-        setSelectedFiles: vi.fn(),
-        setEditingMessageId: vi.fn(),
-        setEditMode: vi.fn(),
-        setAppFileError: vi.fn(),
-        updateAndPersistSessions: vi.fn(),
-        setActiveSessionId: vi.fn(),
-        userScrolledUpRef: { current: false },
-        handleSendMessage: vi.fn(),
-        setSessionLoading,
-      }),
-    );
+    const { result, unmount } = renderHook(() => useMessageActions(createStoreWiredOptions()));
 
+    let stopResult: 'stopped' | 'no_local_job' | 'not_loading' = 'not_loading';
     act(() => {
-      result.current.handleStopGenerating();
+      stopResult = result.current.handleStopGenerating();
     });
 
+    // The only local job belongs to another session: request a cross-tab abort
+    // instead of touching anything local, and leave the unrelated job alone.
+    expect(stopResult).toBe('no_local_job');
     expect(otherAbort).not.toHaveBeenCalled();
-    expect(setSessionLoading).toHaveBeenCalledWith('session-current', false);
+    expect(activeJobs.current.has('job-other')).toBe(true);
+    // Loading stays flagged for the owner tab to clean up.
+    expect(useChatStore.getState().loadingSessionIds.has('session-current')).toBe(true);
     unmount();
   });
 
   it('blocks retry when loading is owned by another tab (no local job)', async () => {
     const handleSendMessage = vi.fn();
     const setAppFileError = vi.fn();
-    const activeJobs = { current: new Map<string, AbortController>() };
     const messages: ChatMessage[] = [
       {
         id: 'user-1',
@@ -73,25 +101,14 @@ describe('useMessageActions', () => {
         timestamp: new Date('2026-05-01T00:00:01.000Z'),
       },
     ];
+    useChatStore.setState({
+      activeSessionId: 'session-current',
+      loadingSessionIds: new Set(['session-current']),
+      activeMessages: messages,
+    });
 
     const { result, unmount } = renderHook(() =>
-      useMessageActions({
-        messages,
-        isLoading: true,
-        activeSessionId: 'session-current',
-        editingMessageId: null,
-        activeJobs,
-        setCommandedInput: vi.fn(),
-        setSelectedFiles: vi.fn(),
-        setEditingMessageId: vi.fn(),
-        setEditMode: vi.fn(),
-        setAppFileError,
-        updateAndPersistSessions: vi.fn(),
-        setActiveSessionId: vi.fn(),
-        userScrolledUpRef: { current: false },
-        handleSendMessage,
-        setSessionLoading: vi.fn(),
-      }),
+      useMessageActions(createStoreWiredOptions({ handleSendMessage, setAppFileError })),
     );
 
     await act(async () => {
@@ -104,8 +121,8 @@ describe('useMessageActions', () => {
   });
 
   it('keeps the input in stop mode while retry hands off from the aborted generation to the replacement', async () => {
-    const setSessionLoading = vi.fn();
-    const activeJobs = { current: new Map<string, AbortController>() };
+    const activeJobs = useChatStore.getState()._activeJobs;
+    const setSessionLoading = useChatStore.getState().setSessionLoading;
     const oldAbortController = new AbortController();
     const sendDeferred = createDeferred<void>();
     const messages: ChatMessage[] = [
@@ -123,6 +140,13 @@ describe('useMessageActions', () => {
         timestamp: new Date('2026-05-01T00:00:01.000Z'),
       },
     ];
+    useChatStore.setState({
+      activeSessionId: 'session-current',
+      loadingSessionIds: new Set(['session-current']),
+      activeMessages: messages,
+    });
+    startActiveGenerationJob(activeJobs, 'session-current', 'model-1', oldAbortController);
+
     const handleSendMessage = vi.fn(() => {
       finishActiveGenerationJob({
         activeJobs,
@@ -132,27 +156,8 @@ describe('useMessageActions', () => {
       });
       return sendDeferred.promise;
     });
-    startActiveGenerationJob(activeJobs, 'session-current', 'model-1', oldAbortController);
 
-    const { result, unmount } = renderHook(() =>
-      useMessageActions({
-        messages,
-        isLoading: true,
-        activeSessionId: 'session-current',
-        editingMessageId: null,
-        activeJobs,
-        setCommandedInput: vi.fn(),
-        setSelectedFiles: vi.fn(),
-        setEditingMessageId: vi.fn(),
-        setEditMode: vi.fn(),
-        setAppFileError: vi.fn(),
-        updateAndPersistSessions: vi.fn(),
-        setActiveSessionId: vi.fn(),
-        userScrolledUpRef: { current: false },
-        handleSendMessage,
-        setSessionLoading,
-      }),
-    );
+    const { result, unmount } = renderHook(() => useMessageActions(createStoreWiredOptions({ handleSendMessage })));
 
     let retryPromise!: Promise<void>;
     await act(async () => {
@@ -166,7 +171,8 @@ describe('useMessageActions', () => {
       editingId: 'user-1',
     });
     expect(oldAbortController.signal.aborted).toBe(true);
-    expect(setSessionLoading).not.toHaveBeenCalledWith('session-current', false);
+    // The handoff holds the session-level loading flag through the swap.
+    expect(useChatStore.getState().loadingSessionIds.has('session-current')).toBe(true);
 
     const replacementController = new AbortController();
     startActiveGenerationJob(activeJobs, 'session-current', 'model-2', replacementController);
@@ -176,7 +182,8 @@ describe('useMessageActions', () => {
       await retryPromise;
     });
 
-    expect(setSessionLoading).not.toHaveBeenCalledWith('session-current', false);
+    // The replacement job keeps the loading flag up.
+    expect(useChatStore.getState().loadingSessionIds.has('session-current')).toBe(true);
 
     act(() => {
       finishActiveGenerationJob({
@@ -187,7 +194,7 @@ describe('useMessageActions', () => {
       });
     });
 
-    expect(setSessionLoading).toHaveBeenLastCalledWith('session-current', false);
+    expect(useChatStore.getState().loadingSessionIds.has('session-current')).toBe(false);
     unmount();
   });
 

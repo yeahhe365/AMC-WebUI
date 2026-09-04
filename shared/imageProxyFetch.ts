@@ -2,9 +2,9 @@ import { assertImageProxyHostResolvesPublic, type ImageProxyDnsLookup } from './
 import { isPrivateNetworkHostname } from './privateNetwork.js';
 
 /** Max redirects followed while re-validating each hop (CDN signed URLs often 302 once). */
-export const IMAGE_PROXY_MAX_REDIRECTS = 3;
+const IMAGE_PROXY_MAX_REDIRECTS = 3;
 
-export const IMAGE_PROXY_REQUEST_HEADERS = {
+const IMAGE_PROXY_REQUEST_HEADERS = {
   accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
   'user-agent': 'AMC-WebUI image proxy',
 } as const;
@@ -24,7 +24,7 @@ export const isUnsafeImageProxyRedirect = (redirectUrl: URL): boolean => {
   }
 };
 
-export type ImageProxyFetchResult =
+type ImageProxyFetchResult =
   | { ok: true; response: Response }
   | { ok: false; kind: 'unsafe_redirect' }
   | { ok: false; kind: 'blocked'; message: string }

@@ -3,6 +3,7 @@ import { Info, Type } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import { type AppSettings } from '@/types';
 import {
+  SETTINGS_RANGE_SLIDER_CLASS,
   SETTINGS_SECTION_CARD_CLASS,
   SETTINGS_SECTION_LABEL_CLASS,
   SETTINGS_VALUE_BADGE_CLASS,
@@ -36,7 +37,7 @@ export const FontSizeControl: React.FC<FontSizeControlProps> = ({ settings, onUp
         step="1"
         value={settings.baseFontSize}
         onChange={(e) => onUpdate('baseFontSize', parseInt(e.target.value, 10))}
-        className="w-full h-1.5 bg-[var(--theme-border-secondary)] rounded-lg appearance-none cursor-pointer accent-[var(--theme-bg-accent)] hover:accent-[var(--theme-bg-accent-hover)]"
+        className={SETTINGS_RANGE_SLIDER_CLASS}
       />
       <div className="flex justify-between text-xs text-[var(--theme-text-secondary)] font-mono px-1 tabular-nums">
         <span>12px</span>

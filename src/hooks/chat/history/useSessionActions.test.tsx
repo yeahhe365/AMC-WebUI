@@ -7,12 +7,6 @@ import { useSessionActions } from './useSessionActions';
 import { renderHook } from '@/test/render/renderer';
 import { useSettingsStore } from '@/stores/settingsStore';
 
-vi.mock('@/services/db/dbService', async () => {
-  const { createDbServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createDbServiceMockModule();
-});
-
 vi.mock('@/utils/chat/session', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/utils/chat/session')>();
 
@@ -26,12 +20,6 @@ vi.mock('@/utils/chat/session', async (importOriginal) => {
       timestamp: Date.now(),
     })),
   };
-});
-
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
 });
 
 vi.mock('@/utils/file/filePreviewUrls', () => ({

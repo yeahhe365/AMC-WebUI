@@ -97,4 +97,92 @@ describe('CreateTextFileEditor image insertion', () => {
     expect(onConfirm.mock.calls[0][0]).toContain('data:image/png;base64,ZmFrZQ==');
     expect(onConfirm.mock.calls[0][0]).not.toContain('(内嵌图片-1)');
   });
+
+  it('pastes HTML text instead of a companion clipboard image thumbnail', async () => {
+    vi.useRealTimers();
+    await import('@/utils/htmlToMarkdown');
+    const onConfirm = vi.fn();
+
+    await act(async () => {
+      renderer.render(
+        <CreateTextFileEditor
+          onConfirm={onConfirm}
+          onCancel={vi.fn()}
+          isProcessing={false}
+          isLoading={false}
+          themeId="pearl"
+        />,
+      );
+    });
+
+    const textarea = document.body.querySelector('textarea')!;
+    const imageFile = new File(['fake-image'], 'thumbnail.png', { type: 'image/png' });
+    const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      configurable: true,
+      value: {
+        items: [
+          {
+            type: 'image/png',
+            getAsFile: () => imageFile,
+          },
+        ],
+        getData: (type: string) => {
+          if (type === 'text/html') return '<p>Hello from docs</p>';
+          if (type === 'text/plain') return 'Hello from docs';
+          return '';
+        },
+      },
+    });
+
+    await act(async () => {
+      textarea.dispatchEvent(pasteEvent);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect((textarea as HTMLTextAreaElement).value).toContain('Hello from docs');
+    expect((textarea as HTMLTextAreaElement).value).not.toContain('thumbnail.png');
+  });
+
+  it('stores data-URL images from pasted HTML as compact placeholders', async () => {
+    vi.useRealTimers();
+    await import('@/utils/htmlToMarkdown');
+
+    await act(async () => {
+      renderer.render(
+        <CreateTextFileEditor
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+          isProcessing={false}
+          isLoading={false}
+          themeId="pearl"
+        />,
+      );
+    });
+
+    const textarea = document.body.querySelector('textarea')!;
+    const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(pasteEvent, 'clipboardData', {
+      configurable: true,
+      value: {
+        items: [],
+        getData: (type: string) => {
+          if (type === 'text/html') {
+            return '<p>Photo</p><img alt="shot.png" src="data:image/png;base64,ZmFrZQ==">';
+          }
+          return '';
+        },
+      },
+    });
+
+    await act(async () => {
+      textarea.dispatchEvent(pasteEvent);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect((textarea as HTMLTextAreaElement).value).toContain('![shot.png](内嵌图片-1)');
+    expect((textarea as HTMLTextAreaElement).value).not.toContain('data:image/png;base64,ZmFrZQ==');
+  });
 });

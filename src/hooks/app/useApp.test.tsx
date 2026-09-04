@@ -2,7 +2,7 @@ import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppSettings, ChatMessage, ModelOption, SavedChatSession } from '@/types';
 import { createAppSettings, createChatSettings } from '@/test/layout/fixtures';
-import { createDefaultThirdPartyApiSettings } from '@/utils/thirdPartyApiProviders';
+import { createThirdPartyConnection } from '@/test/data/factories';
 import { useApp } from './useApp';
 import { renderHook } from '@/test/render/renderer';
 
@@ -175,12 +175,6 @@ vi.mock('@/utils/themeDom', () => ({
   applyThemeToDocument: vi.fn(),
 }));
 
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
 describe('useApp', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -304,7 +298,7 @@ describe('useApp', () => {
     unmount();
   });
 
-  it('saves default settings without mutating the active chat settings', () => {
+  it('propagates changed chat settings to the active chat but keeps its session-scoped model', () => {
     currentChatState.activeChat = {
       ...hydratedSession,
       settings: {
@@ -326,8 +320,12 @@ describe('useApp', () => {
 
     expect(currentAppSettings.modelId).toBe('default-model');
     expect(currentAppSettings.temperature).toBe(1.4);
+    // The model is chosen per chat via the header picker, so a global default
+    // change must not yank the open session away from its own model.
     expect(currentChatState.activeChat.settings.modelId).toBe('session-model');
-    expect(currentChatState.activeChat.settings.temperature).toBe(0.2);
+    // Generation settings have no per-session UI, so they must reach the open
+    // chat instead of being silently shadowed by the session snapshot.
+    expect(currentChatState.activeChat.settings.temperature).toBe(1.4);
 
     unmount();
   });
@@ -365,29 +363,92 @@ describe('useApp', () => {
     unmount();
   });
 
-  it('displays the independent OpenAI-compatible model name in OpenAI-compatible mode', () => {
-    const thirdPartyDefaults = createDefaultThirdPartyApiSettings();
+  it('preserves the locked API key when saving chat settings if Files API references remain', () => {
+    const fileMessage: ChatMessage = {
+      id: 'message-file',
+      role: 'user',
+      content: 'see this',
+      timestamp: new Date('2026-04-20T08:00:00.000Z'),
+      files: [
+        {
+          id: 'file-1',
+          name: 'notes.pdf',
+          type: 'application/pdf',
+          size: 10,
+          fileApiName: 'files/abc',
+          fileUri: 'https://files/abc',
+          uploadState: 'active',
+        },
+      ],
+    };
+    currentChatState.messages = [fileMessage];
+    currentChatState.activeChat = {
+      ...hydratedSession,
+      messages: [fileMessage],
+      settings: {
+        ...hydratedSession.settings,
+        lockedApiKey: 'locked-key',
+        temperature: 0.2,
+      },
+    };
+
+    const { result, unmount } = renderHook(() => useApp());
+
+    act(() => {
+      result.current.handleSaveCurrentChatSettings({
+        ...currentChatState.activeChat!.settings,
+        temperature: 1.2,
+      });
+    });
+
+    expect(currentChatState.activeChat.settings.temperature).toBe(1.2);
+    expect(currentChatState.activeChat.settings.lockedApiKey).toBe('locked-key');
+
+    unmount();
+  });
+
+  it('preserves the locked API key when saving chat settings even if no Files API references remain', () => {
+    currentChatState.activeChat = {
+      ...hydratedSession,
+      settings: {
+        ...hydratedSession.settings,
+        lockedApiKey: 'locked-key',
+        temperature: 0.2,
+      },
+    };
+
+    const { result, unmount } = renderHook(() => useApp());
+
+    act(() => {
+      result.current.handleSaveCurrentChatSettings({
+        ...currentChatState.activeChat!.settings,
+        temperature: 1.2,
+      });
+    });
+
+    expect(currentChatState.activeChat.settings.temperature).toBe(1.2);
+    expect(currentChatState.activeChat.settings.lockedApiKey).toBe('locked-key');
+
+    unmount();
+  });
+
+  it('displays the independent OpenAI-compatible model name in a third-party session', () => {
     currentAppSettings = {
       ...currentAppSettings,
-      isThirdPartyApiEnabled: true,
-      apiMode: 'third-party',
       modelId: 'gemini-3-flash-preview',
       thirdPartyApi: {
-        activeProvider: 'openai',
-        providers: {
-          ...thirdPartyDefaults.providers,
-          openai: {
+        connections: [
+          createThirdPartyConnection({
+            id: 'openai',
             apiKey: null,
-            baseUrl: thirdPartyDefaults.providers.openai.baseUrl,
             modelId: 'gpt-5.6-sol',
             models: [
               { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', isPinned: true },
               { id: 'gpt-4.1', name: 'GPT-4.1' },
             ],
-            protocol: 'openai-compatible',
             enabled: true,
-          },
-        },
+          }),
+        ],
       },
     };
     currentChatState.activeChat = {
@@ -395,9 +456,7 @@ describe('useApp', () => {
       settings: {
         ...hydratedSession.settings,
         modelId: 'gpt-5.6-sol',
-        apiMode: 'third-party',
-        thirdPartyProviderId: 'openai',
-        thirdPartyModelId: 'gpt-5.6-sol',
+        providerId: 'openai',
       },
     };
     currentChatState.apiModels = [{ id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' }];

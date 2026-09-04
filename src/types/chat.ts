@@ -37,8 +37,12 @@ export interface UploadedFile {
   fileUri?: string;
   fileApiName?: string;
   fileApiExpirationTime?: string;
+  /** Fingerprint of the API key the file was uploaded (or last verified) with — Files API access is scoped to that key's project. */
+  fileApiKeyFingerprint?: string;
   transferStrategy?: FileTransferStrategy;
   uploadState?: 'pending' | 'uploading' | 'processing_api' | 'active' | 'failed' | 'cancelled';
+  /** When true, history replay emits a protocol omission note instead of file bytes. */
+  omittedFromApiHistory?: boolean;
   abortController?: AbortController;
   uploadSpeed?: string;
   videoMetadata?: VideoMetadata;
@@ -72,6 +76,15 @@ export interface ChatMessage {
   generationEndTime?: Date;
   thinkingTimeMs?: number;
   firstTokenTimeMs?: number;
+  // True while the model is actively reasoning (interleaved code-execution
+  // round trips and resumed thinking keep it true); the thinking strip keys
+  // off this so re-entered thinking re-shows instead of staying collapsed.
+  thinkingActive?: boolean;
+  // Source of the thinking text, recorded the first time a thought arrives.
+  // Third-party streams are forced into the flat strip (5-line scroll, no
+  // titles) regardless of content, so a markdown header in third-party
+  // reasoning can never masquerade as a Gemini sectioned stream.
+  thinkingSource?: 'gemini' | 'third-party';
   promptTokens?: number;
   cachedPromptTokens?: number;
   completionTokens?: number;
@@ -101,6 +114,7 @@ export interface ChatGroup {
   timestamp: number;
   isPinned?: boolean;
   isExpanded?: boolean;
+  orderKey?: string;
 }
 
 export interface SavedChatSession {
@@ -112,6 +126,14 @@ export interface SavedChatSession {
   isPinned?: boolean;
   groupId?: string | null;
   createdTabId?: string; // for tab-isolated empty session reuse
+  /**
+   * Title origin:
+   * - 'default': heuristic title or 'New Chat' (may be overwritten by auto-titling)
+   * - 'auto': AI-generated title (never auto-titled again)
+   * - 'manual': user-renamed / scenario / fork / copy title (never auto-titled again)
+   * - undefined: legacy session — eligibility inferred from the heuristic (see isSessionAutoTitleEligible)
+   */
+  titleSource?: 'default' | 'auto' | 'manual';
 }
 
 export interface PreloadedMessage {
@@ -124,7 +146,8 @@ export interface PreloadedMessage {
  * Semantic category for a scenario. Drives the icon, accent color and the
  * category filter in the scenarios library. Defaults to `'custom'`.
  */
-export type ScenarioCategory = 'assistant' | 'roleplay' | 'creative' | 'system' | 'custom';
+export type ScenarioCategory =
+  'coding' | 'creative' | 'workplace' | 'academic' | 'roleplay' | 'system' | 'custom' | 'assistant';
 
 export interface SavedScenario {
   id: string;
@@ -143,16 +166,7 @@ export interface CommandInfo {
 }
 
 export type AttachmentAction =
-  | 'upload'
-  | 'gallery'
-  | 'camera'
-  | 'recorder'
-  | 'id'
-  | 'url'
-  | 'text'
-  | 'screenshot'
-  | 'folder'
-  | 'zip';
+  'upload' | 'gallery' | 'camera' | 'recorder' | 'id' | 'url' | 'text' | 'screenshot' | 'folder' | 'zip';
 
 export interface SideViewContent {
   type: 'html' | 'mermaid' | 'graphviz' | 'svg';

@@ -6,12 +6,16 @@ import { useHtmlPreviewModal } from '@/hooks/ui/useHtmlPreviewModal';
 import { HtmlPreviewHeader } from './html-preview/HtmlPreviewHeader';
 import { HtmlPreviewContent } from './html-preview/HtmlPreviewContent';
 import type { LiveArtifactFollowupPayload } from '@/utils/live-artifacts/liveArtifactFollowup';
+import { DEFAULT_HTML_PREVIEW_PRIVILEGE, type HtmlPreviewPrivilege } from '@/utils/html-preview/previewPrivilege';
 
 interface HtmlPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   htmlContent: string | null;
   initialTrueFullscreenRequest?: boolean;
+  privilege?: HtmlPreviewPrivilege;
+  themeId?: string;
+  baseFontSize?: number;
   onLiveArtifactFollowUp?: (payload: LiveArtifactFollowupPayload) => void;
 }
 
@@ -20,6 +24,9 @@ export const HtmlPreviewModal: React.FC<HtmlPreviewModalProps> = ({
   onClose,
   htmlContent,
   initialTrueFullscreenRequest,
+  privilege = DEFAULT_HTML_PREVIEW_PRIVILEGE,
+  themeId,
+  baseFontSize,
   onLiveArtifactFollowUp,
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -31,12 +38,14 @@ export const HtmlPreviewModal: React.FC<HtmlPreviewModalProps> = ({
     isDirectFullscreenLaunch,
     scale,
     isPreviewReady,
+    contentHeight,
     isScreenshotting,
     handleZoomIn,
     handleZoomOut,
     handleDownload,
     handleScreenshot,
     handleRefresh,
+    iframeRefreshKey,
     enterTrueFullscreen,
     exitTrueFullscreen,
     getPreviewTitle,
@@ -47,41 +56,32 @@ export const HtmlPreviewModal: React.FC<HtmlPreviewModalProps> = ({
     onClose,
     htmlContent,
     initialTrueFullscreenRequest,
+    privilege,
+    themeId,
     iframeRef,
-    onLiveArtifactFollowUp,
+    onLiveArtifactFollowUp: privilege === 'sanitized' ? onLiveArtifactFollowUp : undefined,
   });
 
   if (!isActuallyOpen || !htmlContent) {
     return null;
   }
 
-  // Skip animation if immediate fullscreen is requested to make it feel instant
   const animationClass = isOpen
     ? initialTrueFullscreenRequest
       ? ''
       : 'modal-enter-animation'
     : 'modal-exit-animation';
 
-  // If direct fullscreen launch is active, hide the modal chrome to prevent flash,
-  // but keep it in the DOM so the iframe can be fullscreened.
   const containerClass = isDirectFullscreenLaunch
     ? `fixed inset-0 ${Z_INDEX_MODAL_BACKDROP} opacity-0 pointer-events-none`
     : `fixed inset-0 bg-black/80 flex items-center justify-center ${Z_INDEX_MODAL_BACKDROP}`;
 
   return createPortal(
-    <div
-      className={containerClass}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="html-preview-modal-title"
-      onClick={isTrueFullscreen ? undefined : onClose}
-    >
-      <div
-        className={`bg-[var(--theme-bg-secondary)] w-full h-full flex flex-col overflow-hidden ${animationClass}`}
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className={containerClass} role="dialog" aria-modal="true" aria-labelledby="html-preview-modal-title">
+      <div className={`bg-[var(--theme-bg-secondary)] w-full h-full flex flex-col overflow-hidden ${animationClass}`}>
         <HtmlPreviewHeader
           title={getPreviewTitle()}
+          privilege={privilege}
           scale={scale}
           isTrueFullscreen={isTrueFullscreen}
           isPreviewReady={isPreviewReady}
@@ -97,7 +97,16 @@ export const HtmlPreviewModal: React.FC<HtmlPreviewModalProps> = ({
           onClose={onClose}
         />
 
-        <HtmlPreviewContent iframeRef={iframeRef} htmlContent={htmlContent} scale={scale} />
+        <HtmlPreviewContent
+          key={iframeRefreshKey}
+          iframeRef={iframeRef}
+          htmlContent={htmlContent}
+          scale={scale}
+          contentHeight={contentHeight}
+          privilege={privilege}
+          themeId={themeId}
+          baseFontSize={baseFontSize}
+        />
       </div>
     </div>,
     targetDocument.body,

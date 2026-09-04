@@ -1,32 +1,47 @@
 import React, { useMemo } from 'react';
 import { AttachmentMenu } from './AttachmentMenu';
 import { ToolsMenu } from './ToolsMenu';
+import { McpPickerMenu } from './toolbar/McpPickerMenu';
+import { IconNewChat } from '@/components/icons';
+import { CHAT_INPUT_BUTTON_CLASS } from '@/constants/buttonClasses';
+import { useI18n } from '@/contexts/I18nContext';
 import { WebSearchToggle } from './actions/WebSearchToggle';
 import { LiveControls } from './actions/LiveControls';
 import { RecordControls } from './actions/RecordControls';
 import { ComposerAuxiliaryButtons } from './actions/ComposerAuxiliaryButtons';
 import { SendControls } from './actions/SendControls';
 import { ComposerMoreMenu } from './actions/ComposerMoreMenu';
+import { ThinkingSpeedControl } from './actions/ThinkingSpeedControl';
 import { useComposerAuxiliaryActions } from './actions/useComposerAuxiliaryActions';
 import { useAuxiliaryActionCollapse } from './actions/useAuxiliaryActionCollapse';
 import { COMPOSER_CLUSTER_GAP_CLASS, COMPOSER_CLUSTER_SEPARATION_CLASS } from '@/constants/designTokens';
 import { useChatInputActionsContext, useChatInputComposerStatusContext } from './ChatInputContext';
+import { isGemmaModel } from '@/utils/model/modelCapabilities';
 
 const ChatInputActionsComponent: React.FC = () => {
+  const { t } = useI18n();
   const {
     disabled,
     isWaitingForUpload,
-    onToggleFullscreen,
     isLiveConnected,
     isNativeAudioModel,
+    isLiveTranslate,
+    isLiveTranscribe,
+    isTranscribeModel,
+    isImageGenerationModel,
+    isTtsModel,
     onToggleToolAndFocus,
     onCountTokens,
     currentModelId,
+    providerId,
     toolStates,
     isLoading,
     isEditing,
+    showVoiceInputButton,
+    onNewChat,
   } = useChatInputActionsContext();
   const { canQueueMessage } = useChatInputComposerStatusContext();
+  const isGemma = isGemmaModel(currentModelId);
   const focusedToolStates = useMemo(
     () => ({
       googleSearch: {
@@ -92,7 +107,7 @@ const ChatInputActionsComponent: React.FC = () => {
         hasComposerMoreActions,
         isNativeAudioModel,
         isLiveConnected,
-        !!onToggleFullscreen,
+        showVoiceInputButton,
         auxiliaryActionSignature,
         isLoading,
         isEditing,
@@ -107,8 +122,8 @@ const ChatInputActionsComponent: React.FC = () => {
       isLoading,
       isNativeAudioModel,
       isWaitingForUpload,
-      onToggleFullscreen,
       auxiliaryActionSignature,
+      showVoiceInputButton,
     ],
   );
   const { rootRef, leftActionsRef, rightActionsRef, shouldCollapseAuxiliaryActions } = useAuxiliaryActionCollapse({
@@ -126,11 +141,23 @@ const ChatInputActionsComponent: React.FC = () => {
       <div
         ref={leftActionsRef}
         data-testid="chat-input-actions-left"
-        className={`flex min-w-0 items-center ${COMPOSER_CLUSTER_GAP_CLASS} overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+        className={`flex min-w-0 items-center ${COMPOSER_CLUSTER_GAP_CLASS} overflow-x-auto p-1 -m-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
       >
-        <AttachmentMenu />
+        <button
+          type="button"
+          onClick={onNewChat}
+          disabled={disabled}
+          className={`${CHAT_INPUT_BUTTON_CLASS} bg-transparent hover:bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]`}
+          aria-label={t('newChat')}
+          title={t('newChat')}
+          data-testid="chat-input-new-chat-button"
+        >
+          <IconNewChat size={20} />
+        </button>
 
-        {isNativeAudioModel && (
+        {!isTtsModel && !isLiveTranslate && !isLiveTranscribe && <AttachmentMenu />}
+
+        {isNativeAudioModel && !isLiveTranslate && !isLiveTranscribe && (
           <WebSearchToggle
             isGoogleSearchEnabled={!!focusedToolStates.googleSearch?.isEnabled}
             onToggleGoogleSearch={focusedToolStates.googleSearch?.onToggle ?? (() => undefined)}
@@ -140,10 +167,19 @@ const ChatInputActionsComponent: React.FC = () => {
 
         <ToolsMenu
           currentModelId={currentModelId}
+          providerId={providerId}
           toolStates={focusedToolStates}
           toolUtilityActions={toolUtilityActions}
           disabled={disabled}
         />
+
+        {!isTtsModel &&
+          !isLiveTranslate &&
+          !isLiveTranscribe &&
+          !isTranscribeModel &&
+          !isNativeAudioModel &&
+          !isImageGenerationModel &&
+          !isGemma && <McpPickerMenu disabled={disabled} />}
       </div>
 
       <div
@@ -151,7 +187,9 @@ const ChatInputActionsComponent: React.FC = () => {
         data-testid="chat-input-actions-right"
         className={`flex min-w-0 flex-shrink-0 items-center ${COMPOSER_CLUSTER_GAP_CLASS}`}
       >
-        {!isLiveConnected && !isNativeAudioModel && <RecordControls />}
+        {showVoiceInputButton && !isLiveConnected && !isNativeAudioModel && !isImageGenerationModel && !isTtsModel && (
+          <RecordControls />
+        )}
 
         {!showAuxiliaryActionsInMenu && auxiliaryActions.length > 0 && (
           <div className={`flex items-center ${COMPOSER_CLUSTER_GAP_CLASS}`}>
@@ -170,7 +208,9 @@ const ChatInputActionsComponent: React.FC = () => {
 
         {isNativeAudioModel && <LiveControls />}
 
-        <div className="ml-1 sm:ml-1.5 flex items-center">
+        {!isNativeAudioModel && <ThinkingSpeedControl />}
+
+        <div className="ml-0.5 flex items-center">
           <SendControls />
         </div>
       </div>

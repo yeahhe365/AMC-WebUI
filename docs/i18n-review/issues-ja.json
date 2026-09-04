@@ -1,0 +1,254 @@
+[
+  {
+    "key": "settingsSearchEscHint",
+    "current": "クリアするには",
+    "suggested": "でクリア",
+    "reason": "MISTRANSLATION/UNNATURAL: Rendered in SettingsSidebar.tsx as <kbd>Esc</kbd> + this hint, producing broken word order \"Esc クリアするには\". English is \"Esc to clear\"; the fragment must read \"Escでクリア\".",
+    "severity": "high"
+  },
+  {
+    "key": "pwaUpdateRefreshPrompt",
+    "current": "更新して、インストール済みのシェルと最新のアセットを更新します。",
+    "suggested": "再読み込みすると、インストール済みのシェルと最新のアセットが更新されます。",
+    "reason": "UNNATURAL: \"Refresh to update...\" becomes 更新して…更新します — the same word 更新 is used for both \"refresh\" and \"update\", which is confusing. Use 再読み込み for Refresh (consistent with errorBoundaryReload / htmlPreviewReload) and 更新 only for update.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsFontSize",
+    "current": "読書サイズ",
+    "suggested": "本文の文字サイズ",
+    "reason": "UNNATURAL: \"Reading Size\" controls chat message body text size (see settingsFontSizeTooltip), but 読書サイズ reads as \"book-reading size\" and does not convey this to Japanese users.",
+    "severity": "medium"
+  },
+  {
+    "key": "alwaysKeepThinkingLabel",
+    "current": "思考過程を保持",
+    "suggested": "思考をコンテキストに保持",
+    "reason": "MISTRANSLATION (omitted meaning): \"Keep Thinking in Context\" drops \"in Context\". The companion setting settingsAlwaysKeepThinkingInContextLabel is 推論を常にコンテキストに保持; the chip alone can be misread as merely keeping the thinking UI visible.",
+    "severity": "medium"
+  },
+  {
+    "key": "tts_style_informative",
+    "current": "知的",
+    "suggested": "情報豊かな",
+    "reason": "MISTRANSLATION: \"Informative\" (a TTS voice style) became 知的 (= intellectual). A different style, Knowledgeable, is already 物知りな; Informative should be 情報豊かな/説明的な.",
+    "severity": "medium"
+  },
+  {
+    "key": "tts_style_easy_going",
+    "current": "穏やかな",
+    "suggested": "マイペースな",
+    "reason": "INCONSISTENCY: Easy-going and Gentle (tts_style_gentle) both map to 穏やかな, so two distinct voice styles are indistinguishable in the picker.",
+    "severity": "medium"
+  },
+  {
+    "key": "messageSenderApiKeyNotConfigured",
+    "current": "設定でAPIキーが構成されていません。",
+    "suggested": "設定でAPIキーが未設定です。",
+    "reason": "INCONSISTENCY/UNNATURAL: \"not configured\" is 構成されていません here but 未設定 everywhere else (apiRuntimeKeyNotConfigured, thirdPartyApiKeyMissing, thirdPartyApiUrlMissing, settingsSystemPromptUnset). 構成されていません is also stiff for UI copy.",
+    "severity": "medium"
+  },
+  {
+    "key": "shortcutsTogglePip",
+    "current": "ピクチャー・イン・ピクチャーを切り替え",
+    "suggested": "ピクチャーインピクチャーを切り替え",
+    "reason": "INCONSISTENCY: Only this key uses ピクチャー・イン・ピクチャー; pipEnter, pipExit, pipPlaceholderTitle and helpCmdPip all use ピクチャーインピクチャー.",
+    "severity": "medium"
+  },
+  {
+    "key": "shortcutsChatInputTitle",
+    "current": "コンポーザー",
+    "suggested": "入力欄",
+    "reason": "UNNATURAL: Section title \"Composer\" (chat input shortcuts). コンポーザー is not used for a chat input area in Japanese UIs and reads as \"music composer\"; 入力欄/入力 is the natural term.",
+    "severity": "medium"
+  },
+  {
+    "key": "headerModelSelectorTooltipAction",
+    "current": "クリックして変更、または'Tab'キーで切り替え",
+    "suggested": "クリックして変更、または「Tab」キーで切り替え",
+    "reason": "PUNCTUATION: halfwidth single quotes around Tab; Japanese UI copy should use 「」.",
+    "severity": "low"
+  },
+  {
+    "key": "videoSettingsTipFps",
+    "current": "講義のような静的な動画では低いFPS（＜1）を使用してください。動きの速い動画では高いFPSを使用してください。",
+    "suggested": "講義のような静的な動画では低いFPS（1未満）を使用してください。動きの速い動画では高いFPSを使用してください。",
+    "reason": "PUNCTUATION: fullwidth ＜ used in a numeric comparison; a numeric expression should read 1未満 (or halfwidth <1).",
+    "severity": "low"
+  },
+  {
+    "key": "thirdPartyApiBaseUrlChatCompletionsWarning",
+    "current": "「/chat/completions」は省略してください — 自動的に付加されます。",
+    "suggested": "「/chat/completions」は省略してください（自動的に付加されます）。",
+    "reason": "PUNCTUATION: halfwidth em dash with spaces is not Japanese UI style; use fullwidth parentheses for the supplementary clause.",
+    "severity": "low"
+  },
+  {
+    "key": "thirdPartyApiBaseUrlModelsWarning",
+    "current": "「/models」は省略してください — 自動的に付加されます。",
+    "suggested": "「/models」は省略してください（自動的に付加されます）。",
+    "reason": "PUNCTUATION: same halfwidth em dash issue as thirdPartyApiBaseUrlChatCompletionsWarning.",
+    "severity": "low"
+  },
+  {
+    "key": "messageSenderGemma4TextImageOnly",
+    "current": "Gemma 4 31B／26Bモデルはテキストと画像の添付のみをサポートしています。",
+    "suggested": "Gemma 4 31B/26Bモデルはテキストと画像の添付のみをサポートしています。",
+    "reason": "PUNCTUATION: fullwidth ／ between alphanumeric model sizes; halfwidth / is standard inside alphanumeric terms (cf. markdownPreviewSourceShortcut Ctrl/Cmd+Alt+S).",
+    "severity": "low"
+  },
+  {
+    "key": "liveStartCamera",
+    "current": "カメラを開始",
+    "suggested": "カメラを起動",
+    "reason": "UNNATURAL: 開始 pairs with sessions/activities; a camera is 起動する in native Japanese UI copy (cf. 画面共有を開始 is fine, but カメラを開始 is not idiomatic).",
+    "severity": "low"
+  },
+  {
+    "key": "liveStatusActiveHint",
+    "current": "ライブセッション接続中 • 入力してチャット",
+    "suggested": "ライブセッション実行中 • 入力してチャット",
+    "reason": "MISTRANSLATION (nuance): \"Live Session Active\" → 接続中 implies the connection is still being established; 実行中 conveys active/running.",
+    "severity": "low"
+  },
+  {
+    "key": "messageSenderEmptyReply",
+    "current": "モデルは表示可能な返答なしにこのターンを終了しました。再試行してください。",
+    "suggested": "モデルは返答を生成せずにこのターンを終了しました。再試行してください。",
+    "reason": "UNNATURAL: \"without a visible reply\" → 表示可能な返答なし is a calque; natural Japanese is 返答を生成せずに/返答なしで.",
+    "severity": "low"
+  },
+  {
+    "key": "messageSenderEmptyReplyWithThoughts",
+    "current": "モデルは表示可能な返答なしにこのターンを終了しました（推論のみが生成されました）。再試行するか、思考レベルを下げて再度お試しください。",
+    "suggested": "モデルは返答を生成せずにこのターンを終了しました（推論のみが生成されました）。再試行するか、思考レベルを下げて再度お試しください。",
+    "reason": "UNNATURAL: same 表示可能な返答なし calque as messageSenderEmptyReply.",
+    "severity": "low"
+  },
+  {
+    "key": "markdownPreviewToc",
+    "current": "目次",
+    "suggested": "アウトライン",
+    "reason": "INCONSISTENCY: \"Outline\" is 目次 here but アウトライン in markdownPreviewTocTitle (\"Document outline\" → 文書のアウトライン) for the same panel; unify on アウトライン (common in JP editors).",
+    "severity": "low"
+  },
+  {
+    "key": "htmlPreviewDemoSubtitle",
+    "current": "制限なしデモ",
+    "suggested": "制限のないデモ",
+    "reason": "UNNATURAL: 制限なしデモ is telegraphic; natural phrasing is 制限のないデモ.",
+    "severity": "low"
+  },
+  {
+    "key": "sidePanelPreviewUnsupported",
+    "current": "この種類はプレビューに対応していません。",
+    "suggested": "この形式はプレビューに対応していません。",
+    "reason": "INCONSISTENCY: file type is ファイル形式 in filePreviewNotSupported / uploadUnsupportedType, but 種類 here; unify on 形式.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsMediaResolution",
+    "current": "入力詳細レベル",
+    "suggested": "入力の詳細レベル",
+    "reason": "UNNATURAL: four-noun compound 入力詳細レベル is hard to parse; 入力の詳細レベル reads naturally (tooltip uses 詳細度).",
+    "severity": "low"
+  },
+  {
+    "key": "aboutDescription",
+    "current": "Geminiエコシステムと深く統合されたオールインワンのモデルコンソールWebUI。テキスト／音声／画像／動画によるマルチモーダル対話、リアルタイムWeb検索、コード実行、長文ドキュメント解析、高度な推論に対応。豊富なプリセットシナリオとパーソナライズ設定で、AIの無限の可能性を探求できます。",
+    "suggested": "Geminiエコシステムと深く統合されたオールインワンのモデルコンソールWebUI。テキスト／音声／画像／動画によるマルチモーダル対話、リアルタイムWeb検索、コード実行、長文ドキュメント解析、高度な推論に対応。豊富なプリセットシナリオとパーソナライズ設定を備えています。",
+    "reason": "MISTRANSLATION (added meaning): the English ends at \"...personalized configurations\", but the Japanese adds a marketing sentence 「AIの無限の可能性を探求できます」 that has no source.",
+    "severity": "low"
+  },
+  {
+    "key": "liveArtifactsPromptActiveAria",
+    "current": "Live Artifactsプロンプトが有効です。クリックして削除します。",
+    "suggested": "Live Artifactsプロンプトが有効です。クリックして削除します",
+    "reason": "UNNATURAL (minor): クリックして削除します reads as a declaration (\"I will delete\"); instruction/aria copy should be クリックして削除 (or クリックで解除). Same text in liveArtifactsPromptActiveTitle.",
+    "severity": "low"
+  },
+  {
+    "key": "liveArtifactsPromptActiveTitle",
+    "current": "Live Artifactsプロンプトが有効です。クリックして削除します。",
+    "suggested": "Live Artifactsプロンプトが有効です。クリックして削除します",
+    "reason": "UNNATURAL (minor): same クリックして削除します issue as the aria twin.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsPasteAsTextFileTooltip",
+    "current": "大量のテキスト（5000 文字超）を貼り付けた際に、自動的に添付 .txt ファイルに変換します。",
+    "suggested": "大量のテキスト（5000文字超）を貼り付けた際に、自動的に .txt ファイルとして添付します。",
+    "reason": "UNNATURAL: 添付 .txt ファイルに変換します has inverted modifier order; .txt ファイルとして添付します is natural. Also removes stray space in 5000 文字.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsFontSizeTooltip",
+    "current": "チャット内のメッセージ本文の文字サイズを調整します。サイドバーやヘッダーなどのインターフェース部分はインターフェースの拡大率を維持します。",
+    "suggested": "チャット内のメッセージ本文の文字サイズを調整します。サイドバーやヘッダーなどその他のUI部分は、インターフェース全体の拡大率のままです。",
+    "reason": "UNNATURAL: インターフェース appears twice in one sentence (インターフェース部分はインターフェースの拡大率を…) — repetitive and confusing.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsGenerateQuadImagesTooltip",
+    "current": "有効にすると、画像生成プロンプトで一度に4つの独立したバリエーションが生成されます。APIの消費量が増加します。",
+    "suggested": "有効にすると、画像生成プロンプトで一度に4つの独立したバリエーションが生成されます。APIクレジットを多く消費します。",
+    "reason": "MISTRANSLATION (nuance): \"API credits\" → APIの消費量 loses the credit/billing notion; APIクレジット is the standard term.",
+    "severity": "low"
+  },
+  {
+    "key": "tts_style_even",
+    "current": "落ち着いた",
+    "suggested": "一定の",
+    "reason": "MISTRANSLATION (nuance): \"Even\" describes a flat/steady delivery (一定の/平坦な); 落ち着いた means calm and overlaps with easy-going/gentle territory.",
+    "severity": "low"
+  },
+  {
+    "key": "shortcutsGlobalTitle",
+    "current": "ダイアログとグローバル",
+    "suggested": "ダイアログとグローバルショートカット",
+    "reason": "UNNATURAL: グローバル as a standalone noun is incomplete in Japanese; spell out グローバルショートカット.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsLiveArtifactsFontSize",
+    "current": "Live Artifacts 基本サイズ",
+    "suggested": "Live Artifacts基本サイズ",
+    "reason": "INCONSISTENCY (spacing): halfwidth space between Latin and Japanese is used in some strings (Live Artifacts 基本サイズ, Mermaid 図表をレンダリング, Graphviz 図表をレンダリング, HTML または SVG の…, MP3 64kbps に…, Markdown に変換, <thinking> を…, API コンテキスト, API リクエスト, Gemini 3 推論, settingsLiveArtifactsFontSizeTooltip) but omitted in others (Live Artifactsプロンプト, Graphviz図, Mermaid図のレンダリング, Gemini APIキー, Markdownファイル, PDFビューア, HTMLプレビュー). Pick one convention (no-space is dominant) and apply it everywhere.",
+    "severity": "low"
+  },
+  {
+    "key": "suggestionAsrShort",
+    "current": "音声ファイルを一字一句書き起こし。",
+    "suggested": "音声ファイルを一字一句文字起こし。",
+    "reason": "INCONSISTENCY: transcription is 文字起こし in voiceInputTranscribingAria, transcriptionFailedWithMessage and chatBehaviorVoiceModelTooltip, but 書き起こし in suggestionAsrDesc, suggestionAsrShort and suggestionSrtDesc. Unify on 文字起こし (standard JP UI term).",
+    "severity": "low"
+  },
+  {
+    "key": "suggestionAsrTitle",
+    "current": "音声テキスト化",
+    "suggested": "音声テキスト変換",
+    "reason": "INCONSISTENCY: \"Audio to Text\" is 音声テキスト化 here but the Speech-to-Text model setting (chatBehaviorVoiceModelLabel) is 音声テキスト変換モデル; unify on 音声テキスト変換.",
+    "severity": "low"
+  },
+  {
+    "key": "audioRecorderBrowserPermissionRequired",
+    "current": "システム音声の録音にはブラウザの許可が必要です。",
+    "suggested": "システム音声の録音にはブラウザの権限が必要です。",
+    "reason": "INCONSISTENCY: \"permission\" is 権限 in voiceInputPermissionError and filePreviewCopyFailed but 許可 here; unify on 権限.",
+    "severity": "low"
+  },
+  {
+    "key": "shortcutsCycleModelsScopeHint",
+    "current": "Tabキーで、現在のピッカーの順序に従ってチェックされたモデル間を循環します。",
+    "suggested": "Tabキーで、チェックを入れたモデル間を現在の選択順序で循環します。",
+    "reason": "INCONSISTENCY: \"picker\" is ピッカー here but モデル選択 in settingsOpenAICompatibleModelIdHelp (メインのモデル選択); unify (モデル選択 is more natural Japanese).",
+    "severity": "low"
+  },
+  {
+    "key": "settingsLiveArtifactsSystemPromptHelp",
+    "current": "Live Artifactsボタン、サジェスト、自動ビジュアライゼーションは、選択中のバージョンに対応するプロンプトを使用します。",
+    "suggested": "Live Artifactsボタン、提案、自動ビジュアライゼーションは、選択中のバージョンに対応するプロンプトを使用します。",
+    "reason": "INCONSISTENCY: \"suggestions\" is サジェスト here, 提案 in generatingSuggestions/suggestionFillInput, and 返信候補 in settingsEnableSuggestionsLabel; avoid サジェスト and unify on 提案/候補.",
+    "severity": "low"
+  }
+]

@@ -13,8 +13,9 @@ import { IMAGE_PROXY_PATH, proxyExternalImage } from './imageProxy.js';
 import { createMcpClientBridge } from './mcpClient.js';
 import { handleMcpRequest } from './mcpRoutes.js';
 import type { McpClientBridge } from './mcpTypes.js';
-import { abortJob } from './streamJobs.js';
-import { STREAM_ABORT_PREFIX } from './streamJobsRoutes.js';
+import { handleEphemeralTokenRequest, EPHEMERAL_TOKEN_PATH, LEGACY_AUTH_TOKENS_PATH } from './ephemeralToken.js';
+import { abortJob, readJobSecret } from './streamJobs.js';
+import { STREAM_ABORT_PREFIX, UNIFIED_STREAM_ABORT_PREFIX } from './streamJobsRoutes.js';
 import { OPENAI_PROXY_PREFIX, proxyThirdPartyRequest, type ThirdPartyProxyConfig } from './thirdPartyProxy.js';
 
 export { readMacOsClipboardPng } from './clipboardImage.js';
@@ -34,6 +35,7 @@ type CreateServerConfig = Pick<ApiServerConfig, 'geminiApiBase' | 'geminiApiKey'
       | 'enableMcpPrivateHttp'
       | 'enableLiveWsProxy'
       | 'liveWsIdleTimeoutMs'
+      | 'liveWsUpstreamBase'
       | 'serverKeyPriority'
       | 'thirdPartyRoutes'
     >
@@ -48,6 +50,7 @@ interface ResolvedServerConfig
       | 'enableMcpPrivateHttp'
       | 'enableLiveWsProxy'
       | 'liveWsIdleTimeoutMs'
+      | 'liveWsUpstreamBase'
       | 'serverKeyPriority'
       | 'thirdPartyRoutes'
     >,
@@ -58,6 +61,7 @@ interface ResolvedServerConfig
   enableMcpPrivateHttp: boolean;
   enableLiveWsProxy: boolean;
   liveWsIdleTimeoutMs: number;
+  liveWsUpstreamBase?: string;
   serverKeyPriority: boolean;
   thirdPartyRoutes: Record<string, ThirdPartyProxyRoute>;
 }
@@ -113,6 +117,8 @@ export function createServer(config: CreateServerConfig, dependencies: CreateSer
             capabilities: {
               liveWsProxy: resolvedConfig.enableLiveWsProxy,
               thirdPartyProxy: Object.keys(resolvedConfig.thirdPartyRoutes).length > 0,
+              mcpStdio: resolvedConfig.enableMcpStdio,
+              mcpPrivateHttp: resolvedConfig.enableMcpPrivateHttp,
             },
           },
           resolvedConfig.allowedOrigins,
@@ -144,27 +150,51 @@ export function createServer(config: CreateServerConfig, dependencies: CreateSer
         return;
       }
 
+      if (path === EPHEMERAL_TOKEN_PATH || path === LEGACY_AUTH_TOKENS_PATH) {
+        await handleEphemeralTokenRequest(request, response, resolvedConfig, fetchImpl);
+        return;
+      }
+
       if (path === OPENAI_PROXY_PREFIX || path.startsWith(`${OPENAI_PROXY_PREFIX}/`)) {
         await proxyThirdPartyRequest(request, response, resolvedConfig, fetchImpl);
         return;
       }
 
+      // Local helper shared by the unified stream-abort endpoint and the legacy
+      // Gemini alias below: a POST carrying a job id kills that journal job and
+      // is answered 200/404; anything else falls through to the next route.
+      const respondAbort = (prefix: string): boolean => {
+        if (!path.startsWith(`${prefix}/`)) {
+          return false;
+        }
+        const jobId = path.slice(`${prefix}/`.length);
+        if (!(method === 'POST' && jobId)) {
+          return false;
+        }
+        const aborted = abortJob(jobId, readJobSecret(request));
+        sendJson(
+          request,
+          response,
+          aborted ? 200 : 404,
+          aborted ? { ok: true } : { error: 'job not found' },
+          resolvedConfig.allowedOrigins,
+        );
+        return true;
+      };
+
+      // Unified stream-abort endpoint: terminates any job in the shared store
+      // regardless of provider (Gemini, OpenAI-compatible, or Anthropic). Placed
+      // before the provider blocks so it works for every provider's job id.
+      if (respondAbort(UNIFIED_STREAM_ABORT_PREFIX)) {
+        return;
+      }
+
       if (path === GEMINI_PROXY_PREFIX || path.startsWith(`${GEMINI_PROXY_PREFIX}/`)) {
-        // Stream-abort endpoint: the browser POSTs here when the user clicks
-        // "stop" so the upstream is killed in addition to the local abort.
-        if (path.startsWith(`${STREAM_ABORT_PREFIX}/`)) {
-          const jobId = path.slice(`${STREAM_ABORT_PREFIX}/`.length);
-          if (method === 'POST' && jobId) {
-            const aborted = abortJob(jobId);
-            sendJson(
-              request,
-              response,
-              aborted ? 200 : 404,
-              aborted ? { ok: true } : { error: 'job not found' },
-              resolvedConfig.allowedOrigins,
-            );
-            return;
-          }
+        // Legacy stream-abort alias: the browser POSTs here when the user
+        // clicks "stop" so the upstream is killed in addition to the local
+        // abort. Kept for backward compat; routes to the same shared store.
+        if (respondAbort(STREAM_ABORT_PREFIX)) {
+          return;
         }
 
         await proxyGeminiRequest(request, response, resolvedConfig, fetchImpl);
@@ -172,7 +202,9 @@ export function createServer(config: CreateServerConfig, dependencies: CreateSer
       }
 
       sendJson(request, response, 404, { error: 'Not found' }, resolvedConfig.allowedOrigins);
-    } catch {
+    } catch (error) {
+      // The 500 body stays generic; the diagnostics only go to the server log.
+      console.error('[server] Unhandled request error:', error instanceof Error ? error.message : String(error));
       sendJson(request, response, 500, { error: 'Internal server error' }, resolvedConfig.allowedOrigins);
     }
   });

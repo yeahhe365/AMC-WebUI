@@ -10,6 +10,7 @@ interface ApiKeyInputProps {
   label?: string;
   placeholder?: string;
   helpText?: string;
+  inputId?: string;
 }
 
 export const ApiKeyInput: React.FC<ApiKeyInputProps> = ({
@@ -19,6 +20,7 @@ export const ApiKeyInput: React.FC<ApiKeyInputProps> = ({
   label,
   placeholder,
   helpText,
+  inputId = 'api-key-input',
 }) => {
   const { t } = useI18n();
   const [isFocused, setIsFocused] = useState(false);
@@ -32,14 +34,14 @@ export const ApiKeyInput: React.FC<ApiKeyInputProps> = ({
   return (
     <div className="space-y-2">
       <label
-        htmlFor="api-key-input"
-        className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)]"
+        htmlFor={inputId}
+        className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-secondary)]"
       >
         {label || t('settingsApiKey')}
       </label>
       <div className="relative">
         <textarea
-          id="api-key-input"
+          id={inputId}
           rows={3}
           value={apiKey || ''}
           onChange={(e) => {
@@ -60,7 +62,7 @@ export const ApiKeyInput: React.FC<ApiKeyInputProps> = ({
           </div>
         )}
       </div>
-      <p className="text-xs text-[var(--theme-text-tertiary)] flex gap-1.5">
+      <p className="text-xs text-[var(--theme-text-secondary)] flex gap-1.5">
         <Info size={14} className="flex-shrink-0 mt-0.5" strokeWidth={1.5} />
         <span>{helpText || t('settingsApiKeyHelpText')}</span>
       </p>

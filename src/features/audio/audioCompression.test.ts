@@ -240,4 +240,14 @@ describe('prepareAudioForGeminiTranscription', () => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
+
+  it('rethrows abort errors instead of falling back to WAV conversion', async () => {
+    const abortController = new AbortController();
+    abortController.abort();
+    const file = new File([new Uint8Array(64 * 1024)], 'clip.webm', { type: 'audio/webm' });
+
+    await expect(prepareAudioForGeminiTranscription(file, abortController.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+  });
 });

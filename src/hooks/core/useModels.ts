@@ -1,51 +1,59 @@
 import { logService } from '@/services/logService';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { type ModelOption } from '@/types';
-import { sanitizeModelOptions } from '@/utils/model/modelSorting';
+import { sanitizeModelOptions, sortModels } from '@/utils/model/modelSorting';
 import { useModelPreferencesStore } from '@/stores/modelPreferencesStore';
-import { useSettingsStore } from '@/stores/settingsStore';
-import { getTranslator } from '@/i18n/translations';
+import { getDefaultModelOptions } from '@/utils/defaultModelOptions';
+
+const reconcileCustomModelsWithDefaults = (
+  customModels: ModelOption[],
+  defaultModels: ModelOption[],
+): { merged: ModelOption[]; hasChanges: boolean } => {
+  const existingIds = new Set(customModels.map((model) => model.id.trim().toLowerCase()));
+  const missingDefaults = defaultModels.filter(
+    (defaultModel) => !existingIds.has(defaultModel.id.trim().toLowerCase()),
+  );
+
+  if (missingDefaults.length === 0) {
+    return { merged: customModels, hasChanges: false };
+  }
+
+  // Auto-merge newly introduced official default models while preserving existing custom entries
+  return {
+    merged: sortModels([...customModels, ...missingDefaults]),
+    hasChanges: true,
+  };
+};
 
 export const useModels = () => {
-  const language = useSettingsStore((state) => state.language);
-  const t = useMemo(() => getTranslator(language), [language]);
   const customModels = useModelPreferencesStore((state) => state.customModels);
   const setCustomModels = useModelPreferencesStore((state) => state.setCustomModels);
-  const [defaultModels, setDefaultModels] = useState<ModelOption[]>([]);
-  const [isDefaultModelsLoading, setIsDefaultModelsLoading] = useState(() => !customModels?.length);
+  const [defaultModels] = useState<ModelOption[]>(() => getDefaultModelOptions());
   const [modelsLoadingError, setModelsLoadingError] = useState<string | null>(null);
-  const hasCustomModels = !!customModels?.length;
+  const initialReconciledRef = useRef(false);
 
   useEffect(() => {
     useModelPreferencesStore.getState().hydrateLegacyModelPreferences();
   }, []);
 
+  // Reconcile once on initial startup if customModels was already populated from persistence
+  // (e.g. user updated Docker container from a previous version without Gemini 3.5 Transcribe).
   useEffect(() => {
-    if (hasCustomModels) {
-      setIsDefaultModelsLoading(false);
-      return;
+    if (!initialReconciledRef.current) {
+      initialReconciledRef.current = true;
+      const initialCustom = useModelPreferencesStore.getState().customModels;
+      if (initialCustom && initialCustom.length > 0) {
+        const defaults = getDefaultModelOptions();
+        const { merged, hasChanges } = reconcileCustomModelsWithDefaults(initialCustom, defaults);
+        if (hasChanges) {
+          useModelPreferencesStore.getState().setCustomModels(merged);
+          logService.info('Auto-reconciled user model list with new built-in default models', {
+            count: merged.length,
+          });
+        }
+      }
     }
-
-    let isActive = true;
-    setIsDefaultModelsLoading(true);
-
-    void import('@/utils/defaultModelOptions')
-      .then(({ getDefaultModelOptions }) => {
-        if (!isActive) return;
-        setDefaultModels(getDefaultModelOptions());
-        setIsDefaultModelsLoading(false);
-      })
-      .catch((error) => {
-        logService.error('Default model import failed', error);
-        if (!isActive) return;
-        setModelsLoadingError(t('appDefaultModelsLoadError'));
-        setIsDefaultModelsLoading(false);
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, [hasCustomModels, t]);
+  }, []);
 
   const setApiModels = useCallback(
     (models: ModelOption[]) => {
@@ -56,10 +64,12 @@ export const useModels = () => {
     [setCustomModels],
   );
 
+  const hasCustomModels = !!customModels?.length;
+
   return {
     apiModels: hasCustomModels ? customModels : defaultModels,
     setApiModels,
-    isModelsLoading: hasCustomModels ? false : isDefaultModelsLoading,
+    isModelsLoading: false,
     modelsLoadingError,
   };
 };

@@ -84,7 +84,7 @@ describe('useCodeBlock', () => {
     vi.unstubAllGlobals();
   });
 
-  it('keeps auto-follow enabled when layout growth fires scroll without the user moving upward', () => {
+  it('auto-follows a growing collapsed block to its bottom', () => {
     act(() => {
       renderer.root.render(<TestCodeBlock text={'a'.repeat(400)} measurements={measurements} />);
     });
@@ -97,16 +97,6 @@ describe('useCodeBlock', () => {
 
     expect(measurements.scrollTop).toBe(500);
 
-    act(() => {
-      vi.advanceTimersByTime(100);
-    });
-
-    measurements.scrollHeight = 650;
-
-    act(() => {
-      renderer.container.querySelector('pre')?.dispatchEvent(new Event('scroll'));
-    });
-
     measurements.scrollHeight = 700;
 
     act(() => {
@@ -114,6 +104,34 @@ describe('useCodeBlock', () => {
     });
 
     expect(measurements.scrollTop).toBe(700);
+  });
+
+  it('keeps a long static block pinned to the top on mount', () => {
+    // prevTextLength starts at 0: a finished block (history) must not auto-scroll
+    // to its bottom — only actively growing streams follow.
+    act(() => {
+      renderer.root.render(<TestCodeBlock text={'x'.repeat(600)} measurements={measurements} />);
+    });
+
+    expect(measurements.scrollTop).toBe(0);
+  });
+
+  it('auto-follows once a block grows past the collapse threshold', () => {
+    measurements.scrollHeight = 100; // below the 320px collapse threshold
+
+    act(() => {
+      renderer.root.render(<TestCodeBlock text={'a'.repeat(100)} measurements={measurements} />);
+    });
+
+    expect(measurements.scrollTop).toBe(0);
+
+    measurements.scrollHeight = 500;
+
+    act(() => {
+      renderer.root.render(<TestCodeBlock text={'b'.repeat(500)} measurements={measurements} />);
+    });
+
+    expect(measurements.scrollTop).toBe(500);
   });
 
   it('does not expose html preview controls for embedded html inside javascript code', () => {

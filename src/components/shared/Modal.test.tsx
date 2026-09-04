@@ -97,4 +97,34 @@ describe('Modal', () => {
 
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
+
+  it('lets the topmost nested dialog own Escape and Tab', () => {
+    const parentClose = vi.fn();
+    const childClose = vi.fn();
+
+    act(() => {
+      renderer.root.render(
+        <>
+          <Modal isOpen onClose={parentClose} ariaLabel="Parent dialog">
+            <button type="button">Parent action</button>
+          </Modal>
+          <Modal isOpen onClose={childClose} ariaLabel="Child dialog">
+            <button type="button">Child first</button>
+            <button type="button">Child last</button>
+          </Modal>
+        </>,
+      );
+    });
+
+    const childDialog = document.querySelector('[aria-label="Child dialog"]');
+    const [childFirst, childLast] = Array.from(childDialog?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+    childLast?.focus();
+
+    fireEvent.keyDown(document, { key: 'Tab' });
+    expect(document.activeElement).toBe(childFirst);
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(childClose).toHaveBeenCalledTimes(1);
+    expect(parentClose).not.toHaveBeenCalled();
+  });
 });

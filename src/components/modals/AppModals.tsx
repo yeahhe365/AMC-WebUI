@@ -4,6 +4,7 @@ import type { LogViewerProps } from '@/components/log-viewer/LogViewer';
 import type { PwaInstallState } from '@/pwa/install';
 import { lazyNamedComponent } from '@/utils/lazyNamedComponent';
 import { ensureFeatureTranslations } from '@/i18n/translations';
+import { logService } from '@/services/logService';
 
 const LazySettingsModal = lazyNamedComponent(() => import('@/components/settings/SettingsModal'), 'SettingsModal');
 const LazyLogViewer = lazyNamedComponent(() => import('@/components/log-viewer/LogViewer'), 'LogViewer');
@@ -101,11 +102,13 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
     if (!isSettingsModalOpen || readyFeatures.settings) return;
 
     let isCancelled = false;
-    void ensureFeatureTranslations('settings').then(() => {
-      if (!isCancelled) {
-        setReadyFeatures((current) => ({ ...current, settings: true }));
-      }
-    });
+    void ensureFeatureTranslations('settings')
+      .then(() => {
+        if (!isCancelled) {
+          setReadyFeatures((current) => ({ ...current, settings: true }));
+        }
+      })
+      .catch((error) => logService.error('[AppModals] Failed to load settings translations', { error }));
 
     return () => {
       isCancelled = true;
@@ -116,11 +119,13 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
     if (!isLogViewerOpen || readyFeatures.logViewer) return;
 
     let isCancelled = false;
-    void ensureFeatureTranslations('logViewer').then(() => {
-      if (!isCancelled) {
-        setReadyFeatures((current) => ({ ...current, logViewer: true }));
-      }
-    });
+    void ensureFeatureTranslations('logViewer')
+      .then(() => {
+        if (!isCancelled) {
+          setReadyFeatures((current) => ({ ...current, logViewer: true }));
+        }
+      })
+      .catch((error) => logService.error('[AppModals] Failed to load logViewer translations', { error }));
 
     return () => {
       isCancelled = true;
@@ -131,11 +136,13 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
     if (!isPreloadedMessagesModalOpen || readyFeatures.scenarios) return;
 
     let isCancelled = false;
-    void ensureFeatureTranslations('scenarios').then(() => {
-      if (!isCancelled) {
-        setReadyFeatures((current) => ({ ...current, scenarios: true }));
-      }
-    });
+    void ensureFeatureTranslations('scenarios')
+      .then(() => {
+        if (!isCancelled) {
+          setReadyFeatures((current) => ({ ...current, scenarios: true }));
+        }
+      })
+      .catch((error) => logService.error('[AppModals] Failed to load scenarios translations', { error }));
 
     return () => {
       isCancelled = true;

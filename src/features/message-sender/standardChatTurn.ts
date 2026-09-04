@@ -49,7 +49,7 @@ export const resolveStandardChatTurn = ({
     // Gemini 3.6+ rejects non-empty prefilled model turns. Continue via a user nudge instead.
     const modelIdLower = apiModelId.toLowerCase();
     const bansModelTurnPrefill =
-      modelIdLower.includes('gemini-3.6') ||
+      /gemini-3\.[6-9]/.test(modelIdLower) ||
       modelIdLower.includes('gemini-3.5-flash-lite') ||
       /gemini-[4-9]/.test(modelIdLower);
     if (bansModelTurnPrefill) {

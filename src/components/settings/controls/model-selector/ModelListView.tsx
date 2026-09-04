@@ -1,21 +1,17 @@
-import React, { useMemo } from 'react';
-import { Check } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type ApiMode, type ModelOption } from '@/types';
 import { getModelIcon } from '@/components/shared/ModelIcon';
 import { useI18n } from '@/contexts/I18nContext';
-import {
-  buildModelCatalog,
-  buildModelCatalogSections,
-  filterModelCatalog,
-  getModelProviderSectionLabelKey,
-} from '@/utils/model/modelCatalog';
+import { buildModelCatalog, buildModelCatalogSections, filterModelCatalog } from '@/utils/model/modelCatalog';
+import { ModelCatalogList } from '@/components/shared/ModelCatalogList';
 
 interface ModelListViewProps {
   availableModels: ModelOption[];
   selectedModelId: string;
   selectedApiMode?: ApiMode;
   onSelectModel: (id: string, apiMode?: ApiMode) => void;
-  extraContent?: React.ReactNode;
+  /** Badge text for the selected model; see ModelCatalogList.activeBadgeLabel. */
+  activeBadgeLabel?: string;
 }
 
 export const ModelListView: React.FC<ModelListViewProps> = ({
@@ -23,90 +19,68 @@ export const ModelListView: React.FC<ModelListViewProps> = ({
   selectedModelId,
   selectedApiMode,
   onSelectModel,
-  extraContent,
+  activeBadgeLabel,
 }) => {
   const { t } = useI18n();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [showBottomFade, setShowBottomFade] = useState(false);
 
-  const catalog = useMemo(() => buildModelCatalog(availableModels), [availableModels]);
-  const filteredEntries = useMemo(() => filterModelCatalog(catalog, ''), [catalog]);
+  const updateBottomFade = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) {
+      return;
+    }
+    setShowBottomFade(el.scrollTop + el.clientHeight < el.scrollHeight - 4);
+  }, []);
 
-  const sections = useMemo(() => buildModelCatalogSections(filteredEntries), [filteredEntries]);
+  useEffect(() => {
+    updateBottomFade();
+  }, [availableModels, updateBottomFade]);
+
+  const sections = useMemo(() => {
+    const catalog = buildModelCatalog(availableModels);
+    const filteredEntries = filterModelCatalog(catalog, '');
+    return buildModelCatalogSections(filteredEntries);
+  }, [availableModels]);
 
   return (
     <div
       data-testid="settings-model-list-container"
-      className="border border-[var(--theme-border-secondary)] rounded-xl bg-[var(--theme-bg-input)]/30 overflow-hidden"
+      className="relative border border-[var(--theme-border-secondary)]/70 rounded-xl bg-[var(--theme-bg-input)]/30 overflow-hidden"
     >
-      <div className="max-h-[280px] overflow-y-auto custom-scrollbar p-1.5 space-y-2">
-        {sections.map((section) => (
-          <div key={section.key} className="space-y-1" data-provider-section={section.providerKey}>
-            {section.providerKey && (
-              <div className="px-2 pt-1 pb-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--theme-text-tertiary)]">
-                {t(getModelProviderSectionLabelKey(section.providerKey))}
-              </div>
-            )}
-            {section.entries.map((entry) => {
-              const isSelected =
-                entry.id === selectedModelId &&
-                (!selectedApiMode || !entry.model.apiMode || entry.model.apiMode === selectedApiMode);
-              const optionKey = entry.model.apiMode ? `${entry.model.apiMode}:${entry.id}` : entry.id;
-
-              return (
-                <button
-                  type="button"
-                  key={optionKey}
-                  data-testid={`settings-model-option-${entry.id}`}
-                  onPointerDown={(event) => {
-                    event.preventDefault();
-                  }}
-                  onClick={() => onSelectModel(entry.id, entry.model.apiMode)}
-                  className={`w-full flex items-start gap-3 px-3 py-2.5 text-sm rounded-xl border transition-colors text-left ${
-                    isSelected
-                      ? 'bg-[var(--theme-bg-accent)]/10 border-[var(--theme-border-focus)] text-[var(--theme-text-primary)]'
-                      : 'border-transparent text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-tertiary)]/50 hover:border-[var(--theme-border-secondary)] hover:text-[var(--theme-text-primary)]'
-                  }`}
-                >
-                  <div
-                    className={`flex-shrink-0 mt-0.5 ${isSelected ? 'text-[var(--theme-text-link)]' : 'opacity-70'}`}
-                  >
-                    {getModelIcon(entry.model)}
-                  </div>
-                  <div className="flex-grow min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`font-medium truncate ${isSelected ? 'text-[var(--theme-text-link)]' : ''}`}>
-                        {entry.name}
-                      </span>
-                    </div>
-                    <div className="text-xs text-[var(--theme-text-tertiary)] font-mono truncate opacity-70">
-                      {entry.id}
-                    </div>
-                  </div>
-
-                  <div className="flex-shrink-0 ml-2">
-                    {isSelected && (
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--theme-bg-accent)] text-[var(--theme-text-accent)] text-xs font-bold shadow-sm border border-transparent">
-                        <Check size={11} strokeWidth={3} />
-                        <span>{t('settingsActiveModel')}</span>
-                      </div>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        ))}
+      <div
+        ref={scrollRef}
+        onScroll={updateBottomFade}
+        className="max-h-[340px] overflow-y-auto custom-scrollbar overscroll-contain p-2 space-y-2.5"
+      >
+        <ModelCatalogList
+          sections={sections}
+          variant="settings"
+          renderModelIcon={getModelIcon}
+          activeBadgeLabel={activeBadgeLabel}
+          isEntrySelected={(entry) =>
+            entry.id === selectedModelId &&
+            (!selectedApiMode || !entry.model.apiMode || entry.model.apiMode === selectedApiMode)
+          }
+          onSelectEntry={(entry) => onSelectModel(entry.id, entry.model.apiMode)}
+        />
         {availableModels.length === 0 && (
-          <div className="p-4 text-center text-xs text-[var(--theme-text-tertiary)] italic">
+          <div className="p-4 text-center text-xs text-[var(--theme-text-secondary)] italic">
             {t('chatBehaviorModelNoModels')}
           </div>
         )}
         {availableModels.length > 0 && sections.length === 0 && (
-          <div className="p-4 text-center text-xs text-[var(--theme-text-tertiary)] italic">
+          <div className="p-4 text-center text-xs text-[var(--theme-text-secondary)] italic">
             {t('modelPickerNoResults')}
           </div>
         )}
       </div>
-      {extraContent && <div className="border-t border-[var(--theme-border-secondary)] p-3">{extraContent}</div>}
+      {showBottomFade && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-8 rounded-b-xl bg-gradient-to-t from-[var(--theme-bg-primary)] via-[var(--theme-bg-primary)]/60 to-transparent"
+        />
+      )}
     </div>
   );
 };

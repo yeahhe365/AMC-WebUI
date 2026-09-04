@@ -1,5 +1,5 @@
+import { GEMINI_PROVIDER_ID, type ChatToolId, type ChatToolSettingKey } from '@/types';
 import type { ModelCapabilities } from '@/utils/model/modelCapabilities';
-import type { ChatToolId, ChatToolSettingKey } from '@/types/chatTools';
 
 type ChatToolSurface = 'tools-menu' | 'slash-command';
 
@@ -23,9 +23,19 @@ export interface ChatToolAvailabilityContext {
   surface: ChatToolSurface;
   capabilities: ModelCapabilities;
   hasLocalPythonHandler?: boolean;
+  /**
+   * Active session routing. The Gemini built-in tools below only exist on the
+   * Gemini-native API — third-party providers never read these settings — so
+   * the menu/slash surfaces must not offer them when the session routes
+   * elsewhere. Undefined means the Gemini-native route.
+   */
+  providerId?: string;
 }
 
 const isToolsMenu = (context: ChatToolAvailabilityContext) => context.surface === 'tools-menu';
+
+const isGeminiNativeRoute = (context: ChatToolAvailabilityContext): boolean =>
+  context.providerId === undefined || context.providerId === GEMINI_PROVIDER_ID;
 
 const CHAT_TOOL_REGISTRY: ChatToolDefinition[] = [
   {
@@ -35,7 +45,7 @@ const CHAT_TOOL_REGISTRY: ChatToolDefinition[] = [
     icon: 'telescope',
     settingKey: 'isDeepSearchEnabled',
     slashCommand: { name: 'deep', descriptionKey: 'helpCmdDeep', icon: 'deep' },
-    isAvailable: ({ capabilities }) => capabilities.permissions.canUseDeepSearch,
+    isAvailable: (context) => isGeminiNativeRoute(context) && context.capabilities.permissions.canUseDeepSearch,
   },
   {
     id: 'googleSearch',
@@ -45,7 +55,9 @@ const CHAT_TOOL_REGISTRY: ChatToolDefinition[] = [
     settingKey: 'isGoogleSearchEnabled',
     slashCommand: { name: 'online', descriptionKey: 'helpCmdSearch', icon: 'search' },
     isAvailable: (context) =>
+      isGeminiNativeRoute(context) &&
       context.capabilities.permissions.canUseGoogleSearch &&
+      // Live models get the dedicated WebSearchToggle button instead.
       (!isToolsMenu(context) || !context.capabilities.permissions.canUseLiveControls),
   },
   {
@@ -56,8 +68,10 @@ const CHAT_TOOL_REGISTRY: ChatToolDefinition[] = [
     settingKey: 'isGoogleMapsEnabled',
     slashCommand: { name: 'maps', descriptionKey: 'helpCmdMaps', icon: 'maps' },
     isAvailable: (context) =>
+      isGeminiNativeRoute(context) &&
       context.capabilities.permissions.canUseGoogleMaps &&
-      (!isToolsMenu(context) || !context.capabilities.permissions.canUseLiveControls),
+      // The Live API never sends the Maps tool, so the toggle would be dead there.
+      !context.capabilities.permissions.canUseLiveControls,
   },
   {
     id: 'codeExecution',
@@ -66,7 +80,7 @@ const CHAT_TOOL_REGISTRY: ChatToolDefinition[] = [
     icon: 'terminal',
     settingKey: 'isCodeExecutionEnabled',
     slashCommand: { name: 'code', descriptionKey: 'helpCmdCode', icon: 'code' },
-    isAvailable: ({ capabilities }) => capabilities.permissions.canUseCodeExecution,
+    isAvailable: (context) => isGeminiNativeRoute(context) && context.capabilities.permissions.canUseCodeExecution,
   },
   {
     id: 'localPython',
@@ -74,7 +88,10 @@ const CHAT_TOOL_REGISTRY: ChatToolDefinition[] = [
     shortLabelKey: 'localPythonShort',
     icon: 'python',
     settingKey: 'isLocalPythonEnabled',
-    isAvailable: (context) => context.capabilities.permissions.canUseLocalPython && !!context.hasLocalPythonHandler,
+    isAvailable: (context) =>
+      isGeminiNativeRoute(context) &&
+      context.capabilities.permissions.canUseLocalPython &&
+      !!context.hasLocalPythonHandler,
   },
   {
     id: 'urlContext',
@@ -83,7 +100,7 @@ const CHAT_TOOL_REGISTRY: ChatToolDefinition[] = [
     icon: 'link',
     settingKey: 'isUrlContextEnabled',
     slashCommand: { name: 'url', descriptionKey: 'helpCmdUrl', icon: 'url' },
-    isAvailable: ({ capabilities }) => capabilities.permissions.canUseUrlContext,
+    isAvailable: (context) => isGeminiNativeRoute(context) && context.capabilities.permissions.canUseUrlContext,
   },
   {
     id: 'alwaysKeepThinking',
@@ -92,13 +109,18 @@ const CHAT_TOOL_REGISTRY: ChatToolDefinition[] = [
     icon: 'brain',
     settingKey: 'alwaysKeepThinkingInContext',
     isAvailable: ({ capabilities }) =>
-      !capabilities.isNativeAudioModel && !capabilities.isTtsModel && !capabilities.isImageGenerationModel,
+      !capabilities.isNativeAudioModel &&
+      !capabilities.isTtsModel &&
+      !capabilities.isImageGenerationModel &&
+      !capabilities.isTranscribeModel,
   },
   {
     id: 'tokenCount',
     labelKey: 'toolsTokenCountLabel',
     icon: 'calculator',
-    isAvailable: ({ capabilities }) => capabilities.permissions.canUseTokenCount,
+    // The token-count modal always targets the Gemini countTokens endpoint and
+    // the Gemini model list, so it would mislead on third-party sessions.
+    isAvailable: (context) => isGeminiNativeRoute(context) && context.capabilities.permissions.canUseTokenCount,
   },
 ];
 

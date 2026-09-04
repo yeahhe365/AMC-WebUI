@@ -99,7 +99,8 @@ export const ToolbarContainer = forwardRef<HTMLDivElement, ToolbarContainerProps
     return createPortal(
       <div
         ref={handleRef}
-        className={`fixed ${Z_INDEX_TOPMOST_OVERLAY} flex max-w-[calc(100vw-20px)] items-center gap-0 overflow-x-auto rounded-full border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-secondary)] p-px shadow-lg pointer-events-auto no-scrollbar`}
+        className={`fixed ${Z_INDEX_TOPMOST_OVERLAY} flex max-w-[calc(100vw-20px)] items-center gap-0 overflow-x-auto rounded-full border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-secondary)] p-px shadow-lg pointer-events-auto no-scrollbar select-none`}
+        onMouseUp={(event) => event.stopPropagation()}
         style={{
           top: renderPosition.top,
           left: renderPosition.left,

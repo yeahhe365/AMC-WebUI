@@ -24,6 +24,13 @@ describe('themeRegistry', () => {
     expect(graphite?.colors.textPrimary).toBe('#f2f2f4');
   });
 
+  it('provides a strong warning surface for solid warning buttons in every theme', () => {
+    for (const theme of AVAILABLE_THEMES) {
+      expect(theme.colors.bgWarningStrong, theme.id).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(theme.colors.bgWarningStrongHover, theme.id).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+  });
+
   it('keeps graphite core surfaces near-neutral gray instead of blue gray', () => {
     const graphite = AVAILABLE_THEMES.find((theme) => theme.id === 'graphite');
 

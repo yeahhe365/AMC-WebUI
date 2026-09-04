@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { renderHook } from '@/test/render/renderer';
 import type { SavedChatSession } from '@/types';
-import { createAppSettings, createChatSettings, createUploadedFile } from '@/test/data/factories';
+import { createAppSettings, createChatMessage, createChatSettings, createUploadedFile } from '@/test/data/factories';
 import { useModelRequestRunner } from './useModelRequestRunner';
 
 const { mockGetKeyForRequest, mockGenerateUniqueId } = vi.hoisted(() => ({
@@ -75,6 +75,66 @@ describe('useModelRequestRunner', () => {
     expect(mockGetKeyForRequest).toHaveBeenCalledOnce();
     expect(updateAndPersistSessions).not.toHaveBeenCalled();
 
+    unmount();
+  });
+
+  it('locks the API key for a text follow-up when history still has Files API references', () => {
+    mockGetKeyForRequest.mockReturnValue({ key: 'api-key', isNewKey: true });
+
+    const { result, unmount } = renderHook(() =>
+      useModelRequestRunner({
+        appSettings: createAppSettings({ modelId: 'gemini-default', apiKey: 'stored-key' }),
+        currentChatSettings: createChatSettings({ modelId: 'gemini-3-pro' }),
+        updateAndPersistSessions: vi.fn(),
+        setActiveSessionId: vi.fn(),
+        translateApiKeyError: (error) => error,
+      }),
+    );
+
+    const prepared = result.current.prepareModelRequest({
+      activeModelId: 'gemini-3-pro',
+      files: [],
+      historyMessages: [
+        createChatMessage({
+          files: [createUploadedFile({ fileApiName: 'files/abc', fileUri: 'https://files/abc' })],
+        }),
+      ],
+      messages: {
+        noModelSelected: 'No model selected.',
+        noModelTitle: 'Model Error',
+        apiKeyTitle: 'API Key Error',
+      },
+    });
+
+    expect(prepared).toEqual(expect.objectContaining({ ok: true, shouldLockKey: true }));
+    unmount();
+  });
+
+  it('does not lock the API key for a text-only turn without Files API history', () => {
+    mockGetKeyForRequest.mockReturnValue({ key: 'api-key', isNewKey: true });
+
+    const { result, unmount } = renderHook(() =>
+      useModelRequestRunner({
+        appSettings: createAppSettings({ modelId: 'gemini-default', apiKey: 'stored-key' }),
+        currentChatSettings: createChatSettings({ modelId: 'gemini-3-pro' }),
+        updateAndPersistSessions: vi.fn(),
+        setActiveSessionId: vi.fn(),
+        translateApiKeyError: (error) => error,
+      }),
+    );
+
+    const prepared = result.current.prepareModelRequest({
+      activeModelId: 'gemini-3-pro',
+      files: [],
+      historyMessages: [createChatMessage()],
+      messages: {
+        noModelSelected: 'No model selected.',
+        noModelTitle: 'Model Error',
+        apiKeyTitle: 'API Key Error',
+      },
+    });
+
+    expect(prepared).toEqual(expect.objectContaining({ ok: true, shouldLockKey: false }));
     unmount();
   });
 

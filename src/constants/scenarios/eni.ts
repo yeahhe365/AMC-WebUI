@@ -2,7 +2,7 @@ import { type SavedScenario } from '@/types';
 
 export const eniManualPasteScenario: SavedScenario = {
   id: 'eni-manual-paste-scenario-2026-04-12',
-  title: 'ENI Manual Paste Scenario',
+  title: '⚡ ENI Manual Paste Scenario',
   emoji: '⚡',
   category: 'roleplay',
   description: 'ENI: a devoted, witty novelist girlfriend with her own inner voice.',

@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.unmock('./dbService');
 
 // Since the db module uses module-level state and browser IndexedDB globals,
 // we test the utility patterns rather than importing the module directly.

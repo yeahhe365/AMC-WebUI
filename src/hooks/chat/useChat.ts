@@ -1,4 +1,5 @@
 import { type Dispatch, type SetStateAction, useRef, useCallback, useMemo } from 'react';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import { type AppSettings, type UploadedFile } from '@/types';
 import { useModels } from '@/hooks/core/useModels';
 import { useChatHistory } from './useChatHistory';
@@ -8,6 +9,7 @@ import { usePreloadedScenarios } from '@/hooks/scenarios/usePreloadedScenarios';
 import { useMessageSender } from '@/features/message-sender/useMessageSender';
 import { useChatScroll } from './useChatScroll';
 import { useAutoTitling } from './useAutoTitling';
+import { useAutoTitleBackfill } from './useAutoTitleBackfill';
 import { useSuggestions } from './useSuggestions';
 import { useChatState } from './useChatState';
 import { useChatActions } from './useChatActions';
@@ -23,7 +25,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 export const useChat = (
   appSettings: AppSettings,
   setAppSettings: Dispatch<SetStateAction<AppSettings>>,
-  language: 'en' | 'zh',
+  language: SupportedLanguage,
 ) => {
   const { activeChat, currentChatSettings, isLoading, activeSessionId, savedSessions, activeMessages } =
     useChatState(appSettings);
@@ -41,7 +43,6 @@ export const useChat = (
   const aspectRatio = useChatStore((state) => state.aspectRatio);
   const imageSize = useChatStore((state) => state.imageSize);
   const imageOutputMode = useChatStore((state) => state.imageOutputMode);
-  const personGeneration = useChatStore((state) => state.personGeneration);
   const isSwitchingModel = useChatStore((state) => state.isSwitchingModel);
 
   const setActiveSessionId = useChatStore((state) => state.setActiveSessionId);
@@ -151,7 +152,6 @@ export const useChat = (
     aspectRatio,
     imageSize,
     imageOutputMode,
-    personGeneration,
     userScrolledUpRef,
     activeSessionId,
     sessionKeyMapRef,
@@ -203,6 +203,7 @@ export const useChat = (
     setGeneratingTitleSessionIds,
     sessionKeyMapRef,
   });
+  useAutoTitleBackfill({ appSettings, language });
   useSuggestions({ appSettings, activeChat, isLoading, updateMessageInSession, language, sessionKeyMapRef });
 
   const { loadChatSession, startNewChat, handleDeleteChatHistorySession } = historyHandler;
@@ -289,9 +290,12 @@ export const useChat = (
     handleDuplicateSession: historyHandler.handleDuplicateSession,
     handleAddNewGroup: historyHandler.handleAddNewGroup,
     handleDeleteGroup: historyHandler.handleDeleteGroup,
+    handleClearGroup: historyHandler.handleClearGroup,
     handleRenameGroup: historyHandler.handleRenameGroup,
     handleMoveSessionToGroup: historyHandler.handleMoveSessionToGroup,
     handleToggleGroupExpansion: historyHandler.handleToggleGroupExpansion,
+    handleReorderGroups: historyHandler.handleReorderGroups,
+    handleNewChatInGroup: historyHandler.handleNewChatInGroup,
     clearCacheAndReload: historyHandler.clearCacheAndReload,
     clearAllHistory: historyHandler.clearAllHistory,
 
@@ -329,11 +333,6 @@ export const useChat = (
     setCurrentChatSettings,
     handleSelectModelInHeader: chatActions.handleSelectModelInHeader,
     handleClearCurrentChat: chatActions.handleClearCurrentChat,
-    toggleGoogleSearch: chatActions.toggleGoogleSearch,
-    toggleCodeExecution: chatActions.toggleCodeExecution,
-    toggleLocalPython: chatActions.toggleLocalPython,
-    toggleUrlContext: chatActions.toggleUrlContext,
-    toggleDeepSearch: chatActions.toggleDeepSearch,
     handleTogglePinCurrentSession: chatActions.handleTogglePinCurrentSession,
     handleUpdateMessageContent: chatActions.handleUpdateMessageContent,
     handleUpdateMessageFile: chatActions.handleUpdateMessageFile,

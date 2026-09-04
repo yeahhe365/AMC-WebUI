@@ -21,18 +21,6 @@ vi.mock('@google/genai', () => ({
   }),
 }));
 
-vi.mock('@/services/db/dbService', async () => {
-  const { createDbServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createDbServiceMockModule();
-});
-
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
 // ── getClient ──
 
 describe('getClient', () => {
@@ -129,6 +117,22 @@ describe('getConfiguredApiClient', () => {
       }),
     );
     // baseUrl should not be in the config
+    const callArgs = vi.mocked(GoogleGenAI).mock.calls[0][0] as MockGoogleGenAIConfig;
+    expect(callArgs.httpOptions?.baseUrl).toBeUndefined();
+  });
+
+  it('bypasses custom proxy and upstream header when directGoogleApi routingOverride is true', async () => {
+    vi.mocked(dbService.getAppSettings).mockResolvedValue({
+      useCustomApiConfig: true,
+      useApiProxy: true,
+      apiProxyUrl: 'https://proxy.example.com',
+    } as StoredAppSettings);
+    await getConfiguredApiClient('key', undefined, { directGoogleApi: true });
+    expect(GoogleGenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        apiKey: 'key',
+      }),
+    );
     const callArgs = vi.mocked(GoogleGenAI).mock.calls[0][0] as MockGoogleGenAIConfig;
     expect(callArgs.httpOptions?.baseUrl).toBeUndefined();
   });

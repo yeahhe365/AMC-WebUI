@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+vi.unmock('./dbService');
 
 const DB_NAME = 'AllModelChatDB';
 const DB_VERSION = 5;

@@ -343,21 +343,32 @@ describe('useDataImport', () => {
     });
 
     expect(didImportSettings).toBe(true);
-    expect(importedSettings.isOpenAICompatibleApiEnabled).toBe(true);
-    // Legacy 'openai-compatible' apiMode is normalized to 'gemini-native' on import
-    // (third-party mode replaced it; enable via isThirdPartyApiEnabled instead).
-    expect(importedSettings.apiMode).toBe('gemini-native');
-    expect(importedSettings.openaiCompatibleApiKey).toBe('openai-key');
-    expect(importedSettings.openaiCompatibleBaseUrl).toBe('https://openai-compatible.example.com/v1');
-    expect(importedSettings.openaiCompatibleModelId).toBe('custom-model');
-    expect(importedSettings.openaiCompatibleModels).toEqual([
-      {
-        id: 'custom-model',
-        name: 'Custom Model',
-        isPinned: true,
-        apiMode: 'openai-compatible',
-      },
-    ]);
+    // Legacy openaiCompatible* fields fold into thirdPartyApi.providers.openai on import.
+    expect(importedSettings.thirdPartyApi.connections.find((connection) => connection.id === 'openai')?.apiKey).toBe(
+      'openai-key',
+    );
+    expect(importedSettings.thirdPartyApi.connections.find((connection) => connection.id === 'openai')?.baseUrl).toBe(
+      'https://openai-compatible.example.com/v1',
+    );
+    expect(importedSettings.thirdPartyApi.connections.find((connection) => connection.id === 'openai')?.modelId).toBe(
+      'custom-model',
+    );
+    expect(importedSettings.thirdPartyApi.connections.find((connection) => connection.id === 'openai')?.models).toEqual(
+      [
+        {
+          id: 'custom-model',
+          name: 'Custom Model',
+          isPinned: true,
+          // The legacy 'openai-compatible' model tag is normalized to
+          // 'third-party' during sanitize (normalizeModelApiModeTag).
+          apiMode: 'third-party',
+        },
+      ],
+    );
+    // Legacy 'openai-compatible' apiMode is no longer part of the settings
+    // shape; routing derives from (providerId, modelId) so the import falls
+    // back to gemini-native.
+    expect(importedSettings.providerId).toBe('gemini-native');
     expect(importedSettings.translationTargetLanguage).toBe('Japanese');
     expect(importedSettings.inputTranslationModelId).toBe('gemini-input-translation');
     expect(importedSettings.thoughtTranslationTargetLanguage).toBe('Korean');

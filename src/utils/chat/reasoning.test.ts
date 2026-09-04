@@ -57,9 +57,33 @@ describe('extractRawThinkingBlocks', () => {
     });
   });
 
+  it('extracts the short <think> variant with its own closer', () => {
+    expect(extractRawThinkingBlocks('<think>Plan carefully.</think>\nFinal answer.')).toEqual({
+      content: 'Final answer.',
+      thoughts: 'Plan carefully.',
+      hasOpenThinkingBlock: false,
+    });
+  });
+
+  it('extracts a long opener closed by a short closer', () => {
+    expect(extractRawThinkingBlocks('<thinking>Plan.</think>Final.')).toEqual({
+      content: 'Final.',
+      thoughts: 'Plan.',
+      hasOpenThinkingBlock: false,
+    });
+  });
+
   it('treats an unclosed thinking block as live raw thoughts', () => {
     expect(extractRawThinkingBlocks('<thinking>Drafting the answer')).toEqual({
       content: '',
+      thoughts: 'Drafting the answer',
+      hasOpenThinkingBlock: true,
+    });
+  });
+
+  it('treats an unclosed short <think> block as live raw thoughts', () => {
+    expect(extractRawThinkingBlocks('Intro <think>Drafting the answer')).toEqual({
+      content: 'Intro',
       thoughts: 'Drafting the answer',
       hasOpenThinkingBlock: true,
     });
@@ -72,5 +96,19 @@ describe('extractRawThinkingBlocks', () => {
       content: markdown,
       hasOpenThinkingBlock: false,
     });
+  });
+});
+
+describe('renderable reasoning markup helpers — <think> variant', () => {
+  it('wraps short <think> blocks into collapsible details', () => {
+    const wrapped = wrapReasoningMarkup('<think>Plan.</think>\nFinal.', false, 'Reasoning');
+
+    expect(wrapped).toContain('<details>');
+    expect(wrapped).toContain('Plan.');
+    expect(wrapped).toContain('Final.');
+  });
+
+  it('strips short <think> blocks from content while preserving plain text', () => {
+    expect(stripReasoningMarkup('<think>Hidden.</think>Visible.')).toBe('Visible.');
   });
 });

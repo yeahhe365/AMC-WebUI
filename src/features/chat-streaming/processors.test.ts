@@ -111,4 +111,135 @@ describe('finalizeMessages', () => {
       'model-message',
     ]);
   });
+
+  it('does not write thinkingTimeMs for replies without thoughts', () => {
+    const generationStartTime = new Date('2026-04-25T01:00:00.000Z');
+    const { updatedMessages } = finalizeMessages({
+      messages: [
+        {
+          id: 'model-message',
+          role: 'model',
+          content: 'Plain answer without reasoning.',
+          timestamp: generationStartTime,
+          generationStartTime,
+          isLoading: true,
+        },
+      ],
+      generationStartTime,
+      newModelMessageIds: new Set(['model-message']),
+      currentChatSettings: createChatSettings(),
+      language: 'zh',
+      firstContentPartTime: new Date('2026-04-25T01:00:01.000Z'),
+    });
+
+    expect(updatedMessages[0]?.thinkingTimeMs).toBeUndefined();
+  });
+
+  it('falls back to total run time for a thoughts-only message with no content part', () => {
+    const generationStartTime = new Date('2026-04-25T01:00:00.000Z');
+    const { updatedMessages } = finalizeMessages({
+      messages: [
+        {
+          id: 'model-message',
+          role: 'model',
+          content: '',
+          thoughts: 'Only reasoning.',
+          timestamp: generationStartTime,
+          generationStartTime,
+          isLoading: true,
+        },
+      ],
+      generationStartTime,
+      newModelMessageIds: new Set(['model-message']),
+      currentChatSettings: createChatSettings(),
+      language: 'zh',
+      firstContentPartTime: null,
+    });
+
+    expect(updatedMessages[0]?.thinkingTimeMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('prefers the last thought chunk over the first content part when both exist', () => {
+    const generationStartTime = new Date('2026-04-25T01:00:00.000Z');
+    const { updatedMessages } = finalizeMessages({
+      messages: [
+        {
+          id: 'model-message',
+          role: 'model',
+          content: 'Answer.',
+          thoughts: 'Thought after interleaved code execution.',
+          timestamp: generationStartTime,
+          generationStartTime,
+          isLoading: true,
+        },
+      ],
+      generationStartTime,
+      newModelMessageIds: new Set(['model-message']),
+      currentChatSettings: createChatSettings(),
+      language: 'zh',
+      firstContentPartTime: new Date('2026-04-25T01:00:02.000Z'),
+      lastThoughtChunkTimeMs: 4200,
+    });
+
+    expect(updatedMessages[0]?.thinkingTimeMs).toBe(4200);
+  });
+
+  it('keeps a thinking time committed mid-stream instead of overwriting it at finalize', () => {
+    const generationStartTime = new Date('2026-04-25T01:00:00.000Z');
+    const { updatedMessages } = finalizeMessages({
+      messages: [
+        {
+          id: 'model-message',
+          role: 'model',
+          content: 'Answer.',
+          thoughts: 'Reasoning.',
+          timestamp: generationStartTime,
+          generationStartTime,
+          isLoading: true,
+          thinkingTimeMs: 1200,
+        },
+      ],
+      generationStartTime,
+      newModelMessageIds: new Set(['model-message']),
+      currentChatSettings: createChatSettings(),
+      language: 'zh',
+      firstContentPartTime: new Date('2026-04-25T01:00:01.000Z'),
+      lastThoughtChunkTimeMs: 3500,
+    });
+
+    expect(updatedMessages[0]?.thinkingTimeMs).toBe(1200);
+  });
+
+  it('does not prune empty model messages from other runs when finalizing this one', () => {
+    const generationStartTime = new Date('2026-04-25T01:00:00.000Z');
+    const otherRunTime = new Date('2026-04-25T00:30:00.000Z');
+    const { updatedMessages } = finalizeMessages({
+      messages: [
+        {
+          id: 'other-empty-model',
+          role: 'model',
+          content: '',
+          timestamp: otherRunTime,
+          generationStartTime: otherRunTime,
+        },
+        {
+          id: 'model-message',
+          role: 'model',
+          content: 'Fresh answer.',
+          timestamp: generationStartTime,
+          generationStartTime,
+          isLoading: true,
+        },
+      ],
+      generationStartTime,
+      newModelMessageIds: new Set(['model-message']),
+      currentChatSettings: createChatSettings(),
+      language: 'zh',
+      firstContentPartTime: generationStartTime,
+    });
+
+    // The empty model message from the earlier run must survive — the cleanup
+    // only owns the messages finalized by THIS run.
+    expect(updatedMessages.map((message) => message.id)).toEqual(['other-empty-model', 'model-message']);
+  });
 });

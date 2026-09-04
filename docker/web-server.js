@@ -14,7 +14,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = Number(process.env.PORT || 80);
-const ROOT = process.env.WEB_ROOT || '/usr/share/nginx/html';
+const ROOT = process.env.WEB_ROOT || '/app/public';
 const API_UPSTREAM = process.env.API_UPSTREAM || 'http://api:3001';
 const LIVE_WS_PATH = '/api/live';
 

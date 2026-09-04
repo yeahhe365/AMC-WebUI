@@ -3,7 +3,7 @@ import { useI18n } from '@/contexts/I18nContext';
 import { type AppSettings, type ChatSettings, type ModelOption } from '@/types';
 import { Modal } from '@/components/shared/Modal';
 import { ConfirmationModal } from '@/components/modals/ConfirmationModal';
-import { useSettingsLogic } from '@/hooks/settings/useSettingsLogic';
+import { useSettingsLogic, ANCHOR_SCROLL_LOCK_MS } from '@/hooks/settings/useSettingsLogic';
 import { SettingsSidebar } from './SettingsSidebar';
 import { SettingsContent } from './SettingsContent';
 import { SettingsSearchResults } from './SettingsSearchResults';
@@ -22,8 +22,25 @@ import {
   SETTINGS_SEGMENTED_TRACK_CLASS,
 } from '@/constants/designTokens';
 import { MODAL_CLOSE_BUTTON_CLASS } from '@/constants/buttonClasses';
-import type { SettingsTab } from '@/stores/settingsUiStore';
+import { type SettingsTab, useSettingsUiStore } from '@/stores/settingsUiStore';
+import { SETTINGS_SEARCH_RESULTS_ID, settingsSearchOptionId } from '@/constants/settingsSearchCatalog';
 import { searchSettingsCatalog, type SettingsSearchResult } from '@/utils/settingsSearch';
+import { interpolate } from '@/i18n/interpolate';
+import { isEditableElement } from '@/utils/chat-input/focus';
+
+const ADVANCED_SETTINGS_ITEM_IDS = new Set([
+  'models-advanced',
+  'models-top-k',
+  'models-max-output-tokens',
+  'models-stop-sequences',
+  'models-presence-penalty',
+  'models-frequency-penalty',
+  'models-seed',
+  'models-media-resolution',
+  'models-raw-mode',
+  'models-hide-thinking',
+  'models-always-keep-thinking',
+]);
 
 const SETTINGS_FOCUS_HIGHLIGHT_CLASSES = [
   'ring-2',
@@ -150,6 +167,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     closeConfirm,
     scrollContainerRef,
     handleContentScroll,
+    beginAnchorScroll,
+    saveActiveScrollPosition,
     handleResetToDefaults,
     handleClearLogs,
     handleRequestClearHistory,
@@ -176,6 +195,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [searchSelectedIndex, setSearchSelectedIndex] = useState(0);
 
   const searchResults = useMemo(() => searchSettingsCatalog(searchQuery, t), [searchQuery, t]);
+  // Results can shrink without a query change (language switch recomputes
+  // matches), so clamp the selection instead of indexing past the end.
+  const clampedSearchSelectedIndex = Math.min(searchSelectedIndex, Math.max(searchResults.length - 1, 0));
+  const activeSearchOptionId = searchResults.length > 0 ? settingsSearchOptionId(clampedSearchSelectedIndex) : null;
 
   useEffect(() => {
     setSearchSelectedIndex(0);
@@ -191,6 +214,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSelectSearchResult = useCallback(
     (result: SettingsSearchResult) => {
+      if (ADVANCED_SETTINGS_ITEM_IDS.has(result.id)) {
+        useSettingsUiStore.getState().setIsAdvancedModeEnabled(true);
+      }
       setPendingFocusId(result.id);
       setSearchQuery('');
       setActiveTab(result.tab);
@@ -201,14 +227,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    const isEditableTarget = (target: EventTarget | null) => {
-      if (!(target instanceof HTMLElement)) return false;
-      const tag = target.tagName;
-      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
-    };
-
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      // IME composition (e.g. pinyin): keystrokes belong to the composition,
+      // not to result navigation — Enter confirms the candidate instead.
+      if (event.isComposing) return;
 
       if (isSearching && searchResults.length > 0) {
         if (event.key === 'ArrowDown') {
@@ -222,7 +245,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           return;
         }
         if (event.key === 'Enter') {
-          const selected = searchResults[searchSelectedIndex];
+          const selected = searchResults[clampedSearchSelectedIndex];
           if (selected) {
             event.preventDefault();
             handleSelectSearchResult(selected);
@@ -231,7 +254,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }
       }
 
-      if (event.key !== '/' || isEditableTarget(event.target)) return;
+      if (event.key !== '/' || (event.target instanceof HTMLElement && isEditableElement(event.target))) return;
       event.preventDefault();
       searchInputRef.current?.focus();
       searchInputRef.current?.select();
@@ -239,7 +262,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [handleSelectSearchResult, isOpen, isSearching, searchResults, searchSelectedIndex]);
+  }, [clampedSearchSelectedIndex, handleSelectSearchResult, isOpen, isSearching, searchResults]);
+
+  // While searching, Escape clears the query before the Modal's own
+  // document-level close handler can run — the capture listener wins the
+  // race regardless of where focus sits.
+  useEffect(() => {
+    if (!isOpen || !isSearching) return undefined;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.isComposing) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setSearchQuery('');
+    };
+
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, [isOpen, isSearching]);
 
   useEffect(() => {
     if (!activeTabUsesScope && settingsScope !== 'defaults') {
@@ -253,6 +293,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
 
     let highlightTimer: number | undefined;
+    let scrollSaveTimer: number | undefined;
+    // The anchor scroll owns the scroll container while it animates (see
+    // ANCHOR_SCROLL_LOCK_MS): without the lock, saving the per-tab scroll
+    // position mid-animation cancels the smooth scroll and the highlighted
+    // row stays off-screen.
+    beginAnchorScroll();
     const frame = window.requestAnimationFrame(() => {
       const container = scrollContainerRef.current;
       if (!container) {
@@ -270,6 +316,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         highlightTimer = window.setTimeout(() => {
           target.classList.remove(...SETTINGS_FOCUS_HIGHLIGHT_CLASSES);
         }, 1600);
+        scrollSaveTimer = window.setTimeout(() => {
+          saveActiveScrollPosition();
+        }, ANCHOR_SCROLL_LOCK_MS);
       }
 
       setPendingFocusId(null);
@@ -280,8 +329,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       if (highlightTimer !== undefined) {
         window.clearTimeout(highlightTimer);
       }
+      if (scrollSaveTimer !== undefined) {
+        window.clearTimeout(scrollSaveTimer);
+      }
     };
-  }, [pendingFocusId, isSearching, isOpen, activeTab, scrollContainerRef]);
+  }, [pendingFocusId, isSearching, isOpen, activeTab, scrollContainerRef, beginAnchorScroll, saveActiveScrollPosition]);
 
   if (!isOpen) return null;
 
@@ -294,7 +346,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         enterAnimationClassName=""
         ariaLabel={t('settingsTitle')}
         contentClassName="w-full h-[100dvh] sm:h-[85vh] sm:max-h-[800px] sm:w-[90vw] max-w-6xl sm:rounded-xl overflow-hidden flex flex-col md:flex-row shadow-2xl bg-[var(--theme-bg-primary)] transition-all"
-        initialFocusRef={activeTabRef}
+        initialFocusRef={searchInputRef}
       >
         <SettingsSidebar
           tabs={tabs}
@@ -305,6 +357,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           searchInputRef={searchInputRef}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
+          resultsCount={searchResults.length}
+          searchExpanded={isSearching}
+          searchResultsId={SETTINGS_SEARCH_RESULTS_ID}
+          searchActiveOptionId={activeSearchOptionId}
         />
 
         <main className="flex-1 flex flex-col min-w-0 bg-[var(--theme-bg-primary)] relative overflow-hidden">
@@ -315,9 +371,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           >
             <div className="max-w-3xl mx-auto w-full pb-4 md:pb-6 md:min-h-[48px] flex flex-col justify-center">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="hidden md:block text-xl font-semibold text-[var(--theme-text-primary)] min-w-0 truncate">
-                  {isSearching ? t('settingsSearchAria') : activeTabLabelKey ? t(activeTabLabelKey) : ''}
+                <h2
+                  className={`${isSearching ? 'block' : 'hidden md:block'} text-xl font-semibold text-[var(--theme-text-primary)] min-w-0 truncate`}
+                >
+                  {isSearching ? t('settingsSearchResultsTitle') : activeTabLabelKey ? t(activeTabLabelKey) : ''}
                 </h2>
+                {isSearching && (
+                  <span
+                    data-settings-search-count
+                    className="md:hidden flex-shrink-0 text-xs font-medium text-[var(--theme-text-secondary)]"
+                  >
+                    {interpolate(t('settingsSearchResultsCount'), { count: searchResults.length })}
+                  </span>
+                )}
                 <div className="flex items-center gap-2 sm:gap-3 ml-auto">
                   {activeTabUsesScope && (
                     <div
@@ -365,7 +431,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <SettingsSearchResults
                   results={searchResults}
                   onSelect={handleSelectSearchResult}
-                  selectedIndex={searchSelectedIndex}
+                  selectedIndex={clampedSearchSelectedIndex}
+                  query={searchQuery}
                 />
               </div>
             ) : (
@@ -393,6 +460,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onExportHistory={settingsTransferActions.onExportHistory}
                 onImportScenarios={onImportScenarios}
                 onExportScenarios={onExportScenarios}
+                activeModelBadgeLabel={
+                  activeTabUsesScope && visibleScope === 'defaults' ? t('settingsDefaultModelBadge') : undefined
+                }
               />
             )}
           </div>

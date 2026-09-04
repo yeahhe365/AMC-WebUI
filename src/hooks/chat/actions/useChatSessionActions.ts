@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { type ChatSettings as IndividualChatSettings, type SavedChatSession, type UploadedFile } from '@/types';
+import { type SavedChatSession, type UploadedFile } from '@/types';
 import { cleanupFilePreviewUrls } from '@/utils/file/filePreviewUrls';
 import { updateSessionById } from '@/utils/chat/sessionMutations';
 
@@ -10,7 +10,6 @@ interface UseChatSessionActionsProps {
     updater: (prev: SavedChatSession[]) => SavedChatSession[],
     options?: { persist?: boolean },
   ) => void;
-  setCurrentChatSettings: (updater: (prevSettings: IndividualChatSettings) => IndividualChatSettings) => void;
   setSelectedFiles: (files: UploadedFile[]) => void;
   handleStopGenerating: () => void;
   startNewChat: () => void;
@@ -21,7 +20,6 @@ export const useChatSessionActions = ({
   activeSessionId,
   isLoading,
   updateAndPersistSessions,
-  setCurrentChatSettings,
   setSelectedFiles,
   handleStopGenerating,
   startNewChat,
@@ -38,6 +36,7 @@ export const useChatSessionActions = ({
             ...session,
             messages: [],
             title: 'New Chat',
+            titleSource: 'default',
             timestamp: Date.now(),
             // Resetting lockedApiKey is crucial to allow using new global settings
             settings: { ...session.settings, lockedApiKey: null },
@@ -56,53 +55,8 @@ export const useChatSessionActions = ({
     }
   }, [activeSessionId, handleTogglePinSession]);
 
-  const toggleGoogleSearch = useCallback(() => {
-    if (!activeSessionId) return;
-    if (isLoading) handleStopGenerating();
-    setCurrentChatSettings((prev) => ({ ...prev, isGoogleSearchEnabled: !prev.isGoogleSearchEnabled }));
-  }, [activeSessionId, isLoading, setCurrentChatSettings, handleStopGenerating]);
-
-  const toggleCodeExecution = useCallback(() => {
-    if (!activeSessionId) return;
-    if (isLoading) handleStopGenerating();
-    // Mutually exclusive: Disable Local Python if enabling Server Code Execution
-    setCurrentChatSettings((prev) => ({
-      ...prev,
-      isCodeExecutionEnabled: !prev.isCodeExecutionEnabled,
-      isLocalPythonEnabled: !prev.isCodeExecutionEnabled ? false : prev.isLocalPythonEnabled,
-    }));
-  }, [activeSessionId, isLoading, setCurrentChatSettings, handleStopGenerating]);
-
-  const toggleLocalPython = useCallback(() => {
-    if (!activeSessionId) return;
-    if (isLoading) handleStopGenerating();
-    // Mutually exclusive: Disable Server Code Execution if enabling Local Python
-    setCurrentChatSettings((prev) => ({
-      ...prev,
-      isLocalPythonEnabled: !prev.isLocalPythonEnabled,
-      isCodeExecutionEnabled: !prev.isLocalPythonEnabled ? false : prev.isCodeExecutionEnabled,
-    }));
-  }, [activeSessionId, isLoading, setCurrentChatSettings, handleStopGenerating]);
-
-  const toggleUrlContext = useCallback(() => {
-    if (!activeSessionId) return;
-    if (isLoading) handleStopGenerating();
-    setCurrentChatSettings((prev) => ({ ...prev, isUrlContextEnabled: !prev.isUrlContextEnabled }));
-  }, [activeSessionId, isLoading, setCurrentChatSettings, handleStopGenerating]);
-
-  const toggleDeepSearch = useCallback(() => {
-    if (!activeSessionId) return;
-    if (isLoading) handleStopGenerating();
-    setCurrentChatSettings((prev) => ({ ...prev, isDeepSearchEnabled: !prev.isDeepSearchEnabled }));
-  }, [activeSessionId, isLoading, setCurrentChatSettings, handleStopGenerating]);
-
   return {
     handleClearCurrentChat,
     handleTogglePinCurrentSession,
-    toggleGoogleSearch,
-    toggleCodeExecution,
-    toggleLocalPython,
-    toggleUrlContext,
-    toggleDeepSearch,
   };
 };

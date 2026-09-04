@@ -1,7 +1,8 @@
-import React, { useState, useRef, useMemo, useId } from 'react';
+import React, { useMemo, useId, useRef } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
 import { useClickOutside } from '@/hooks/useClickOutside';
 import { useI18n } from '@/contexts/I18nContext';
+import { useListboxNavigation } from '@/hooks/ui/useListboxNavigation';
 
 interface SelectProps {
   id?: string;
@@ -48,23 +49,7 @@ export const Select: React.FC<SelectProps> = ({
 }) => {
   const { t } = useI18n();
   const listboxId = useId();
-  const [isOpen, setIsOpen] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const isOpenRef = useRef(false);
-  const activeIndexRef = useRef(-1);
   const wrapperRef = useRef<HTMLDivElement>(null);
-
-  const setOpenState = (nextIsOpen: boolean) => {
-    isOpenRef.current = nextIsOpen;
-    setIsOpen(nextIsOpen);
-  };
-
-  const setActiveOptionIndex = (nextIndex: number) => {
-    activeIndexRef.current = nextIndex;
-    setActiveIndex(nextIndex);
-  };
-
-  useClickOutside(wrapperRef, () => setOpenState(false), isOpen);
 
   const options = useMemo<SelectOption[]>(() => {
     return React.Children.toArray(children).flatMap((child) => {
@@ -106,89 +91,45 @@ export const Select: React.FC<SelectProps> = ({
     return findEnabledIndex(0);
   };
 
-  const openWithInitialActiveOption = () => {
-    setActiveOptionIndex(getInitialActiveIndex());
-    setOpenState(true);
-  };
-
-  const closeSelect = () => {
-    setOpenState(false);
-  };
-
   const handleSelect = (selectedValue: string) => {
     onChange({ target: { value: selectedValue } });
-    closeSelect();
+    navigation.close();
   };
+
+  const navigation = useListboxNavigation({
+    getInitialActiveIndex,
+    getRelativeActiveIndex: (currentIndex, directionStep) => {
+      const baseIndex = currentIndex >= 0 ? currentIndex : getInitialActiveIndex();
+      return findEnabledIndex(baseIndex + directionStep, directionStep);
+    },
+    getFirstActiveIndex: () => findEnabledIndex(0),
+    getLastActiveIndex: () => findEnabledIndex(options.length - 1, -1),
+    onSelectActiveIndex: (index) => {
+      const option = options[index];
+      if (option && !option.disabled) {
+        handleSelect(option.value);
+      }
+    },
+  });
+
+  const { isOpen, activeIndex } = navigation;
+
+  useClickOutside(wrapperRef, () => navigation.close(), isOpen);
 
   const handleToggle = () => {
     if (disabled) return;
-    if (isOpenRef.current) {
-      closeSelect();
+    if (navigation.isOpenRef.current) {
+      navigation.close();
       return;
     }
 
-    openWithInitialActiveOption();
-  };
-
-  const moveActiveOption = (directionStep: 1 | -1) => {
-    const currentIndex = activeIndexRef.current >= 0 ? activeIndexRef.current : getInitialActiveIndex();
-    const nextIndex = findEnabledIndex(currentIndex + directionStep, directionStep);
-    setActiveOptionIndex(nextIndex);
+    navigation.open();
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (disabled) return;
 
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      if (!isOpenRef.current) {
-        openWithInitialActiveOption();
-        return;
-      }
-      moveActiveOption(1);
-      return;
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      if (!isOpenRef.current) {
-        openWithInitialActiveOption();
-        return;
-      }
-      moveActiveOption(-1);
-      return;
-    }
-
-    if (event.key === 'Home' && isOpenRef.current) {
-      event.preventDefault();
-      setActiveOptionIndex(findEnabledIndex(0));
-      return;
-    }
-
-    if (event.key === 'End' && isOpenRef.current) {
-      event.preventDefault();
-      setActiveOptionIndex(findEnabledIndex(options.length - 1, -1));
-      return;
-    }
-
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      if (!isOpenRef.current) {
-        openWithInitialActiveOption();
-        return;
-      }
-
-      const option = options[activeIndexRef.current];
-      if (option && !option.disabled) {
-        handleSelect(option.value);
-      }
-      return;
-    }
-
-    if (event.key === 'Escape' && isOpenRef.current) {
-      event.preventDefault();
-      closeSelect();
-    }
+    navigation.handleKeyDown(event);
   };
 
   const containerClasses =

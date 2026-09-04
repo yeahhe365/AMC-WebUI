@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, type MutableRefObject } from 'react
 import { Document, Page } from 'react-pdf';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
+import type { PdfNavHighlight } from '@/stores/mediaNavStore';
+import PdfHighlightOverlay from '@/components/media-nav/PdfHighlightOverlay';
 
 interface PdfMainContentProps {
   fileUrl: string | undefined;
@@ -14,6 +16,8 @@ interface PdfMainContentProps {
   onLoadError: (error: Error) => void;
   setPageRef: (pageNum: number, element: HTMLDivElement | null) => void;
   containerRef: MutableRefObject<HTMLDivElement | null>;
+  /** Visual-grounding box rendered on top of its page (PDF navigation panel). */
+  highlight?: PdfNavHighlight | null;
 }
 
 const LazyPdfPage = ({
@@ -22,12 +26,14 @@ const LazyPdfPage = ({
   rotation,
   setPageRef,
   containerRef,
+  highlight,
 }: {
   pageNum: number;
   scale: number;
   rotation: number;
   setPageRef: (pageNum: number, element: HTMLDivElement | null) => void;
   containerRef: MutableRefObject<HTMLDivElement | null>;
+  highlight?: PdfNavHighlight | null;
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -94,9 +100,10 @@ const LazyPdfPage = ({
         />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-50 text-gray-300">
-          <span className="text-sm font-mono font-medium tracking-widest">PAGE {pageNum}</span>
+          <span className="text-sm font-mono font-medium">PAGE {pageNum}</span>
         </div>
       )}
+      {highlight && highlight.pageNumber === pageNum && <PdfHighlightOverlay highlight={highlight} />}
     </div>
   );
 };
@@ -112,11 +119,12 @@ export const PdfMainContent: React.FC<PdfMainContentProps> = ({
   onLoadError,
   setPageRef,
   containerRef,
+  highlight,
 }) => {
   const { t } = useI18n();
   return (
-    <div className="flex-grow h-full relative flex flex-col min-w-0">
-      <div ref={containerRef} className="flex-grow overflow-y-auto custom-scrollbar p-4 sm:p-8 relative">
+    <div className="flex-1 min-h-0 relative flex flex-col min-w-0">
+      <div ref={containerRef} className="flex-grow overflow-y-auto custom-scrollbar p-4 sm:p-8 pb-8 relative">
         <div
           className={`flex flex-col items-center gap-6 transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
         >
@@ -139,6 +147,7 @@ export const PdfMainContent: React.FC<PdfMainContentProps> = ({
                     rotation={rotation}
                     setPageRef={setPageRef}
                     containerRef={containerRef}
+                    highlight={highlight}
                   />
                 );
               })}

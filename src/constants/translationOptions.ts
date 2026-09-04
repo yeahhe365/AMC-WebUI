@@ -110,8 +110,6 @@ export const LIVE_TRANSLATE_TARGET_LANGUAGE_CODES: string[] = [
   'zu',
 ];
 
-export const DEFAULT_LIVE_TRANSLATE_TARGET_LANGUAGE_CODE = 'en';
-
 /**
  * 将 BCP-47 语言代码转为本地化显示名。
  * 使用浏览器原生 Intl.DisplayNames，跟随 UI 语言，无需维护翻译表。

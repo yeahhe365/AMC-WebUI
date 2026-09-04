@@ -35,7 +35,7 @@ export const LiveArtifactsFontSizeControl: React.FC<LiveArtifactsFontSizeControl
             {t('settingsLiveArtifactsFontSize')}
           </label>
           <Tooltip text={t('settingsLiveArtifactsFontSizeTooltip')}>
-            <Info size={14} className="text-[var(--theme-text-tertiary)] cursor-help" strokeWidth={1.5} />
+            <Info size={14} className="text-[var(--theme-text-secondary)] cursor-help" strokeWidth={1.5} />
           </Tooltip>
         </div>
         <span className={SETTINGS_VALUE_BADGE_CLASS}>{customFontSize}px</span>
@@ -52,7 +52,7 @@ export const LiveArtifactsFontSizeControl: React.FC<LiveArtifactsFontSizeControl
         }
         className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-[var(--theme-border-secondary)] accent-[var(--theme-bg-accent)] hover:accent-[var(--theme-bg-accent-hover)]"
       />
-      <div className="flex justify-between px-1 font-mono text-xs text-[var(--theme-text-tertiary)]">
+      <div className="flex justify-between px-1 font-mono text-xs text-[var(--theme-text-secondary)]">
         <span>{LIVE_ARTIFACTS_CUSTOM_FONT_SIZE_MIN}px</span>
         <span>16px</span>
         <span>{LIVE_ARTIFACTS_CUSTOM_FONT_SIZE_MAX}px</span>

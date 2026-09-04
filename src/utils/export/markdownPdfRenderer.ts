@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 
 import { CJK_FONT_FILE, CJK_FONT_NAME, loadCjkFontBase64 } from './markdownPdfFonts';
-import { fetchImageAsDataUrl, getImageFormat, getImageSize } from './markdownPdfImages';
+import { ensurePdfEmbeddableImage, fetchImageAsDataUrl, getImageFormat, getImageSize } from './markdownPdfImages';
 import type { MarkdownNode } from './markdownPdfTypes';
 import { isDarkThemeId } from '@/utils/themeMode';
 
@@ -46,16 +46,32 @@ const collectInlineText = (node: MarkdownNode): string => {
 
   if (node.type === 'image') {
     const label = node.alt || 'image';
-    return node.url ? `Image: ${label} (${node.url})` : `Image: ${label}`;
+    if (!node.url || node.url.startsWith('data:')) {
+      return `Image: ${label}`;
+    }
+
+    return `Image: ${label} (${node.url})`;
   }
 
   if (node.type === 'link') {
     const label = normalizeWhitespace((node.children ?? []).map(collectInlineText).join('')) || node.url || '';
-    return node.url && label !== node.url ? `${label} (${node.url})` : label;
+    return label;
   }
 
   return (node.children ?? []).map(collectInlineText).join('');
 };
+
+const containsImage = (node: MarkdownNode): boolean =>
+  node.type === 'image' || (node.children ?? []).some(containsImage);
+
+const unwrapLinkedImages = (children: MarkdownNode[]): MarkdownNode[] =>
+  children.flatMap((child) => {
+    if (child.type === 'link' && containsImage(child)) {
+      return unwrapLinkedImages(child.children ?? []);
+    }
+
+    return [child];
+  });
 
 export class MarkdownPdfRenderer {
   private readonly doc: PdfDocument;
@@ -78,6 +94,7 @@ export class MarkdownPdfRenderer {
 
   async render(root: MarkdownNode): Promise<Blob> {
     await this.configureFonts();
+    this.paintPageBackground();
     this.applyBodyStyle();
     await this.renderBlocks(root.children ?? []);
     this.renderFooter();
@@ -99,6 +116,15 @@ export class MarkdownPdfRenderer {
     this.bodyFontFamily = CJK_FONT_NAME;
   }
 
+  private paintPageBackground() {
+    if (!isDarkThemeId(this.themeId)) {
+      return;
+    }
+
+    this.doc.setFillColor(12, 12, 14);
+    this.doc.rect(0, 0, this.pageWidth, this.pageHeight, 'F');
+  }
+
   private applyBodyStyle() {
     const [r, g, b] = getTextColor(this.themeId);
     this.doc.setFont(this.bodyFontFamily, 'normal');
@@ -116,6 +142,7 @@ export class MarkdownPdfRenderer {
     }
 
     this.doc.addPage();
+    this.paintPageBackground();
     this.cursorY = PAGE.marginTop;
     this.applyBodyStyle();
   }
@@ -133,14 +160,45 @@ export class MarkdownPdfRenderer {
 
     lines.forEach((line) => {
       this.ensureSpace(lineHeight);
-      this.doc.text(line, PAGE.marginX + indent, this.cursorY, { renderingMode: 'fillThenStroke' });
+      this.doc.text(line, PAGE.marginX + indent, this.cursorY, {
+        renderingMode: this.shouldUseCjkFont ? 'fill' : 'fillThenStroke',
+      });
       this.cursorY += lineHeight;
     });
   }
 
-  private splitText(text: string, width = this.contentWidth): string[] {
+  private splitText(text: string, width = this.contentWidth, fontSize?: number): string[] {
+    if (fontSize != null) {
+      this.doc.setFontSize(fontSize);
+    }
+
+    if (this.shouldUseCjkFont && typeof this.doc.getTextWidth === 'function') {
+      return this.splitMeasuredText(text, width);
+    }
+
     const result = this.doc.splitTextToSize(text, width);
     return Array.isArray(result) ? result : [result];
+  }
+
+  private splitMeasuredText(text: string, width: number): string[] {
+    const lines: string[] = [];
+    let current = '';
+
+    for (const character of text) {
+      const next = current + character;
+      if (current && this.doc.getTextWidth(next) > width) {
+        lines.push(current);
+        current = character;
+      } else {
+        current = next;
+      }
+    }
+
+    if (current) {
+      lines.push(current);
+    }
+
+    return lines.length > 0 ? lines : [''];
   }
 
   private async renderBlocks(nodes: MarkdownNode[], options: { indent?: number } = {}) {
@@ -193,20 +251,20 @@ export class MarkdownPdfRenderer {
 
     this.cursorY += this.cursorY === PAGE.marginTop ? 0 : 3;
     this.doc.setFont(this.bodyFontFamily, this.bodyFontFamily === CJK_FONT_NAME ? 'normal' : 'bold');
-    this.writeLines(this.splitText(text), { fontSize });
+    this.writeLines(this.splitText(text, this.contentWidth, fontSize), { fontSize });
     this.doc.setFont(this.bodyFontFamily, 'normal');
     this.cursorY += 2;
   }
 
-  private async renderParagraph(node: MarkdownNode, options: { indent?: number }) {
-    const children = node.children ?? [];
-    const hasImage = children.some((child) => child.type === 'image');
+  private async renderParagraph(node: MarkdownNode, options: { indent?: number; prefix?: string }) {
+    const children = unwrapLinkedImages(node.children ?? []);
+    const hasImage = children.some(containsImage);
     if (hasImage) {
       await this.renderParagraphWithImages(children, options);
       return;
     }
 
-    const text = normalizeWhitespace(children.map(collectInlineText).join(''));
+    const text = normalizeWhitespace(`${options.prefix ?? ''}${children.map(collectInlineText).join('')}`);
     if (!text) return;
 
     const indent = options.indent ?? 0;
@@ -215,9 +273,9 @@ export class MarkdownPdfRenderer {
     this.cursorY += 3;
   }
 
-  private async renderParagraphWithImages(children: MarkdownNode[], options: { indent?: number }) {
-    const flushText = (parts: string[]) => {
-      const text = normalizeWhitespace(parts.join(''));
+  private async renderParagraphWithImages(children: MarkdownNode[], options: { indent?: number; prefix?: string }) {
+    const flushText = (parts: string[], prefix = '') => {
+      const text = normalizeWhitespace(`${prefix}${parts.join('')}`);
       if (!text) return;
 
       const indent = options.indent ?? 0;
@@ -227,9 +285,11 @@ export class MarkdownPdfRenderer {
     };
 
     const textParts: string[] = [];
+    let pendingPrefix = options.prefix ?? '';
     for (const child of children) {
       if (child.type === 'image') {
-        flushText(textParts);
+        flushText(textParts, pendingPrefix);
+        pendingPrefix = '';
         textParts.length = 0;
         await this.renderImage(child, options);
         continue;
@@ -238,7 +298,7 @@ export class MarkdownPdfRenderer {
       textParts.push(collectInlineText(child));
     }
 
-    flushText(textParts);
+    flushText(textParts, pendingPrefix);
   }
 
   private renderPlainText(text: string, options: { indent?: number }) {
@@ -266,14 +326,32 @@ export class MarkdownPdfRenderer {
     }
 
     try {
-      const size = await getImageSize(dataUrl);
+      const embeddableUrl = await ensurePdfEmbeddableImage(dataUrl);
+      if (!embeddableUrl) {
+        this.renderPlainText(`Image: ${label}`, options);
+        return;
+      }
+
+      const size = await getImageSize(embeddableUrl);
       const maxWidth = this.contentWidth - indent;
+      const maxHeight = this.pageHeight - PAGE.marginTop - PAGE.marginBottom - 6;
       const naturalWidth = Math.max(1, size.width);
       const naturalHeight = Math.max(1, size.height);
-      const width = maxWidth;
-      const height = width * (naturalHeight / naturalWidth);
+      let width = maxWidth;
+      let height = width * (naturalHeight / naturalWidth);
+      if (height > maxHeight) {
+        height = maxHeight;
+        width = height * (naturalWidth / naturalHeight);
+      }
       this.ensureSpace(height + 6);
-      this.doc.addImage(dataUrl, getImageFormat(dataUrl), PAGE.marginX + indent, this.cursorY, width, height);
+      this.doc.addImage(
+        embeddableUrl,
+        getImageFormat(embeddableUrl),
+        PAGE.marginX + indent,
+        this.cursorY,
+        width,
+        height,
+      );
       this.cursorY += height + 5;
     } catch {
       this.renderPlainText(`Image: ${label} (${src})`, options);
@@ -285,20 +363,36 @@ export class MarkdownPdfRenderer {
     const items = node.children ?? [];
 
     for (let index = 0; index < items.length; index += 1) {
-      const itemText = normalizeWhitespace((items[index].children ?? []).map(collectInlineText).join(''));
       const marker = node.ordered ? `${index + 1}. ` : '- ';
-      if (itemText) {
-        this.writeLines(this.splitText(`${marker}${itemText}`, this.contentWidth - baseIndent), { indent: baseIndent });
-      }
-
-      const nestedBlocks = (items[index].children ?? []).filter(
-        (child) => child.type === 'list' || child.type === 'code',
-      );
-      await this.renderBlocks(nestedBlocks, { indent: baseIndent + 6 });
+      await this.renderListItem(items[index], marker, baseIndent);
       this.cursorY += 1.5;
     }
 
     this.cursorY += 2;
+  }
+
+  private async renderListItem(item: MarkdownNode, marker: string, baseIndent: number) {
+    const children = item.children ?? [];
+    if (children.length === 0) {
+      this.writeLines([marker.trimEnd()], { indent: baseIndent });
+      return;
+    }
+
+    let isFirstBlock = true;
+    for (const child of children) {
+      if (child.type === 'paragraph') {
+        await this.renderParagraph(child, { indent: baseIndent, prefix: isFirstBlock ? marker : undefined });
+        isFirstBlock = false;
+        continue;
+      }
+
+      if (isFirstBlock) {
+        this.writeLines(this.splitText(marker.trimEnd(), this.contentWidth - baseIndent), { indent: baseIndent });
+        isFirstBlock = false;
+      }
+
+      await this.renderBlock(child, { indent: baseIndent + 6 });
+    }
   }
 
   private renderCode(node: MarkdownNode, options: { indent?: number }) {

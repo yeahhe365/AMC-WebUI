@@ -1,82 +1,48 @@
 import type { UsageMetadata } from '@google/genai';
-import { readResponseErrorMessage, toError } from '@/utils/errorMessage';
-import { deduplicateModelsById } from '@/utils/model/modelSorting';
 import type { ModelOption, NonStreamMessageSender, StreamMessageSender } from '@/types';
-import { logService } from '@/services/logService';
 import { buildOpenAICompatibleRequestBody } from './openaiCompatibleMessages';
-import { extractOpenAICompatibleMessageText, extractOpenAICompatibleReasoningText } from './openaiCompatibleResponses';
+import {
+  extractOpenAICompatibleFinishReason,
+  extractOpenAICompatibleMessageText,
+  extractOpenAICompatibleReasoningDelta,
+  extractOpenAICompatibleReasoningText,
+} from './openaiCompatibleResponses';
 import { readOpenAICompatibleStreamEvents } from './openaiCompatibleStream';
 import {
   asOpenAICompatibleConfig,
   mapOpenAICompatibleUsage,
-  type OpenAIModelsResponsePayload,
   type OpenAIResponsePayload,
 } from './openaiCompatibleTypes';
 import { buildOpenAICompatibleChatCompletionsUrl, buildOpenAICompatibleModelsUrl } from './openaiCompatibleUrls';
+import {
+  createApiRequestInitFactory,
+  executeNonStreamChatRequest,
+  executeStreamChatRequest,
+  fetchProviderModelOptions,
+} from './requestFactory';
 
-// Tag every request with the provider id so the api container's third-party
-// proxy can look up the correct upstream route. Defaults to "openai".
-const THIRD_PARTY_PROVIDER_HEADER = 'x-third-party-provider';
-// In pure-BYOK mode (no server route table entry), the browser supplies the
-// provider's real baseUrl here so the proxy can forward without a configured
-// THIRD_PARTY_ROUTES entry.
-const THIRD_PARTY_BASE_URL_HEADER = 'x-third-party-base-url';
-
-const createRequestInit = (
-  apiKey: string,
-  body: Record<string, unknown>,
-  abortSignal: AbortSignal,
-  providerId?: string | null,
-  baseUrl?: string | null,
-): RequestInit => ({
-  method: 'POST',
-  headers: {
-    authorization: `Bearer ${apiKey}`,
-    'content-type': 'application/json',
-    ...(providerId ? { [THIRD_PARTY_PROVIDER_HEADER]: providerId } : {}),
-    ...(baseUrl ? { [THIRD_PARTY_BASE_URL_HEADER]: baseUrl } : {}),
-  },
-  body: JSON.stringify(body),
-  signal: abortSignal,
+const openAiCompatibleAuthHeaders = (apiKey: string): Record<string, string> => ({
+  authorization: `Bearer ${apiKey}`,
 });
 
-const createGetRequestInit = (
-  apiKey: string,
-  abortSignal: AbortSignal,
-  providerId?: string | null,
-  baseUrl?: string | null,
-): RequestInit => ({
-  method: 'GET',
-  headers: {
-    authorization: `Bearer ${apiKey}`,
-    ...(providerId ? { [THIRD_PARTY_PROVIDER_HEADER]: providerId } : {}),
-    ...(baseUrl ? { [THIRD_PARTY_BASE_URL_HEADER]: baseUrl } : {}),
-  },
-  signal: abortSignal,
-});
+const TRUNCATION_NOTICE = '\n\n[Output truncated: the response hit max_tokens (finish_reason: length).]';
+
+const appendTruncationNotice = (text: string): string => `${text}${TRUNCATION_NOTICE}`;
+
+const { createRequestInit, createGetRequestInit } = createApiRequestInitFactory(openAiCompatibleAuthHeaders);
 
 export const fetchOpenAICompatibleModels = async (
   apiKey: string,
   baseUrl: string | null | undefined,
   abortSignal: AbortSignal,
   providerId?: string | null,
-): Promise<ModelOption[]> => {
-  const response = await fetch(
-    buildOpenAICompatibleModelsUrl(baseUrl),
-    createGetRequestInit(apiKey, abortSignal, providerId, baseUrl),
-  );
-
-  if (!response.ok) {
-    throw new Error(await readResponseErrorMessage(response, 'OpenAI-compatible'));
-  }
-
-  const payload = (await response.json()) as OpenAIModelsResponsePayload;
-  const rawModels = (payload.data ?? [])
-    .map((item) => (typeof item.id === 'string' ? item.id.trim() : ''))
-    .filter((id) => id.length > 0)
-    .map((id) => ({ id, name: id }));
-  return deduplicateModelsById(rawModels);
-};
+  extraHeaders?: Record<string, string> | null,
+): Promise<ModelOption[]> =>
+  fetchProviderModelOptions({
+    url: buildOpenAICompatibleModelsUrl(baseUrl),
+    requestInit: createGetRequestInit(apiKey, abortSignal, providerId, baseUrl, extraHeaders),
+    errorContextLabel: 'OpenAI-compatible',
+  });
 
 export const sendOpenAICompatibleMessageNonStream: NonStreamMessageSender = async (
   apiKey,
@@ -91,46 +57,41 @@ export const sendOpenAICompatibleMessageNonStream: NonStreamMessageSender = asyn
   providerId,
 ) => {
   const compatibleConfig = asOpenAICompatibleConfig(config);
-
-  try {
-    if (abortSignal.aborted) {
-      onComplete([], undefined, undefined, undefined, undefined);
-      return;
-    }
-
-    const response = await fetch(
-      buildOpenAICompatibleChatCompletionsUrl(compatibleConfig.baseUrl),
+  await executeNonStreamChatRequest<OpenAIResponsePayload>({
+    requestUrl: () => buildOpenAICompatibleChatCompletionsUrl(compatibleConfig.baseUrl),
+    requestInit: () =>
       createRequestInit(
         apiKey,
         buildOpenAICompatibleRequestBody(modelId, history, parts, compatibleConfig, role, false),
         abortSignal,
         providerId,
         compatibleConfig.baseUrl,
+        compatibleConfig.extraHeaders,
       ),
-    );
+    errorContextLabel: 'OpenAI-compatible',
+    failureLogLabel: 'OpenAI-compatible non-stream request failed:',
+    abortSignal,
+    onError,
+    onComplete,
+    toCompletionArgs: (payload) => {
+      const finishReason = extractOpenAICompatibleFinishReason(payload);
+      const text = extractOpenAICompatibleMessageText(payload);
 
-    if (!response.ok) {
-      throw new Error(await readResponseErrorMessage(response, 'OpenAI-compatible'));
-    }
+      // Mirror the Gemini-native line's finishReason handling: a filtered
+      // response with no content is an error, not a silent empty answer.
+      if (finishReason === 'content_filter' && !text) {
+        throw new Error(
+          'The model returned no content because generation was filtered (finish_reason: content_filter).',
+        );
+      }
 
-    const payload = (await response.json()) as OpenAIResponsePayload;
-    if (abortSignal.aborted) {
-      onComplete([], undefined, undefined, undefined, undefined);
-      return;
-    }
-
-    const text = extractOpenAICompatibleMessageText(payload);
-    onComplete(
-      text ? [{ text }] : [],
-      extractOpenAICompatibleReasoningText(payload),
-      mapOpenAICompatibleUsage(payload.usage),
-      undefined,
-      undefined,
-    );
-  } catch (error) {
-    logService.error('OpenAI-compatible non-stream request failed:', error);
-    onError(toError(error));
-  }
+      return [
+        text ? [{ text: finishReason === 'length' ? appendTruncationNotice(text) : text }] : [],
+        extractOpenAICompatibleReasoningText(payload),
+        mapOpenAICompatibleUsage(payload.usage),
+      ];
+    },
+  });
 };
 
 export const sendOpenAICompatibleMessageStream: StreamMessageSender = async (
@@ -149,48 +110,75 @@ export const sendOpenAICompatibleMessageStream: StreamMessageSender = async (
 ) => {
   const compatibleConfig = asOpenAICompatibleConfig(config);
   let finalUsage: UsageMetadata | undefined;
-
-  try {
-    if (abortSignal.aborted) {
-      onComplete(undefined, undefined, undefined);
-      return;
-    }
-
-    const response = await fetch(
-      buildOpenAICompatibleChatCompletionsUrl(compatibleConfig.baseUrl),
+  await executeStreamChatRequest({
+    requestUrl: () => buildOpenAICompatibleChatCompletionsUrl(compatibleConfig.baseUrl),
+    requestInit: () =>
       createRequestInit(
         apiKey,
         buildOpenAICompatibleRequestBody(modelId, history, parts, compatibleConfig, role, true),
         abortSignal,
         providerId,
         compatibleConfig.baseUrl,
+        compatibleConfig.extraHeaders,
       ),
-    );
+    errorContextLabel: 'OpenAI-compatible',
+    failureLogLabel: 'OpenAI-compatible stream request failed:',
+    abortSignal,
+    onError,
+    onComplete,
+    readStream: async (response) => {
+      // The SSE reader swallows exceptions thrown from its event callback (it
+      // treats them as malformed events), so a filtered finish_reason is
+      // captured here and thrown after the loop — that lands in
+      // executeStreamChatRequest's catch → onError, like the Gemini line.
+      let contentFiltered = false;
+      let truncationNoticeSent = false;
+      // Some providers (web-session proxies in particular) deliver in-stream
+      // failures as a data frame carrying {error:{message}} instead of a
+      // non-200 response. Capture and throw after the loop — the reader wraps
+      // the callback in try/catch, so throwing inside it would be swallowed.
+      let streamErrorMessage: string | null = null;
 
-    if (!response.ok) {
-      throw new Error(await readResponseErrorMessage(response, 'OpenAI-compatible'));
-    }
+      await readOpenAICompatibleStreamEvents(response, abortSignal, (payload) => {
+        if (!streamErrorMessage && payload.error?.message) {
+          streamErrorMessage = payload.error.message;
+        }
 
-    await readOpenAICompatibleStreamEvents(response, abortSignal, (payload) => {
-      const reasoningContent = payload.choices?.[0]?.delta?.reasoning_content;
-      if (reasoningContent) {
-        onThoughtChunk(reasoningContent);
+        const finishReason = extractOpenAICompatibleFinishReason(payload);
+        if (finishReason === 'content_filter') {
+          contentFiltered = true;
+        }
+
+        if (finishReason === 'length' && !truncationNoticeSent) {
+          truncationNoticeSent = true;
+          onPart({ text: TRUNCATION_NOTICE });
+        }
+
+        const reasoningContent = extractOpenAICompatibleReasoningDelta(payload);
+        if (reasoningContent) {
+          onThoughtChunk(reasoningContent);
+        }
+
+        const content = payload.choices?.[0]?.delta?.content;
+        if (content) {
+          onPart({ text: content });
+        }
+
+        const usage = mapOpenAICompatibleUsage(payload.usage);
+        if (usage) {
+          finalUsage = usage;
+        }
+      });
+
+      if (streamErrorMessage) {
+        throw new Error(streamErrorMessage);
       }
-
-      const content = payload.choices?.[0]?.delta?.content;
-      if (content) {
-        onPart({ text: content });
+      if (contentFiltered) {
+        throw new Error(
+          'The model returned no content because generation was filtered (finish_reason: content_filter).',
+        );
       }
-
-      const usage = mapOpenAICompatibleUsage(payload.usage);
-      if (usage) {
-        finalUsage = usage;
-      }
-    });
-
-    onComplete(finalUsage, undefined, undefined);
-  } catch (error) {
-    logService.error('OpenAI-compatible stream request failed:', error);
-    onError(toError(error));
-  }
+      return finalUsage;
+    },
+  });
 };

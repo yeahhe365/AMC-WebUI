@@ -1,19 +1,38 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
 vi.mock('@/utils/file/filePreviewUrls', () => ({
   cleanupFilePreviewUrls: vi.fn(),
+}));
+
+// Tab id / lease / stream-job / active-jobs are read straight from the chat
+// store's module-level refs; stub them so resume behavior is controllable.
+vi.mock('@/stores/chatStore', () => ({
+  useChatStore: {
+    getState: () => mockChatStoreState,
+  },
+}));
+
+const mockChatStoreState = vi.hoisted(() => ({
+  activeMessages: [] as ChatMessage[],
+  _activeJobs: { current: new Map<string, AbortController>() },
+}));
+
+vi.mock('@/features/message-sender/generationLease', () => ({
+  isGenerationLeaseHeldByTab: vi.fn(() => false),
+}));
+
+vi.mock('@/features/stream-jobs/amcStreamJobs', () => ({
+  readPendingStreamJob: vi.fn(() => null),
 }));
 
 import { useChatEffects } from './useChatEffects';
 import { renderHook } from '@/test/render/renderer';
 import { createChatSettings } from '@/test/data/factories';
+import type { ChatMessage } from '@/types';
+import { readPendingStreamJob } from '@/features/stream-jobs/amcStreamJobs';
+import { isGenerationLeaseHeldByTab } from '@/features/message-sender/generationLease';
+import { startActiveGenerationJob } from '@/features/message-sender/activeGenerationJobs';
 
 const createProps = (overrides: Partial<Parameters<typeof useChatEffects>[0]> = {}) => ({
   activeSessionId: null,
@@ -49,6 +68,10 @@ describe('useChatEffects', () => {
         disconnect() {}
       },
     );
+    mockChatStoreState.activeMessages = [];
+    mockChatStoreState._activeJobs.current.clear();
+    (isGenerationLeaseHeldByTab as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (readPendingStreamJob as ReturnType<typeof vi.fn>).mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -124,10 +147,41 @@ describe('useChatEffects', () => {
     hook.unmount();
   });
 
-  it('starts a fresh chat when the active session is missing after initial history load', async () => {
-    const startNewChat = vi.fn();
+  it('switches to another session when the active session is missing after initial history load', async () => {
+    const loadChatSession = vi.fn();
     const props = createProps({
       activeSessionId: 'deleted-session',
+      savedSessions: [
+        {
+          id: 'session-alive',
+          title: 'Alive',
+          timestamp: 2,
+          messages: [],
+          settings: createChatSettings(),
+        },
+      ],
+      loadInitialData: vi.fn(async () => undefined),
+      loadChatSession,
+    });
+
+    const hook = renderHook(() => useChatEffects(props));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(loadChatSession).toHaveBeenCalledWith('session-alive');
+    hook.unmount();
+  });
+
+  it('does not blank the restored active session while the metadata list is still empty', async () => {
+    // A refresh that restored the active session (setActiveSessionId ran) but
+    // whose DB metadata read failed (savedSessions stayed []) must not conclude
+    // the session is gone and start a fresh chat — that would wipe the user's
+    // conversation.
+    const startNewChat = vi.fn();
+    const props = createProps({
+      activeSessionId: 'session-abc',
       savedSessions: [],
       loadInitialData: vi.fn(async () => undefined),
       startNewChat,
@@ -139,7 +193,7 @@ describe('useChatEffects', () => {
       await Promise.resolve();
     });
 
-    expect(startNewChat).toHaveBeenCalledTimes(1);
+    expect(startNewChat).not.toHaveBeenCalled();
     hook.unmount();
   });
 
@@ -201,6 +255,117 @@ describe('useChatEffects', () => {
     });
     expect(firstLoad).toHaveBeenCalledTimes(1);
     expect(secondLoad).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it('resumes a pending stream after a refresh even when a stale lease survives', async () => {
+    const resumePendingStream = vi.fn(async () => undefined);
+    const props = createProps({
+      activeSessionId: 'session-1',
+      resumePendingStream,
+    });
+    mockChatStoreState.activeMessages = [
+      {
+        id: 'gen-1',
+        role: 'model',
+        content: '',
+        timestamp: new Date(),
+        generationStartTime: new Date(),
+        isLoading: true,
+      },
+    ];
+    (readPendingStreamJob as ReturnType<typeof vi.fn>).mockReturnValue({
+      sessionId: 'session-1',
+      generationId: 'gen-1',
+      jobId: 'gen-1',
+      startedAt: Date.now() - 1000,
+      lastSeq: 0,
+      tabId: 'test-tab',
+    });
+    // Refresh keeps the sessionStorage TAB_ID and the localStorage lease, but
+    // the in-memory job map is empty. The resume must NOT be blocked.
+    (isGenerationLeaseHeldByTab as ReturnType<typeof vi.fn>).mockReturnValue(true);
+
+    const hook = renderHook(() => useChatEffects(props));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(resumePendingStream).toHaveBeenCalledTimes(1);
+    expect(resumePendingStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-1',
+        generationId: 'gen-1',
+      }),
+    );
+    hook.unmount();
+  });
+
+  it('skips resume when the lease is held AND an in-memory job is live (send in flight)', async () => {
+    const resumePendingStream = vi.fn(async () => undefined);
+    const props = createProps({
+      activeSessionId: 'session-1',
+      resumePendingStream,
+    });
+    mockChatStoreState.activeMessages = [
+      {
+        id: 'gen-1',
+        role: 'model',
+        content: '',
+        timestamp: new Date(),
+        generationStartTime: new Date(),
+        isLoading: true,
+      },
+    ];
+    (readPendingStreamJob as ReturnType<typeof vi.fn>).mockReturnValue({
+      sessionId: 'session-1',
+      generationId: 'gen-1',
+      jobId: 'gen-1',
+      startedAt: Date.now() - 1000,
+      lastSeq: 0,
+      tabId: 'test-tab',
+    });
+    (isGenerationLeaseHeldByTab as ReturnType<typeof vi.fn>).mockReturnValue(true);
+    // A live send registered an in-memory job for this session via the real
+    // bookkeeping module (keyed by the ref object, not just the Map entry).
+    const controller = new AbortController();
+    startActiveGenerationJob(mockChatStoreState._activeJobs, 'session-1', 'gen-1', controller);
+
+    const hook = renderHook(() => useChatEffects(props));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(resumePendingStream).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it('does not resume when the loading message is missing from activeMessages', async () => {
+    const resumePendingStream = vi.fn(async () => undefined);
+    const props = createProps({
+      activeSessionId: 'session-1',
+      resumePendingStream,
+    });
+    // activeMessages has no matching isLoading message for gen-1.
+    mockChatStoreState.activeMessages = [];
+    (readPendingStreamJob as ReturnType<typeof vi.fn>).mockReturnValue({
+      sessionId: 'session-1',
+      generationId: 'gen-1',
+      jobId: 'gen-1',
+      startedAt: Date.now() - 1000,
+      lastSeq: 0,
+      tabId: 'test-tab',
+    });
+
+    const hook = renderHook(() => useChatEffects(props));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(resumePendingStream).not.toHaveBeenCalled();
     hook.unmount();
   });
 });

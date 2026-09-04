@@ -23,7 +23,7 @@ describe('buildModelCatalog', () => {
       { id: 'gemini-3.1-flash-tts-preview', name: 'Gemini 3.1 Flash TTS Preview' },
       { id: 'gemini-3-pro-image-preview', name: 'Gemini 3 Pro Image Preview' },
       { id: 'gemma-4-31b-it', name: 'Gemma 4 31B IT' },
-      { id: 'gemini-robotics-er-1.6-preview', name: 'Gemini Robotics-ER 1.6 Preview' },
+      { id: 'gemini-robotics-er-2-preview', name: 'Gemini Robotics-ER 2 Preview' },
     ];
 
     const entries = buildModelCatalog(models);
@@ -48,7 +48,7 @@ describe('buildModelCatalog', () => {
       group: 'standard',
       badgeKeys: expect.arrayContaining(['gemma']),
     });
-    expect(getEntry(entries, 'gemini-robotics-er-1.6-preview')).toMatchObject({
+    expect(getEntry(entries, 'gemini-robotics-er-2-preview')).toMatchObject({
       category: 'robotics',
       group: 'standard',
       badgeKeys: expect.arrayContaining(['robotics']),
@@ -74,7 +74,7 @@ describe('buildModelCatalogSections', () => {
   it('groups mixed provider catalogs by provider instead of duplicating section assembly in pickers', () => {
     const entries = buildModelCatalog([
       { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', apiMode: 'gemini-native' },
-      { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', apiMode: 'openai-compatible' },
+      { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', apiMode: 'third-party' },
     ]);
 
     expect(buildModelCatalogSections(entries)).toMatchObject([
@@ -84,8 +84,8 @@ describe('buildModelCatalogSections', () => {
         entries: [{ id: 'gemini-3.1-pro-preview' }],
       },
       {
-        key: 'openai-compatible',
-        providerKey: 'openai-compatible',
+        key: 'third-party',
+        providerKey: 'third-party',
         entries: [{ id: 'gpt-5.6-sol' }],
       },
     ]);
@@ -113,13 +113,44 @@ describe('buildModelCatalogSections', () => {
 
     expect(sections.map((section) => ({ key: section.key, label: section.label }))).toEqual([
       { key: 'gemini-native', label: undefined },
-      { key: 'third-party:openai', label: 'OpenAI' },
       { key: 'third-party:anthropic', label: 'Anthropic' },
+      { key: 'third-party:openai', label: 'OpenAI' },
       { key: 'third-party:qwen', label: 'Qwen' },
     ]);
     expect(
       sections.find((section) => section.key === 'third-party:anthropic')?.entries.map((entry) => entry.id),
     ).toEqual(['claude-fable-5']);
+  });
+
+  it('flags unavailable and missing-key connection sections for picker chrome', () => {
+    const entries = buildModelCatalog([
+      {
+        id: 'gpt-4o',
+        name: 'GPT-4o',
+        apiMode: 'third-party',
+        providerId: 'openai',
+        connectionName: 'OpenAI',
+        missingApiKey: true,
+      },
+      {
+        id: 'old-model',
+        name: 'Old Model',
+        apiMode: 'third-party',
+        providerId: 'removed',
+        connectionName: 'Removed',
+        unavailable: true,
+      },
+    ]);
+
+    const sections = buildModelCatalogSections(entries);
+    expect(sections.find((section) => section.key === 'third-party:openai')).toMatchObject({
+      missingApiKey: true,
+      unavailable: false,
+    });
+    expect(sections.find((section) => section.key === 'third-party:removed')).toMatchObject({
+      unavailable: true,
+      missingApiKey: false,
+    });
   });
 });
 
@@ -146,6 +177,8 @@ describe('getQuickSwitchModelIds', () => {
 describe('getTabCycleModelIds', () => {
   const models: ModelOption[] = [
     { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', isPinned: true },
+    { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', isPinned: true },
+    { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', isPinned: true },
     { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', isPinned: true },
     { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', isPinned: true },
     { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash-Lite', isPinned: true },
@@ -153,7 +186,7 @@ describe('getTabCycleModelIds', () => {
   ];
 
   it('falls back to the default quick-switch order when no manual selection is set', () => {
-    expect(getTabCycleModelIds(models)).toEqual(['gemini-3.1-pro-preview', 'gemini-3.6-flash']);
+    expect(getTabCycleModelIds(models)).toEqual(['gemini-3.1-pro-preview', 'gemini-3.8-flash']);
   });
 
   it('filters the cycle order down to the manually selected models while preserving picker order', () => {
@@ -164,6 +197,6 @@ describe('getTabCycleModelIds', () => {
   });
 
   it('falls back to the default order when the stored selection is fully stale', () => {
-    expect(getTabCycleModelIds(models, ['missing-model'])).toEqual(['gemini-3.1-pro-preview', 'gemini-3.6-flash']);
+    expect(getTabCycleModelIds(models, ['missing-model'])).toEqual(['gemini-3.1-pro-preview', 'gemini-3.8-flash']);
   });
 });

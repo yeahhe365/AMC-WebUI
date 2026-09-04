@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { extractTextFromNode } from '@/utils/reactNodeText';
 import { getCodeBlockPreviewType } from '@/utils/previewableMarkdown';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 import { triggerDownload, sanitizeFilename } from '@/utils/export/core';
 import { type SideViewContent } from '@/types';
+import { type OpenHtmlPreviewHandler } from '@/utils/html-preview/previewPrivilege';
 import { useI18n } from '@/contexts/I18nContext';
 
 const COLLAPSE_THRESHOLD_PX = 320;
@@ -77,7 +78,7 @@ interface UseCodeBlockProps {
   children: React.ReactNode;
   className?: string;
   expandCodeBlocksByDefault: boolean;
-  onOpenHtmlPreview: (html: string, options?: { initialTrueFullscreen?: boolean }) => void;
+  onOpenHtmlPreview: OpenHtmlPreviewHandler;
   onOpenSidePanel: (content: SideViewContent) => void;
 }
 
@@ -100,9 +101,10 @@ export const useCodeBlock = ({
 
   const { isCopied, copyToClipboard } = useCopyToClipboard();
 
-  const userHasScrolledUp = useRef(false);
+  // Tracks the length from the previous layout pass. A code block only auto-follows
+  // to its bottom while its text is actively growing (i.e. streaming). Static blocks
+  // — historical sessions, finished messages — are left pinned to the top.
   const prevTextLength = useRef(0);
-  const lastKnownScrollTop = useRef(0);
 
   const codeElement = React.Children.toArray(children).find(
     (child): child is React.ReactElement<CodeElementProps> =>
@@ -115,58 +117,47 @@ export const useCodeBlock = ({
     : extractTextFromNode(children);
   const isExpanded = expandedOverride ?? expandCodeBlocksByDefault;
 
-  const handleScroll = useCallback(() => {
+  // Collapsed blocks hide overflow (overflow-y: hidden) so the user can never scroll
+  // them manually — there is no "user scrolled up" state to honor. Auto-follow is
+  // driven purely by text growth below.
+
+  // Pin a growing block to its tail. Declared FIRST so it runs before the measure
+  // effect below (effects run in declaration order), letting it read the previous
+  // commit's length. The write is deferred to a frame callback: reading scrollHeight
+  // already forced layout, and writing scrollTop in the same pass would force a
+  // second one. The browser runs the callback before painting, so follow still lands
+  // without a visible flash.
+  useLayoutEffect(() => {
+    if (isExpanded || !isOverflowing) return;
     const el = preRef.current;
     if (!el) return;
+    const currentLength = resolvedCodeText.length;
+    // prevTextLength starts at 0 on mount: a long static block (history) must stay
+    // pinned to the top, only actively growing streams auto-follow to the bottom.
+    if (prevTextLength.current <= 0 || currentLength <= prevTextLength.current) return;
+    const raf = requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [resolvedCodeText, isExpanded, isOverflowing]);
 
-    const previousScrollTop = lastKnownScrollTop.current;
-    const isAtBottom = Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop) < 25;
-
-    if (isAtBottom) {
-      userHasScrolledUp.current = false;
-    } else if (el.scrollTop < previousScrollTop - 1) {
-      userHasScrolledUp.current = true;
-    }
-
-    lastKnownScrollTop.current = el.scrollTop;
-  }, []);
-
-  useEffect(() => {
-    const el = preRef.current;
-    if (el) {
-      lastKnownScrollTop.current = el.scrollTop;
-      el.addEventListener('scroll', handleScroll);
-      return () => el.removeEventListener('scroll', handleScroll);
-    }
-    return undefined;
-  }, [handleScroll]);
-
+  // Measure only when the block's text actually changed. `resolvedCodeText` is a
+  // plain string, so finished blocks (already-closed code in a streaming message,
+  // history) compare equal across the per-chunk React re-render and skip all layout
+  // work — re-parsing markdown each chunk must not cost N forced layouts for N blocks.
+  // Runs after the follow effect above so growth detection sees the pre-flip length.
   useLayoutEffect(() => {
-    const preElement = preRef.current;
-    if (!preElement) return;
-
-    const isCurrentlyOverflowing = preElement.scrollHeight > COLLAPSE_THRESHOLD_PX;
-
-    if (isCurrentlyOverflowing !== isOverflowing) {
-      setIsOverflowing(isCurrentlyOverflowing);
-      if (isCurrentlyOverflowing) {
-        userHasScrolledUp.current = false;
-      }
-      lastKnownScrollTop.current = preElement.scrollTop;
+    const el = preRef.current;
+    if (!el) return;
+    const overflowing = el.scrollHeight > COLLAPSE_THRESHOLD_PX;
+    if (overflowing !== isOverflowing) {
+      // Threshold-crossing commit: leave prevTextLength untouched so the follow
+      // effect in the synced commit still sees this chunk as growth.
+      setIsOverflowing(overflowing);
       return;
     }
-
-    const currentLength = resolvedCodeText.length;
-    if (!isExpanded && prevTextLength.current > 0 && currentLength > prevTextLength.current) {
-      if (!userHasScrolledUp.current) {
-        preElement.scrollTop = preElement.scrollHeight;
-        lastKnownScrollTop.current = preElement.scrollTop;
-      }
-    }
-
-    prevTextLength.current = currentLength;
-    lastKnownScrollTop.current = preElement.scrollTop;
-  }, [children, isExpanded, isOverflowing, resolvedCodeText]);
+    prevTextLength.current = resolvedCodeText.length;
+  }, [resolvedCodeText, isOverflowing]);
 
   const handleToggleExpand = () => {
     setExpandedOverride((prev) => !(prev ?? expandCodeBlocksByDefault));
@@ -222,8 +213,8 @@ export const useCodeBlock = ({
     });
   };
 
-  const handleFullscreenPreview = (trueFullscreen: boolean) => {
-    onOpenHtmlPreview(resolvedCodeText, { initialTrueFullscreen: trueFullscreen });
+  const handleOpenPreview = () => {
+    onOpenHtmlPreview(resolvedCodeText, { privilege: 'unrestricted' });
   };
 
   const handleDownload = () => {
@@ -253,7 +244,7 @@ export const useCodeBlock = ({
     handleToggleExpand,
     handleCopy,
     handleOpenSide,
-    handleFullscreenPreview,
+    handleOpenPreview,
     handleDownload,
     codeElement,
     resolvedCodeText,

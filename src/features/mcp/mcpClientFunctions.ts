@@ -1,9 +1,25 @@
 import { Type, type Schema } from '@google/genai';
 import type { McpServerConfig, StandardClientFunctions } from '@/types';
-import { callMcpTool, fetchMcpTools, type McpToolDefinition, type McpToolsResponse } from '@/services/api/mcpApi';
+import {
+  callMcpTool,
+  fetchMcpTools,
+  type McpToolDefinition,
+  type McpToolProgressEvent,
+  type McpToolsResponse,
+} from '@/services/api/mcpApi';
 import { logService } from '@/services/logService';
+import { beginMcpToolRun, appendMcpToolProgress, finishMcpToolRun } from '@/stores/mcpToolRuntimeStore';
 import { toMcpFunctionName } from './mcpToolNames';
 import { isRecord } from '../../../shared/predicates';
+import { extractMcpCallError, summarizeMcpResultForModel } from './mcpResultSummary';
+import {
+  isSessionApproved,
+  rememberSessionApproval,
+  requiresApproval,
+  sessionApprovalKey,
+  type McpApprovalDecision,
+  type McpApprovalRequest,
+} from './toolApproval';
 
 interface CreateMcpClientFunctionsOptions {
   servers: McpServerConfig[];
@@ -14,8 +30,46 @@ interface CreateMcpClientFunctionsOptions {
     toolName: string,
     args: Record<string, unknown>,
     abortSignal?: AbortSignal,
+    onProgress?: (event: McpToolProgressEvent) => void,
   ) => Promise<unknown>;
+  /** Resolves user decisions for tools flagged as "ask before running". */
+  requestApproval?: (request: McpApprovalRequest) => Promise<McpApprovalDecision>;
+  /**
+   * Returns the freshest server configs at call time. Discovery is cached for
+   * 30s, so without this re-check a tool the user just disabled could still
+   * execute inside the cache window.
+   */
+  resolveLatestServers?: () => McpServerConfig[] | undefined;
 }
+
+type McpToolsLister = NonNullable<CreateMcpClientFunctionsOptions['listTools']>;
+
+const MCP_DISCOVERY_CACHE_TTL_MS = 30_000;
+
+/**
+ * Gemini docs best practice: keep the active tool set to roughly 10–20 so the
+ * model does not mis-select and declarations do not bloat the input tokens.
+ */
+const MCP_TOOL_COUNT_GUIDANCE_MAX = 20;
+
+interface McpDiscoveryCacheEntry {
+  configKey: string;
+  expiresAt: number;
+  response: McpToolsResponse;
+}
+
+// Discovery runs on every chat turn; without a short-lived cache each user
+// message pays a full /api/mcp/tools round trip. Keyed weakly by the lister
+// so injected test doubles never share entries with the production fetcher.
+const discoveryCache = new WeakMap<McpToolsLister, McpDiscoveryCacheEntry>();
+
+const readCachedTools = (lister: McpToolsLister, configKey: string): McpToolsResponse | null => {
+  const entry = discoveryCache.get(lister);
+  if (!entry || entry.configKey !== configKey || Date.now() >= entry.expiresAt) {
+    return null;
+  }
+  return entry.response;
+};
 
 const toSchemaType = (value: unknown): Type | undefined => {
   switch (value) {
@@ -103,6 +157,42 @@ const pickUnionBranch = (schema: Record<string, unknown>): Record<string, unknow
   return first;
 };
 
+/**
+ * Validation keywords the v1beta Gemini Schema subset understands and the SDK
+ * Schema type carries. The count/length ones are proto int64s, so JSON Schema
+ * numbers must be stringified; minimum/maximum stay numeric.
+ */
+const STRINGIFIED_CONSTRAINT_KEYS = [
+  'minLength',
+  'maxLength',
+  'minItems',
+  'maxItems',
+  'minProperties',
+  'maxProperties',
+] as const;
+const NUMERIC_CONSTRAINT_KEYS = ['minimum', 'maximum'] as const;
+
+const copyConstraintKeywords = (source: Record<string, unknown>, target: Schema): void => {
+  for (const key of STRINGIFIED_CONSTRAINT_KEYS) {
+    const value = source[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      target[key] = String(value);
+    }
+  }
+  for (const key of NUMERIC_CONSTRAINT_KEYS) {
+    const value = source[key];
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      target[key] = value;
+    }
+  }
+  if (typeof source.pattern === 'string' && source.pattern) {
+    target.pattern = source.pattern;
+  }
+  if (Array.isArray(source.propertyOrdering) && source.propertyOrdering.every((item) => typeof item === 'string')) {
+    target.propertyOrdering = source.propertyOrdering as string[];
+  }
+};
+
 const toGeminiSchema = (schema: unknown): Schema => {
   if (!isRecord(schema)) {
     return { type: Type.OBJECT };
@@ -137,6 +227,8 @@ const toGeminiSchema = (schema: unknown): Schema => {
     geminiSchema.format = effective.format;
   }
 
+  copyConstraintKeywords(effective, geminiSchema);
+
   if (type === Type.OBJECT) {
     if (isRecord(effective.properties)) {
       geminiSchema.properties = Object.fromEntries(
@@ -163,10 +255,10 @@ const toGeminiSchema = (schema: unknown): Schema => {
     geminiSchema.items = toGeminiSchema(effective.items);
   }
 
-  // Nullable via type: ["string","null"] — Gemini uses nullable on some schemas; attach description note.
-  if (Array.isArray(schema.type) && schema.type.includes('null') && type !== Type.NULL) {
-    const baseDescription = geminiSchema.description ?? '';
-    geminiSchema.description = baseDescription ? `${baseDescription} (nullable)` : 'Nullable value.';
+  // JSON Schema unions like ["string","null"] become the primary type plus
+  // Gemini's native nullable flag (v1beta Schema supports it).
+  if (Array.isArray(effective.type) && effective.type.includes('null') && type !== Type.NULL) {
+    geminiSchema.nullable = true;
   }
 
   return geminiSchema;
@@ -210,6 +302,8 @@ export const createMcpClientFunctions = async ({
   abortSignal,
   listTools = fetchMcpTools,
   callTool = callMcpTool,
+  requestApproval,
+  resolveLatestServers,
 }: CreateMcpClientFunctionsOptions): Promise<StandardClientFunctions> => {
   const enabledServers = servers.filter((server) => server.enabled);
   if (enabledServers.length === 0) {
@@ -219,7 +313,26 @@ export const createMcpClientFunctions = async ({
   try {
     const runtimeServerEntries = makeRuntimeServerEntries(enabledServers);
     const runtimeServers = runtimeServerEntries.map(({ runtimeServer }) => runtimeServer);
-    const toolResponse = await listTools(runtimeServers, abortSignal);
+    const lister: McpToolsLister = listTools;
+    const configKey = JSON.stringify(
+      runtimeServers.map((s) => ({
+        id: s.id,
+        url: s.url,
+        command: s.command,
+        disabledTools: s.disabledTools,
+        disabledAutoApproveTools: s.disabledAutoApproveTools,
+        isTrusted: s.isTrusted,
+      })),
+    );
+    const cachedResponse = readCachedTools(lister, configKey);
+    const toolResponse = cachedResponse ?? (await listTools(runtimeServers, abortSignal));
+    if (!cachedResponse) {
+      discoveryCache.set(lister, {
+        configKey,
+        expiresAt: Date.now() + MCP_DISCOVERY_CACHE_TTL_MS,
+        response: toolResponse,
+      });
+    }
 
     if (toolResponse.errors.length > 0) {
       logService.warn(`MCP tool discovery reported errors: ${formatDiscoveryErrors(toolResponse.errors)}`, {
@@ -227,12 +340,18 @@ export const createMcpClientFunctions = async ({
       });
     }
 
+    const serverDisabledMap = new Map(runtimeServers.map((s) => [s.id, new Set(s.disabledTools ?? [])]));
+    const filteredServers = toolResponse.servers.map((s) => ({
+      ...s,
+      tools: s.tools.filter((t) => !serverDisabledMap.get(s.serverId)?.has(t.name)),
+    }));
+
     const serverByRuntimeId = new Map(
       runtimeServerEntries.map(({ originalServer, runtimeServer }) => [runtimeServer.id, originalServer]),
     );
     const functions: StandardClientFunctions = {};
 
-    for (const serverTools of toolResponse.servers) {
+    for (const serverTools of filteredServers) {
       const server = serverByRuntimeId.get(serverTools.serverId);
       if (!server) {
         continue;
@@ -246,16 +365,71 @@ export const createMcpClientFunctions = async ({
             description: buildDescription(serverTools.serverName, tool),
             parameters: toGeminiSchema(tool.inputSchema),
           },
-          handler: async (args, options) => ({
-            response: await callTool(
-              server,
-              tool.name,
-              isRecord(args) ? args : {},
-              options?.abortSignal ?? abortSignal,
-            ),
-          }),
+          handler: async (args, options) => {
+            // Execution-time disable re-check: discovery results are cached
+            // for 30s, so honor what the user toggled after this turn began.
+            const latestServers = resolveLatestServers?.();
+            const latestServer = latestServers?.find((entry) => entry.id === server.id);
+            if (latestServer && (!latestServer.enabled || (latestServer.disabledTools ?? []).includes(tool.name))) {
+              throw new Error(`Tool ${tool.name} on ${serverTools.serverName} was disabled by the user.`);
+            }
+            if (requestApproval && requiresApproval(server, tool.name)) {
+              const approvalKey = sessionApprovalKey(server.id, tool.name);
+              if (!isSessionApproved(approvalKey)) {
+                const decision = await requestApproval({
+                  serverId: server.id,
+                  serverName: serverTools.serverName,
+                  toolName: tool.name,
+                  args: isRecord(args) ? args : {},
+                });
+                if (decision === 'deny') {
+                  throw new Error(`User denied tool execution: ${tool.name}`);
+                }
+                if (decision === 'allow-session') {
+                  rememberSessionApproval(approvalKey);
+                }
+              }
+            }
+            // Surface the call live: the card rendered from the FunctionCall
+            // part holds this exact args object, so the run attaches to it.
+            const callArgs = isRecord(args) ? args : {};
+            const runId = beginMcpToolRun(callArgs);
+            try {
+              const rawResult = await callTool(
+                server,
+                tool.name,
+                callArgs,
+                options?.abortSignal ?? abortSignal,
+                (event) => appendMcpToolProgress(runId, event),
+              );
+              // MCP signals execution failure with isError:true on a successful
+              // RPC — surface it as an error response so the model can recover
+              // and the tool card reports the run as failed.
+              const callError = extractMcpCallError(rawResult);
+              if (callError) {
+                finishMcpToolRun(runId, 'error');
+                throw new Error(callError);
+              }
+              finishMcpToolRun(runId, 'success');
+              return {
+                response: summarizeMcpResultForModel(rawResult),
+              };
+            } catch (error) {
+              finishMcpToolRun(runId, options?.abortSignal?.aborted ? 'cancelled' : 'error');
+              throw error;
+            }
+          },
         };
       }
+    }
+
+    const totalToolCount = Object.keys(functions).length;
+    if (totalToolCount > MCP_TOOL_COUNT_GUIDANCE_MAX) {
+      logService.warn(
+        `${totalToolCount} MCP tools are active across ${filteredServers.length} server(s). ` +
+          'Gemini guidance recommends keeping the active set to about 10-20 tools to avoid mis-selection and input-token bloat.',
+        { totalToolCount },
+      );
     }
 
     return functions;

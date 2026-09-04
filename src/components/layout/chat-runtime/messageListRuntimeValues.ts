@@ -10,6 +10,20 @@ interface MessageListRuntimeValuesOptions {
 export const useChatMessageListRuntimeValues = ({ app }: MessageListRuntimeValuesOptions) => {
   const { chatState, sessionTitle, handleOpenSidePanel, handleSuggestionClick } = app;
 
+  // Destructure chatState members into stable local references so the memo
+  // below is not invalidated by the whole chatState object changing identity on
+  // every render (see inputRuntimeValues.ts for the same rationale).
+  const {
+    setScrollContainerRef,
+    handleEditMessage,
+    handleDeleteMessage,
+    handleRetryMessage,
+    handleUpdateMessageFile,
+    handleContinueGeneration,
+    handleForkMessage,
+    handleQuickTTS,
+  } = chatState;
+
   const onFollowUpSuggestionClick = useCallback(
     (text: string) => {
       handleSuggestionClick('follow-up', text);
@@ -27,18 +41,31 @@ export const useChatMessageListRuntimeValues = ({ app }: MessageListRuntimeValue
   return useMemo<ChatMessageListRuntimeValue>(
     () => ({
       sessionTitle,
-      setScrollContainerRef: chatState.setScrollContainerRef,
-      onEditMessage: chatState.handleEditMessage,
-      onDeleteMessage: chatState.handleDeleteMessage,
-      onRetryMessage: chatState.handleRetryMessage,
-      onUpdateMessageFile: chatState.handleUpdateMessageFile,
+      setScrollContainerRef,
+      onEditMessage: handleEditMessage,
+      onDeleteMessage: handleDeleteMessage,
+      onRetryMessage: handleRetryMessage,
+      onUpdateMessageFile: handleUpdateMessageFile,
       onFollowUpSuggestionClick,
       onFollowUpSuggestionFill,
-      onContinueGeneration: chatState.handleContinueGeneration,
-      onForkMessage: chatState.handleForkMessage,
-      onQuickTTS: chatState.handleQuickTTS,
+      onContinueGeneration: handleContinueGeneration,
+      onForkMessage: handleForkMessage,
+      onQuickTTS: handleQuickTTS,
       onOpenSidePanel: handleOpenSidePanel,
     }),
-    [chatState, handleOpenSidePanel, onFollowUpSuggestionClick, onFollowUpSuggestionFill, sessionTitle],
+    [
+      handleContinueGeneration,
+      handleDeleteMessage,
+      handleEditMessage,
+      handleForkMessage,
+      handleOpenSidePanel,
+      handleQuickTTS,
+      handleRetryMessage,
+      handleUpdateMessageFile,
+      onFollowUpSuggestionClick,
+      onFollowUpSuggestionFill,
+      sessionTitle,
+      setScrollContainerRef,
+    ],
   );
 };

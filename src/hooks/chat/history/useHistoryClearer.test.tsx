@@ -21,12 +21,6 @@ vi.mock('@/services/db/dbService', async () => {
   return createDbServiceMockModule(dbServiceMock);
 });
 
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
 vi.mock('@/utils/file/filePreviewUrls', () => ({
   cleanupFilePreviewUrls: cleanupFilePreviewUrlsMock,
 }));

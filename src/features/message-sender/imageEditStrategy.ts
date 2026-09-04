@@ -6,7 +6,6 @@ import {
   type ChatSettings as IndividualChatSettings,
   type UploadedFile,
   type ImageOutputMode,
-  type ImagePersonGeneration,
 } from '@/types';
 import { editImageApi } from '@/services/api/generation/imageEditApi';
 import { logService } from '@/services/logService';
@@ -58,7 +57,6 @@ interface SendImageEditMessageParams {
   aspectRatio: string;
   imageSize: string | undefined;
   imageOutputMode: ImageOutputMode;
-  personGeneration: ImagePersonGeneration;
   shouldLockKey?: boolean;
   updateAndPersistSessions: SessionsUpdater;
   setActiveSessionId: (id: string | null) => void;
@@ -80,7 +78,6 @@ export const sendImageEditMessage = async ({
   aspectRatio,
   imageSize,
   imageOutputMode,
-  personGeneration,
   shouldLockKey,
   updateAndPersistSessions,
   setActiveSessionId,
@@ -88,6 +85,7 @@ export const sendImageEditMessage = async ({
   t,
 }: SendImageEditMessageParams) => {
   const imageFiles = files.filter((file) => isImageMimeType(file.type));
+  const { contentParts: promptParts } = await buildContentParts(text, imageFiles, currentChatSettings.modelId);
 
   await runOptimisticMessagePipeline({
     activeSessionId,
@@ -105,8 +103,10 @@ export const sendImageEditMessage = async ({
     abortController,
     errorPrefix: t('messageSenderImageEditErrorPrefix'),
     runMessageLifecycle,
+    userMessageOptions: {
+      apiParts: promptParts,
+    },
     execute: async () => {
-      const { contentParts: promptParts } = await buildContentParts(text, imageFiles, currentChatSettings.modelId);
       const alwaysKeepThinking =
         currentChatSettings.alwaysKeepThinkingInContext ?? appSettings.alwaysKeepThinkingInContext ?? false;
       const shouldStripThinking = shouldStripThinkingFromContext(
@@ -152,7 +152,6 @@ export const sendImageEditMessage = async ({
             isDeepSearchEnabled: !!currentChatSettings.isDeepSearchEnabled,
             safetySettings: currentChatSettings.safetySettings,
             imageOutputMode,
-            personGeneration,
           },
         );
 
@@ -227,6 +226,12 @@ export const sendImageEditMessage = async ({
           files: combinedFiles,
           apiParts: combinedApiParts,
           generationEndTime: new Date(),
+        },
+        feedback: {
+          notification: {
+            title: t('messageSenderImageEditReadyTitle'),
+            body: t('messageSenderImageEditReadyBody'),
+          },
         },
       };
     },

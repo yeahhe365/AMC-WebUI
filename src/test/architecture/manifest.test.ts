@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { projectRoot } from './projectFiles';
 
-const manifestPath = path.join(projectRoot, 'manifest.json');
+const manifestPath = path.join(projectRoot, 'public', 'manifest.json');
 const indexHtmlPath = path.join(projectRoot, 'index.html');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as {
   start_url: string;

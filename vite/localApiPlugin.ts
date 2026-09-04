@@ -224,6 +224,57 @@ const handleLocalApiRequest = (request: DevServerRequest, response: DevServerRes
     return;
   }
 
+  if (requestUrl.pathname === '/api/live/ephemeral-token' || requestUrl.pathname === '/api/auth_tokens') {
+    void (async () => {
+      if (request.method !== 'POST') {
+        response.writeHead(405, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ error: 'Method not allowed' }));
+        return;
+      }
+      const apiKey =
+        (typeof request.headers?.['x-goog-api-key'] === 'string' ? request.headers['x-goog-api-key'] : undefined) ||
+        process.env.GEMINI_API_KEY ||
+        '';
+      if (!apiKey) {
+        response.writeHead(401, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ error: 'Live API key is not configured' }));
+        return;
+      }
+      try {
+        const body = (await readRequestBody(request)) ?? undefined;
+        const upstreamRes = await fetch('https://generativelanguage.googleapis.com/v1beta/auth_tokens', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
+          body: body ? await body.text() : JSON.stringify({ uses: 1 }),
+        });
+        const upstreamData = await upstreamRes.json().catch(() => ({}));
+        if (!upstreamRes.ok) {
+          response.writeHead(upstreamRes.status, { 'content-type': 'application/json' });
+          response.end(JSON.stringify(upstreamData));
+          return;
+        }
+        const tokenName = (upstreamData as { name?: string }).name || '';
+        const token = tokenName.startsWith('authTokens/') ? tokenName.slice('authTokens/'.length) : tokenName;
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            token,
+            name: tokenName,
+            expireTime: (upstreamData as { expireTime?: string }).expireTime,
+            newSessionExpireTime: (upstreamData as { newSessionExpireTime?: string }).newSessionExpireTime,
+          }),
+        );
+      } catch (err) {
+        response.writeHead(502, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Upstream error' }));
+      }
+    })();
+    return;
+  }
+
   next();
 };
 

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Modal } from '@/components/shared/Modal';
-import { type UploadedFile, type VideoMetadata, type MediaResolution } from '@/types';
+import { MediaResolution, type UploadedFile, type VideoMetadata } from '@/types';
 import { FileConfigHeader } from './file-config/FileConfigHeader';
 import { ResolutionConfig } from './file-config/ResolutionConfig';
 import { VideoConfig } from './file-config/VideoConfig';
 import { FileConfigFooter } from './file-config/FileConfigFooter';
 import { getFileKindFlags } from '@/utils/file/fileTypeClassification';
+import { interpolate } from '@/i18n/interpolate';
+import { useI18n } from '@/contexts/I18nContext';
 
 interface FileConfigModalProps {
   isOpen: boolean;
@@ -13,6 +15,8 @@ interface FileConfigModalProps {
   file: UploadedFile | null;
   onSave: (fileId: string, updates: { videoMetadata?: VideoMetadata; mediaResolution?: MediaResolution }) => void;
   isGemini3: boolean;
+  /** Global input detail level; labels the "follow global" option in the per-file select. */
+  globalMediaResolution?: MediaResolution;
 }
 
 interface FileConfigurationDraft {
@@ -74,9 +78,37 @@ const normalizeDurationOffset = (value: string): string | undefined => {
   return normalizeTimestampOffset(trimmedValue);
 };
 
+const parseDurationSeconds = (value: string): number | null => {
+  const normalized = normalizeDurationOffset(value);
+  if (!normalized) return null;
+  const seconds = Number(normalized.slice(0, -1));
+  return Number.isFinite(seconds) ? seconds : null;
+};
+
 const normalizeVideoFps = (value: string): number | undefined => {
   const fps = Number(value.trim());
   return Number.isFinite(fps) && fps > 0 && fps <= 24 ? fps : undefined;
+};
+
+// Per-unit token cost of each detail level (Gemini 3 models), used for the
+// inline estimate. Source: https://ai.google.dev/gemini-api/docs/media-resolution
+const RESOLUTION_TOKEN_ESTIMATES: Record<'image' | 'video' | 'pdf', Partial<Record<MediaResolution, number>>> = {
+  image: {
+    [MediaResolution.MEDIA_RESOLUTION_LOW]: 280,
+    [MediaResolution.MEDIA_RESOLUTION_MEDIUM]: 560,
+    [MediaResolution.MEDIA_RESOLUTION_HIGH]: 1120,
+    [MediaResolution.MEDIA_RESOLUTION_ULTRA_HIGH]: 2240,
+  },
+  video: {
+    [MediaResolution.MEDIA_RESOLUTION_LOW]: 70,
+    [MediaResolution.MEDIA_RESOLUTION_MEDIUM]: 70,
+    [MediaResolution.MEDIA_RESOLUTION_HIGH]: 280,
+  },
+  pdf: {
+    [MediaResolution.MEDIA_RESOLUTION_LOW]: 280,
+    [MediaResolution.MEDIA_RESOLUTION_MEDIUM]: 560,
+    [MediaResolution.MEDIA_RESOLUTION_HIGH]: 1120,
+  },
 };
 
 type FileConfigModalContentProps = Omit<FileConfigModalProps, 'file'> & {
@@ -89,12 +121,55 @@ const FileConfigModalContent: React.FC<FileConfigModalContentProps> = ({
   file,
   onSave,
   isGemini3,
+  globalMediaResolution,
 }) => {
   const [draft, setDraft] = useState<FileConfigurationDraft>(() => buildDraft(file));
   const { isVideo, isYoutube, isImage, isPdf } = getFileKindFlags(file);
   const supportsVideoConfiguration = isVideo || isYoutube;
+  const { t } = useI18n();
+
+  // Derived (not mirrored) validation so every keystroke re-evaluates without
+  // extra state or effects.
+  const startOffsetError =
+    supportsVideoConfiguration && draft.startOffset.trim() && !normalizeDurationOffset(draft.startOffset)
+      ? t('fileSettingsErrorOffset')
+      : undefined;
+  const endOffsetFormatError =
+    supportsVideoConfiguration && draft.endOffset.trim() && !normalizeDurationOffset(draft.endOffset)
+      ? t('fileSettingsErrorOffset')
+      : undefined;
+  const startSeconds = supportsVideoConfiguration ? parseDurationSeconds(draft.startOffset) : null;
+  const endSeconds = supportsVideoConfiguration ? parseDurationSeconds(draft.endOffset) : null;
+  const endOffsetError =
+    endOffsetFormatError ??
+    (startSeconds !== null && endSeconds !== null && endSeconds <= startSeconds
+      ? t('fileSettingsErrorEndBeforeStart')
+      : undefined);
+  const fpsError =
+    supportsVideoConfiguration && draft.fps.trim() && normalizeVideoFps(draft.fps) === undefined
+      ? t('fileSettingsErrorFps')
+      : undefined;
+  const hasErrors = Boolean(startOffsetError || endOffsetError || fpsError);
+
+  // Echo the canonical "Ns" form back into the field on blur so the user sees
+  // what will actually be sent (e.g. "01:15" → "75s").
+  const handleOffsetBlur = (field: 'startOffset' | 'endOffset', value: string) => {
+    const normalized = normalizeDurationOffset(value);
+    if (normalized && normalized !== value.trim()) {
+      setDraft((prev) => ({ ...prev, [field]: normalized }));
+    }
+  };
+
+  const handleFpsBlur = (value: string) => {
+    const fps = normalizeVideoFps(value);
+    if (fps !== undefined && String(fps) !== value.trim()) {
+      setDraft((prev) => ({ ...prev, fps: String(fps) }));
+    }
+  };
 
   const handleSave = () => {
+    if (hasErrors) return;
+
     const updates: { videoMetadata?: VideoMetadata; mediaResolution?: MediaResolution } = {};
 
     if (supportsVideoConfiguration) {
@@ -134,6 +209,29 @@ const FileConfigModalContent: React.FC<FileConfigModalContentProps> = ({
 
   const showResolutionSettings = isGemini3 && (isImage || supportsVideoConfiguration || isPdf);
 
+  const estimateKind: 'image' | 'video' | 'pdf' | undefined = isImage
+    ? 'image'
+    : isPdf
+      ? 'pdf'
+      : supportsVideoConfiguration
+        ? 'video'
+        : undefined;
+  const estimateCount =
+    estimateKind && draft.mediaResolution ? RESOLUTION_TOKEN_ESTIMATES[estimateKind][draft.mediaResolution] : undefined;
+  const tokenEstimate =
+    estimateKind && estimateCount !== undefined
+      ? interpolate(
+          t(
+            estimateKind === 'image'
+              ? 'fileSettingsTokenPerImage'
+              : estimateKind === 'pdf'
+                ? 'fileSettingsTokenPerPage'
+                : 'fileSettingsTokenPerFrame',
+          ),
+          { count: estimateCount },
+        )
+      : undefined;
+
   return (
     <Modal
       isOpen={isOpen}
@@ -144,6 +242,7 @@ const FileConfigModalContent: React.FC<FileConfigModalContentProps> = ({
         onClose={onClose}
         showResolutionSettings={showResolutionSettings}
         isVideo={supportsVideoConfiguration}
+        fileName={file.name}
       />
 
       <div className="p-6 space-y-6">
@@ -152,6 +251,9 @@ const FileConfigModalContent: React.FC<FileConfigModalContentProps> = ({
             mediaResolution={draft.mediaResolution}
             setMediaResolution={(value) => setDraft((prev) => ({ ...prev, mediaResolution: value }))}
             allowUltraHigh={isImage}
+            globalMediaResolution={globalMediaResolution}
+            tokenEstimate={tokenEstimate}
+            kind={estimateKind}
           />
         )}
 
@@ -159,14 +261,20 @@ const FileConfigModalContent: React.FC<FileConfigModalContentProps> = ({
           <VideoConfig
             startOffset={draft.startOffset}
             setStartOffset={(value) => setDraft((prev) => ({ ...prev, startOffset: value }))}
+            setStartOffsetBlur={(value) => handleOffsetBlur('startOffset', value)}
+            startOffsetError={startOffsetError}
             endOffset={draft.endOffset}
             setEndOffset={(value) => setDraft((prev) => ({ ...prev, endOffset: value }))}
+            setEndOffsetBlur={(value) => handleOffsetBlur('endOffset', value)}
+            endOffsetError={endOffsetError}
             fps={draft.fps}
             setFps={(value) => setDraft((prev) => ({ ...prev, fps: value }))}
+            setFpsBlur={handleFpsBlur}
+            fpsError={fpsError}
           />
         )}
 
-        <FileConfigFooter onClose={onClose} onSave={handleSave} />
+        <FileConfigFooter onClose={onClose} onSave={handleSave} disabled={hasErrors} />
       </div>
     </Modal>
   );

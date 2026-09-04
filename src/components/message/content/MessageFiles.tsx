@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { type UploadedFile } from '@/types';
 import { FileDisplay } from '@/components/message/FileDisplay';
-import { SUPPORTED_IMAGE_MIME_TYPES } from '@/constants/fileTypeSupport';
+import { isImageMimeType } from '@/utils/file/fileTypeClassification';
 
 interface MessageFilesProps {
   files: UploadedFile[];
@@ -38,7 +38,7 @@ export const MessageFiles: React.FC<MessageFilesProps> = ({
         return;
       }
 
-      const isImageFile = SUPPORTED_IMAGE_MIME_TYPES.includes(file.type) || file.type === 'image/svg+xml';
+      const isImageFile = isImageMimeType(file.type);
       if (isImageFile) imageAttachments.push(file);
       else documentAttachments.push(file);
     });

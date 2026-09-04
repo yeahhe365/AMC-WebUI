@@ -1,10 +1,13 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import DOMPurify from 'dompurify';
 import { type SideViewContent, type UploadedFile } from '@/types';
 import { DiagramWrapper } from './parts/DiagramWrapper';
 import { useI18n } from '@/contexts/I18nContext';
 import { isDarkThemeId } from '@/utils/themeMode';
+import { svgToUploadedFile } from '@/utils/export/svgToUploadedFile';
+import { useDebouncedDiagramRender } from '@/hooks/diagram/useDebouncedDiagramRender';
+import { useDiagramExport } from '@/hooks/diagram/useDiagramExport';
 
 // Strip script tags and event handlers from mermaid-rendered SVG before injection.
 // With securityLevel 'strict', mermaid already escapes HTML labels; this is a
@@ -38,16 +41,12 @@ export const MermaidBlock: React.FC<MermaidBlockProps> = ({
   const [svg, setSvg] = useState('');
   const [error, setError] = useState('');
   const [isRendering, setIsRendering] = useState(true);
-  const [isDownloading, setIsDownloading] = useState(false);
   const [diagramFile, setDiagramFile] = useState<UploadedFile | null>(null);
   const [showSource, setShowSource] = useState(false);
   const diagramContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    // Debounce rendering to avoid syntax errors while typing
-    const timeoutId = setTimeout(async () => {
+  const renderMermaid = useCallback(
+    async (isMounted: () => boolean) => {
       if (!code) return;
 
       try {
@@ -62,24 +61,19 @@ export const MermaidBlock: React.FC<MermaidBlockProps> = ({
 
         const { svg: renderedSvg } = await mermaid.render(id, code);
 
-        if (!isMounted) return;
+        if (!isMounted()) return;
 
         const sanitizedSvg = sanitizeMermaidSvg(renderedSvg);
         setSvg(sanitizedSvg);
 
-        const svgDataUrl = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(sanitizedSvg)))}`;
-        setDiagramFile({
-          id,
-          name: 'mermaid-diagram.svg',
-          type: 'image/svg+xml',
-          size: renderedSvg.length,
-          dataUrl: svgDataUrl,
-          uploadState: 'active',
-        });
+        setDiagramFile(
+          // Size intentionally mirrors the raw render output (pre-sanitization).
+          svgToUploadedFile(sanitizedSvg, { id, name: 'mermaid-diagram.svg', size: renderedSvg.length }),
+        );
         setError('');
         setIsRendering(false);
       } catch (error) {
-        if (!isMounted) return;
+        if (!isMounted()) return;
 
         if (isMessageLoading) {
           setIsRendering(true);
@@ -90,27 +84,19 @@ export const MermaidBlock: React.FC<MermaidBlockProps> = ({
           setIsRendering(false);
         }
       }
-    }, renderDelayMs);
+    },
+    [code, isMessageLoading, themeId, t],
+  );
 
-    return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
-    };
-  }, [code, isMessageLoading, themeId, renderDelayMs, t]);
+  useDebouncedDiagramRender(renderMermaid, renderDelayMs);
 
-  const handleDownloadJpg = async () => {
-    if (!svg || isDownloading) return;
-    setIsDownloading(true);
-    try {
-      const { exportSvgAsImage } = await import('@/utils/export/image');
-      await exportSvgAsImage(svg, `mermaid-diagram-${Date.now()}.jpg`, 3, 'image/jpeg');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : t('diagramExportJpgFailed');
-      setError(errorMessage);
-    } finally {
-      setIsDownloading(false);
-    }
-  };
+  const { isDownloading, handleDownloadJpg } = useDiagramExport({
+    svg,
+    filenamePrefix: 'mermaid',
+    scale: 3,
+    onError: setError,
+    fallbackErrorMessage: t('diagramExportJpgFailed'),
+  });
 
   return (
     <DiagramWrapper

@@ -153,6 +153,80 @@ describe('sendAnthropicMessageStream', () => {
     expect(onPart).toHaveBeenCalledTimes(1);
     expect(onPart.mock.calls[0][0]).toEqual({ text: 'Answer' });
   });
+
+  it('aggregates input_tokens from message_start with output_tokens from message_delta', async () => {
+    const sseBody = [
+      'event: message_start',
+      'data: {"type":"message_start","message":{"role":"assistant","usage":{"input_tokens":25,"output_tokens":1}}}',
+      '',
+      '',
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi"}}',
+      '',
+      '',
+      'event: message_delta',
+      'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":7}}',
+      '',
+      '',
+      'event: message_stop',
+      'data: {"type":"message_stop"}',
+      '',
+      '',
+    ].join('\n');
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response(sseBody, { status: 200 }));
+    const onComplete = vi.fn();
+    await sendAnthropicMessageStream(
+      'k',
+      'm',
+      [],
+      [{ text: 'x' }],
+      {},
+      new AbortController().signal,
+      vi.fn(),
+      vi.fn(),
+      vi.fn(),
+      onComplete,
+    );
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(onComplete.mock.calls[0][0]).toEqual({
+      promptTokenCount: 25,
+      candidatesTokenCount: 7,
+      totalTokenCount: 32,
+    });
+  });
+
+  it('surfaces mid-stream error events via onError', async () => {
+    const sseBody = [
+      'event: content_block_delta',
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"partial"}}',
+      '',
+      '',
+      'event: error',
+      'data: {"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}',
+      '',
+      '',
+      'event: message_stop',
+      'data: {"type":"message_stop"}',
+      '',
+      '',
+    ].join('\n');
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response(sseBody, { status: 200 }));
+    const onError = vi.fn();
+    await sendAnthropicMessageStream(
+      'k',
+      'm',
+      [],
+      [{ text: 'x' }],
+      {},
+      new AbortController().signal,
+      vi.fn(),
+      vi.fn(),
+      onError,
+      vi.fn(),
+    );
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect((onError.mock.calls[0][0] as Error).message).toBe('Overloaded');
+  });
 });
 
 describe('fetchAnthropicModels', () => {

@@ -12,6 +12,10 @@ const CURRENT_TURN_VIEWPORT_OFFSET_PX = 96;
 const SCROLL_BOTTOM_THRESHOLD_PX = 150;
 const ANCHOR_SCROLL_DELAY_MS = 50;
 const RESTORE_SCROLL_DELAY_MS = 50;
+// After a bottom jump, Virtuoso keeps re-measuring items (lazy markdown,
+// estimate replacement) and the real bottom drifts. Re-assert the bottom on
+// each total-height change for this long, unless the user scrolls away.
+const BOTTOM_LOCK_MS = 2500;
 
 type StoredMessageScrollSnapshot = {
   messageId: string;
@@ -102,12 +106,23 @@ export const useMessageListScroll = ({
   activeSessionId,
 }: UseMessageListScrollProps) => {
   const virtuosoRef = useRef<VirtuosoHandle>(null);
-  const [atBottom, setAtBottom] = useState(true);
+  // Mirrors the scroller element for imperative access from callbacks without
+  // re-creating them; the scroller state below still drives React consumers.
+  const scrollerElementRef = useRef<HTMLElement | null>(null);
+  const [atBottom, setAtBottomState] = useState(true);
+  // Mirrors `atBottom` for reads inside effects/timers without a render round-trip.
+  // Only the anchor effect consumes it, so a ref avoids re-running on every toggle.
+  const atBottomRef = useRef(true);
+  const setAtBottom = useCallback((value: boolean) => {
+    atBottomRef.current = value;
+    setAtBottomState(value);
+  }, []);
   const [visibleStartIndex, setVisibleStartIndex] = useState(0);
   const [scrollerRef, setInternalScrollerRef] = useState<HTMLElement | null>(null);
   const visibleRangeRef = useRef({ startIndex: 0, endIndex: 0 });
 
   const scrollSaveTimeoutRef = useRef<number | null>(null);
+  const lastPersistedSnapshotJsonRef = useRef<string | null>(null);
   const anchorTimeoutRef = useRef<number | null>(null);
   const restoreTimeoutRef = useRef<number | null>(null);
   const lastRestoredSessionIdRef = useRef<string | null>(null);
@@ -116,9 +131,56 @@ export const useMessageListScroll = ({
   const lastScrollTarget = useRef<number | null>(null);
   const prevMsgCount = useRef(messages.length);
   const prevSessionIdForAnchor = useRef(activeSessionId);
+  const bottomLockUntilRef = useRef(0);
+  const detachBottomLockListenersRef = useRef<(() => void) | null>(null);
+  const bottomLockPrevScrollTopRef = useRef(0);
+
+  const cancelBottomLock = useCallback(() => {
+    bottomLockUntilRef.current = 0;
+  }, []);
+
+  // Scroll events can also express escape intent (keyboard, scrollbar drag
+  // without a mousedown on the scroller, external anchors): moving notably
+  // upward while away from the bottom cancels the lock. The lock's own
+  // corrections only ever move the view down toward the bottom, so they never
+  // trip this.
+  const handleBottomLockScroll = useCallback(() => {
+    const scroller = scrollerElementRef.current;
+    if (!scroller) return;
+    const { scrollTop } = scroller;
+    const movedUp = bottomLockPrevScrollTopRef.current - scrollTop > 10;
+    bottomLockPrevScrollTopRef.current = scrollTop;
+    if (!movedUp) return;
+    if (scroller.scrollHeight - scroller.clientHeight - scrollTop > 40) {
+      cancelBottomLock();
+    }
+  }, [cancelBottomLock]);
+
+  // User scroll intent during a lock window comes from real input events —
+  // not from atBottom, which itself flickers while the height settles.
+  const activateBottomLockListeners = useCallback(() => {
+    const scroller = scrollerElementRef.current;
+    if (!scroller || detachBottomLockListenersRef.current) return;
+    const options: AddEventListenerOptions = { capture: true, passive: true };
+    scroller.addEventListener('wheel', cancelBottomLock, options);
+    scroller.addEventListener('touchmove', cancelBottomLock, options);
+    scroller.addEventListener('mousedown', cancelBottomLock, options);
+    scroller.addEventListener('scroll', handleBottomLockScroll, options);
+    detachBottomLockListenersRef.current = () => {
+      scroller.removeEventListener('wheel', cancelBottomLock, options);
+      scroller.removeEventListener('touchmove', cancelBottomLock, options);
+      scroller.removeEventListener('mousedown', cancelBottomLock, options);
+      scroller.removeEventListener('scroll', handleBottomLockScroll, options);
+    };
+  }, [cancelBottomLock, handleBottomLockScroll]);
 
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
+    // The persisted-snapshot dedup is per-session; a session switch must not
+    // suppress the first save of the new session's position.
+    lastPersistedSnapshotJsonRef.current = null;
+    // A stale bottom lock must not yank the incoming session's restore.
+    bottomLockUntilRef.current = 0;
   }, [activeSessionId]);
 
   const clearAnchorTimeout = useCallback(() => {
@@ -143,12 +205,52 @@ export const useMessageListScroll = ({
   const handleScrollerRef = useCallback(
     (ref: Window | HTMLElement | null) => {
       if (ref === null || ref instanceof HTMLElement) {
+        if (scrollerElementRef.current !== ref) {
+          detachBottomLockListenersRef.current?.();
+          detachBottomLockListenersRef.current = null;
+        }
+        scrollerElementRef.current = ref;
         setInternalScrollerRef(ref);
         setScrollContainerRef(ref as HTMLDivElement | null);
       }
     },
     [setScrollContainerRef],
   );
+
+  // react-virtuoso derives scrollToIndex({ index: 'LAST', align: 'end' })
+  // targets from its internal size tree, which settles slightly below the real
+  // DOM height, leaving the tail of the last message hidden behind the
+  // composer. Scrolling the scroller element itself lands on the true bottom;
+  // scrollToIndex remains as a fallback for before the scroller mounts.
+  const scrollToRealBottom = useCallback(
+    (behavior?: 'auto' | 'smooth') => {
+      const scroller = scrollerElementRef.current;
+      bottomLockUntilRef.current = Date.now() + BOTTOM_LOCK_MS;
+      if (scroller) {
+        bottomLockPrevScrollTopRef.current = scroller.scrollTop;
+      }
+      activateBottomLockListeners();
+      if (scroller) {
+        scroller.scrollTo(behavior ? { top: scroller.scrollHeight, behavior } : { top: scroller.scrollHeight });
+        return;
+      }
+      virtuosoRef.current?.scrollToIndex(
+        behavior ? { index: 'LAST', align: 'end', behavior } : { index: 'LAST', align: 'end' },
+      );
+    },
+    [activateBottomLockListeners],
+  );
+
+  // Wired to Virtuoso's totalListHeightChanged: while a bottom jump settles,
+  // keep the view pinned to the (moving) true bottom.
+  const handleTotalListHeightChanged = useCallback(() => {
+    if (Date.now() > bottomLockUntilRef.current) return;
+    const scroller = scrollerElementRef.current;
+    if (!scroller) return;
+    if (scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop > 1) {
+      scroller.scrollTo({ top: scroller.scrollHeight });
+    }
+  }, []);
 
   useEffect(() => {
     const sessionChanged = prevSessionIdForAnchor.current !== activeSessionId;
@@ -171,18 +273,26 @@ export const useMessageListScroll = ({
       }
 
       if (targetIndex !== -1) {
-        const sessionIdForScroll = activeSessionId;
-        clearAnchorTimeout();
-        anchorTimeoutRef.current = window.setTimeout(() => {
-          anchorTimeoutRef.current = null;
-          if (activeSessionIdRef.current !== sessionIdForScroll) return;
-          virtuosoRef.current?.scrollToIndex({
-            index: targetIndex,
-            align: 'start',
-            behavior: 'smooth',
-          });
-          lastScrollTarget.current = targetIndex;
-        }, ANCHOR_SCROLL_DELAY_MS);
+        // Anchor newly appended model turns only when the user is already at
+        // the bottom. Reading history, a queued auto-resend, or cross-tab
+        // session sync appending mid-list must not yank the view to the latest
+        // message. The ref is re-checked inside the timer so scrolling away
+        // during the debounce window cancels the pending anchor.
+        if (atBottomRef.current) {
+          const sessionIdForScroll = activeSessionId;
+          clearAnchorTimeout();
+          anchorTimeoutRef.current = window.setTimeout(() => {
+            anchorTimeoutRef.current = null;
+            if (activeSessionIdRef.current !== sessionIdForScroll) return;
+            if (!atBottomRef.current) return;
+            virtuosoRef.current?.scrollToIndex({
+              index: targetIndex,
+              align: 'start',
+              behavior: 'smooth',
+            });
+            lastScrollTarget.current = targetIndex;
+          }, ANCHOR_SCROLL_DELAY_MS);
+        }
       }
     }
     prevMsgCount.current = messages.length;
@@ -291,26 +401,35 @@ export const useMessageListScroll = ({
 
     clearAnchorTimeout();
     lastScrollTarget.current = messages.length - 1;
-    virtuosoRef.current?.scrollToIndex({ index: 'LAST', align: 'end', behavior: 'smooth' });
-  }, [messages.length, clearAnchorTimeout]);
+    scrollToRealBottom('smooth');
+  }, [messages.length, clearAnchorTimeout, scrollToRealBottom]);
 
   const handleScroll = useCallback(() => {
     if (document.hidden) return;
 
     const container = scrollerRef;
-    if (container) {
-      const { scrollTop } = container;
+    if (!container) return;
+    if (!activeSessionId || lastRestoredSessionIdRef.current !== activeSessionId || messages.length === 0) return;
 
-      if (activeSessionId && lastRestoredSessionIdRef.current === activeSessionId && messages.length > 0) {
-        const snapshot = createScrollSnapshot(container) ?? { scrollTop: Math.max(0, Math.round(scrollTop)) };
-        if (scrollSaveTimeoutRef.current) {
-          clearTimeout(scrollSaveTimeoutRef.current);
-        }
-        scrollSaveTimeoutRef.current = window.setTimeout(() => {
-          localStorage.setItem(getScrollStorageKey(activeSessionId), JSON.stringify(snapshot));
-        }, 300);
-      }
+    const { scrollTop } = container;
+    const snapshot = createScrollSnapshot(container) ?? { scrollTop: Math.max(0, Math.round(scrollTop)) };
+
+    // Skip scheduling when the snapshot is byte-identical to the last one
+    // persisted (a repeated scroll event over the same content), so a burst of
+    // same-position scrolls does not restart the debounce timer pointlessly.
+    const serialized = JSON.stringify(snapshot);
+    if (lastPersistedSnapshotJsonRef.current === serialized) {
+      return;
     }
+
+    if (scrollSaveTimeoutRef.current) {
+      clearTimeout(scrollSaveTimeoutRef.current);
+    }
+    scrollSaveTimeoutRef.current = window.setTimeout(() => {
+      scrollSaveTimeoutRef.current = null;
+      lastPersistedSnapshotJsonRef.current = serialized;
+      localStorage.setItem(getScrollStorageKey(activeSessionId), serialized);
+    }, 300);
   }, [scrollerRef, activeSessionId, messages.length]);
 
   useEffect(() => {
@@ -320,6 +439,8 @@ export const useMessageListScroll = ({
       }
       clearAnchorTimeout();
       clearRestoreTimeout();
+      detachBottomLockListenersRef.current?.();
+      detachBottomLockListenersRef.current = null;
     };
   }, [clearAnchorTimeout, clearRestoreTimeout]);
 
@@ -340,7 +461,7 @@ export const useMessageListScroll = ({
             virtuosoRef.current?.scrollTo({ top: savedSnapshot });
           } else if (savedSnapshot) {
             if ('atBottom' in savedSnapshot) {
-              virtuosoRef.current?.scrollToIndex({ index: 'LAST', align: 'end' });
+              scrollToRealBottom();
               lastRestoredSessionIdRef.current = sessionIdForRestore;
               return;
             }
@@ -356,13 +477,13 @@ export const useMessageListScroll = ({
               virtuosoRef.current?.scrollTo({ top: savedSnapshot.scrollTop });
             }
           } else {
-            virtuosoRef.current?.scrollToIndex({ index: 'LAST', align: 'end' });
+            scrollToRealBottom();
           }
           lastRestoredSessionIdRef.current = sessionIdForRestore;
         }, RESTORE_SCROLL_DELAY_MS);
       }
     }
-  }, [activeSessionId, messages, clearRestoreTimeout]);
+  }, [activeSessionId, messages, clearRestoreTimeout, scrollToRealBottom]);
 
   const showScrollDown =
     !atBottom && messages.some((message, index) => index > visibleStartIndex && message.role === 'user');
@@ -373,6 +494,7 @@ export const useMessageListScroll = ({
     handleScrollerRef,
     setAtBottom,
     onRangeChanged,
+    handleTotalListHeightChanged,
     scrollToPrevTurn,
     scrollToNextTurn,
     scrollToTop,

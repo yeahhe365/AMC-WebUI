@@ -1,7 +1,7 @@
 import { attachRelativePath, normalizeRelativePath } from './filePath';
 import { readDirectoryHandle } from './directoryHandleReader';
 import { IGNORED_DIRS } from './defaultIgnorePatterns';
-import { snapshotDroppedItems, type DroppedItemsSnapshot } from './droppedItemsSnapshot';
+import { type DroppedItemsSnapshot } from './droppedItemsSnapshot';
 
 interface DroppedItemsResult {
   files: File[];
@@ -123,12 +123,4 @@ export async function processDroppedItemsSnapshot(
     files: allFiles,
     emptyDirectoryPaths,
   };
-}
-
-export async function processDroppedItems(
-  items: DataTransferItemList,
-  signal?: AbortSignal,
-  options: ProcessDroppedItemsOptions = {},
-): Promise<DroppedItemsResult> {
-  return processDroppedItemsSnapshot(snapshotDroppedItems(items), signal, options);
 }

@@ -15,12 +15,10 @@ const { loadableScenario, scenarioManagerState } = vi.hoisted(() => ({
     editingScenario: null,
     searchQuery: '',
     setSearchQuery: vi.fn(),
-    feedback: null,
     importInputRef: { current: null },
     systemScenarioIds: [],
     builtInScenarioIds: [],
     hasUnsavedChanges: true,
-    showFeedback: vi.fn(),
     actions: {
       handleStartAddNew: vi.fn(),
       handleStartEdit: vi.fn(),
@@ -28,7 +26,6 @@ const { loadableScenario, scenarioManagerState } = vi.hoisted(() => ({
       handleCancelEdit: vi.fn(),
       handleSaveScenario: vi.fn(),
       handleDeleteScenario: vi.fn(),
-      handleSaveAllAndClose: vi.fn(),
       handleExportScenarios: vi.fn(),
       handleExportSingleScenario: vi.fn(),
       handleImportScenarios: vi.fn(),
@@ -38,6 +35,11 @@ const { loadableScenario, scenarioManagerState } = vi.hoisted(() => ({
 
 vi.mock('@/hooks/scenarios/useScenarioManager', () => ({
   useScenarioManager: () => scenarioManagerState,
+}));
+
+vi.mock('@/stores/toastStore', () => ({
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
 }));
 
 vi.mock('@/components/shared/Modal', () => ({
@@ -96,10 +98,9 @@ describe('PreloadedMessagesModal', () => {
     });
 
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(scenarioManagerState.actions.handleSaveAllAndClose).not.toHaveBeenCalled();
   });
 
-  it('asks for confirmation before closing with unsaved changes', () => {
+  it('asks for confirmation before closing with unsaved editor changes', () => {
     const onClose = vi.fn();
 
     act(() => {
@@ -124,7 +125,6 @@ describe('PreloadedMessagesModal', () => {
       closeButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    // Unsaved changes should gate the close behind a confirmation, not close yet.
     expect(onClose).not.toHaveBeenCalled();
 
     const discardButton = Array.from(renderer.container.querySelectorAll('button')).find((button) =>
@@ -138,10 +138,9 @@ describe('PreloadedMessagesModal', () => {
     });
 
     expect(onClose).toHaveBeenCalledTimes(1);
-    expect(scenarioManagerState.actions.handleSaveAllAndClose).not.toHaveBeenCalled();
   });
 
-  it('persists changes only when the explicit save button is clicked', () => {
+  it('does not render a deferred save-all action', () => {
     act(() => {
       renderer.root.render(
         <PreloadedMessagesModal
@@ -154,17 +153,11 @@ describe('PreloadedMessagesModal', () => {
       );
     });
 
-    const saveButton = Array.from(renderer.container.querySelectorAll('button')).find((button) =>
-      button.textContent?.includes('Save'),
+    const saveAllButton = Array.from(renderer.container.querySelectorAll('button')).find((button) =>
+      /save all|全部保存/i.test(button.textContent ?? ''),
     );
 
-    expect(saveButton).not.toBeUndefined();
-
-    act(() => {
-      saveButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-
-    expect(scenarioManagerState.actions.handleSaveAllAndClose).toHaveBeenCalledTimes(1);
+    expect(saveAllButton).toBeUndefined();
   });
 
   it('uses compact desktop spacing in the scenario list content area', () => {
@@ -188,7 +181,7 @@ describe('PreloadedMessagesModal', () => {
     expect(contentArea?.className).not.toContain('md:p-8');
   });
 
-  it('matches the settings modal desktop corner radius', () => {
+  it('matches the settings modal desktop shell', () => {
     act(() => {
       renderer.root.render(
         <PreloadedMessagesModal
@@ -204,7 +197,32 @@ describe('PreloadedMessagesModal', () => {
     const modalShell = renderer.container.querySelector('[data-testid="modal-shell"]');
 
     expect(modalShell?.className).toContain('sm:rounded-xl');
+    expect(modalShell?.className).toContain('sm:h-[85vh]');
+    expect(modalShell?.className).toContain('sm:max-h-[800px]');
+    expect(modalShell?.className).toContain('max-w-6xl');
     expect(modalShell?.className).not.toContain('sm:rounded-3xl');
+    expect(modalShell?.className).not.toContain('sm:max-w-7xl');
+    expect(modalShell?.className).not.toContain('sm:h-[90vh]');
+  });
+
+  it('keeps the list title at the settings heading scale', () => {
+    act(() => {
+      renderer.root.render(
+        <PreloadedMessagesModal
+          isOpen
+          onClose={vi.fn()}
+          savedScenarios={[]}
+          onSaveAllScenarios={vi.fn()}
+          onLoadScenario={vi.fn()}
+        />,
+      );
+    });
+
+    const title = renderer.container.querySelector('#scenarios-title');
+    expect(title?.className).toContain('text-xl');
+    expect(title?.className).toContain('font-semibold');
+    expect(title?.className).not.toContain('text-2xl');
+    expect(title?.className).not.toContain('font-bold');
   });
 
   it('cleans up the delayed close when a loaded scenario is dismissed before the timeout fires', () => {

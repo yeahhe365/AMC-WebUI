@@ -1,11 +1,12 @@
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useState } from 'react';
-import { getErrorMessage } from '@/utils/errorMessage';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import { useAppSettings } from '@/hooks/core/useAppSettings';
 import { useChat } from '@/hooks/chat/useChat';
 import { useAppUi } from '@/hooks/core/useAppUi';
 import { useAppEvents } from '@/hooks/core/useAppEvents';
 import { usePictureInPicture } from '@/hooks/core/usePictureInPicture';
 import { logService } from '@/services/logService';
+import { toastError } from '@/stores/toastStore';
 import { getTranslator } from '@/i18n/translations';
 import { applyThemeToDocument } from '@/utils/themeDom';
 import { useUIStore } from '@/stores/uiStore';
@@ -29,7 +30,9 @@ import { useAppFavicon } from './useAppFavicon';
 import { focusChatInput } from '@/utils/chat-input/focus';
 import { useAppPromptModes } from './useAppPromptModes';
 import { DEFAULT_THINKING_BUDGET } from '@/constants/modelConfiguration';
+import { DEFAULT_CHAT_SETTINGS } from '@/constants/settingsDefaults';
 import { getModelCapabilities } from '@/utils/model/modelCapabilities';
+import { formatI18nErrorMessage } from '@/i18n/interpolate';
 
 type AppTranslator = ReturnType<typeof getTranslator>;
 type ChatViewModel = ReturnType<typeof useChat>;
@@ -42,7 +45,7 @@ export interface AppViewModel {
   appSettings: AppSettings;
   setAppSettings: Dispatch<SetStateAction<AppSettings>>;
   currentTheme: Theme;
-  language: 'en' | 'zh';
+  language: SupportedLanguage;
   t: AppTranslator;
   chatState: ChatViewModel;
   uiState: AppUiViewModel;
@@ -127,8 +130,8 @@ export const useApp = (): AppViewModel => {
   }, [pipState.pipWindow, currentTheme, appSettings]);
 
   const providerAwareModels = useMemo(
-    () => buildProviderAwareModelList(appSettings, apiModels),
-    [appSettings, apiModels],
+    () => buildProviderAwareModelList(appSettings, apiModels, currentChatSettings),
+    [appSettings, apiModels, currentChatSettings],
   );
 
   const eventsState = useAppEvents({
@@ -158,7 +161,7 @@ export const useApp = (): AppViewModel => {
     sessionTitle,
   });
 
-  useAppFavicon({ isLoading, activeSessionId });
+  useAppFavicon({ activeSessionId });
 
   const dataExport = useDataExport({
     appSettings,
@@ -198,7 +201,7 @@ export const useApp = (): AppViewModel => {
         setIsExportModalOpen(false);
       } catch (error) {
         logService.error(`Chat export failed (format: ${format})`, { error });
-        alert(t('exportFailedWithMessage').replace('{message}', getErrorMessage(error)));
+        toastError(formatI18nErrorMessage(t, 'exportFailedWithMessage', error));
       } finally {
         setExportStatus('idle');
       }
@@ -208,9 +211,29 @@ export const useApp = (): AppViewModel => {
 
   const handleSaveSettings = useCallback(
     (newSettings: AppSettings) => {
+      // Chat-level keys that changed globally must also be written through to
+      // the active session: while a session is open, its settings snapshot
+      // shadows appSettings, so without this the settings modal would silently
+      // not apply to the open chat. Unchanged keys keep session-local overrides.
+      // Model identity (modelId/providerId) stays session-scoped — it is chosen
+      // per chat via the header model picker — and lockedApiKey is session-owned.
+      const changedChatSettings: Partial<ChatSettings> = {};
+      (Object.keys(DEFAULT_CHAT_SETTINGS) as (keyof ChatSettings)[]).forEach((key) => {
+        if (key === 'lockedApiKey' || key === 'modelId' || key === 'providerId') {
+          return;
+        }
+        if (!Object.is(appSettings[key], newSettings[key])) {
+          (changedChatSettings as Record<string, unknown>)[key] = newSettings[key];
+        }
+      });
+      const hasChatSettingChanges = Object.keys(changedChatSettings).length > 0;
+
       setAppSettings(newSettings);
+      if (activeSessionId && hasChatSettingChanges) {
+        setCurrentChatSettings((prevChatSettings) => ({ ...prevChatSettings, ...changedChatSettings }));
+      }
     },
-    [setAppSettings],
+    [activeSessionId, appSettings, setCurrentChatSettings, setAppSettings],
   );
 
   const handleSaveCurrentChatSettings = useCallback(
@@ -226,7 +249,7 @@ export const useApp = (): AppViewModel => {
       setCurrentChatSettings((prevChatSettings) => ({
         ...prevChatSettings,
         ...newSettings,
-        lockedApiKey: null,
+        lockedApiKey: prevChatSettings.lockedApiKey ?? null,
       }));
     },
     [activeSessionId, currentChatSettings.modelId, handleSelectModelInHeader, setCurrentChatSettings],

@@ -87,6 +87,10 @@ export const createChatExportElement = async (
                   onOpenSidePanel: noop as (content: SideViewContent) => void,
                   onConfigureFile: noop as (file: UploadedFile, messageId: string) => void,
                   isGemini3: false,
+                  // The export host is rendered offscreen (left: -9999px), so
+                  // IntersectionObserver never fires and deferred diagrams would
+                  // export as their placeholder button. Load them eagerly.
+                  diagramLoadMode: 'eager',
                 }),
               ),
             ),

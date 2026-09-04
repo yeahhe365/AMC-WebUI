@@ -463,6 +463,39 @@ describe('useSelectionPosition', () => {
     unmount();
   });
 
+  const flushAnimationFrame = async () => {
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
+  };
+
+  it('makes plain selected text available as soon as the toolbar is positioned', () => {
+    const host = document.createElement('div');
+    const strong = document.createElement('strong');
+    strong.textContent = 'hello world';
+    host.appendChild(strong);
+    document.body.appendChild(host);
+
+    const toolbarRef = createToolbarRef();
+    const { result, unmount } = renderHook(() =>
+      useSelectionPosition({
+        containerRef: host,
+        isAudioActive: false,
+        toolbarRef,
+      }),
+    );
+
+    selectNode(strong);
+
+    expect(result.current.position).not.toBeNull();
+    expect(result.current.selectedSpeechText).toBe('hello world');
+    expect(result.current.selectedText).toBe('hello world');
+
+    unmount();
+  });
+
   it('preserves the toolbar anchor while audio playback is active', async () => {
     const host = document.createElement('div');
     const strong = document.createElement('strong');
@@ -508,6 +541,92 @@ describe('useSelectionPosition', () => {
     unmount();
   });
 
+  it('preserves the toolbar when mouseup collapses the selection while audio is active', async () => {
+    const host = document.createElement('div');
+    const strong = document.createElement('strong');
+    strong.textContent = 'hello world';
+    host.appendChild(strong);
+    document.body.appendChild(host);
+
+    const toolbarRef = createToolbarRef();
+    let isAudioActive = false;
+
+    const { result, rerender, unmount } = renderHook(() =>
+      useSelectionPosition({
+        containerRef: host,
+        isAudioActive,
+        toolbarRef,
+      }),
+    );
+
+    selectNode(strong);
+
+    await vi.waitFor(() => {
+      expect(result.current.selectedText).toBe('**hello world**');
+      expect(result.current.position).not.toBeNull();
+    });
+
+    isAudioActive = true;
+    rerender(() =>
+      useSelectionPosition({
+        containerRef: host,
+        isAudioActive,
+        toolbarRef,
+      }),
+    );
+
+    window.getSelection()?.removeAllRanges();
+    act(() => {
+      document.dispatchEvent(new Event('mouseup'));
+    });
+    await flushAnimationFrame();
+
+    expect(result.current.selectedText).toBe('**hello world**');
+    expect(result.current.position).not.toBeNull();
+
+    unmount();
+  });
+
+  it('preserves the toolbar when selection collapses before isAudioActive re-renders', async () => {
+    const host = document.createElement('div');
+    const strong = document.createElement('strong');
+    strong.textContent = 'hello world';
+    host.appendChild(strong);
+    document.body.appendChild(host);
+
+    const toolbarRef = createToolbarRef();
+    const isAudioActiveRef = { current: false };
+
+    const { result, unmount } = renderHook(() =>
+      useSelectionPosition({
+        containerRef: host,
+        isAudioActive: false,
+        isAudioActiveRef,
+        toolbarRef,
+      }),
+    );
+
+    selectNode(strong);
+
+    await vi.waitFor(() => {
+      expect(result.current.selectedText).toBe('**hello world**');
+      expect(result.current.position).not.toBeNull();
+    });
+
+    isAudioActiveRef.current = true;
+    window.getSelection()?.removeAllRanges();
+    act(() => {
+      document.dispatchEvent(new Event('selectionchange'));
+      document.dispatchEvent(new Event('mouseup'));
+    });
+    await flushAnimationFrame();
+
+    expect(result.current.selectedText).toBe('**hello world**');
+    expect(result.current.position).not.toBeNull();
+
+    unmount();
+  });
+
   it('reads text selection relayed from a Live Artifact iframe', () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -540,6 +659,7 @@ describe('useSelectionPosition', () => {
     });
 
     expect(result.current.selectedText).toBe('artifact text');
+    expect(result.current.selectedSpeechText).toBe('artifact text');
     expect(result.current.selectedCopyText).toBe('artifact text');
     expect(result.current.position).toEqual({ top: 110, left: 280 });
 

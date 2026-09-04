@@ -1,14 +1,20 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { type ApiMode, type MediaResolution, type ModelOption, type ThinkingLevel, THINKING_LEVELS } from '@/types';
 import {
-  createPersistedStateStorage,
-  readPersistentStorageItem,
-  registerPersistedStoreSync,
-} from './persistentStorage';
+  type MediaResolution,
+  type ModelOption,
+  type ThinkingLevel,
+  normalizeModelApiModeTag,
+  THINKING_LEVELS,
+} from '@/types';
+import { readPersistentStorageItem } from './persistentStorage';
+import { createSyncedPersist, type PersistedStoreApi } from './syncedPersist';
 import { safeJsonParse } from '@/utils/safeJsonParse';
 
 const MODEL_PREFERENCES_STORE_STORAGE_KEY = 'all_model_chat_model_preferences_v1';
+const { storage: modelPreferencesSyncedStorage, sync: syncModelPreferences } = createSyncedPersist(
+  MODEL_PREFERENCES_STORE_STORAGE_KEY,
+);
 
 const LEGACY_CUSTOM_MODELS_KEY = 'custom_model_list_v1';
 const LEGACY_MODEL_SETTINGS_CACHE_KEY = 'model_settings_cache';
@@ -34,8 +40,6 @@ interface ModelPreferencesActions {
 
 const parseJson = (rawValue: string | null): unknown => (rawValue ? safeJsonParse(rawValue, undefined) : undefined);
 
-const isApiMode = (value: unknown): value is ApiMode => value === 'gemini-native' || value === 'openai-compatible';
-
 const normalizeModelOptions = (value: unknown): ModelOption[] | null => {
   if (!Array.isArray(value)) {
     return null;
@@ -54,12 +58,14 @@ const normalizeModelOptions = (value: unknown): ModelOption[] | null => {
       return;
     }
 
+    const apiModeTag = normalizeModelApiModeTag(model.apiMode);
+
     seenIds.add(model.id);
     models.push({
       id: model.id,
       name: typeof model.name === 'string' && model.name ? model.name : model.id,
       ...(typeof model.isPinned === 'boolean' ? { isPinned: model.isPinned } : {}),
-      ...(isApiMode(model.apiMode) ? { apiMode: model.apiMode } : {}),
+      ...(apiModeTag ? { apiMode: apiModeTag } : {}),
     });
   });
 
@@ -144,7 +150,7 @@ export const useModelPreferencesStore = create<ModelPreferencesState & ModelPref
     }),
     {
       name: MODEL_PREFERENCES_STORE_STORAGE_KEY,
-      storage: createJSONStorage(() => createPersistedStateStorage()),
+      storage: createJSONStorage(() => modelPreferencesSyncedStorage),
       partialize: (state) => ({
         customModels: state.customModels,
         modelSettingsCache: state.modelSettingsCache,
@@ -153,4 +159,4 @@ export const useModelPreferencesStore = create<ModelPreferencesState & ModelPref
   ),
 );
 
-registerPersistedStoreSync(useModelPreferencesStore, MODEL_PREFERENCES_STORE_STORAGE_KEY);
+syncModelPreferences(useModelPreferencesStore as PersistedStoreApi);

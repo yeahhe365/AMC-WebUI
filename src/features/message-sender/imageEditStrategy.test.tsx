@@ -9,6 +9,7 @@ const {
   buildContentPartsMock,
   createChatHistoryForApiMock,
   performOptimisticSessionUpdateMock,
+  createMessageMock,
   createUploadedFileFromBase64Mock,
 } = vi.hoisted(() => ({
   handleApiErrorMock: vi.fn(),
@@ -16,6 +17,13 @@ const {
   buildContentPartsMock: vi.fn(),
   createChatHistoryForApiMock: vi.fn(),
   performOptimisticSessionUpdateMock: vi.fn((prev: unknown) => prev),
+  createMessageMock: vi.fn((role: string, content: string, options: Record<string, unknown> = {}) => ({
+    id: options.id ?? `${role}-message`,
+    role,
+    content,
+    timestamp: new Date('2026-04-21T00:00:00.000Z'),
+    ...options,
+  })),
   createUploadedFileFromBase64Mock: vi.fn(() => ({
     id: 'file-1',
     name: 'edited-image-1.png',
@@ -41,17 +49,12 @@ vi.mock('@/utils/chat/builder', () => ({
     'A previously generated image is missing from this image edit history. Please reattach the image or start a new image edit turn.',
 }));
 
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
 vi.mock('@/utils/chat/session', async () => {
   const { createChatSessionMockModule } = await import('@/test/doubles/moduleMocks');
 
   return createChatSessionMockModule({
     performOptimisticSessionUpdate: performOptimisticSessionUpdateMock,
+    createMessage: createMessageMock,
   });
 });
 
@@ -118,7 +121,6 @@ describe('imageEditStrategy', () => {
         aspectRatio: '1:1',
         imageSize: '2K',
         imageOutputMode: 'IMAGE_TEXT',
-        personGeneration: 'ALLOW_ADULT',
         t: getTranslator('en'),
         updateAndPersistSessions,
         setActiveSessionId,
@@ -163,6 +165,13 @@ describe('imageEditStrategy', () => {
       }),
     );
     expect(runMessageLifecycle).toHaveBeenCalledOnce();
+    expect(createMessageMock).toHaveBeenCalledWith(
+      'user',
+      'edit this image',
+      expect.objectContaining({
+        apiParts: [{ text: 'edit this image' }],
+      }),
+    );
   });
 
   it('uses translated image edit errors and partial failure notes', async () => {
@@ -203,7 +212,6 @@ describe('imageEditStrategy', () => {
         aspectRatio: '1:1',
         imageSize: '2K',
         imageOutputMode: 'IMAGE_TEXT',
-        personGeneration: 'ALLOW_ADULT',
         t: getTranslator('zh'),
         updateAndPersistSessions,
         setActiveSessionId,
@@ -280,7 +288,6 @@ describe('imageEditStrategy', () => {
         aspectRatio: '1:1',
         imageSize: '2K',
         imageOutputMode: 'IMAGE_TEXT',
-        personGeneration: 'ALLOW_ADULT',
         t: getTranslator('zh'),
         updateAndPersistSessions: vi.fn(),
         setActiveSessionId: vi.fn(),

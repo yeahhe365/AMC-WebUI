@@ -25,7 +25,6 @@ describe('useVoiceInput', () => {
     cancelRecording: vi.fn(),
     onStop: undefined as ((blob: Blob) => void) | undefined,
     onError: undefined as ((error: string) => void) | undefined,
-    onSystemAudioWarning: undefined as ((warning: string | null) => void) | undefined,
   };
 
   beforeEach(() => {
@@ -37,20 +36,14 @@ describe('useVoiceInput', () => {
     recorderState.cancelRecording = vi.fn();
     recorderState.onStop = undefined;
     recorderState.onError = undefined;
-    recorderState.onSystemAudioWarning = undefined;
     prepareAudioForGeminiTranscriptionMock.mockImplementation(async (blob: Blob) => {
       return new File([blob], 'voice-input.mp3', { type: 'audio/mpeg' });
     });
 
     mockUseRecorder.mockImplementation(
-      (options?: {
-        onStop?: (blob: Blob) => void;
-        onError?: (error: string) => void;
-        onSystemAudioWarning?: (warning: string | null) => void;
-      }) => {
+      (options?: { onStop?: (blob: Blob) => void; onError?: (error: string) => void }) => {
         recorderState.onStop = options?.onStop;
         recorderState.onError = options?.onError;
-        recorderState.onSystemAudioWarning = options?.onSystemAudioWarning;
         return {
           status: recorderState.status,
           isInitializing: recorderState.isInitializing,
@@ -110,40 +103,26 @@ describe('useVoiceInput', () => {
     unmount();
   });
 
-  it('reports system audio fallback warnings through the chat input file error channel', () => {
-    const setAppFileError = vi.fn();
-    const { result, unmount } = renderHook(() =>
+  it('keeps the raw microphone signal by opting out of speech enhancement', () => {
+    const { unmount } = renderHook(() =>
       useVoiceInput({
         onTranscribeAudio: vi.fn(async () => ''),
         setInputText: vi.fn(),
-        setAppFileError,
         textareaRef: { current: null },
       }),
     );
 
-    act(() => {
-      recorderState.onSystemAudioWarning?.(
-        'System audio was not shared. Recording continued with microphone audio only.',
-      );
-    });
-
-    expect(result.current.systemAudioWarning).toBe(
-      'System audio was not shared. Recording continued with microphone audio only.',
-    );
-    expect(setAppFileError).toHaveBeenCalledWith(
-      'System audio was not shared. Recording continued with microphone audio only.',
-    );
+    expect(mockUseRecorder).toHaveBeenCalledWith(expect.objectContaining({ enhanceSpeech: false }));
 
     unmount();
   });
 
-  it('always starts input-bar voice recording with microphone audio only', () => {
+  it('starts input-bar voice recording without a system audio request', () => {
     const { result, unmount } = renderHook(() =>
       useVoiceInput({
         onTranscribeAudio: vi.fn(async () => ''),
         setInputText: vi.fn(),
         setAppFileError: vi.fn(),
-        isSystemAudioRecordingEnabled: true,
         textareaRef: { current: null },
       }),
     );
@@ -152,12 +131,12 @@ describe('useVoiceInput', () => {
       result.current.handleVoiceInputClick();
     });
 
-    expect(recorderState.startRecording).toHaveBeenCalledWith({ captureSystemAudio: false });
+    expect(recorderState.startRecording).toHaveBeenCalledWith();
 
     unmount();
   });
 
-  it('always converts recorded audio before transcription, even when compression setting is off', async () => {
+  it('always converts recorded audio before transcription', async () => {
     const onTranscribeAudio = vi.fn(async () => '你好');
     const setInputText = vi.fn();
     const converted = new File([new Uint8Array([1, 2, 3])], 'voice-input.mp3', { type: 'audio/mpeg' });
@@ -167,7 +146,6 @@ describe('useVoiceInput', () => {
       useVoiceInput({
         onTranscribeAudio,
         setInputText,
-        isAudioCompressionEnabled: false,
         textareaRef: { current: null },
       }),
     );

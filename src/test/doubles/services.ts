@@ -10,6 +10,7 @@ type MockDbService = MockRecord & {
   getAllSessions: MockFn;
   getAllSessionMetadata: MockFn;
   getSession: MockFn;
+  getSessionMetadataOnly: MockFn;
   searchSessions: MockFn;
   setAllSessions: MockFn;
   saveSession: MockFn;
@@ -38,6 +39,7 @@ type MockLogService = MockRecord & {
   warn: MockFn;
   info: MockFn;
   debug: MockFn;
+  setEnabled: MockFn;
   recordTokenUsage: MockFn;
   recordApiKeyUsage: MockFn;
   getRecentLogs: MockFn;
@@ -58,6 +60,7 @@ export const createMockDbService = (overrides: Partial<MockDbService> = {}): Moc
   getAllSessions: asyncMockFn([]),
   getAllSessionMetadata: asyncMockFn([]),
   getSession: asyncMockFn(null),
+  getSessionMetadataOnly: asyncMockFn(null),
   searchSessions: asyncMockFn([]),
   setAllSessions: asyncMockFn(undefined),
   saveSession: asyncMockFn(undefined),
@@ -91,6 +94,7 @@ export const createMockLogService = (overrides: Partial<MockLogService> = {}): M
   warn: mockFn(),
   info: mockFn(),
   debug: mockFn(),
+  setEnabled: mockFn(),
   recordTokenUsage: mockFn(),
   recordApiKeyUsage: mockFn(),
   getRecentLogs: asyncMockFn([]),

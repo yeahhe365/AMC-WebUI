@@ -10,8 +10,18 @@ import {
 import { mergeUsageMetadata, mergeUrlContextMetadata } from './messageStreamMetadata';
 
 type MessageStreamEvent =
-  | { type: 'part'; part: Part; receivedAt?: Date }
-  | { type: 'thought'; text: string; receivedAt?: Date }
+  | {
+      type: 'part';
+      part: Part;
+      /** Split deltas for inline-reasoning streams (third-party providers). When
+       *  absent, contentDelta falls back to getContentDeltaFromPart so Live API
+       *  and other callers that pass raw parts behave exactly as before. */
+      contentDelta?: string;
+      thoughtDelta?: string;
+      receivedAt?: Date;
+      recordFirstToken?: boolean;
+    }
+  | { type: 'thought'; text: string; receivedAt?: Date; recordFirstToken?: boolean }
   | { type: 'files'; files: UploadedFile[]; receivedAt?: Date }
   | {
       type: 'complete';
@@ -32,6 +42,9 @@ export interface MessageStreamState {
   files: UploadedFile[];
   firstTokenTimeMs?: number;
   firstContentPartTime: Date | null;
+  lastThoughtChunkTimeMs?: number;
+  lastContentPartTime?: Date;
+  thinkingActive: boolean;
   usage?: UsageMetadata;
   grounding?: MetadataWithCitations;
   urlContext?: unknown;
@@ -52,10 +65,20 @@ export const createMessageStreamState = ({
   apiParts: [],
   files: [],
   firstContentPartTime: null,
+  thinkingActive: false,
   aborted: false,
 });
 
-const isMeaningfulPart = (part: Part) => {
+// A part counts as "thinking has ended" only when it visibly switches the
+// turn to answering. Visible content (the split contentDelta or generated
+// media) ends thinking; interleaved code execution is a tooling round-trip, so
+// it keeps the thinking state alive so the thinking strip survives the
+// round-trip and resumes if the model thinks again afterwards.
+const hasInlineData = (part: Part): boolean => Boolean((part as Part & { inlineData?: unknown }).inlineData);
+
+// Any part that can carry model output is a "token", but it must not end the
+// thinking state (see hasContentEnd below).
+const isTokenPart = (part: Part) => {
   const anyPart = part as Part & {
     text?: string;
     executableCode?: unknown;
@@ -95,25 +118,82 @@ const recordFirstContentPart = (state: MessageStreamState, receivedAt?: Date): M
 };
 
 export const reduceMessageStreamEvent = (state: MessageStreamState, event: MessageStreamEvent): MessageStreamState => {
+  // recordFirstToken:false marks a replay (non-streaming reply, tool-loop final
+  // turn) whose parts all arrive at completion time. Such replays must not
+  // advance the first-token timestamp or per-chunk thinking timings — those
+  // would be stamped "now" and zero out the thinking-time display. They still
+  // record the first content part so finalizeMessages can measure the total
+  // run as the thinking duration.
+  const isReplay = 'recordFirstToken' in event && event.recordFirstToken === false;
+
   switch (event.type) {
-    case 'thought':
+    case 'thought': {
+      const receivedAt = event.receivedAt ?? new Date();
+      if (isReplay) {
+        return {
+          ...state,
+          thoughts: state.thoughts + event.text,
+        };
+      }
+
       return {
-        ...recordFirstToken(state, event.receivedAt),
+        ...recordFirstToken(state, receivedAt),
         thoughts: state.thoughts + event.text,
+        lastThoughtChunkTimeMs: receivedAt.getTime() - state.generationStartTime.getTime(),
+        thinkingActive: true,
       };
+    }
     case 'part': {
-      let nextState = recordFirstToken(state, event.receivedAt);
-      if (isMeaningfulPart(event.part)) {
-        nextState = recordFirstContentPart(nextState, event.receivedAt);
+      const receivedAt = event.receivedAt ?? new Date();
+      const contentDelta = event.contentDelta ?? getContentDeltaFromPart(event.part);
+      const thoughtDelta = event.thoughtDelta ?? '';
+      let nextState = state;
+      if (!isReplay && isTokenPart(event.part)) {
+        nextState = recordFirstToken(state, receivedAt);
+      }
+
+      // Content-end is decided on visible *text* content. When split deltas are
+      // supplied (inline-reasoning streams) contentDelta is authoritative; a
+      // part whose raw text is entirely inline reasoning yields an empty delta
+      // and must not end thinking. Without deltas, fall back to the raw part
+      // text — executableCode/codeExecutionResult derive markdown from
+      // getContentDeltaFromPart but are tooling round-trips, not the model
+      // switching to answering. inlineData (images) still ends thinking.
+      const hasVisibleText =
+        event.contentDelta !== undefined
+          ? contentDelta.trim().length > 0
+          : Boolean((event.part as Part & { text?: string }).text?.trim());
+      const hasContentEnd = hasVisibleText || hasInlineData(event.part);
+
+      if (hasContentEnd) {
+        nextState = recordFirstContentPart(nextState, receivedAt);
       }
 
       const generatedFile = getGeneratedFileFromPart(event.part);
 
+      // Split thought deltas append to thoughts and, outside replay, keep the
+      // thinking state alive and stamp the chunk time. Replays still get the
+      // thought text (non-streaming third-party replies must render it) but
+      // must not advance the live timing state machine.
+      const thoughts = thoughtDelta ? nextState.thoughts + thoughtDelta : nextState.thoughts;
+      const lastThoughtChunkTimeMs =
+        !isReplay && thoughtDelta
+          ? receivedAt.getTime() - state.generationStartTime.getTime()
+          : nextState.lastThoughtChunkTimeMs;
+      const thinkingActive =
+        !isReplay && hasContentEnd ? false : !isReplay && thoughtDelta ? true : nextState.thinkingActive;
+
       return {
         ...nextState,
-        content: nextState.content + getContentDeltaFromPart(event.part),
+        content: nextState.content + contentDelta,
+        thoughts,
         apiParts: appendApiPart(nextState.apiParts, event.part),
         files: generatedFile ? mergeUniqueFiles(nextState.files, [generatedFile]) : nextState.files,
+        // lastContentPartTime drives the mid-stream "thinking ended" commit; a
+        // replay measures the whole run once at finalize instead.
+        lastContentPartTime: !isReplay && hasContentEnd ? receivedAt : nextState.lastContentPartTime,
+        thinkingActive,
+        lastThoughtChunkTimeMs,
       };
     }
     case 'files':

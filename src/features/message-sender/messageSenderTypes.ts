@@ -1,4 +1,5 @@
 import type { MutableRefObject } from 'react';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import {
   type AppSettings,
   type ChatMessage,
@@ -6,7 +7,6 @@ import {
   type SavedChatSession,
   type UploadedFile,
   type ImageOutputMode,
-  type ImagePersonGeneration,
 } from '@/types';
 import type { Part, UsageMetadata } from '@google/genai';
 import type { getTranslator } from '@/i18n/translations';
@@ -18,6 +18,17 @@ export type SessionsUpdater = (
 
 export type MessageSenderTranslator = ReturnType<typeof getTranslator>;
 
+export interface StreamHandlerOptions {
+  /** When false, replayed parts (non-streaming replies, tool-loop final turn) do
+   *  not advance the first-token timestamp, which would otherwise be stamped at
+   *  completion time and zero out the "thinking took" display. */
+  recordFirstToken?: boolean;
+  /** Provenance of the thought text, stamped on the message the first time a
+   *  thought arrives. `'third-party'` forces the flat strip (no sectioned
+   *  rendering); `'gemini'` (or undefined) allows Gemini-style sections. */
+  source?: 'gemini' | 'third-party';
+}
+
 export interface StreamHandlerFunctions {
   streamOnError: (error: Error) => void;
   streamOnComplete: (
@@ -26,8 +37,8 @@ export interface StreamHandlerFunctions {
     urlContextMetadata?: unknown,
     generatedFiles?: UploadedFile[],
   ) => void;
-  streamOnPart: (part: Part) => void;
-  onThoughtChunk: (thoughtChunk: string) => void;
+  streamOnPart: (part: Part, options?: StreamHandlerOptions) => void;
+  onThoughtChunk: (thoughtChunk: string, options?: StreamHandlerOptions) => void;
 }
 
 export type GetStreamHandlers = (
@@ -48,7 +59,7 @@ export interface BaseSenderProps {
   setSessionLoading: (sessionId: string, isLoading: boolean) => void;
   activeJobs: MutableRefObject<Map<string, AbortController>>;
   setAppFileError: (error: string | null) => void;
-  language: 'en' | 'zh';
+  language: SupportedLanguage;
 }
 
 export interface StandardChatProps extends BaseSenderProps {
@@ -57,7 +68,6 @@ export interface StandardChatProps extends BaseSenderProps {
   aspectRatio: string;
   imageSize?: string;
   imageOutputMode: ImageOutputMode;
-  personGeneration: ImagePersonGeneration;
   userScrolledUpRef: MutableRefObject<boolean>;
   activeSessionId: string | null;
   setActiveSessionId: (id: string | null) => void;

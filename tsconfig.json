@@ -1,7 +1,6 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "experimentalDecorators": true,
     "useDefineForClassFields": false,
     "module": "ESNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
@@ -22,5 +21,6 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": ["dist", "server/dist"]
 }

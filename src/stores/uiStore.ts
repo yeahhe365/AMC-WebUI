@@ -1,10 +1,14 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { DESKTOP_BREAKPOINT_PX } from '@/constants/layout';
-import { createPersistedStateStorage, readPersistentStorageItem } from './persistentStorage';
+import { readPersistentStorageItem } from './persistentStorage';
+import { createSyncedPersist } from './syncedPersist';
 import { resolveUpdaterOrValue, type UpdaterOrValue } from './stateUpdaters';
 
 const UI_PREFERENCES_STORAGE_KEY = 'all_model_chat_ui_preferences_v1';
+const { storage: uiSyncedStorage } = createSyncedPersist(UI_PREFERENCES_STORAGE_KEY, {
+  enableCrossTabSync: false,
+});
 const LEGACY_HISTORY_SIDEBAR_STORAGE_KEY = 'all_model_chat_history_sidebar_v1';
 
 type HistorySidebarPreferences = {
@@ -47,6 +51,8 @@ const buildInitialHistorySidebarState = () => {
   };
 };
 
+export type HistoryDisplayMode = 'group' | 'time';
+
 interface UIState {
   isSettingsModalOpen: boolean;
   isPreloadedMessagesModalOpen: boolean;
@@ -55,6 +61,7 @@ interface UIState {
   mobileHistorySidebarOpen: boolean;
   isLogViewerOpen: boolean;
   chatInputHeight: number;
+  historyDisplayMode: HistoryDisplayMode;
 }
 
 interface UIActions {
@@ -66,9 +73,13 @@ interface UIActions {
   setIsLogViewerOpen: (value: UpdaterOrValue<boolean>) => void;
   toggleHistorySidebar: () => void;
   setChatInputHeight: (height: number) => void;
+  setHistoryDisplayMode: (mode: HistoryDisplayMode) => void;
 }
 
-type PersistedUiPreferences = Pick<UIState, 'desktopHistorySidebarOpen' | 'mobileHistorySidebarOpen'>;
+type PersistedUiPreferences = Pick<
+  UIState,
+  'desktopHistorySidebarOpen' | 'mobileHistorySidebarOpen' | 'historyDisplayMode'
+>;
 
 const mergePersistedUiPreferences = (
   persistedState: unknown,
@@ -83,11 +94,16 @@ const mergePersistedUiPreferences = (
     typeof persistedPreferences.mobileHistorySidebarOpen === 'boolean'
       ? persistedPreferences.mobileHistorySidebarOpen
       : currentState.mobileHistorySidebarOpen;
+  const historyDisplayMode =
+    persistedPreferences.historyDisplayMode === 'time' || persistedPreferences.historyDisplayMode === 'group'
+      ? persistedPreferences.historyDisplayMode
+      : currentState.historyDisplayMode;
 
   return {
     ...currentState,
     desktopHistorySidebarOpen,
     mobileHistorySidebarOpen,
+    historyDisplayMode,
     isHistorySidebarOpen: isDesktopViewport() ? desktopHistorySidebarOpen : mobileHistorySidebarOpen,
   };
 };
@@ -98,6 +114,7 @@ export const useUIStore = create<UIState & UIActions>()(
       isSettingsModalOpen: false,
       isPreloadedMessagesModalOpen: false,
       ...buildInitialHistorySidebarState(),
+      historyDisplayMode: 'group' as HistoryDisplayMode,
       isLogViewerOpen: false,
       chatInputHeight: 160,
 
@@ -138,14 +155,16 @@ export const useUIStore = create<UIState & UIActions>()(
         })),
       toggleHistorySidebar: () => get().setIsHistorySidebarOpen((isOpen) => !isOpen),
       setChatInputHeight: (height) => set({ chatInputHeight: height }),
+      setHistoryDisplayMode: (mode) => set({ historyDisplayMode: mode }),
     }),
     {
       name: UI_PREFERENCES_STORAGE_KEY,
       // Sidebar open/closed is tab chrome — keep per-tab, no cross-tab rehydrate.
-      storage: createJSONStorage(() => createPersistedStateStorage({ notifyUpdate: () => {} })),
+      storage: createJSONStorage(() => uiSyncedStorage),
       partialize: (state) => ({
         desktopHistorySidebarOpen: state.desktopHistorySidebarOpen,
         mobileHistorySidebarOpen: state.mobileHistorySidebarOpen,
+        historyDisplayMode: state.historyDisplayMode,
       }),
       merge: mergePersistedUiPreferences,
     },

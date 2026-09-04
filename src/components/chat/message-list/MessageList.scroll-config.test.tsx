@@ -99,8 +99,8 @@ describe('MessageList scroll configuration', () => {
 
     expect(virtuosoPropsSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        increaseViewportBy: { bottom: 800, top: 800 },
-        atBottomThreshold: 150,
+        increaseViewportBy: { bottom: 800, top: 1200 },
+        atBottomThreshold: 40,
         computeItemKey: expect.any(Function),
         followOutput: expect.any(Function),
       }),

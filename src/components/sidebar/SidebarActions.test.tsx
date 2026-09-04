@@ -68,7 +68,7 @@ describe('SidebarActions', () => {
     expect(folderIcon?.getAttribute('viewBox')).toBe('0 0 24 24');
     expect(folderIcon?.getAttribute('width')).toBe('18');
     expect(folderIcon?.getAttribute('height')).toBe('18');
-    expect(folderIcon?.getAttribute('stroke-width')).toBe('2');
+    expect(folderIcon?.getAttribute('stroke-width')).toBe('2.2');
     expect(folderIcon?.querySelectorAll('path').length).toBeGreaterThan(0);
     expect(container.querySelector('[data-testid="new-group-icon"]')).toBeNull();
   });
@@ -90,6 +90,9 @@ describe('SidebarActions', () => {
   });
 
   it('renders configured shortcuts as hover-revealed action row hints', () => {
+    const originalPlatform = Object.getOwnPropertyDescriptor(window.navigator, 'platform')?.value;
+    Object.defineProperty(window.navigator, 'platform', { value: 'MacIntel', configurable: true });
+
     const container = render(
       <SidebarActions
         onNewChat={vi.fn()}
@@ -106,16 +109,38 @@ describe('SidebarActions', () => {
     const shortcuts = Array.from(container.querySelectorAll('[data-testid="sidebar-action-shortcut"]'));
     const actionRows = Array.from(container.querySelectorAll('a, button')).slice(0, 3);
 
-    expect(shortcuts.map((element) => element.textContent)).toEqual(['⇧ ⌘ O', '⌘ K']);
+    // Cherry Studio KbdGroup 借鉴：每个按键独立胶囊
+    const firstKeys = Array.from(shortcuts[0].querySelectorAll('[data-testid="sidebar-shortcut-key"]')).map(
+      (el) => el.textContent,
+    );
+    const secondKeys = Array.from(shortcuts[1].querySelectorAll('[data-testid="sidebar-shortcut-key"]')).map(
+      (el) => el.textContent,
+    );
+    expect(firstKeys).toEqual(['⇧', '⌘', 'O']);
+    expect(secondKeys).toEqual(['⌘', 'K']);
     for (const shortcut of shortcuts) {
+      expect(shortcut.className).toContain('inline-flex');
+      expect(shortcut.className).toContain('gap-1');
       expect(shortcut.className).toContain('opacity-0');
       expect(shortcut.className).toContain('group-hover:opacity-100');
       expect(shortcut.className).toContain('group-focus-visible:opacity-100');
-      expect(shortcut.className).toContain('text-sm');
-      expect(shortcut.className).toContain('font-semibold');
-      expect(shortcut.className).toContain('tracking-normal');
-      expect(shortcut.className).not.toContain('border');
+      expect(shortcut.className).toContain('transition-opacity');
+      expect(shortcut.getAttribute('title')).toBeTruthy();
+      for (const keyEl of Array.from(shortcut.querySelectorAll('[data-testid="sidebar-shortcut-key"]'))) {
+        expect(keyEl.className).toContain('h-5');
+        expect(keyEl.className).toContain('min-w-5');
+        expect(keyEl.className).toContain('rounded-md');
+        expect(keyEl.className).toContain('border');
+        expect(keyEl.className).toContain('bg-[var(--theme-bg-tertiary)]');
+        expect(keyEl.className).toContain('text-[11px]');
+        expect(keyEl.className).toContain('font-medium');
+      }
     }
+
+    Object.defineProperty(window.navigator, 'platform', {
+      value: originalPlatform ?? '',
+      configurable: true,
+    });
     for (const actionRow of actionRows) {
       expect(actionRow.className).toContain('h-9');
       expect(actionRow.className).toContain('rounded-lg');

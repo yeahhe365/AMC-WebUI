@@ -15,6 +15,8 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { isShortcutPressed } from '@/utils/keyboardShortcuts';
 import { getFileKindFlags, isMarkdownFile, isTextFile } from '@/utils/file/fileTypeClassification';
 import { lazyNamedComponent } from '@/utils/lazyNamedComponent';
+import { interpolate } from '@/i18n/interpolate';
+import { isEditableElement } from '@/utils/chat-input/focus';
 
 const LazyPdfViewer = lazyNamedComponent(() => import('@/components/shared/file-preview/PdfViewerEntry'), 'PdfViewer');
 
@@ -65,7 +67,6 @@ const FilePreviewModalContent: React.FC<FilePreviewModalContentProps> = ({
 
   useEffect(() => {
     if (file.dataUrl || !(file.rawFile instanceof Blob)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- Clear stale object URLs when switching preview files.
       setLocalPreviewUrl(null);
       return;
     }
@@ -94,11 +95,7 @@ const FilePreviewModalContent: React.FC<FilePreviewModalContentProps> = ({
         const selection = window.getSelection();
         const hasActiveSelection = !!selection && !selection.isCollapsed && selection.toString().length > 0;
         const activeElement = document.activeElement as HTMLElement | null;
-        const isEditingFieldFocused =
-          !!activeElement &&
-          (activeElement.tagName === 'INPUT' ||
-            activeElement.tagName === 'TEXTAREA' ||
-            activeElement.isContentEditable);
+        const isEditingFieldFocused = !!activeElement && isEditableElement(activeElement);
 
         if (hasActiveSelection || isEditingFieldFocused) {
           return;
@@ -163,7 +160,6 @@ const FilePreviewModalContent: React.FC<FilePreviewModalContentProps> = ({
       };
     }
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional loading-state transition before async preview extraction begins.
     setIsDocxPreviewLoading(true);
 
     void extractDocxText(file.rawFile)
@@ -200,7 +196,7 @@ const FilePreviewModalContent: React.FC<FilePreviewModalContentProps> = ({
     <Modal isOpen={true} onClose={onClose} noPadding backdropClassName="bg-black/95" contentClassName="w-full h-full">
       <div className="w-full h-full relative flex flex-col">
         <h2 id="file-preview-modal-title" className="sr-only">
-          {t('imageZoomTitle').replace('{filename}', file.name)}
+          {interpolate(t('imageZoomTitle'), { filename: file.name })}
         </h2>
 
         <FilePreviewHeader
@@ -313,11 +309,22 @@ const FilePreviewModalContent: React.FC<FilePreviewModalContentProps> = ({
               )}
             </div>
           ) : isAudio ? (
-            <div className="w-full h-full flex items-center justify-center">
+            <div className="w-full h-full flex items-center justify-center p-4">
               {previewFile.dataUrl && (
-                <div className="max-w-[calc(100vw-2rem)] bg-white/15 p-4 sm:p-8 rounded-2xl border border-white/10 shadow-2xl flex flex-col items-center gap-4">
-                  <FileAudio size={64} className="text-white/50" />
-                  <audio src={previewFile.dataUrl} controls className="w-full max-w-full sm:w-[400px]" />
+                <div className="max-w-[calc(100vw-2rem)] bg-[var(--theme-bg-secondary)] p-6 sm:p-8 rounded-2xl border border-[var(--theme-border-secondary)] shadow-2xl flex flex-col items-center gap-4">
+                  <div className="p-3.5 rounded-2xl bg-purple-500/10 text-purple-500 dark:text-purple-400">
+                    <FileAudio size={44} strokeWidth={1.5} />
+                  </div>
+                  <div className="text-center max-w-sm px-2">
+                    <p
+                      className="text-sm font-semibold text-[var(--theme-text-primary)] truncate"
+                      title={previewFile.name}
+                    >
+                      {previewFile.name}
+                    </p>
+                    <p className="text-xs text-[var(--theme-text-tertiary)] mt-1 font-mono">{previewFile.type}</p>
+                  </div>
+                  <audio src={previewFile.dataUrl} controls className="w-full max-w-full sm:w-[400px] outline-none" />
                 </div>
               )}
             </div>

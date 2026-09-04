@@ -13,8 +13,7 @@ import {
 import { type UploadedFile } from '@/types';
 import { ChatInput } from './ChatInput';
 
-const { mockChatStoreState, mockChatStoreSubscribers, mockLiveApiState, mockModelCapabilities } =
-  getChatInputHarnessMocks();
+const { mockChatStoreState, mockLiveApiState, mockModelCapabilities } = getChatInputHarnessMocks();
 
 describe('ChatInput', () => {
   const renderer = setupProviderTestRenderer({ providers: { language: 'en' } });
@@ -56,6 +55,41 @@ describe('ChatInput', () => {
 
     expect(textarea?.value).toBe('Original message updated');
     expect(valueProbe?.textContent).toBe('Original message updated');
+  });
+
+  it('does not re-apply a commanded replace after the user continues editing', async () => {
+    const providerValue = createProviderValue({
+      id: 1,
+      mode: 'replace',
+      text: 'Original message',
+    });
+
+    await act(async () => {
+      renderChatInput(providerValue);
+    });
+
+    const textarea = renderer.container.querySelector<HTMLTextAreaElement>('[data-testid="chat-input-textarea"]');
+    expect(textarea).not.toBeNull();
+
+    await act(async () => {
+      if (!textarea) {
+        return;
+      }
+
+      setTextareaValue(textarea, 'Original message updated');
+    });
+
+    const providerValueAgain = createProviderValue({
+      id: 1,
+      mode: 'replace',
+      text: 'Original message',
+    });
+
+    await act(async () => {
+      renderChatInput(providerValueAgain);
+    });
+
+    expect(textarea?.value).toBe('Original message updated');
   });
 
   it('focuses replacement commands at the bottom of the filled input', async () => {
@@ -209,6 +243,47 @@ describe('ChatInput', () => {
     expect(textarea?.value).toBe('ni');
   });
 
+  it('does not submit the IME confirmation Enter, then sends on the next Enter', async () => {
+    const onSendMessage = vi.fn();
+    const providerValue = createProviderValue(null);
+    providerValue.input.isLoading = false;
+    providerValue.input.isEditing = false;
+    providerValue.input.editMode = 'resend';
+    providerValue.input.editingMessageId = null;
+    providerValue.input.onSendMessage = onSendMessage;
+
+    await act(async () => {
+      renderChatInput(providerValue);
+    });
+
+    const textarea = renderer.container.querySelector<HTMLTextAreaElement>('[data-testid="chat-input-textarea"]');
+    expect(textarea).not.toBeNull();
+
+    await act(async () => {
+      if (!textarea) {
+        return;
+      }
+
+      setTextareaValue(textarea, '你好');
+      textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+      textarea.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
+      dispatchKeyDown(textarea, 'Enter');
+    });
+
+    expect(onSendMessage).not.toHaveBeenCalled();
+    expect(textarea?.value).toBe('你好');
+
+    await act(async () => {
+      if (!textarea) {
+        return;
+      }
+
+      dispatchKeyDown(textarea, 'Enter');
+    });
+
+    expect(onSendMessage).toHaveBeenCalledWith('你好', { isFastMode: false, files: undefined });
+  });
+
   it('sends Live text turns with selected attachments through client content', async () => {
     const onAddUserMessage = vi.fn();
     const selectedFiles: UploadedFile[] = [
@@ -219,6 +294,8 @@ describe('ChatInput', () => {
         size: 128,
         uploadState: 'active',
         fileUri: 'files/diagram',
+        fileApiName: 'files/diagram',
+        fileApiExpirationTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
       },
     ];
     const providerValue = createProviderValue(null);
@@ -616,26 +693,20 @@ describe('ChatInput', () => {
     expect(setSelectedFiles).toHaveBeenCalledTimes(1);
 
     const removeConvertedFile = setSelectedFiles.mock.calls[0]?.[0] as
-      | ((files: Array<{ id: string }>) => Array<{ id: string }>)
-      | undefined;
+      ((files: Array<{ id: string }>) => Array<{ id: string }>) | undefined;
 
     expect(removeConvertedFile).toBeTypeOf('function');
     expect(removeConvertedFile?.([{ id: 'text-file' }, { id: 'image-file' }])).toEqual([{ id: 'image-file' }]);
   });
 
-  it('does not auto-send a pending message when an attachment finishes as failed', async () => {
+  it('blocks send if an attachment has already failed before sending', async () => {
     const onSendMessage = vi.fn();
     const setAppFileError = vi.fn();
-    const processingFile: UploadedFile = {
-      id: 'processing-file',
+    const failedFile: UploadedFile = {
+      id: 'failed-file',
       name: 'large.pdf',
       type: 'application/pdf',
       size: 4096,
-      uploadState: 'processing_api',
-      isProcessing: true,
-    };
-    const failedFile: UploadedFile = {
-      ...processingFile,
       uploadState: 'failed',
       isProcessing: false,
       error: 'Backend processing failed.',
@@ -645,10 +716,10 @@ describe('ChatInput', () => {
     providerValue.input.isEditing = false;
     providerValue.input.editMode = 'resend';
     providerValue.input.editingMessageId = null;
-    providerValue.input.selectedFiles = [processingFile];
+    providerValue.input.selectedFiles = [failedFile];
     providerValue.input.onSendMessage = onSendMessage;
     providerValue.input.setAppFileError = setAppFileError;
-    mockChatStoreState.selectedFiles = [processingFile];
+    mockChatStoreState.selectedFiles = [failedFile];
 
     await act(async () => {
       renderChatInput(providerValue);
@@ -667,34 +738,20 @@ describe('ChatInput', () => {
     });
 
     expect(onSendMessage).not.toHaveBeenCalled();
-
-    await act(async () => {
-      const previousState = { selectedFiles: [processingFile] };
-      const nextState = { selectedFiles: [failedFile] };
-      mockChatStoreState.selectedFiles = nextState.selectedFiles;
-      mockChatStoreSubscribers.forEach((subscriber) => subscriber(nextState, previousState));
-    });
-
-    expect(onSendMessage).not.toHaveBeenCalled();
     expect(setAppFileError).toHaveBeenCalledWith(
       'Attachment upload failed. Remove the failed file or upload it again before sending.',
     );
   });
 
-  it('cancels a pending automatic send while an attachment is still uploading', async () => {
+  it('sends optimistically immediately when pressing Enter even if an attachment is still uploading', async () => {
     const onSendMessage = vi.fn();
     const processingFile: UploadedFile = {
       id: 'processing-file',
       name: 'large.pdf',
       type: 'application/pdf',
       size: 4096,
-      uploadState: 'processing_api',
+      uploadState: 'uploading',
       isProcessing: true,
-    };
-    const activeFile: UploadedFile = {
-      ...processingFile,
-      uploadState: 'active',
-      isProcessing: false,
     };
     const providerValue = createProviderValue(null);
     providerValue.input.isLoading = false;
@@ -710,12 +767,7 @@ describe('ChatInput', () => {
     });
 
     const textarea = renderer.container.querySelector<HTMLTextAreaElement>('[data-testid="chat-input-textarea"]');
-    const cancelPendingButton = renderer.container.querySelector<HTMLButtonElement>(
-      '[data-testid="cancel-pending-upload-send"]',
-    );
-
     expect(textarea).not.toBeNull();
-    expect(cancelPendingButton).not.toBeNull();
 
     await act(async () => {
       if (!textarea) {
@@ -726,19 +778,7 @@ describe('ChatInput', () => {
       dispatchKeyDown(textarea, 'Enter');
     });
 
-    expect(onSendMessage).not.toHaveBeenCalled();
-
-    await act(async () => {
-      cancelPendingButton?.click();
-    });
-
-    await act(async () => {
-      const previousState = { selectedFiles: [processingFile] };
-      const nextState = { selectedFiles: [activeFile] };
-      mockChatStoreState.selectedFiles = nextState.selectedFiles;
-      mockChatStoreSubscribers.forEach((subscriber) => subscriber(nextState, previousState));
-    });
-
-    expect(onSendMessage).not.toHaveBeenCalled();
+    expect(onSendMessage).toHaveBeenCalledWith('Summarize this file', expect.objectContaining({ isFastMode: false }));
+    expect(textarea?.value).toBe('');
   });
 });

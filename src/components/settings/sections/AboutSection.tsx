@@ -2,7 +2,7 @@ import { Github, Star, ExternalLink } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
 import { useI18n } from '@/contexts/I18nContext';
-import { useResponsiveValue } from '@/hooks/useDevice';
+import { SETTINGS_OUTLINE_BUTTON_CLASS } from '@/constants/buttonClasses';
 import { logService } from '@/services/logService';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { isDarkThemeId } from '@/utils/themeMode';
@@ -25,8 +25,6 @@ const compareVersions = (v1: string, v2: string) => {
 export const AboutSection: React.FC = () => {
   const { t, language } = useI18n();
   const themeId = useSettingsStore((state) => state.currentTheme.id);
-  const iconSize = useResponsiveValue(18, 20);
-  const isCompactViewport = useResponsiveValue(true, false, 900);
   const currentVersion = packageJson.version;
   const [stars, setStars] = useState<number | null>(null);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
@@ -91,17 +89,16 @@ export const AboutSection: React.FC = () => {
   const isUpdateAvailable = comparison === 1;
   const isBeta = comparison === -1;
   const isReleaseStatusUnavailable = !isLoading && !hasReleaseData;
-  const starStatusText = stars !== null ? stars.toLocaleString() : t(isLoading ? 'loading' : 'aboutUnavailable');
   const statusSeparator = language === 'zh' ? '：' : ': ';
   const versionTooltip =
     isUpdateAvailable && latestVersion ? `${t('aboutUpdateAvailable')}${statusSeparator}${latestVersion}` : undefined;
 
   const getStatusColor = () => {
-    if (isLoading) return 'bg-sky-500';
-    if (isUpdateAvailable) return 'bg-amber-500';
-    if (isBeta) return 'bg-purple-500';
-    if (isReleaseStatusUnavailable) return 'bg-slate-400';
-    return 'bg-emerald-500';
+    if (isLoading) return 'bg-[var(--theme-text-info)]';
+    if (isUpdateAvailable) return 'bg-[var(--theme-text-warning)]';
+    if (isBeta) return 'bg-[var(--theme-text-info)]';
+    if (isReleaseStatusUnavailable) return 'bg-[var(--theme-text-tertiary)]';
+    return 'bg-[var(--theme-text-success)]';
   };
 
   const getStatusText = () => {
@@ -112,96 +109,43 @@ export const AboutSection: React.FC = () => {
     return t('aboutLatestVersion');
   };
 
+  const starCountLabel = stars !== null ? stars.toLocaleString() : t(isLoading ? 'loading' : 'aboutUnavailable');
+
   return (
-    <div
-      data-settings-item="about-root"
-      className={`flex min-h-full flex-col items-center px-4 text-center animate-in fade-in slide-in-from-bottom-4 duration-500 ${isCompactViewport ? 'py-2.5' : 'py-3 sm:py-4 md:py-5'}`}
-    >
-      <div className="relative group">
-        <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
-        <div className="relative">
-          <img
-            src={isDarkThemeId(themeId) ? '/app-logo-dark.png' : '/app-logo.png'}
-            alt={t('aboutLogoAlt')}
-            className={`h-auto drop-shadow-2xl ${isCompactViewport ? 'w-40' : 'w-48 sm:w-56 md:w-64'}`}
-          />
-        </div>
-      </div>
+    <div data-settings-item="about-root" className="flex min-h-full flex-col items-center px-4 py-6 text-center">
+      <img
+        src={isDarkThemeId(themeId) ? '/app-logo-dark.png' : '/app-logo.png'}
+        alt={t('aboutLogoAlt')}
+        className="h-auto w-24 sm:w-28"
+      />
 
-      <div
-        className={`flex max-w-lg flex-col items-center ${isCompactViewport ? 'mt-2.5 space-y-3.5' : 'mt-3 space-y-4 sm:mt-4 sm:space-y-5'}`}
+      <a
+        href="https://github.com/yeahhe365/AMC-WebUI/releases"
+        target="_blank"
+        rel="noopener noreferrer"
+        title={versionTooltip}
+        className="mt-4 inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm transition-colors hover:bg-[var(--theme-bg-tertiary)]/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)]"
       >
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <a
-            href="https://github.com/yeahhe365/AMC-WebUI/releases"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group relative inline-flex items-center justify-center overflow-hidden rounded-full p-[1px] transition-transform duration-200 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)] focus:ring-offset-2 focus:ring-offset-[var(--theme-bg-primary)]"
-            title={versionTooltip}
-          >
-            <span
-              className={`absolute inset-0 transition-all duration-300 ${
-                isUpdateAvailable
-                  ? 'bg-gradient-to-r from-amber-400 via-orange-500 to-red-500'
-                  : isBeta
-                    ? 'bg-gradient-to-r from-purple-400 via-indigo-500 to-blue-500'
-                    : isReleaseStatusUnavailable
-                      ? 'bg-gradient-to-r from-slate-300 via-slate-400 to-slate-500'
-                      : isLoading
-                        ? 'bg-gradient-to-r from-sky-400 via-cyan-500 to-blue-500'
-                        : 'bg-gradient-to-r from-emerald-400 via-teal-500 to-cyan-500'
-              } opacity-70 group-hover:opacity-100`}
-            ></span>
+        <span className="font-mono tabular-nums text-[var(--theme-text-primary)]">v{currentVersion}</span>
+        <span className={`h-1.5 w-1.5 rounded-full ${getStatusColor()}`} />
+        <span className="text-xs text-[var(--theme-text-secondary)]">
+          {getStatusText()}
+          {isUpdateAvailable && latestVersion ? ` (${latestVersion})` : null}
+        </span>
+        <ExternalLink size={12} className="text-[var(--theme-text-secondary)]" />
+      </a>
 
-            <span
-              className={`relative flex items-center gap-3 rounded-full bg-[var(--theme-bg-primary)] px-4 transition-all duration-75 ease-in group-hover:bg-opacity-[0.96] sm:px-5 ${isCompactViewport ? 'py-1' : 'py-1.5'}`}
-            >
-              <span className="font-mono text-sm font-bold text-[var(--theme-text-primary)]">v{currentVersion}</span>
+      <p className="mt-3 max-w-md text-sm leading-6 text-[var(--theme-text-secondary)]">{t('aboutDescription')}</p>
 
-              <span className="w-px h-3.5 bg-[var(--theme-border-secondary)] opacity-50"></span>
-
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
-                  <span
-                    className={`absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                      isUpdateAvailable ? `motion-safe:animate-ping ${getStatusColor()}` : getStatusColor()
-                    }`}
-                  ></span>
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${getStatusColor()}`}></span>
-                </span>
-                <span
-                  className={`text-xs font-medium ${isUpdateAvailable ? 'text-amber-500' : 'text-[var(--theme-text-secondary)]'}`}
-                >
-                  {getStatusText()}
-                  {isUpdateAvailable && latestVersion && <span className="ml-1 opacity-80">({latestVersion})</span>}
-                </span>
-              </div>
-
-              <ExternalLink
-                size={12}
-                className="ml-0.5 text-[var(--theme-text-tertiary)] opacity-70 transition-colors group-hover:text-[var(--theme-text-primary)] group-hover:opacity-100"
-              />
-            </span>
-          </a>
-        </div>
-
-        <p
-          className={`max-w-md text-sm text-[var(--theme-text-secondary)] ${isCompactViewport ? 'leading-5' : 'leading-6'}`}
-        >
-          {t('aboutDescription')}
-        </p>
-      </div>
-
-      <div
-        className={`flex w-full flex-col items-stretch justify-center gap-2.5 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center ${isCompactViewport ? 'mt-3.5' : 'mt-4 sm:mt-5'}`}
-      >
+      <div className="mt-5 flex w-full flex-col items-stretch justify-center gap-2 sm:w-auto sm:flex-row sm:items-center">
         <a
           href="https://github.com/yeahhe365/AMC-WebUI"
           target="_blank"
           rel="noopener noreferrer"
-          className={`inline-flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#24292F] text-sm font-semibold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:bg-[#24292F]/90 hover:shadow-xl active:translate-y-0 dark:bg-white dark:text-black dark:hover:bg-gray-200 sm:min-w-[10.5rem] sm:w-auto ${isCompactViewport ? 'px-4 py-2' : 'px-5 py-2.5'}`}
+          data-settings-item="about-github"
+          className={`${SETTINGS_OUTLINE_BUTTON_CLASS} w-full sm:w-auto`}
         >
-          <Github size={iconSize} />
+          <Github size={16} />
           <span>{t('aboutViewOnGithub')}</span>
         </a>
 
@@ -209,15 +153,11 @@ export const AboutSection: React.FC = () => {
           href="https://github.com/yeahhe365/AMC-WebUI/stargazers"
           target="_blank"
           rel="noopener noreferrer"
-          className={`group inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-input)] text-sm font-medium text-[var(--theme-text-primary)] shadow-sm transition-all hover:-translate-y-0.5 hover:border-[var(--theme-border-focus)] hover:bg-[var(--theme-bg-tertiary)] hover:shadow-md active:translate-y-0 sm:min-w-[10.5rem] sm:w-auto ${isCompactViewport ? 'px-4 py-2' : 'px-5 py-2.5'}`}
+          className={`${SETTINGS_OUTLINE_BUTTON_CLASS} w-full sm:w-auto`}
         >
-          <Star
-            size={iconSize}
-            className="text-yellow-500 fill-yellow-500 transition-transform duration-300 group-hover:scale-110"
-          />
-          <span className="tabular-nums">{stars !== null ? stars.toLocaleString() : '—'}</span>
-          <span className="text-[var(--theme-text-tertiary)]">{t('aboutStarsLabel')}</span>
-          {stars === null && <span className="text-[var(--theme-text-tertiary)]">{starStatusText}</span>}
+          <Star size={16} className="text-[var(--theme-text-secondary)]" />
+          <span className="tabular-nums">{starCountLabel}</span>
+          <span>{t('aboutStarsLabel')}</span>
         </a>
       </div>
     </div>

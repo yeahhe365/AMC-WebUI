@@ -77,13 +77,8 @@ vi.mock('@/utils/apiKeySelection', () => ({
 vi.mock('@/utils/chat/session', () => ({
   createMessage: mockCreateMessage,
   createNewSession: mockCreateNewSession,
+  rehydrateSessionFiles: vi.fn((session) => session),
 }));
-
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
 
 vi.mock('@/services/api/fileApi', () => ({
   getFileMetadataApi: mockGetFileMetadataApi,
@@ -92,15 +87,27 @@ vi.mock('@/services/api/fileApi', () => ({
 
 import { useMessageSender } from './useMessageSender';
 import { createMessageSenderProps, type MessageSenderPropsOverrides } from '@/test/hooks/factories';
-import { createChatSettings, createUploadedFile } from '@/test/data/factories';
-import { createDefaultThirdPartyApiSettings } from '@/utils/thirdPartyApiProviders';
+import {
+  createChatMessage,
+  createChatSettings,
+  createThirdPartyConnection,
+  createUploadedFile,
+} from '@/test/data/factories';
+import { useChatStore } from '@/stores/chatStore';
 import { CODE_EXECUTION_TEXT_FILE_LIMIT_BYTES } from '@/utils/codeExecution';
 
 describe('useMessageSender', () => {
-  const renderMessageSender = (overrides: MessageSenderPropsOverrides = {}) =>
-    renderHookWithProviders(() => useMessageSender(createMessageSenderProps({ language: 'zh', ...overrides })), {
+  const renderMessageSender = (overrides: MessageSenderPropsOverrides = {}) => {
+    const props = createMessageSenderProps({ language: 'zh', ...overrides });
+    // handleSendMessage reads the live store selectedFiles when the closure's
+    // value has gone stale, so the store must mirror the prop (the production
+    // invariant: prop === store reference). Tests that want to exercise the
+    // stale-closure path update the store separately, after rendering.
+    useChatStore.setState({ selectedFiles: props.selectedFiles });
+    return renderHookWithProviders(() => useMessageSender(props), {
       language: 'zh',
     });
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -110,7 +117,6 @@ describe('useMessageSender', () => {
     mockUploadFileApi.mockResolvedValue({ state: 'ACTIVE', name: 'files/refreshed', uri: 'https://files/refreshed' });
     mockGetModelCapabilities.mockReturnValue({
       isTtsModel: false,
-      isFlashImageModel: false,
       isGemini3ImageModel: false,
       isNativeAudioModel: false,
       permissions: {
@@ -122,12 +128,12 @@ describe('useMessageSender', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    useChatStore.setState({ selectedFiles: [] });
   });
 
   it('blocks attachments for models that cannot accept files', async () => {
     mockGetModelCapabilities.mockReturnValue({
       isTtsModel: true,
-      isFlashImageModel: false,
       isGemini3ImageModel: false,
       isNativeAudioModel: false,
       permissions: {
@@ -167,7 +173,6 @@ describe('useMessageSender', () => {
   it('blocks Gemini 3 image requests with more than 14 reference images', async () => {
     mockGetModelCapabilities.mockReturnValue({
       isTtsModel: false,
-      isFlashImageModel: false,
       isGemini3ImageModel: true,
     });
 
@@ -204,7 +209,6 @@ describe('useMessageSender', () => {
   it('blocks oversized text files when server-side code execution is enabled', async () => {
     mockGetModelCapabilities.mockReturnValue({
       isTtsModel: false,
-      isFlashImageModel: false,
       isGemini3ImageModel: false,
     });
 
@@ -242,7 +246,6 @@ describe('useMessageSender', () => {
   it('blocks audio attachments for hosted Gemma 4 large models', async () => {
     mockGetModelCapabilities.mockReturnValue({
       isTtsModel: false,
-      isFlashImageModel: false,
       isGemini3ImageModel: false,
       isGemmaModel: true,
     });
@@ -274,7 +277,6 @@ describe('useMessageSender', () => {
   it('blocks manual sends while failed attachments are still selected', async () => {
     mockGetModelCapabilities.mockReturnValue({
       isTtsModel: false,
-      isFlashImageModel: false,
       isGemini3ImageModel: false,
     });
 
@@ -307,7 +309,6 @@ describe('useMessageSender', () => {
   it('blocks PDF attachments for Gemini 3 Pro image', async () => {
     mockGetModelCapabilities.mockReturnValue({
       isTtsModel: false,
-      isFlashImageModel: false,
       isGemini3ImageModel: true,
     });
 
@@ -316,9 +317,7 @@ describe('useMessageSender', () => {
     const { result, unmount } = renderMessageSender({
       currentChatSettings: {
         modelId: 'gpt-5.6-sol',
-        apiMode: 'third-party',
-        thirdPartyProviderId: 'openai',
-        thirdPartyModelId: 'gpt-5.6-sol',
+        providerId: 'openai',
       },
       selectedFiles: [
         createUploadedFile({
@@ -344,7 +343,6 @@ describe('useMessageSender', () => {
   it('allows PDF attachments for Gemini 3.1 Flash image', async () => {
     mockGetModelCapabilities.mockReturnValue({
       isTtsModel: false,
-      isFlashImageModel: false,
       isGemini3ImageModel: true,
     });
 
@@ -377,7 +375,6 @@ describe('useMessageSender', () => {
   it('passes per-send settings overrides into the standard message route', async () => {
     mockGetModelCapabilities.mockReturnValue({
       isTtsModel: false,
-      isFlashImageModel: false,
       isGemini3ImageModel: false,
     });
 
@@ -415,7 +412,6 @@ describe('useMessageSender', () => {
   it('converts local Files API references to inline files before sending in OpenAI-compatible mode', async () => {
     mockGetModelCapabilities.mockImplementation((modelId: string) => ({
       isTtsModel: false,
-      isFlashImageModel: false,
       isGemini3ImageModel: modelId === 'gemini-3-pro-image-preview',
     }));
 
@@ -435,21 +431,13 @@ describe('useMessageSender', () => {
 
     const { result, unmount } = renderMessageSender({
       appSettings: {
-        isThirdPartyApiEnabled: true,
-        apiMode: 'third-party',
         thirdPartyApi: {
-          activeProvider: 'openai',
-          providers: {
-            ...createDefaultThirdPartyApiSettings().providers,
-            openai: { ...createDefaultThirdPartyApiSettings().providers.openai, modelId: 'gpt-5.6-sol' },
-          },
+          connections: [createThirdPartyConnection({ id: 'openai', modelId: 'gpt-5.6-sol' })],
         },
       },
       currentChatSettings: {
         modelId: 'gpt-5.6-sol',
-        apiMode: 'third-party',
-        thirdPartyProviderId: 'openai',
-        thirdPartyModelId: 'gpt-5.6-sol',
+        providerId: 'openai',
       },
       selectedFiles,
       setAppFileError,
@@ -493,7 +481,6 @@ describe('useMessageSender', () => {
   it('blocks remote-only Files API references in OpenAI-compatible mode', async () => {
     mockGetModelCapabilities.mockImplementation((modelId: string) => ({
       isTtsModel: false,
-      isFlashImageModel: false,
       isGemini3ImageModel: modelId === 'gemini-3-pro-image-preview',
     }));
 
@@ -511,21 +498,13 @@ describe('useMessageSender', () => {
 
     const { result, unmount } = renderMessageSender({
       appSettings: {
-        isThirdPartyApiEnabled: true,
-        apiMode: 'third-party',
         thirdPartyApi: {
-          activeProvider: 'openai',
-          providers: {
-            ...createDefaultThirdPartyApiSettings().providers,
-            openai: { ...createDefaultThirdPartyApiSettings().providers.openai, modelId: 'gpt-5.6-sol' },
-          },
+          connections: [createThirdPartyConnection({ id: 'openai', modelId: 'gpt-5.6-sol' })],
         },
       },
       currentChatSettings: {
         modelId: 'gpt-5.6-sol',
-        apiMode: 'third-party',
-        thirdPartyProviderId: 'openai',
-        thirdPartyModelId: 'gpt-5.6-sol',
+        providerId: 'openai',
       },
       selectedFiles,
       setAppFileError,
@@ -544,10 +523,73 @@ describe('useMessageSender', () => {
     unmount();
   });
 
+  it('omits historical Gemini Files API ids before sending in OpenAI-compatible mode', async () => {
+    mockGetModelCapabilities.mockImplementation((modelId: string) => ({
+      isTtsModel: false,
+      isGemini3ImageModel: modelId === 'gemini-3-pro-image-preview',
+    }));
+
+    const { result, unmount } = renderMessageSender({
+      activeSessionId: 'session-1',
+      appSettings: {
+        thirdPartyApi: {
+          connections: [createThirdPartyConnection({ id: 'openai', modelId: 'gpt-5.6-sol' })],
+        },
+      },
+      currentChatSettings: {
+        modelId: 'gpt-5.6-sol',
+        providerId: 'openai',
+      },
+      messages: [
+        createChatMessage({
+          id: 'user-1',
+          content: 'summarize this',
+          files: [
+            createUploadedFile({
+              id: 'file-remote',
+              name: 'remote-only.pdf',
+              type: 'application/pdf',
+              fileApiName: 'files/expired',
+              fileUri: 'https://files/expired',
+              transferStrategy: 'remote-file-id',
+            }),
+          ],
+        }),
+      ],
+    });
+
+    await act(async () => {
+      await result.current.handleSendMessage({ text: 'try again' });
+    });
+
+    expect(mockGetFileMetadataApi).not.toHaveBeenCalled();
+    expect(mockSendStandardMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'try again',
+        props: expect.objectContaining({
+          messages: [
+            expect.objectContaining({
+              id: 'user-1',
+              content: 'summarize this',
+              files: [
+                expect.objectContaining({
+                  id: 'file-remote',
+                  omittedFromApiHistory: true,
+                  fileApiName: undefined,
+                  fileUri: undefined,
+                }),
+              ],
+            }),
+          ],
+        }),
+      }),
+    );
+    unmount();
+  });
+
   it('creates a localized error session when no model is selected', async () => {
     mockGetModelCapabilities.mockReturnValue({
       isTtsModel: false,
-      isFlashImageModel: false,
       isGemini3ImageModel: false,
     });
 
@@ -578,7 +620,6 @@ describe('useMessageSender', () => {
   it('refreshes an expired Files API reference from the local file before sending', async () => {
     mockGetModelCapabilities.mockReturnValue({
       isTtsModel: false,
-      isFlashImageModel: false,
       isGemini3ImageModel: false,
     });
     mockGetFileMetadataApi.mockResolvedValue(null);
@@ -637,7 +678,6 @@ describe('useMessageSender', () => {
   it('blocks an expired Files API reference when no local backup is available', async () => {
     mockGetModelCapabilities.mockReturnValue({
       isTtsModel: false,
-      isFlashImageModel: false,
       isGemini3ImageModel: false,
     });
     mockGetFileMetadataApi.mockResolvedValue(null);
@@ -671,6 +711,234 @@ describe('useMessageSender', () => {
       'remote-only.pdf 的远端文件引用已失效，且本地备份不可用。请重新附加该文件。',
     );
     expect(mockSendStandardMessage).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('starts a continue-generation turn with a fresh generationStartTime, not the target message timestamp', async () => {
+    mockGetModelCapabilities.mockReturnValue({
+      isTtsModel: false,
+      isGemini3ImageModel: false,
+    });
+
+    const oldStart = new Date('2026-05-04T08:00:00.000Z');
+    const targetMessage = {
+      id: 'target-model',
+      role: 'model' as const,
+      content: 'continue me',
+      timestamp: oldStart,
+      generationStartTime: oldStart,
+      firstTokenTimeMs: 500,
+      thinkingTimeMs: 1200,
+    };
+
+    const { result, unmount } = renderMessageSender({
+      currentChatSettings: {
+        modelId: 'gemini-3.1-pro-preview',
+      },
+      messages: [targetMessage],
+      editingMessageId: 'target-model',
+    });
+
+    await act(async () => {
+      await result.current.handleSendMessage({
+        text: 'keep going',
+        isContinueMode: true,
+        editingId: 'target-model',
+      });
+    });
+
+    expect(mockSendStandardMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: expect.objectContaining({
+          generationStartTime: expect.any(Date),
+        }),
+      }),
+    );
+    const sentRequest = mockSendStandardMessage.mock.calls[0][0].request as { generationStartTime: Date };
+    expect(sentRequest.generationStartTime.getTime()).not.toBe(oldStart.getTime());
+    unmount();
+  });
+
+  it('sends with the live store files when the closure selectedFiles are stale (pending-submission flush)', async () => {
+    mockGetModelCapabilities.mockReturnValue({
+      isTtsModel: false,
+      isGemini3ImageModel: false,
+    });
+
+    const setAppFileError = vi.fn();
+    const processingFile = createUploadedFile({
+      id: 'file-uploading',
+      name: 'report.pdf',
+      type: 'application/pdf',
+      isProcessing: true,
+      uploadState: 'uploading',
+    });
+    const activeFile = createUploadedFile({
+      id: 'file-uploading',
+      name: 'report.pdf',
+      type: 'application/pdf',
+      isProcessing: false,
+      uploadState: 'active',
+    });
+
+    // Render with the file still processing, then let the upload complete by
+    // updating the store without re-rendering — exactly the window the
+    // pending-submission flush runs in, before React commits the new files.
+    const { result, unmount } = renderMessageSender({
+      selectedFiles: [processingFile],
+      setAppFileError,
+    });
+
+    useChatStore.setState({ selectedFiles: [activeFile] });
+
+    await act(async () => {
+      await result.current.handleSendMessage({ text: 'summarize this' });
+    });
+
+    expect(setAppFileError).toHaveBeenCalledWith(null);
+    expect(mockSendStandardMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'summarize this',
+        files: [
+          expect.objectContaining({
+            id: 'file-uploading',
+            uploadState: 'active',
+            isProcessing: false,
+          }),
+        ],
+      }),
+    );
+    unmount();
+  });
+
+  it('refreshes an expired Files API reference in history before a text follow-up', async () => {
+    mockGetFileMetadataApi.mockResolvedValue(null);
+    const rawFile = new File(['image-bytes'], 'reference.png', { type: 'image/png' });
+    const staleFile = createUploadedFile({
+      id: 'file-history',
+      name: 'reference.png',
+      type: 'image/png',
+      size: rawFile.size,
+      rawFile,
+      fileApiName: 'files/expired',
+      fileUri: 'https://files/expired',
+      uploadState: 'active',
+      transferStrategy: 'files-api',
+    });
+    const historyUserMessage = createChatMessage({
+      id: 'user-1',
+      content: 'describe this image',
+      files: [staleFile],
+      apiParts: [
+        { fileData: { mimeType: 'image/png', fileUri: 'https://files/expired' } },
+        { text: 'describe this image' },
+      ],
+    });
+
+    const { result, unmount } = renderMessageSender({
+      activeSessionId: 'session-1',
+      currentChatSettings: {
+        modelId: 'gemini-3.1-pro-preview',
+      },
+      messages: [historyUserMessage, createChatMessage({ id: 'model-1', role: 'model', content: 'a cat' })],
+    });
+
+    await act(async () => {
+      await result.current.handleSendMessage({ text: 'what color is it?' });
+    });
+
+    expect(mockUploadFileApi).toHaveBeenCalledWith(
+      'api-key',
+      rawFile,
+      'image/png',
+      'reference.png',
+      expect.any(AbortSignal),
+    );
+    expect(mockSenderStoreActions.updateAndPersistSessions).toHaveBeenCalled();
+    expect(mockSendStandardMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'what color is it?',
+        props: expect.objectContaining({
+          messages: [
+            expect.objectContaining({
+              id: 'user-1',
+              files: [
+                expect.objectContaining({
+                  id: 'file-history',
+                  fileApiName: 'files/refreshed',
+                  fileUri: 'https://files/refreshed',
+                }),
+              ],
+              apiParts: [
+                { fileData: { mimeType: 'image/png', fileUri: 'https://files/refreshed' } },
+                { text: 'describe this image' },
+              ],
+            }),
+            expect.objectContaining({ id: 'model-1' }),
+          ],
+        }),
+      }),
+    );
+    unmount();
+  });
+
+  it('continues a follow-up after dropping an expired historical Files API id that has no local backup', async () => {
+    mockGetFileMetadataApi.mockResolvedValue(null);
+    const staleFile = createUploadedFile({
+      id: 'file-remote',
+      name: 'remote-only.pdf',
+      type: 'application/pdf',
+      fileApiName: 'files/expired',
+      fileUri: 'https://files/expired',
+      uploadState: 'active',
+      transferStrategy: 'remote-file-id',
+    });
+
+    const { result, unmount } = renderMessageSender({
+      activeSessionId: 'session-1',
+      currentChatSettings: {
+        modelId: 'gemini-3.1-pro-preview',
+      },
+      messages: [
+        createChatMessage({
+          id: 'user-1',
+          content: 'summarize this',
+          files: [staleFile],
+          apiParts: [
+            { fileData: { mimeType: 'application/pdf', fileUri: 'https://files/expired' } },
+            { text: 'summarize this' },
+          ],
+        }),
+      ],
+    });
+
+    await act(async () => {
+      await result.current.handleSendMessage({ text: 'try again' });
+    });
+
+    expect(mockUploadFileApi).not.toHaveBeenCalled();
+    expect(mockSendStandardMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'try again',
+        props: expect.objectContaining({
+          messages: [
+            expect.objectContaining({
+              id: 'user-1',
+              content: 'summarize this',
+              files: [
+                expect.objectContaining({
+                  id: 'file-remote',
+                  fileApiName: undefined,
+                  fileUri: undefined,
+                  uploadState: 'failed',
+                  omittedFromApiHistory: true,
+                }),
+              ],
+            }),
+          ],
+        }),
+      }),
+    );
     unmount();
   });
 });

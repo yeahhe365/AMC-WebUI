@@ -15,6 +15,48 @@ export class LiveApiAuthConfigurationError extends Error {
   }
 }
 
+export interface EphemeralTokenResponse {
+  token: string;
+  name: string;
+  expireTime?: string;
+  newSessionExpireTime?: string;
+}
+
+export const createLiveEphemeralToken = async (
+  appSettings: Pick<AppSettings, 'useCustomApiConfig' | 'useApiProxy' | 'apiProxyUrl'>,
+  options?: {
+    model?: string;
+    liveConnectConstraints?: Record<string, unknown>;
+    apiKey?: string | null;
+  },
+): Promise<EphemeralTokenResponse> => {
+  const proxyBaseUrl = resolveLiveClientBaseUrl(appSettings);
+  const endpoint = proxyBaseUrl ? `${proxyBaseUrl}/api/live/ephemeral-token` : '/api/live/ephemeral-token';
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (options?.apiKey) {
+    headers['x-goog-api-key'] = options.apiKey;
+  }
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model: options?.model,
+      liveConnectConstraints: options?.liveConnectConstraints,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(errorData.error || `Failed to create ephemeral token: ${response.status}`);
+  }
+
+  return response.json() as Promise<EphemeralTokenResponse>;
+};
+
 export const getLiveApiClient = async (
   appSettings: Pick<AppSettings, 'useCustomApiConfig' | 'useApiProxy' | 'apiProxyUrl'>,
   httpOptions?: GeminiClientHttpOptions,

@@ -10,13 +10,17 @@ const setDrawColorMock = vi.fn();
 const setLineWidthMock = vi.fn();
 const addFileToVFSMock = vi.fn();
 const addFontMock = vi.fn();
+const setFillColorMock = vi.fn();
+const rectMock = vi.fn();
+const addPageMock = vi.fn();
 const splitTextToSizeMock = vi.fn((text: string) => [text]);
-const expectPdfBodyText = (text: string) => {
+const getTextWidthMock = vi.fn((text: string) => String(text).length * 3);
+const expectPdfBodyText = (text: string, renderingMode: 'fill' | 'fillThenStroke' = 'fillThenStroke') => {
   expect(textMock).toHaveBeenCalledWith(
     text,
     expect.any(Number),
     expect.any(Number),
-    expect.objectContaining({ renderingMode: 'fillThenStroke' }),
+    expect.objectContaining({ renderingMode }),
   );
 };
 
@@ -29,7 +33,7 @@ vi.mock('jspdf', () => ({
           getHeight: () => 297,
         },
       },
-      addPage: vi.fn(),
+      addPage: addPageMock,
       addImage: addImageMock,
       addFileToVFS: addFileToVFSMock,
       addFont: addFontMock,
@@ -37,12 +41,13 @@ vi.mock('jspdf', () => ({
       setFontSize: vi.fn(),
       setTextColor: setTextColorMock,
       setDrawColor: setDrawColorMock,
-      setFillColor: vi.fn(),
+      setFillColor: setFillColorMock,
       setLineWidth: setLineWidthMock,
       line: vi.fn(),
-      rect: vi.fn(),
+      rect: rectMock,
       text: textMock,
       splitTextToSize: splitTextToSizeMock,
+      getTextWidth: getTextWidthMock,
       output: outputMock,
     };
   }),
@@ -57,9 +62,13 @@ describe('createMarkdownPdfBlob', () => {
     setTextColorMock.mockClear();
     setDrawColorMock.mockClear();
     setLineWidthMock.mockClear();
+    setFillColorMock.mockClear();
+    rectMock.mockClear();
+    addPageMock.mockClear();
     addFileToVFSMock.mockClear();
     addFontMock.mockClear();
     splitTextToSizeMock.mockClear();
+    getTextWidthMock.mockClear();
   });
 
   it('renders Markdown text into a PDF blob without html2canvas/html2pdf', async () => {
@@ -119,8 +128,8 @@ describe('createMarkdownPdfBlob', () => {
     expect(addFileToVFSMock).toHaveBeenCalledWith('NotoSansCJKsc-VF.ttf', expect.any(String));
     expect(addFontMock).toHaveBeenCalledWith('NotoSansCJKsc-VF.ttf', 'NotoSansCJKsc', 'normal', 'Identity-H');
     expect(setFontMock).toHaveBeenCalledWith('NotoSansCJKsc', 'normal');
-    expectPdfBodyText('中文标题');
-    expectPdfBodyText('你好，世界。');
+    expectPdfBodyText('中文标题', 'fill');
+    expectPdfBodyText('你好，世界。', 'fill');
   });
 
   it('keeps an unreachable external image as link text instead of drawing an empty block', async () => {
@@ -248,5 +257,239 @@ describe('createMarkdownPdfBlob', () => {
     const height = imageCall[5] as number;
     expect(width).toBeCloseTo(174, 2);
     expect(height).toBeCloseTo(87, 2);
+  });
+
+  it('paints a dark page background so dark-theme text stays readable', async () => {
+    await createMarkdownPdfBlob('Readable text', {
+      filename: 'article.pdf',
+      themeId: 'onyx',
+    });
+
+    expect(setTextColorMock).toHaveBeenCalledWith(255, 255, 255);
+    expect(setFillColorMock).toHaveBeenCalledWith(12, 12, 14);
+    expect(rectMock).toHaveBeenCalledWith(0, 0, 210, 297, 'F');
+  });
+
+  it('scales oversized images down so they fit on a page', async () => {
+    const originalFetch = globalThis.fetch;
+    const originalImage = globalThis.Image;
+
+    class MockImage {
+      naturalWidth = 400;
+      naturalHeight = 4000;
+      width = 400;
+      height = 4000;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      set src(_value: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+
+    globalThis.Image = MockImage as unknown as typeof Image;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['png'], { type: 'image/png' }),
+    });
+
+    try {
+      await createMarkdownPdfBlob('![tall](https://cdn.example.com/tall.png)', {
+        filename: 'article.pdf',
+        themeId: 'pearl',
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+      globalThis.Image = originalImage;
+    }
+
+    const imageCall = addImageMock.mock.calls.at(-1);
+    expect(imageCall).toBeDefined();
+    const width = imageCall![4] as number;
+    const height = imageCall![5] as number;
+    expect(height).toBeLessThanOrEqual(255);
+    expect(width).toBeCloseTo(height * (400 / 4000), 2);
+  });
+
+  it('draws list images instead of dumping data URLs as body text', async () => {
+    const originalImage = globalThis.Image;
+
+    class MockImage {
+      naturalWidth = 100;
+      naturalHeight = 50;
+      width = 100;
+      height = 50;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      set src(_value: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+
+    globalThis.Image = MockImage as unknown as typeof Image;
+
+    try {
+      await createMarkdownPdfBlob('- ![shot](data:image/png;base64,ZmFrZQ==)', {
+        filename: 'article.pdf',
+        themeId: 'pearl',
+      });
+    } finally {
+      globalThis.Image = originalImage;
+    }
+
+    expect(addImageMock).toHaveBeenCalled();
+    expect(textMock.mock.calls.some(([text]) => String(text).includes('data:image/png;base64'))).toBe(false);
+  });
+
+  it('loads the CJK font for Japanese kana as well as Han characters', async () => {
+    const originalFetch = globalThis.fetch;
+    const fontChunks = [new Uint8Array([1, 2]).buffer, new Uint8Array([3]).buffer];
+    const fetchMock = vi.fn().mockImplementation(async () => ({
+      ok: true,
+      arrayBuffer: async () => fontChunks.shift() ?? new Uint8Array([]).buffer,
+    }));
+    globalThis.fetch = fetchMock;
+
+    try {
+      await createMarkdownPdfBlob('ひらがなとカタカナ', {
+        filename: 'article.pdf',
+        themeId: 'pearl',
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(addFontMock).toHaveBeenCalledWith('NotoSansCJKsc-VF.ttf', 'NotoSansCJKsc', 'normal', 'Identity-H');
+    expectPdfBodyText('ひらがなとカタカナ', 'fill');
+  });
+
+  it('renders markdown link labels without dumping the raw URL', async () => {
+    await createMarkdownPdfBlob('[Anthropic 自曝安全漏洞](https://linux.do/t/topic/2763210)', {
+      filename: 'article.pdf',
+      themeId: 'pearl',
+    });
+
+    expectPdfBodyText('Anthropic 自曝安全漏洞', 'fill');
+    expect(textMock.mock.calls.some(([text]) => String(text).includes('https://linux.do'))).toBe(false);
+  });
+
+  it('draws linked images instead of flattening them to Image: label (url)', async () => {
+    const originalFetch = globalThis.fetch;
+    const originalImage = globalThis.Image;
+
+    class MockImage {
+      naturalWidth = 400;
+      naturalHeight = 200;
+      width = 400;
+      height = 200;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      set src(_value: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+
+    globalThis.Image = MockImage as unknown as typeof Image;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['png'], { type: 'image/png' }),
+    });
+
+    try {
+      await createMarkdownPdfBlob('[![diagram](https://cdn.example.com/diagram.png)](https://example.com/page)', {
+        filename: 'article.pdf',
+        themeId: 'pearl',
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+      globalThis.Image = originalImage;
+    }
+
+    expect(addImageMock).toHaveBeenCalled();
+    expect(textMock.mock.calls.some(([text]) => String(text).includes('example.com/page'))).toBe(false);
+    expect(textMock.mock.calls.some(([text]) => String(text).includes('Image: diagram'))).toBe(false);
+  });
+
+  it('strips lightbox size metadata before rendering a broken image wrapper', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('blocked by CORS'));
+
+    try {
+      await createMarkdownPdfBlob(
+        `[![] (https://cdn.example.com/optimized.avif)
+
+1440x418 67.2 KB
+
+](https://cdn.example.com/original.avif)`,
+        {
+          filename: 'article.pdf',
+          themeId: 'pearl',
+        },
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(textMock.mock.calls.some(([text]) => String(text).includes('1440x418'))).toBe(false);
+  });
+
+  it('rasterizes AVIF images to PNG before embedding them', async () => {
+    const originalFetch = globalThis.fetch;
+    const originalImage = globalThis.Image;
+    const originalCreateElement = document.createElement.bind(document);
+
+    class MockImage {
+      naturalWidth = 80;
+      naturalHeight = 40;
+      width = 80;
+      height = 40;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      set src(_value: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+
+    globalThis.Image = MockImage as unknown as typeof Image;
+    document.createElement = ((tagName: string, options?: ElementCreationOptions) => {
+      if (tagName === 'canvas') {
+        return {
+          width: 0,
+          height: 0,
+          getContext: () => ({ drawImage: vi.fn() }),
+          toDataURL: () => 'data:image/png;base64,ZmFrZQ==',
+        } as unknown as HTMLCanvasElement;
+      }
+
+      return originalCreateElement(tagName, options);
+    }) as typeof document.createElement;
+
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['avif'], { type: 'image/avif' }),
+    });
+
+    try {
+      await createMarkdownPdfBlob('![chart](https://cdn.example.com/chart.avif)', {
+        filename: 'article.pdf',
+        themeId: 'pearl',
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+      globalThis.Image = originalImage;
+      document.createElement = originalCreateElement;
+    }
+
+    expect(addImageMock).toHaveBeenCalledWith(
+      'data:image/png;base64,ZmFrZQ==',
+      'PNG',
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+    );
   });
 });

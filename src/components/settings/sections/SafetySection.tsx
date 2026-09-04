@@ -3,6 +3,7 @@ import { useI18n } from '@/contexts/I18nContext';
 import { type SafetySetting, HarmCategory, HarmBlockThreshold } from '@/types';
 import { Shield, Info } from 'lucide-react';
 import { DEFAULT_SAFETY_SETTINGS } from '@/constants/safetySettings';
+import { SETTINGS_RANGE_SLIDER_CLASS } from '@/constants/designTokens';
 
 interface SafetySectionProps {
   safetySettings: SafetySetting[] | undefined;
@@ -15,7 +16,6 @@ const ALL_CATEGORIES: HarmCategory[] = [
   HarmCategory.HARM_CATEGORY_HATE_SPEECH,
   HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
   HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-  HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY,
 ];
 
 const CATEGORY_TRANSLATION_KEYS: Record<HarmCategory, string> = {
@@ -23,7 +23,6 @@ const CATEGORY_TRANSLATION_KEYS: Record<HarmCategory, string> = {
   [HarmCategory.HARM_CATEGORY_HATE_SPEECH]: 'safetyCategoryHateSpeech',
   [HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT]: 'safetyCategorySexuallyExplicit',
   [HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT]: 'safetyCategoryDangerousContent',
-  [HarmCategory.HARM_CATEGORY_CIVIC_INTEGRITY]: 'safetyCategoryCivicIntegrity',
 };
 
 const DEFAULT_THRESHOLD_INDEX = 3;
@@ -42,14 +41,6 @@ const THRESHOLD_LABEL_KEYS: Record<HarmBlockThreshold, string> = {
   [HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE]: 'safetyThresholdBlockMediumAndAbove',
   [HarmBlockThreshold.BLOCK_LOW_AND_ABOVE]: 'safetyThresholdBlockLowAndAbove',
 };
-
-const STEP_TEXT_COLOR_CLASSES = [
-  'text-red-500',
-  'text-orange-500',
-  'text-yellow-500',
-  'text-blue-500',
-  'text-green-500',
-];
 
 type SliderValueMap = Record<HarmCategory, number>;
 
@@ -124,7 +115,7 @@ export const SafetySection: React.FC<SafetySectionProps> = ({
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div className="space-y-6">
       {showIntro && (
         <div className="flex items-start gap-3 p-4 bg-[var(--theme-bg-secondary)] border border-[var(--theme-border-secondary)] rounded-xl">
           <Shield size={24} className="text-[var(--theme-text-link)] flex-shrink-0 mt-0.5" />
@@ -152,11 +143,7 @@ export const SafetySection: React.FC<SafetySectionProps> = ({
                 <label className="text-sm font-medium text-[var(--theme-text-primary)]">
                   {t(CATEGORY_TRANSLATION_KEYS[category])}
                 </label>
-                <span
-                  className={`text-xs font-bold uppercase tracking-wider ${
-                    STEP_TEXT_COLOR_CLASSES[sliderValue] || 'text-[var(--theme-text-primary)]'
-                  }`}
-                >
+                <span className="text-xs font-medium text-[var(--theme-text-primary)]">
                   {t(THRESHOLD_LABEL_KEYS[effectiveThreshold])}
                 </span>
               </div>
@@ -171,28 +158,14 @@ export const SafetySection: React.FC<SafetySectionProps> = ({
                 onPointerDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
                 style={{ touchAction: 'none' }}
-                className="w-full h-2 bg-[var(--theme-bg-tertiary)] rounded-lg appearance-none cursor-pointer accent-[var(--theme-bg-accent)] hover:accent-[var(--theme-bg-accent-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)]"
+                className={SETTINGS_RANGE_SLIDER_CLASS}
               />
-
-              <div className="flex justify-between px-1">
-                {THRESHOLD_STEPS.map((step, stepIndex) => (
-                  <div key={step} className="flex flex-col items-center w-8">
-                    <div
-                      className={`w-1 h-2 rounded-full mb-1 ${
-                        stepIndex === sliderValue
-                          ? 'bg-[var(--theme-text-primary)] h-3'
-                          : 'bg-[var(--theme-border-secondary)]'
-                      }`}
-                    />
-                  </div>
-                ))}
-              </div>
             </div>
           );
         })}
       </div>
 
-      <div className="flex items-center justify-center gap-2 text-xs text-[var(--theme-text-tertiary)] pt-4">
+      <div className="flex items-center justify-center gap-2 text-xs text-[var(--theme-text-secondary)] pt-4">
         <Info size={14} />
         <span>{t('safetyChangesApply')}</span>
       </div>

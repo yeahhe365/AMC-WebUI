@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { type AppSettings, type ChatSettings, type ModelOption } from '@/types';
+import { type AppSettings, type ChatSettings, type ModelOption, type ChatProviderId } from '@/types';
 import { usePwaLifecycle } from './usePwaLifecycle';
 import { useGlobalShortcuts } from './useGlobalShortcuts';
 
@@ -9,7 +9,7 @@ interface AppEventsProps {
   startNewChat: () => void;
   currentChatSettings: ChatSettings;
   availableModels: ModelOption[];
-  handleSelectModelInHeader: (modelId: string) => void;
+  handleSelectModelInHeader: (modelId: string, providerId?: ChatProviderId) => void;
   setIsLogViewerOpen: (isOpen: boolean | ((prev: boolean) => boolean)) => void;
   onTogglePip: () => void;
   isPipSupported: boolean;

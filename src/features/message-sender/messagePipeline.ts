@@ -126,6 +126,13 @@ const startOptimisticMessageTurn = ({
         isLoading: true,
         generationEndTime: undefined,
         stoppedByUser: false,
+        // Reset the whole timing window to this run. generationStartTime must
+        // match the new request's start so finalizeMessages (which matches by
+        // it) finalizes this message; stale firstTokenTimeMs/thinkingTimeMs
+        // would otherwise leak old-run durations into the new timings.
+        generationStartTime,
+        firstTokenTimeMs: undefined,
+        thinkingTimeMs: undefined,
       }));
     }
 

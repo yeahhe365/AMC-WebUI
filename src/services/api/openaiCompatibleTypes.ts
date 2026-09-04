@@ -6,7 +6,14 @@ export interface OpenAICompatibleChatConfig {
   systemInstruction?: string;
   temperature?: number;
   topP?: number;
+  topK?: number;
+  maxOutputTokens?: number;
+  stopSequences?: string[];
+  presencePenalty?: number;
+  frequencyPenalty?: number;
+  seed?: number;
   thinkingLevel?: ThinkingLevel;
+  extraHeaders?: Record<string, string> | null;
 }
 
 export type OpenAIMessageContent =
@@ -29,28 +36,25 @@ export type OpenAIUsage = {
 };
 
 export type OpenAIChoice = {
+  finish_reason?: string;
+  finishReason?: string;
   message?: {
     content?: string | Array<{ text?: string }>;
     reasoning_content?: string;
+    reasoning?: string;
+    reasoning_details?: Array<{ text?: string }>;
   };
   delta?: {
     content?: string;
     reasoning_content?: string;
+    reasoning?: string;
+    reasoning_details?: Array<{ text?: string }>;
   };
 };
 
 export type OpenAIResponsePayload = {
   choices?: OpenAIChoice[];
   usage?: OpenAIUsage;
-  error?: {
-    message?: string;
-  };
-};
-
-export type OpenAIModelsResponsePayload = {
-  data?: Array<{
-    id?: unknown;
-  }>;
   error?: {
     message?: string;
   };

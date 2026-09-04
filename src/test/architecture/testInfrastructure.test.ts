@@ -83,6 +83,12 @@ describe('test infrastructure guardrails', () => {
       if (!relativePath.startsWith('src/test/')) {
         expect(source, relativePath).not.toMatch(/\bcreate(?:MockLogService|MockDbService|I18nMock|RealI18nMock)\(\)/);
       }
+      // The no-arg core mocks live once in the setup file; per-file copies are
+      // only allowed when they parameterize the double (pass overrides).
+      if (!relativePath.startsWith('src/test/')) {
+        expect(source, relativePath).not.toContain('return createLogServiceMockModule();');
+        expect(source, relativePath).not.toContain('return createDbServiceMockModule();');
+      }
     }
   });
 

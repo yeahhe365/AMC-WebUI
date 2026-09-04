@@ -251,6 +251,9 @@ export const getBaseRehypePlugins = (
       ...defaultSchema.attributes,
       '*': ['ariaHidden', 'ariaLabel', 'role', 'title', 'style'],
       code: [...(defaultSchema.attributes?.code || []), 'inline'],
+      // Server code execution blocks mark their <pre> so the renderer can wrap
+      // them in the code-execution card (CodeExecutionBlock).
+      pre: [...(defaultSchema.attributes?.pre || []), ['className', 'code-exec-code']],
       span: [...(defaultSchema.attributes?.span || [])],
       div: [...(defaultSchema.attributes?.div || []), 'align', ['className', 'tool-result', /^outcome-[a-z0-9_-]+$/]],
       p: [...(defaultSchema.attributes?.p || []), 'align'],

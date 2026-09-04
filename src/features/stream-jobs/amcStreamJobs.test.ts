@@ -109,4 +109,45 @@ describe('amcStreamJobs pending record', () => {
 
     expect(readPendingStreamJob(SESSION_ID)).toBeNull();
   });
+
+  it('generates and persists a random job secret when none is provided', () => {
+    recordPendingStreamJob({
+      sessionId: SESSION_ID,
+      generationId: 'gen-1',
+      jobId: 'gen-1',
+      startedAt: Date.now(),
+    });
+    const pending = readPendingStreamJob(SESSION_ID);
+    expect(pending?.secret).toBeTruthy();
+    expect(pending?.secret).not.toBe('gen-1');
+  });
+
+  it('keeps a caller-provided job secret (creation and resume share it)', () => {
+    recordPendingStreamJob({
+      sessionId: SESSION_ID,
+      generationId: 'gen-1',
+      jobId: 'gen-1',
+      secret: 'fixed-secret',
+      startedAt: Date.now(),
+    });
+    expect(readPendingStreamJob(SESSION_ID)?.secret).toBe('fixed-secret');
+  });
+
+  it('still reads legacy records without a secret (secret stays undefined)', () => {
+    const key = `amc_stream_job:${SESSION_ID}`;
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        sessionId: SESSION_ID,
+        generationId: 'gen-legacy',
+        jobId: 'gen-legacy',
+        startedAt: Date.now(),
+        lastSeq: 2,
+        tabId: 'test-tab',
+      }),
+    );
+    const pending = readPendingStreamJob(SESSION_ID);
+    expect(pending).not.toBeNull();
+    expect(pending?.secret).toBeUndefined();
+  });
 });

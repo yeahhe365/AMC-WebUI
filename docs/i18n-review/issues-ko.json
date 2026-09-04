@@ -1,0 +1,191 @@
+[
+  {
+    "key": "settingsSearchEscHint",
+    "current": "지우려면",
+    "suggested": "눌러서 지우기",
+    "reason": "Rendered immediately after a <kbd>Esc</kbd> chip (SettingsSidebar.tsx), so the UI literally reads 'Esc 지우려면' — broken word order for '[Esc] to clear'. Natural Korean is '눌러서 지우기' (or reverse the order to '지우려면 Esc').",
+    "severity": "medium"
+  },
+  {
+    "key": "tts_style_informative",
+    "current": "정보 전달의",
+    "suggested": "정보 전달형",
+    "reason": "Standalone voice-style label ending in the possessive/attributive '-의' is not natural Korean UI copy. All sibling TTS style labels use adjective endings (밝은, 경쾌한, 단호한, 친근한...). '정보 전달형' or '유익한' fits the series.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsVoiceSectionTitle",
+    "current": "음성 및 보이스",
+    "suggested": "음성 및 TTS",
+    "reason": "'음성' and '보이스' are the same word (Konglish duplication); no native UI pairs them as 'X 및 X'. The section holds the TTS voice picker and speech-to-text model, so '음성 및 TTS' (or '음성 설정') reads naturally.",
+    "severity": "medium"
+  },
+  {
+    "key": "shortcutsChatInputTitle",
+    "current": "작성기",
+    "suggested": "메시지 입력창",
+    "reason": "'Composer' rendered as '작성기' — a coinage Korean UIs never use for the chat input area. Use '메시지 입력창' or '입력창'.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsFontSize",
+    "current": "읽기 크기",
+    "suggested": "본문 글자 크기",
+    "reason": "Literal rendering of the unusual English 'Reading Size'; '읽기 크기' is not phrasing a native Korean UI would use. '본문 글자 크기' (or simply '글자 크기') is standard and matches the tooltip's description.",
+    "severity": "medium"
+  },
+  {
+    "key": "headerThinkingToggleAria",
+    "current": "사고 수준 전환",
+    "suggested": "추론 수준 전환",
+    "reason": "INCONSISTENCY: 'Thinking' is split into '사고' (headerThinkingToggleAria, headerThinkingMinimalFastTitle '사고: 최소 (빠른 모드)', headerThinkingLowFastTitle, headerThinkingHighTitle '사고: 높음 (프로 모드)', helpCmdFast '빠른 사고 모드 전환', alwaysKeepThinkingLabel '컨텍스트에 사고 유지', messageSenderEmptyReplyWithThoughts '사고 수준을 낮춰') vs '추론' (thinkingText '추론 중...', thinkingTookTime, thinkingProcess '추론 과정', thinkingRawProcess '원본 추론 과정', settingsThinkingMode '추론 모드', settingsThinkingModePreset / settingsReasoningLevelTitle '추론 수준', settingsThinkingBudget '추론 예산', settingsRawModeLabel '원시 추론'). '추론' is the majority; unify on it unless Reasoning-mode and Thinking-level must remain visually distinct terms.",
+    "severity": "medium"
+  },
+  {
+    "key": "voiceInputTranscribingAria",
+    "current": "전사 중...",
+    "suggested": "텍스트 변환 중...",
+    "reason": "INCONSISTENCY: transcription = '전사' (voiceInputTranscribingAria, transcriptionFailedWithMessage '전사에 실패했습니다', suggestionAsrDesc, suggestionAsrShort, suggestionSrtDesc) vs '변환' (chatBehaviorVoiceModelLabel '음성 텍스트 변환 모델', chatBehaviorVoiceModelTooltip '텍스트로 변환하는 데 사용되는 모델'). '전사' is linguistic jargon many users won't parse at a glance; unify on '변환' (텍스트 변환).",
+    "severity": "medium"
+  },
+  {
+    "key": "modelPickerProviderThirdParty",
+    "current": "서드파티",
+    "suggested": "타사",
+    "reason": "INCONSISTENCY: 'Third-party' = '타사' (settingsApiModeLabel, settingsApiModeThirdParty, thirdPartyConnectionsEmpty, apiRuntimeThirdPartyConnectionMissing, apiRuntimeThirdPartyConnectionDisabled) vs '서드파티' (modelPickerProviderThirdParty). Unify on '타사'.",
+    "severity": "medium"
+  },
+  {
+    "key": "shortcutsTogglePip",
+    "current": "화면 속 화면 전환",
+    "suggested": "PIP 모드 전환",
+    "reason": "INCONSISTENCY: Picture-in-Picture appears three ways — 'PIP 모드/PIP 창' (pipEnter 'PIP 모드 진입', pipExit 'PIP 모드 종료', pipPlaceholderTitle 'PIP 모드의 채팅', pipPlaceholderClose 'PIP 창 닫기'), 'Picture-in-Picture 모드' (helpCmdPip), and '화면 속 화면' (shortcutsTogglePip). Pick one (recommend 'PIP 모드', optionally introducing '화면 속 화면(PIP)' once) and apply everywhere.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsResetModelList",
+    "current": "재설정",
+    "suggested": "초기화",
+    "reason": "INCONSISTENCY: 'Reset' = '초기화' (settingsReset '설정만 초기화', settingsApiProxyReset '초기화', filePreviewResetView / codeResetView '보기 초기화') vs '재설정' (settingsResetModelList, settingsLiveArtifactsSystemPromptReset '...재설정', shortcutsResetDefault '기본값으로 재설정', shortcutsResetAria '단축키 재설정'). Unify on one term ('초기화' recommended).",
+    "severity": "medium"
+  },
+  {
+    "key": "exportChatTitle",
+    "current": "대화 내보내기",
+    "suggested": "채팅 내보내기",
+    "reason": "INCONSISTENCY: identical source 'Export Chat' translated two ways — '채팅 내보내기' (exportChat, history item menu) and '대화 내보내기' (exportChatTitle, export dialog header). Unify on '채팅 내보내기' to match app-wide usage (새 채팅, 채팅 기록).",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsFetchModelList",
+    "current": "모델 가져오기",
+    "suggested": "모델 불러오기",
+    "reason": "AMBIGUITY: 'Fetch' and 'Import' are both '가져오기' inside the same model-management flow — Fetch family: settingsFetchModelList '모델 가져오기', settingsFetchingModelList '가져오는 중...', settingsOpenAICompatibleFetchedPreviewTitle '가져온 모델', settingsOpenAICompatibleFetchedPreviewCount '가져온 {count}개 모델 중...', settingsOpenAICompatibleFetchedPreviewEmpty '모델을 가져와 미리보고 가져오세요.'; Import family: settingsOpenAICompatibleImportSelectedModels '선택 항목 가져오기', settingsOpenAICompatibleModelImportNoSelection '가져올 모델을 선택하세요.', settingsOpenAICompatibleModelImportAdded '{count}개 모델을 가져왔습니다.'. Two distinct actions share one verb. Reserve '가져오기' for Import (matches global import keys such as settingsImportHistory) and switch the Fetch family to '불러오기'.",
+    "severity": "medium"
+  },
+  {
+    "key": "audioRecorderTotalDuration",
+    "current": "총 재생 시간",
+    "suggested": "총 녹음 시간",
+    "reason": "Same English 'Total Duration' translated differently: '총 소요 시간' (metricsTotalDuration) vs '총 재생 시간' (review-screen label above the recorded clip length). '재생 시간' implies playback time while the value shown is the recording length.",
+    "severity": "low"
+  },
+  {
+    "key": "liveStopVideo",
+    "current": "라이브 비디오 중지",
+    "suggested": "라이브 동영상 중지",
+    "reason": "INCONSISTENCY: 'Video' = '동영상' everywhere else (settingsFilesApiVideo, settingsMediaResolutionTooltip, videoSettingsTipFps, filePreviewYoutubePlayer, suggestionSrtDesc, tokenModalVideoEstimate) but '비디오' here and in settingsMediaResolutionLiveTooltip '비디오/오디오 해상도'. Unify on '동영상'.",
+    "severity": "low"
+  },
+  {
+    "key": "tts_style_even",
+    "current": "차분한",
+    "suggested": "균일한",
+    "reason": "'Even' describes an even/steady, near-monotone delivery; '차분한' means calm — related but shifted. '균일한' (or '일정한 톤') is accurate.",
+    "severity": "low"
+  },
+  {
+    "key": "tts_style_excitable",
+    "current": "흥분한",
+    "suggested": "신나는",
+    "reason": "'흥분한' carries an agitated/negative nuance in Korean; for the upbeat 'Excitable' voice style '신나는' (or '들뜬') is the natural positive equivalent.",
+    "severity": "low"
+  },
+  {
+    "key": "appDragDropRelease",
+    "current": "놓아서 지원되는 파일 업로드",
+    "suggested": "놓으면 지원되는 파일이 업로드됩니다",
+    "reason": "Drag-and-drop overlay copy chains two verbal nouns awkwardly ('놓아서 ... 업로드'); natural Korean overlay text is a conditional clause ('놓으면 ...됩니다').",
+    "severity": "low"
+  },
+  {
+    "key": "suggestionTranslateShort",
+    "current": "전문적인 양방향 번역.",
+    "suggested": "전문적인 양방향 번역을 제공합니다.",
+    "reason": "STYLE INCONSISTENCY: all sibling suggestion-card subtitles end in '-합니다.' (suggestionSummarizeShort '핵심 주제를 빠르게 추출합니다.', suggestionOcrShort, suggestionExplainShort, suggestionAsrShort, suggestionSrtShort, suggestionHtmlShort); this one is a bare noun plus period.",
+    "severity": "low"
+  },
+  {
+    "key": "suggestionHtmlDesc",
+    "current": "Live Artifacts를 사용하여 제공된 정보를 구조화되고 반응형인 HTML 아티팩트로 정리해 주세요. 모든 중요한 정보를 유지하세요:",
+    "suggested": "Live Artifacts를 사용하여 제공된 정보를 구조화된 반응형 HTML 아티팩트로 정리해 주세요. 모든 중요한 정보를 유지하세요:",
+    "reason": "'구조화되고 반응형인' stacks two clunky attributives; '구조화된 반응형' is the natural modifier form.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsImportErrorWithMessage",
+    "current": "가져오기 실패: {message}",
+    "suggested": "가져오기에 실패했습니다: {message}",
+    "reason": "STYLE INCONSISTENCY: sibling failure messages use '~에 실패했습니다: {message}' (exportFailedWithMessage '내보내기에 실패했습니다:', uploadFailedWithMessage, scenariosFeedbackImportFailed); this one is telegraphic.",
+    "severity": "low"
+  },
+  {
+    "key": "safetyCategorySexuallyExplicit",
+    "current": "선정적 콘텐츠",
+    "suggested": "성적으로 노골적인 콘텐츠",
+    "reason": "'Sexually Explicit' is stronger than '선정적' (suggestive/sensational); the established Korean category name is '성적으로 노골적인 콘텐츠'.",
+    "severity": "low"
+  },
+  {
+    "key": "markdownPreviewPreview",
+    "current": "미리 보기",
+    "suggested": "미리보기",
+    "reason": "SPACING INCONSISTENCY: noun spelled '미리 보기' (markdownPreviewPreview, markdownPreviewPreviewShortcut, filePreviewNotSupported '미리 보기를 지원하지 않습니다', filePreviewLoadingWord 'Word 미리 보기 로딩 중...', filePreviewLargeMarkdownNotice '미리 보기를 원활하게 유지하기') vs '미리보기' (htmlPreviewTitle, htmlPreviewIframeTitle, htmlPreviewOpenLarger, sidePanelLoadingPreview, sidePanelPreviewUnsupported, codeFullscreenModal '미리보기 열기', settingsAutoFullscreenHtmlLabel, createTextSwitchToPreview, settingsRenderingPreview). '미리보기' is the compound registered in the standard dictionary; unify on it. (Verb forms like filePreviewWordUnavailable '미리 볼 수 없습니다' are correctly spaced and excluded.)",
+    "severity": "low"
+  },
+  {
+    "key": "createTextUnsavedTitle",
+    "current": "변경사항을 버리시겠습니까?",
+    "suggested": "변경 사항을 버리시겠습니까?",
+    "reason": "SPACING INCONSISTENCY: '변경 사항' (filePreviewSaveChanges '변경 사항 저장', filePreviewDiscardUnsavedChanges, safetyChangesApply, settingsResetConfirm) vs '변경사항' (createTextUnsavedTitle, scenariosConfirmCloseTitle, scenariosConfirmCloseMessage). Standard orthography spaces it; unify on '변경 사항'.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsLocalAppDataLoading",
+    "current": "로컬 저장소 사용량 계산 중…",
+    "suggested": "로컬 저장소 사용량 계산 중...",
+    "reason": "ELLIPSIS INCONSISTENCY: three strings use the single character '…' (settingsLocalAppDataLoading, settingsSearchPlaceholder '설정 검색…', usageLoading '사용량 데이터를 불러오는 중…') while every other progress/status string in the app uses ASCII '...' (60+ keys). The EN sources mirror the same mix, so normalize both languages — '...' recommended.",
+    "severity": "low"
+  },
+  {
+    "key": "thirdPartyApiBaseUrlModelsWarning",
+    "current": "'/models'는 생략하세요 — 자동으로 추가됩니다.",
+    "suggested": "'/models'은(는) 생략하세요 — 자동으로 추가됩니다.",
+    "reason": "JOSA INCONSISTENCY: the sibling string treats the trailing 's' as a consonant ('/chat/completions'은 생략하세요 — thirdPartyApiBaseUrlChatCompletionsWarning) but this one uses '는'. Both words end in 's'; pick one treatment — the bracketed '은(는)' sidesteps the ambiguity.",
+    "severity": "low"
+  },
+  {
+    "key": "suggestionFillInput",
+    "current": "제안을 입력창에 채우기",
+    "suggested": "제안을 입력란에 채우기",
+    "reason": "TERMINOLOGY INCONSISTENCY: input field = '입력란' (pasteClipboardAria '클립보드를 입력란에 붙여넣기', selectedFileMoveTextToInput '텍스트를 입력란으로 이동', fullscreenTooltipExpand '입력란 확대', fullscreenTooltipCollapse, helpModalTip '채팅 입력란에') vs '입력창' (suggestionFillInput only). Unify on '입력란'.",
+    "severity": "low"
+  },
+  {
+    "key": "filePreviewLoadingTextContent",
+    "current": "콘텐츠 로딩 중...",
+    "suggested": "콘텐츠를 불러오는 중...",
+    "reason": "INCONSISTENCY: 'Loading' = '불러오는 중' (loading, pdfLoading 'PDF 불러오는 중...', sidePanelLoadingPreview '미리보기 불러오는 중...', usageLoading, fileIdAdderLoadingFile) vs '로딩 중' (filePreviewLoadingTextContent, filePreviewLoadingPdfViewer 'PDF 뷰어 로딩 중...', filePreviewLoadingWord 'Word 미리 보기 로딩 중...'). Unify on '불러오는 중'.",
+    "severity": "low"
+  }
+]

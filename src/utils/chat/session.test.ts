@@ -100,9 +100,22 @@ describe('generateSessionTitle', () => {
     expect(generateSessionTitle(msgs)).toBe('Hello world');
   });
 
-  it('falls back to model message when no user message', () => {
-    const msgs = [makeMessage('model', 'Here is a detailed response for you')];
-    expect(generateSessionTitle(msgs)).toBe('Model: Here is a detailed response...');
+  it('falls back to model message (first 7 words) when no user message', () => {
+    const msgs = [makeMessage('model', 'Here is a detailed response for you to read later')];
+    expect(generateSessionTitle(msgs)).toBe('Model: Here is a detailed response for you...');
+  });
+
+  it('returns short spaceless text as-is', () => {
+    const msgs = [makeMessage('user', '你好世界')];
+    expect(generateSessionTitle(msgs)).toBe('你好世界');
+  });
+
+  it('truncates spaceless CJK text to 30 characters', () => {
+    const longCjk = '这是一个没有任何空格的很长很长的中文句子用来测试标题的字符截断逻辑是否正确生效';
+    const msgs = [makeMessage('user', longCjk)];
+    const title = generateSessionTitle(msgs);
+    expect(title.length).toBeLessThanOrEqual(31);
+    expect(title).toBe(`${longCjk.slice(0, 30)}…`);
   });
 
   it('falls back to file name when no text messages', () => {

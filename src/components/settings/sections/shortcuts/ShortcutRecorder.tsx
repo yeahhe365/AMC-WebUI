@@ -95,7 +95,7 @@ export const ShortcutRecorder: React.FC<ShortcutRecorderProps> = ({ value, defau
         {hasChanged && (
           <button
             onClick={handleReset}
-            className="p-1.5 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)]"
+            className="p-1.5 text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)]"
             title={t('shortcutsResetDefault')}
             aria-label={t('shortcutsResetAria')}
           >
@@ -105,7 +105,7 @@ export const ShortcutRecorder: React.FC<ShortcutRecorderProps> = ({ value, defau
         {isBound && (
           <button
             onClick={handleClear}
-            className="p-1.5 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-danger)] hover:bg-[var(--theme-bg-danger)]/10 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)]"
+            className="p-1.5 text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-danger)] hover:bg-[var(--theme-bg-danger)]/10 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)]"
             title={t('shortcutsClear')}
             aria-label={t('shortcutsClearAria')}
           >
@@ -136,28 +136,20 @@ export const ShortcutRecorder: React.FC<ShortcutRecorderProps> = ({ value, defau
             {tempKey ? formatShortcut(tempKey).join(' + ') : t('shortcutsRecording')}
           </span>
         ) : isBound ? (
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {formattedKeys.map((k, i) => (
               <kbd
                 key={i}
-                className="
-                                        min-w-[20px] h-6 px-1.5 
-                                        flex items-center justify-center 
-                                        bg-[var(--theme-bg-primary)] 
-                                        border border-[var(--theme-border-secondary)] 
-                                        border-b-2
-                                        rounded-[6px]
-                                        text-xs font-sans font-medium text-[var(--theme-text-secondary)]
-                                        shadow-sm
-                                        select-none
-                                    "
+                // Cherry Studio: packages/ui/src/components/primitives/kbd.tsx + ShortcutSettings.tsx Kbd
+                // min-w-6 rounded-md border border-border-subtle bg-card px-1.5 py-0.75 text-xs
+                className="inline-flex min-w-6 items-center justify-center rounded-md border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] px-1.5 py-[3px] text-xs font-medium leading-none text-[var(--theme-text-primary)] shadow-none select-none"
               >
                 {k}
               </kbd>
             ))}
           </div>
         ) : (
-          <span className="text-xs text-[var(--theme-text-tertiary)] italic px-2">{t('shortcutsNone')}</span>
+          <span className="text-xs text-[var(--theme-text-secondary)] italic px-2">{t('shortcutsNone')}</span>
         )}
       </button>
     </div>

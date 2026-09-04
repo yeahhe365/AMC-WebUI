@@ -10,6 +10,7 @@ import {
 import { AVAILABLE_THEMES } from '@/constants/themeRegistry';
 import { I18nProvider } from '@/contexts/I18nContext';
 import type { AppViewModel } from '@/hooks/app/useApp';
+import type { QuickTtsResult } from '@/hooks/chat/message/useTextToSpeechHandler';
 import { WindowProvider } from '@/contexts/WindowContext';
 import { useChatStore } from '@/stores/chatStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -48,7 +49,6 @@ type ChatAreaInputValue = {
   onTranscribeAudio: (file: File) => Promise<string | null>;
   isProcessingFile: boolean;
   fileError: string | null;
-  isImageEditModel?: boolean;
   aspectRatio?: string;
   setAspectRatio?: (ratio: string) => void;
   imageSize?: string;
@@ -99,7 +99,7 @@ type ChatAreaMessageListValue = {
   onFollowUpSuggestionFill: (suggestion: string) => void;
   onContinueGeneration: (messageId: string) => void;
   onForkMessage: (messageId: string) => void;
-  onQuickTTS: (text: string) => Promise<string | null>;
+  onQuickTTS: (text: string) => Promise<QuickTtsResult>;
   chatInputHeight: number;
   currentModelId: string;
   onOpenSidePanel: () => void;
@@ -146,12 +146,11 @@ export const createChatAreaProviderValue = (overrides: ChatAreaProviderValueOver
       isPipSupported: true,
       isPipActive: inputOverrides.isPipActive ?? false,
       onNewChat: inputOverrides.onNewChat ?? vi.fn(),
+      newChatHref: '/',
       onOpenScenariosModal: vi.fn(),
       onToggleHistorySidebar: vi.fn(),
       onLoadLiveArtifactsPrompt: inputOverrides.onToggleLiveArtifactsPrompt ?? vi.fn(),
       onSelectModel: inputOverrides.onSelectModel ?? vi.fn(),
-      onSetThinkingLevel: vi.fn(),
-      onToggleGemmaReasoning: vi.fn(),
       onTogglePip: inputOverrides.onTogglePip ?? vi.fn(),
       ...overrides.header,
     },
@@ -170,7 +169,7 @@ export const createChatAreaProviderValue = (overrides: ChatAreaProviderValueOver
       onFollowUpSuggestionFill: vi.fn(),
       onContinueGeneration: vi.fn(),
       onForkMessage: vi.fn(),
-      onQuickTTS: vi.fn(async () => null),
+      onQuickTTS: vi.fn(async () => ({ error: 'Mock TTS error' })),
       chatInputHeight: 0,
       currentModelId: 'gemini-3.1-pro-preview',
       onOpenSidePanel: vi.fn(),
@@ -197,7 +196,6 @@ export const createChatAreaProviderValue = (overrides: ChatAreaProviderValueOver
       onTranscribeAudio: vi.fn(async () => null),
       isProcessingFile: false,
       fileError: null,
-      isImageEditModel: false,
       aspectRatio: '1:1',
       setAspectRatio: vi.fn(),
       imageSize: '1K',
@@ -359,11 +357,6 @@ export const createChatRuntimeApp = (value: ChatAreaProviderValue): AppViewModel
       handleAddFileById: value.input.onAddFileById,
       handleCancelFileUpload: value.input.onCancelUpload,
       handleTranscribeAudio: value.input.onTranscribeAudio,
-      toggleGoogleSearch: vi.fn(),
-      toggleCodeExecution: vi.fn(),
-      toggleLocalPython: vi.fn(),
-      toggleUrlContext: vi.fn(),
-      toggleDeepSearch: vi.fn(),
       handleClearCurrentChat: value.input.onClearChat,
       handleTogglePinCurrentSession: value.input.onTogglePinCurrentSession,
       handleTogglePinSession: vi.fn(),
@@ -380,9 +373,12 @@ export const createChatRuntimeApp = (value: ChatAreaProviderValue): AppViewModel
       handleDuplicateSession: vi.fn(),
       handleAddNewGroup: vi.fn(),
       handleDeleteGroup: vi.fn(),
+      handleClearGroup: vi.fn(),
       handleRenameGroup: vi.fn(),
       handleMoveSessionToGroup: vi.fn(),
       handleToggleGroupExpansion: vi.fn(),
+      handleReorderGroups: vi.fn(),
+      handleNewChatInGroup: vi.fn(),
       clearCacheAndReload: vi.fn(),
       clearAllHistory: vi.fn(),
       handleSaveAllScenarios: vi.fn(),
@@ -412,7 +408,7 @@ export const createChatRuntimeApp = (value: ChatAreaProviderValue): AppViewModel
     handleSuggestionClick: vi.fn(),
     isLiveArtifactsPromptActive: value.header.isLiveArtifactsPromptActive,
     isLiveArtifactsPromptBusy: value.header.isLiveArtifactsPromptBusy,
-    handleSetThinkingLevel: value.header.onSetThinkingLevel,
+    handleSetThinkingLevel: vi.fn(),
     getCurrentModelDisplayName: vi.fn(() => value.header.currentModelName),
     handleExportAllScenarios: vi.fn(),
     handleImportAllScenarios: vi.fn(),

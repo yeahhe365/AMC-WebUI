@@ -1,0 +1,303 @@
+[
+  {
+    "key": "shortcutsChatInputTitle",
+    "current": "Compositeur",
+    "suggested": "Zone de saisie",
+    "reason": "MISTRANSLATION: EN 'Composer' here means the message-composer area (section header grouping input/composer keyboard shortcuts in ShortcutsSection.tsx). FR 'Compositeur' means a musical composer; a French UI would never label this section 'Compositeur'.",
+    "severity": "high"
+  },
+  {
+    "key": "appDragDropRelease",
+    "current": "Relâchez pour importer les fichiers compatibles",
+    "suggested": "Relâchez pour téléverser les fichiers pris en charge",
+    "reason": "INCONSISTENCY: 'Upload' is rendered 'importer' here while every other upload string uses 'téléverser' (attachMenuUpload, selectedFileUploading, uploadFailedWithMessage...). 'Import' must stay reserved for attachMenuImportFolder/ImportZip. Also 'fichiers compatibles' vs the standard 'fichiers pris en charge' used in uploadUnsupportedType.",
+    "severity": "medium"
+  },
+  {
+    "key": "logViewerOverviewTab",
+    "current": "Aperçu",
+    "suggested": "Vue d'ensemble",
+    "reason": "MISTRANSLATION/INCONSISTENCY: 'Overview' (usage-statistics tab) becomes 'Aperçu', which is the established translation of 'Preview' (preview, markdownPreviewPreview, htmlPreviewTitle...). Two different concepts now share one label; 'Vue d'ensemble' is the standard French term for Overview.",
+    "severity": "medium"
+  },
+  {
+    "key": "filePreviewRenderMarkdownAnyway",
+    "current": "Rendre le Markdown quand même",
+    "suggested": "Effectuer le rendu du Markdown quand même",
+    "reason": "UNNATURAL/MISTRANSLATION: 'Render' (computing) is translated 'Rendre', which primarily reads as 'to give back/return'. The correct UI phrasing is 'effectuer le rendu de'. Same defect in settingsEnableMermaidRenderingLabel and settingsEnableGraphvizRenderingLabel.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsEnableMermaidRenderingLabel",
+    "current": "Rendre les diagrammes Mermaid",
+    "suggested": "Effectuer le rendu des diagrammes Mermaid",
+    "reason": "UNNATURAL/MISTRANSLATION: 'Render Mermaid Diagrams' -> 'Effectuer le rendu des diagrammes Mermaid'; 'Rendre les diagrammes' reads as 'give the diagrams back'. Related tooltip keys already use the correct 'Rend les blocs de code ... en diagrammes'.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsEnableGraphvizRenderingLabel",
+    "current": "Rendre les diagrammes Graphviz",
+    "suggested": "Effectuer le rendu des diagrammes Graphviz",
+    "reason": "UNNATURAL/MISTRANSLATION: same 'render'->'rendre' calque as settingsEnableMermaidRenderingLabel.",
+    "severity": "medium"
+  },
+  {
+    "key": "messageSenderFileUploadFailedBeforeSend",
+    "current": "Échec du téléversement de la pièce jointe. Supprimez le fichier échoué ou téléversez-le à nouveau avant d'envoyer.",
+    "suggested": "Échec du téléversement de la pièce jointe. Supprimez le fichier concerné ou téléversez-le à nouveau avant l'envoi.",
+    "reason": "UNNATURAL: 'le fichier échoué' ('the stranded/failed file') is not French; the failure applies to the upload, not the file. Use 'le fichier concerné' / 'dont le téléversement a échoué'. 'avant d'envoyer' -> 'avant l'envoi' reads better after a noun phrase.",
+    "severity": "medium"
+  },
+  {
+    "key": "scenariosConfirmCloseMessage",
+    "current": "Vous avez des modifications non enregistrées. Les fermer les supprimera.",
+    "suggested": "Vous avez des modifications non enregistrées. Si vous fermez maintenant, elles seront perdues.",
+    "reason": "MISTRANSLATION/GRAMMAR: 'Les fermer' makes 'les' refer to the modifications (you cannot 'close changes'); EN means closing the dialog discards them. Reference is broken and 'supprimera' overstates.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsGenerateQuadImagesTooltip",
+    "current": "Lorsqu'elle est activée, les prompts de génération d'images produiront quatre variations indépendantes à la fois. Cela consommera plus de crédits API.",
+    "suggested": "Lorsque cette option est activée, les prompts de génération d'images produiront quatre variations indépendantes à la fois. Cela consommera plus de crédits API.",
+    "reason": "GRAMMAR: dangling agreement — 'Lorsqu'elle est activée' (feminine singular) has no matching subject; the main clause subject is 'les prompts' (masculine plural). Must anchor to 'cette option'.",
+    "severity": "medium"
+  },
+  {
+    "key": "shortcutsGlobalTitle",
+    "current": "Dialogues et global",
+    "suggested": "Boîtes de dialogue et actions globales",
+    "reason": "UNNATURAL: 'et global' uses English 'global' as a bare noun, which a native French UI would never do. Section groups dialog-related and global shortcut actions.",
+    "severity": "medium"
+  },
+  {
+    "key": "thirdPartyAddConnectionTitle",
+    "current": "Choisissez un modèle de connexion",
+    "suggested": "Choisissez un type de connexion",
+    "reason": "MISTRANSLATION RISK: EN 'template' became 'modèle', the word this whole app uses for AI models (100+ keys). In a model-picker-heavy UI, 'modèle de connexion' invites confusion with selecting an AI model; use 'type' or 'gabarit'.",
+    "severity": "medium"
+  },
+  {
+    "key": "liveArtifactInteractionInvalidReasonLead",
+    "current": "La spécification a échoué à la validation :",
+    "suggested": "La validation de la spécification a échoué :",
+    "reason": "UNNATURAL: 'échouer à la validation' is an anglicism (calque of 'failed validation'). Invert: 'La validation de la spécification a échoué'.",
+    "severity": "low"
+  },
+  {
+    "key": "usagePromptTokens",
+    "current": "Jetons d'entrée",
+    "suggested": "Tokens d'entrée",
+    "reason": "INCONSISTENCY family 'token': the app predominantly keeps 'tokens' (toolsTokenCountLabel/tokenModalTitle 'Calculateur de tokens', tokenModalEstimatedTokens 'Tokens estimés', logViewerTokensTab 'Tokens', logViewerTokenUsageTitle/Empty, metricsTokenUsage 'Utilisation des tokens', tokensUnit 'tokens', fileSettingsResolution 'Résolution des tokens', settingsThinkingModeCustom 'Budget de tokens', settingsThinkingModeTooltip, settingsMediaResolutionTooltip, settingsTopKTooltip, settingsReasoningBudgetHelp, tokenCountErrorWithMessage, tokenModalPlaceholder) but these use 'jeton(s)': usageDescription, usageCachedTokens, usageCompletionTokens, usageTotalTokens ('Total des jetons'), settingsAudioCompressionTooltip, settingsHideThinkingInContextTooltip, settingsAlwaysKeepThinkingInContextTooltip, plus 'Jeton Bearer' (settingsMcpAuthBearer, settingsMcpBearerToken). Unify on 'tokens' (majority) or on 'jetons' (official French term) — currently both appear for the same concept.",
+    "severity": "medium"
+  },
+  {
+    "key": "scenariosSystemPromptLabel",
+    "current": "Invite système",
+    "suggested": "Prompt système",
+    "reason": "INCONSISTENCY family 'prompt': every other occurrence keeps English 'prompt' (settingsSystemPrompt 'Prompt système par défaut', settingsClearSystemPrompt, settingsSystemPromptAria, settingsLiveArtifactsSystemPromptLabel/Placeholder/Help/Reset, helpCmdArtifacts, liveArtifactsPrompt*, settingsMcpCapabilityPrompts 'Prompts', settingsGenerateQuadImagesTooltip). Only this key translates it 'Invite'. Unify (recommend 'Prompt système').",
+    "severity": "medium"
+  },
+  {
+    "key": "shortcutsTogglePip",
+    "current": "Basculer l'incrustation d'image",
+    "suggested": "Activer/désactiver le mode image dans l'image",
+    "reason": "INCONSISTENCY family 'Picture-in-Picture': three renderings coexist — 'mode image dans l'image' (pipEnter, pipExit, pipPlaceholderTitle), 'Picture-in-Picture' (helpCmdPip), 'PiP' (pipPlaceholderClose 'fenêtre PiP') and here a fourth, 'incrustation d'image'. Pick one term (Microsoft-style 'image dans l'image' recommended) and reuse it.",
+    "severity": "medium"
+  },
+  {
+    "key": "headerReasoningToggleAria",
+    "current": "Basculer le mode raisonnement",
+    "suggested": "Activer/désactiver le mode raisonnement",
+    "reason": "INCONSISTENCY family 'Toggle': aria/help labels alternate between 'Basculer' (headerReasoningToggleAria, headerThinkingToggleAria, diagramToggleLayout, pdfToggleThumbnails, modelsSafetyToggleAria, shortcutsTogglePip, shortcutsToggleFullscreen, shortcutsCycleModelsScopeToggleAria, shortcutsCycleModelsScopeModelAria) and 'Activer/désactiver' (helpCmdSearch/Maps/Deep/Code/Url/Artifacts/Pip/Fast). 'Basculer X' is a franglais calque for toggle switches; standardize on 'Activer/désactiver'.",
+    "severity": "medium"
+  },
+  {
+    "key": "thirdPartyTemplateSetUrlAfterAdd",
+    "current": "Définir la Base URL après l'ajout",
+    "suggested": "Définir l'URL de base après l'ajout",
+    "reason": "INCONSISTENCY family 'Base URL': kept untranslated in thirdPartyApiBaseUrl ('Base URL'), settingsLiveProxyCompatibilityHelp ('les Base URL absolues') and here, but translated in settingsApiProxyUrlAria ('URL de base du Proxy') and settingsFetchModelListNeedsKeyAndUrl ('une URL de base'). Choose one form (recommend 'URL de base') across all five keys.",
+    "severity": "medium"
+  },
+  {
+    "key": "apiConfigUsingOwnKeys",
+    "current": "Utilisation des Clés API stockées dans ce navigateur.",
+    "suggested": "Utilisation des clés API stockées dans ce navigateur.",
+    "reason": "FORMAT INCONSISTENCY: spurious mid-sentence capitals on 'Clé(s) API' in apiConfigKeyPlaceholder, apiConfigOpenaiKeyPlaceholder, apiConfigOverridingEnvKey ('la Clé API d'environnement'), apiConfigUsingOwnKeys, apiConfigMissingEnvKey, apiConfigNoKeyProvided, apiConfigNoKeyAvailable, apiConfigInvalidKeyFormat, settingsFetchModelListNeedsKeyAndUrl, settingsLiveAutomaticHelp ('la Clé API de votre navigateur'), thirdPartyApiKeyHelp ('des Clés API Gemini' then lowercase 'la clé' in the very next sentence). Elsewhere consistently lowercase (messageSenderApiKeyNotConfigured, uploadMissingApiKey...). Lowercase unless sentence-initial.",
+    "severity": "medium"
+  },
+  {
+    "key": "audioRecorderFailedToSave",
+    "current": "Échec de l'enregistrement.",
+    "suggested": "Échec de la sauvegarde de l'enregistrement.",
+    "reason": "AMBIGUITY: because 'enregistrer' covers both 'record' and 'save', this reads as 'recording failed' when EN means saving the finished recording failed. Distinguish with 'sauvegarde'.",
+    "severity": "low"
+  },
+  {
+    "key": "audioRecorderSaveRecording",
+    "current": "Enregistrer l'enregistrement",
+    "suggested": "Sauvegarder l'enregistrement",
+    "reason": "UNNATURAL: 'enregistrer un enregistrement' doubles the same word for save+record; prefer 'Sauvegarder' (consistent with the previous fix).",
+    "severity": "low"
+  },
+  {
+    "key": "createTextSwitchToPreview",
+    "current": "Passer en aperçu",
+    "suggested": "Passer en mode aperçu",
+    "reason": "INCONSISTENCY: sibling key createTextSwitchToEdit is 'Passer en mode édition'; the pair should be parallel ('Passer en mode aperçu').",
+    "severity": "low"
+  },
+  {
+    "key": "headerModelSelectorTooltipAction",
+    "current": "Cliquez pour changer ou appuyez sur 'Tab' pour faire défiler",
+    "suggested": "Cliquez pour changer ou appuyez sur Tab pour parcourir les modèles",
+    "reason": "MISTRANSLATION-lite/PUNCTUATION: 'cycle' means stepping through models in sequence, not scrolling ('faire défiler'); and straight quotes around Tab clash with the guillemets used in videoSettingsTipTimestamp.",
+    "severity": "low"
+  },
+  {
+    "key": "exportImageTooLarge",
+    "current": "Échec de l'exportation : L'image est trop grande pour être traitée par le navigateur. Essayez d'exporter en HTML ou en Texte.",
+    "suggested": "Échec de l'exportation : l'image est trop volumineuse pour être traitée par le navigateur. Essayez d'exporter en HTML ou en texte.",
+    "reason": "PUNCTUATION/WORD CHOICE: lowercase after colon in French; 'trop grande' -> 'trop volumineuse' for file size; 'en Texte' -> 'en texte'.",
+    "severity": "low"
+  },
+  {
+    "key": "chatBehaviorTempTooltip",
+    "current": "Contrôle l'aléatoire.",
+    "suggested": "Contrôle le caractère aléatoire.",
+    "reason": "UNNATURAL: 'l'aléatoire' as a bare noun is awkward; 'le caractère aléatoire' (or 'le niveau d'aléa') is the natural phrasing.",
+    "severity": "low"
+  },
+  {
+    "key": "aboutUpdateReady",
+    "current": "Mise à jour prête à actualiser",
+    "suggested": "Mise à jour prête à être installée",
+    "reason": "UNNATURAL: 'prête à actualiser' literally says the update will do the refreshing; the update itself is ready to be applied/installed.",
+    "severity": "low"
+  },
+  {
+    "key": "suggestionHtmlShort",
+    "current": "Créer un artefact HTML interactif.",
+    "suggested": "Créer un artefact HTML dynamique (Live Artifact).",
+    "reason": "INCONSISTENCY: EN 'live HTML artifact' drops 'live' and swaps it for 'interactif', while the product name 'Live Artifacts'/'Live Artifact' is kept verbatim everywhere else (suggestionHtmlDesc uses 'artefact HTML structuré et réactif'). Align wording.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsEnableLoggingDescription",
+    "current": "Conservez les journaux système dans le stockage local pour le dépannage. Désactivé par défaut.",
+    "suggested": "Conserve les journaux système dans le stockage local à des fins de dépannage. Désactivé par défaut.",
+    "reason": "INCONSISTENCY: setting descriptions otherwise use 3rd-person descriptive verbs (Compresse..., Convertit..., Affiche..., Génère...); this one alone is imperative 'Conservez'.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsLocalAppDataLoading",
+    "current": "Calcul du stockage local en cours…",
+    "suggested": "Calcul du stockage local en cours...",
+    "reason": "PUNCTUATION: uses the typographic ellipsis '…' while the 50 other loading/progress strings use three dots '...' (e.g. loading, Chargement du PDF...). Make consistent.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsSearchPlaceholder",
+    "current": "Rechercher des paramètres…",
+    "suggested": "Rechercher des paramètres...",
+    "reason": "PUNCTUATION: '…' vs '...' inconsistency (see settingsLocalAppDataLoading).",
+    "severity": "low"
+  },
+  {
+    "key": "usageLoading",
+    "current": "Chargement des données d'utilisation…",
+    "suggested": "Chargement des données d'utilisation...",
+    "reason": "PUNCTUATION: '…' vs '...' inconsistency (see settingsLocalAppDataLoading).",
+    "severity": "low"
+  },
+  {
+    "key": "thirdPartyApiBaseUrlChatCompletionsWarning",
+    "current": "Omettez '/chat/completions' — il est ajouté automatiquement.",
+    "suggested": "Omettez « /chat/completions » — il est ajouté automatiquement.",
+    "reason": "PUNCTUATION: straight quotes vs guillemets used in videoSettingsTipTimestamp (see family note there). (The only key already using guillemets « » is videoSettingsTipTimestamp.)",
+    "severity": "low"
+  },
+  {
+    "key": "thirdPartyApiBaseUrlModelsWarning",
+    "current": "Omettez '/models' — il est ajouté automatiquement.",
+    "suggested": "Omettez « /models » — il est ajouté automatiquement.",
+    "reason": "PUNCTUATION: straight quotes vs guillemets used in videoSettingsTipTimestamp. (The only key already using guillemets « » is videoSettingsTipTimestamp.)",
+    "severity": "low"
+  },
+  {
+    "key": "settingsEnableMermaidRenderingTooltip",
+    "current": "Rend les blocs de code marqués comme 'mermaid' en diagrammes.",
+    "suggested": "Rend les blocs de code marqués comme « mermaid » sous forme de diagrammes.",
+    "reason": "PUNCTUATION: straight quotes vs guillemets used in videoSettingsTipTimestamp ('en diagrammes' -> 'sous forme de diagrammes' also avoids momentary 'mermaid en diagrammes' garden-path). (The only key already using guillemets « » is videoSettingsTipTimestamp.)",
+    "severity": "low"
+  },
+  {
+    "key": "settingsEnableGraphvizRenderingTooltip",
+    "current": "Rend les blocs de code marqués comme 'graphviz' ou 'dot' en diagrammes.",
+    "suggested": "Rend les blocs de code marqués comme « graphviz » ou « dot » sous forme de diagrammes.",
+    "reason": "PUNCTUATION: straight quotes vs guillemets used in videoSettingsTipTimestamp. (The only key already using guillemets « » is videoSettingsTipTimestamp.)",
+    "severity": "low"
+  },
+  {
+    "key": "apiConfigTestConnection",
+    "current": "Tester la Connexion",
+    "suggested": "Tester la connexion",
+    "reason": "PUNCTUATION/CAPS: unnecessary internal capital; sibling statuses are lowercase ('Connexion réussie', 'Échec de la connexion').",
+    "severity": "low"
+  },
+  {
+    "key": "safetyTitle",
+    "current": "Paramètres de Sécurité",
+    "suggested": "Paramètres de sécurité",
+    "reason": "PUNCTUATION/CAPS: French UI uses sentence case; cf. 'Paramètres' titles elsewhere. Same issue in settingsAdvancedMode ('Mode Avancé') and thirdPartyApiKey ('Clé API de Connexion').",
+    "severity": "low"
+  },
+  {
+    "key": "settingsAdvancedMode",
+    "current": "Mode Avancé",
+    "suggested": "Mode avancé",
+    "reason": "PUNCTUATION/CAPS: sentence case; compare '(Mode rapide)', '(Mode Pro)' which use lowercase descriptors.",
+    "severity": "low"
+  },
+  {
+    "key": "thirdPartyApiKey",
+    "current": "Clé API de Connexion",
+    "suggested": "Clé API de connexion",
+    "reason": "PUNCTUATION/CAPS: unnecessary internal capital.",
+    "severity": "low"
+  },
+  {
+    "key": "videoSettingsFpsPlaceholder",
+    "current": "ex. 1 (Par défaut)",
+    "suggested": "ex. 1 (par défaut)",
+    "reason": "PUNCTUATION/CAPS: inconsistent with mediaResolutionUnspecified 'Auto (par défaut)' — same parenthetical, two casings.",
+    "severity": "low"
+  },
+  {
+    "key": "selectedFileRemoveFile",
+    "current": "Retirer le fichier",
+    "suggested": "Supprimer le fichier",
+    "reason": "INCONSISTENCY family 'Remove': usually 'Supprimer' (removeQuoteAria, queuedSubmissionRemove, thirdPartyRemoveHeader/Connection, settingsMcpRemoveServer, settingsRemoveModel) but 'Retirer' here and in liveArtifactsPromptActiveAria/Title ('Cliquez pour le retirer'). Unify on 'Supprimer'.",
+    "severity": "low"
+  },
+  {
+    "key": "mapsExpand",
+    "current": "Agrandir",
+    "suggested": "Développer",
+    "reason": "INCONSISTENCY family 'Expand': generic key expand = 'Développer' (and settingsExpandCodeBlocksByDefaultLabel), but 'Agrandir' in mapsExpand and fullscreenTooltipExpand ('Agrandir la saisie'). Acceptable in view-zoom contexts, yet the bare 'Expand' control should match 'Développer' or be deliberately unified.",
+    "severity": "low"
+  },
+  {
+    "key": "shortcutsResetDefault",
+    "current": "Rétablir par défaut",
+    "suggested": "Rétablir les valeurs par défaut",
+    "reason": "INCONSISTENCY family 'Reset': mostly 'Réinitialiser' (settingsApiProxyReset, settingsResetModelList, filePreviewResetView, codeResetView, shortcutsResetAria) vs 'Rétablir par défaut' here (also clipped — add 'les valeurs'). Pick one verb family.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsDefaultModel",
+    "current": "Modèle de chat principal",
+    "suggested": "Modèle de discussion principal",
+    "reason": "INCONSISTENCY family 'Chat': 'discussion' dominates (newChat 'Nouvelle discussion', historyRecentChats 'Discussions récentes', settingsTabChat 'Discussion', settingsDataHistory 'Discussions', 28 occurrences) but 'chat' survives in: chatInputTextareaAria, helpModalTip, settingsApiKeyHelpText ('session de chat'), thirdPartyRemoveConnectionInUse ('Les chats utilisant...'), apiRuntimeThirdPartyConnectionMissing/Disabled ('de ce chat'), settingsFontSizeTooltip, settingsLiveArtifactsFontSizeTooltip, settingsChatBehavior ('Comportement du chat'), isAutoTitleEnabled(+Tooltip) ('nouveaux chats'), settingsMcpDescription ('chat natif Gemini'), settingsDefaultModel. Unify on 'discussion' (or deliberately keep 'chat') — currently mixed.",
+    "severity": "low"
+  }
+]

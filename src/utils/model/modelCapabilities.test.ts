@@ -5,13 +5,15 @@ import {
   getModelCapabilities,
   isGemini3Model,
   isLiveTranslateModel,
+  isLiveTranscribeModel,
+  isTranscribeModel,
   normalizeThinkingLevelForModel,
   shouldStripThinkingFromContext,
 } from './modelCapabilities';
 
 describe('raw mode support', () => {
-  it('includes Gemini Robotics-ER 1.6', () => {
-    expect(MODELS_SUPPORTING_RAW_MODE).toContain('gemini-robotics-er-1.6-preview');
+  it('includes Gemini Robotics-ER 2', () => {
+    expect(MODELS_SUPPORTING_RAW_MODE).toContain('gemini-robotics-er-2-preview');
   });
 });
 
@@ -24,16 +26,22 @@ describe('isGemini3Model', () => {
     expect(isGemini3Model('gemini-3-flash-preview')).toBe(true);
   });
 
-  it('returns true for gemini-3.6-flash and gemini-3.5-flash-lite', () => {
+  it('returns true for gemini-3.6-flash, gemini-3.7-flash, gemini-3.8-flash and gemini-3.5-flash-lite', () => {
     expect(isGemini3Model('gemini-3.6-flash')).toBe(true);
     expect(isGemini3Model('models/gemini-3.6-flash')).toBe(true);
+    expect(isGemini3Model('gemini-3.7-flash')).toBe(true);
+    expect(isGemini3Model('models/gemini-3.7-flash')).toBe(true);
+    expect(isGemini3Model('gemini-3.8-flash')).toBe(true);
+    expect(isGemini3Model('models/gemini-3.8-flash')).toBe(true);
     expect(isGemini3Model('gemini-3.5-flash-lite')).toBe(true);
     expect(isGemini3Model('models/gemini-3.5-flash-lite')).toBe(true);
   });
 
-  it('returns true for stable gemini-3-flash IDs', () => {
-    expect(isGemini3Model('gemini-3-flash')).toBe(true);
-    expect(isGemini3Model('models/gemini-3-flash')).toBe(true);
+  it('returns false for the retired bare gemini-3-flash ID', () => {
+    // Only gemini-3-flash-preview exists upstream; the bare stable ID is no
+    // longer special-cased.
+    expect(isGemini3Model('gemini-3-flash')).toBe(false);
+    expect(isGemini3Model('models/gemini-3-flash')).toBe(false);
   });
 
   it('returns true for gemini-3-pro', () => {
@@ -70,15 +78,15 @@ describe('getModelCapabilities', () => {
     expect(capabilities.supportsThinkingLevel).toBe(false);
   });
 
-  it('marks Gemini Robotics-ER 1.6 as supporting thinking levels', () => {
-    const capabilities = getModelCapabilities('gemini-robotics-er-1.6-preview');
+  it('marks Gemini Robotics-ER 2 as supporting thinking levels', () => {
+    const capabilities = getModelCapabilities('gemini-robotics-er-2-preview');
 
     expect(capabilities.supportsThinkingLevel).toBe(true);
     expect(capabilities.isGemini3).toBe(false);
   });
 
-  it('marks stable Gemini 3 Flash as supporting thinking levels', () => {
-    const capabilities = getModelCapabilities('gemini-3-flash');
+  it('marks Gemini 3 Flash Preview as supporting thinking levels', () => {
+    const capabilities = getModelCapabilities('gemini-3-flash-preview');
 
     expect(capabilities.isGemini3).toBe(true);
     expect(capabilities.supportsThinkingLevel).toBe(true);
@@ -98,6 +106,8 @@ describe('getModelCapabilities', () => {
   it('exposes raw reasoning prefill support as a model capability', () => {
     expect(getModelCapabilities('gemini-3-flash-preview').supportsRawReasoningPrefill).toBe(true);
     expect(getModelCapabilities('gemini-3.6-flash').supportsRawReasoningPrefill).toBe(true);
+    expect(getModelCapabilities('gemini-3.7-flash').supportsRawReasoningPrefill).toBe(true);
+    expect(getModelCapabilities('gemini-3.8-flash').supportsRawReasoningPrefill).toBe(true);
     expect(getModelCapabilities('gemini-3.5-flash-lite').supportsRawReasoningPrefill).toBe(true);
     expect(getModelCapabilities('gemini-2.5-flash').supportsRawReasoningPrefill).toBe(false);
   });
@@ -169,9 +179,15 @@ describe('normalizeThinkingLevelForModel', () => {
     expect(normalizeThinkingLevelForModel('models/gemini-3-pro-preview', 'MINIMAL')).toBe('LOW');
   });
 
+  it('maps MINIMAL to LOW for gemini-3.7-flash and gemini-3.8-flash, whose model cards reject minimal', () => {
+    expect(normalizeThinkingLevelForModel('gemini-3.7-flash', 'MINIMAL')).toBe('LOW');
+    expect(normalizeThinkingLevelForModel('gemini-3.8-flash', 'MINIMAL')).toBe('LOW');
+  });
+
   it('keeps MINIMAL for Gemini 3 Flash models', () => {
     expect(normalizeThinkingLevelForModel('gemini-3-flash-preview', 'MINIMAL')).toBe('MINIMAL');
     expect(normalizeThinkingLevelForModel('gemini-3.5-flash-lite', 'MINIMAL')).toBe('MINIMAL');
+    expect(normalizeThinkingLevelForModel('gemini-3.6-flash', 'MINIMAL')).toBe('MINIMAL');
   });
 });
 
@@ -232,5 +248,61 @@ describe('Live Translate model capabilities', () => {
 
   it('does not require a text prompt (audio-first)', () => {
     expect(capabilities.permissions.requiresTextPrompt).toBe(false);
+  });
+});
+
+describe('isTranscribeModel', () => {
+  it('returns false for empty string or general chat models', () => {
+    expect(isTranscribeModel('')).toBe(false);
+    expect(isTranscribeModel('gemini-3.8-flash')).toBe(false);
+    expect(isTranscribeModel('gemini-3.7-flash')).toBe(false);
+    expect(isTranscribeModel('gemini-3.5-flash-lite')).toBe(false);
+  });
+
+  it('returns true for dedicated transcribe models', () => {
+    expect(isTranscribeModel('gemini-3.5-transcribe')).toBe(true);
+    expect(isTranscribeModel('models/gemini-3.5-transcribe')).toBe(true);
+    expect(isTranscribeModel('gemini-3.5-transcribe-live')).toBe(false);
+  });
+
+  it('identifies live transcribe models specifically', () => {
+    expect(isLiveTranscribeModel('gemini-3.5-transcribe-live')).toBe(true);
+    expect(isLiveTranscribeModel('gemini-3.5-transcribe')).toBe(false);
+  });
+});
+
+describe('Gemini 3.5 Transcribe model capabilities', () => {
+  const capabilities = getModelCapabilities('gemini-3.5-transcribe');
+
+  it('is classified as a dedicated transcribe model', () => {
+    expect(capabilities.isTranscribeModel).toBe(true);
+    expect(capabilities.supportsThinkingLevel).toBe(false);
+  });
+
+  it('does not allow general text chat tools but allows attachments and marks as specialized', () => {
+    expect(capabilities.permissions.canUseTools).toBe(false);
+    expect(capabilities.permissions.canAcceptAttachments).toBe(true);
+    expect(capabilities.permissions.canUseTokenCount).toBe(true);
+    expect(capabilities.permissions.requiresTextPrompt).toBe(false);
+  });
+});
+
+describe('specialized audio and image model capability constraints', () => {
+  it('does not support thinking levels for gemini-3-pro-image-preview but supports them for flash image', () => {
+    expect(getModelCapabilities('gemini-3-pro-image-preview').supportsThinkingLevel).toBe(false);
+    expect(getModelCapabilities('gemini-3.1-flash-image-preview').supportsThinkingLevel).toBe(true);
+    expect(getModelCapabilities('gemini-3.1-flash-lite-image').supportsThinkingLevel).toBe(true);
+  });
+
+  it('restricts local python to live models that support function calling', () => {
+    expect(getModelCapabilities('gemini-3.1-flash-live-preview').permissions.canUseLocalPython).toBe(true);
+    expect(getModelCapabilities('gemini-3.5-live-translate-preview').permissions.canUseLocalPython).toBe(false);
+    expect(getModelCapabilities('gemini-3.5-transcribe-live').permissions.canUseLocalPython).toBe(false);
+  });
+
+  it('restricts Google search to live models that support search grounding', () => {
+    expect(getModelCapabilities('gemini-3.1-flash-live-preview').permissions.canUseGoogleSearch).toBe(true);
+    expect(getModelCapabilities('gemini-3.5-live-translate-preview').permissions.canUseGoogleSearch).toBe(false);
+    expect(getModelCapabilities('gemini-3.5-transcribe-live').permissions.canUseGoogleSearch).toBe(false);
   });
 });

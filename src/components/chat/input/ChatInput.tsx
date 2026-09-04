@@ -1,5 +1,4 @@
 import React from 'react';
-import { createPortal } from 'react-dom';
 import { ChatInputArea } from './ChatInputArea';
 import { ChatInputFileModals } from './ChatInputFileModals';
 import { ChatInputCoreModals } from './ChatInputCoreModals';
@@ -7,16 +6,8 @@ import { useChatInputContext } from './ChatInputContext';
 import { ChatInputProvider } from './ChatInputProvider';
 
 const ChatInputContent: React.FC = () => {
-  const {
-    chatInput,
-    inputState,
-    capabilities,
-    modalsState,
-    localFileState,
-    slashCommandState,
-    handlers,
-    targetDocument,
-  } = useChatInputContext();
+  const { chatInput, inputState, capabilities, modalsState, localFileState, slashCommandState, handlers } =
+    useChatInputContext();
 
   const chatInputContent = <ChatInputArea />;
 
@@ -79,7 +70,7 @@ const ChatInputContent: React.FC = () => {
         }}
       />
 
-      {inputState.isFullscreen ? createPortal(chatInputContent, targetDocument.body) : chatInputContent}
+      {chatInputContent}
     </>
   );
 };

@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   getGeminiApiBaseUrlForSettings,
   getGeminiProxyBaseUrlForSettings,
   resolveConfiguredGeminiBaseUrl,
   resolveLiveClientBaseUrl,
 } from './geminiApiBaseUrl';
+
+const setRuntimeConfig = (config: Record<string, unknown> | undefined) => {
+  (window as Window & { __AMC_RUNTIME_CONFIG__?: Record<string, unknown> }).__AMC_RUNTIME_CONFIG__ = config;
+};
 
 const disabledProxySettings = {
   useCustomApiConfig: true,
@@ -63,5 +67,22 @@ describe('geminiApiBaseUrl', () => {
         apiProxyUrl: '/api/gemini/v1beta',
       }),
     ).toBeNull();
+  });
+
+  it('resolves the Docker runtime relative proxy path into an absolute URL for the SDK', () => {
+    setRuntimeConfig({
+      serverManagedApi: true,
+      useCustomApiConfig: true,
+      useApiProxy: true,
+      apiProxyUrl: '/api/gemini',
+    });
+
+    // A bare relative path would make the @google/genai SDK throw "Invalid URL"
+    // inside new URL(baseUrl + path). It must be resolved against the origin.
+    expect(getGeminiApiBaseUrlForSettings()).toBe('http://localhost/api/gemini');
+  });
+
+  afterEach(() => {
+    setRuntimeConfig(undefined);
   });
 });

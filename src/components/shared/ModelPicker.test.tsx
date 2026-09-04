@@ -8,8 +8,9 @@ describe('getModelIcon', () => {
       getModelIcon({ id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview' }),
     );
 
-    expect(geminiMarkup).toContain('width="22"');
-    expect(geminiMarkup).toContain('height="22"');
+    // 统一 22×22 外框容器（Brand 与 Provider 一致，解决大小不一）
+    expect(geminiMarkup).toContain('width:22px');
+    expect(geminiMarkup).toContain('height:22px');
   });
 
   it('uses the Gemini SVG brand icon for Gemini general models', () => {
@@ -47,7 +48,7 @@ describe('getModelIcon', () => {
 
   it('uses the Gemini SVG brand icon for Gemini Robotics models', () => {
     const roboticsMarkup = renderToStaticMarkup(
-      getModelIcon({ id: 'gemini-robotics-er-1.6-preview', name: 'Gemini Robotics-ER 1.6 Preview' }),
+      getModelIcon({ id: 'gemini-robotics-er-2-preview', name: 'Gemini Robotics-ER 2 Preview' }),
     );
 
     expect(roboticsMarkup).toContain('data-model-brand-icon="gemini"');

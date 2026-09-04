@@ -1,12 +1,12 @@
 import React, { useMemo } from 'react';
-import { ClipboardPaste, Eraser, Languages, Loader2, Maximize2, Minimize2 } from 'lucide-react';
+import { ClipboardPaste, Eraser, Languages, Loader2 } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import {
   useChatInputActionsContext,
   useChatInputComposerStatusContext,
 } from '@/components/chat/input/ChatInputContext';
 
-export type ComposerAuxiliaryActionId = 'fullscreen' | 'translate' | 'clear' | 'paste';
+export type ComposerAuxiliaryActionId = 'translate' | 'clear' | 'paste';
 
 export interface ComposerAuxiliaryAction {
   id: ComposerAuxiliaryActionId;
@@ -27,8 +27,6 @@ const actionText = (label: string, ariaLabel = label) => ({
 
 export const useComposerAuxiliaryActions = (): ComposerAuxiliaryAction[] => {
   const {
-    isFullscreen,
-    onToggleFullscreen,
     isTranslating,
     disabled,
     isWaitingForUpload,
@@ -46,20 +44,9 @@ export const useComposerAuxiliaryActions = (): ComposerAuxiliaryAction[] => {
   const localInputEditBlocked = disabled || isWaitingForUpload;
 
   return useMemo(() => {
-    const fullscreenLabel = isFullscreen ? t('fullscreenTooltipCollapse') : t('fullscreenTooltipExpand');
     const translateLabel = isTranslating ? t('translatingButtonTitle') : t('translateButtonTitle');
 
     const actions: Array<ComposerAuxiliaryAction | null> = [
-      !isNativeAudioModel && onToggleFullscreen
-        ? {
-            id: 'fullscreen',
-            ...actionText(fullscreenLabel),
-            icon: isFullscreen ? <Minimize2 size={20} strokeWidth={2} /> : <Maximize2 size={20} strokeWidth={2} />,
-            disabled,
-            action: onToggleFullscreen,
-            testId: 'fullscreen-button',
-          }
-        : null,
       !isNativeAudioModel && showInputTranslationButton
         ? {
             id: 'translate',
@@ -99,14 +86,11 @@ export const useComposerAuxiliaryActions = (): ComposerAuxiliaryAction[] => {
     return actions.filter((item): item is ComposerAuxiliaryAction => item !== null);
   }, [
     canTranslate,
-    disabled,
-    isFullscreen,
     isNativeAudioModel,
     isTranslating,
     localInputEditBlocked,
     onClearInput,
     onPasteFromClipboard,
-    onToggleFullscreen,
     onTranslate,
     showInputClearButton,
     showInputPasteButton,

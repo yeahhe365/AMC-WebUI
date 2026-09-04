@@ -1,5 +1,6 @@
 import { forwardRef, type ComponentType, type ReactNode } from 'react';
 import type { ChatMessage, UploadedFile } from '@/types';
+import type { HtmlPreviewRequest } from '@/utils/html-preview/previewPrivilege';
 
 export interface VirtuosoMockProps<T> {
   data: T[];
@@ -33,8 +34,7 @@ type MessageListScrollMockResult = {
 type MessageListUiMockResult = {
   previewFile: UploadedFile | null;
   isHtmlPreviewModalOpen: boolean;
-  htmlToPreview: string | null;
-  initialTrueFullscreenRequest: boolean;
+  htmlPreview: HtmlPreviewRequest | null;
   configuringFile: null;
   setConfiguringFile: () => void;
   handleFileClick: () => void;
@@ -131,8 +131,7 @@ export const createMessageListUiMock = (overrides: Partial<MessageListUiMockResu
   useMessageListUi: (): MessageListUiMockResult => ({
     previewFile: null,
     isHtmlPreviewModalOpen: false,
-    htmlToPreview: null,
-    initialTrueFullscreenRequest: false,
+    htmlPreview: null,
     configuringFile: null,
     setConfiguringFile: noop,
     handleFileClick: noop,

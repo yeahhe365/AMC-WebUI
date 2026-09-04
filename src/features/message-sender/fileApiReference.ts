@@ -1,18 +1,32 @@
-import type { File as GeminiFile } from '@google/genai';
+import type { File as GeminiFile, Part } from '@google/genai';
 import { getErrorMessage } from '@/utils/errorMessage';
-import type { UploadedFile } from '@/types';
+import type { ChatMessage, UploadedFile } from '@/types';
 import { getFileMetadataApi, uploadFileApi } from '@/services/api/fileApi';
 import { getUploadLifecycleForGeminiState } from '@/utils/file-upload/fileUploadPolicy';
 import { logService } from '@/services/logService';
-import { usesRemoteFileReference } from '@/utils/chat/fileTransferStrategy';
+import {
+  formatGeminiFileApiProcessingError,
+  formatHistoryFileApiUnavailablePartText,
+  getApiKeyFingerprint,
+  getGeminiFilesApiName,
+  getGeminiFilesApiNameFromUri,
+  isFileApiKeyMismatch,
+  isGeminiFilesApiReferenceStillValid,
+  sessionHasGeminiFilesApiReferences,
+  shouldRefreshGeminiFilesApiReferenceFromExpiration,
+  toFileApiExpirationTime,
+  usesGeminiFilesApiReference,
+} from '@/utils/chat/geminiFilesApi';
 import { formatMessageSenderText } from './i18nFormat';
+import { createFileReferenceUnavailablePatch } from '../../../shared/fileReferencePatch';
 
-const FILE_API_REFRESH_LEEWAY_MS = 5 * 60 * 1000;
+export { formatHistoryFileApiUnavailablePartText, sessionHasGeminiFilesApiReferences };
 
 type FileApiReferenceErrorKey =
   | 'messageSenderWaitForFiles'
   | 'messageSenderFileReferenceExpiredNoBackup'
-  | 'messageSenderFileReferenceRefreshFailed';
+  | 'messageSenderFileReferenceRefreshFailed'
+  | 'messageSenderFileReferenceVerifyFailed';
 
 type FilePatch = Partial<UploadedFile>;
 
@@ -32,30 +46,41 @@ type EnsureFilesApiReferencesResult =
       fileName?: string;
     };
 
+interface EnsureHistoryFilesApiReferencesParams {
+  messages: ChatMessage[];
+  apiKey: string;
+  abortSignal: AbortSignal;
+  translate: (key: string) => string;
+}
+
+type EnsureHistoryFilesApiReferencesResult =
+  | { ok: true; messages: ChatMessage[]; changed: boolean }
+  | {
+      ok: false;
+      messages: ChatMessage[];
+      errorKey: FileApiReferenceErrorKey;
+      fileName?: string;
+    };
+
 interface FileReferenceErrorResult {
   ok: false;
   errorKey: string;
   fileName?: string;
 }
 
-const getFileApiExpirationTime = (file: GeminiFile): string | undefined => {
-  const expirationTime = (file as { expirationTime?: unknown }).expirationTime;
-  if (expirationTime instanceof Date) {
-    return expirationTime.toISOString();
-  }
+interface HistoryFileGroup {
+  fileApiName: string;
+  representative: UploadedFile;
+  oldUris: Set<string>;
+}
 
-  return typeof expirationTime === 'string' ? expirationTime : undefined;
-};
-
-const shouldRefreshFromKnownExpiration = (file: UploadedFile): boolean => {
-  const expirationTime = (file as UploadedFile & { fileApiExpirationTime?: string }).fileApiExpirationTime;
-  if (!expirationTime) {
-    return false;
-  }
-
-  const expiresAt = Date.parse(expirationTime);
-  return Number.isFinite(expiresAt) && expiresAt <= Date.now() + FILE_API_REFRESH_LEEWAY_MS;
-};
+type ResolvedRemoteFile =
+  | { kind: 'active'; patch: FilePatch }
+  | { kind: 'wait'; patch: FilePatch; fileName: string }
+  | { kind: 'uploaded'; patch: FilePatch }
+  | { kind: 'needs-backup' }
+  | { kind: 'refresh-failed'; patch: FilePatch; fileName: string }
+  | { kind: 'verify-failed'; fileName: string };
 
 const toUploadableFile = (file: UploadedFile): File | null => {
   if (file.rawFile instanceof File) {
@@ -79,15 +104,335 @@ const applyFilePatch = (
   return files.map((file) => (file.id === fileId ? { ...file, ...patch } : file));
 };
 
-const buildActivePatchFromMetadata = (metadata: GeminiFile, fallbackFile: UploadedFile): FilePatch =>
+const buildActivePatchFromMetadata = (metadata: GeminiFile, fallbackFile: UploadedFile, apiKey: string): FilePatch =>
   ({
     fileUri: metadata.uri ?? fallbackFile.fileUri,
     fileApiName: metadata.name ?? fallbackFile.fileApiName,
     uploadState: 'active',
     isProcessing: false,
     error: undefined,
-    fileApiExpirationTime: getFileApiExpirationTime(metadata),
+    fileApiExpirationTime: toFileApiExpirationTime((metadata as { expirationTime?: unknown }).expirationTime),
+    fileApiKeyFingerprint: getApiKeyFingerprint(apiKey),
   }) as FilePatch;
+
+const FILES_API_ACCESS_DENIED_PATTERN = /403|PERMISSION_DENIED|permission/i;
+
+const isFilesApiAccessDeniedError = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return FILES_API_ACCESS_DENIED_PATTERN.test(message);
+};
+
+const createSyntheticHistoryFile = (fileApiName: string): UploadedFile => ({
+  id: fileApiName,
+  name: fileApiName,
+  type: 'application/octet-stream',
+  size: 0,
+  fileApiName,
+  uploadState: 'active',
+  transferStrategy: 'remote-file-id',
+});
+
+const pickRepresentative = (current: UploadedFile, candidate: UploadedFile): UploadedFile => {
+  if (toUploadableFile(current)) {
+    return current;
+  }
+  if (toUploadableFile(candidate) || current.id === current.fileApiName) {
+    return candidate;
+  }
+  return current;
+};
+
+const collectHistoryFileGroups = (messages: ChatMessage[]): HistoryFileGroup[] => {
+  const groups = new Map<string, HistoryFileGroup>();
+
+  const addUri = (group: HistoryFileGroup, uri?: string) => {
+    if (uri) {
+      group.oldUris.add(uri);
+    }
+  };
+
+  const ensureGroup = (fileApiName: string, file?: UploadedFile): HistoryFileGroup => {
+    const existing = groups.get(fileApiName);
+    if (!existing) {
+      const group: HistoryFileGroup = {
+        fileApiName,
+        representative: file ?? createSyntheticHistoryFile(fileApiName),
+        oldUris: new Set([fileApiName]),
+      };
+      groups.set(fileApiName, group);
+      return group;
+    }
+
+    if (file) {
+      existing.representative = pickRepresentative(existing.representative, file);
+    }
+
+    return existing;
+  };
+
+  for (const message of messages) {
+    for (const file of message.files ?? []) {
+      if (!usesGeminiFilesApiReference(file)) {
+        continue;
+      }
+      const fileApiName = getGeminiFilesApiName(file);
+      if (!fileApiName) {
+        continue;
+      }
+      const group = ensureGroup(fileApiName, file);
+      addUri(group, file.fileUri);
+      addUri(group, file.fileApiName);
+    }
+
+    for (const part of message.apiParts ?? []) {
+      const fileUri = part.fileData?.fileUri;
+      const fileApiName = getGeminiFilesApiNameFromUri(fileUri);
+      if (!fileApiName) {
+        continue;
+      }
+      const group = ensureGroup(fileApiName);
+      addUri(group, fileUri);
+    }
+  }
+
+  return [...groups.values()];
+};
+
+const fileBelongsToGroup = (file: UploadedFile, group: HistoryFileGroup): boolean =>
+  getGeminiFilesApiName(file) === group.fileApiName;
+
+const partBelongsToGroup = (part: Part, group: HistoryFileGroup): boolean => {
+  const fileUri = part.fileData?.fileUri;
+  if (!fileUri) {
+    return false;
+  }
+  return group.oldUris.has(fileUri) || getGeminiFilesApiNameFromUri(fileUri) === group.fileApiName;
+};
+
+const mapMatchingMessages = (
+  messages: ChatMessage[],
+  group: HistoryFileGroup,
+  updateMessage: (message: ChatMessage) => ChatMessage,
+): { messages: ChatMessage[]; changed: boolean } => {
+  let changed = false;
+  const nextMessages = messages.map((message) => {
+    const hasMatchingFile = message.files?.some((file) => fileBelongsToGroup(file, group)) ?? false;
+    const hasMatchingPart = message.apiParts?.some((part) => partBelongsToGroup(part, group)) ?? false;
+    if (!hasMatchingFile && !hasMatchingPart) {
+      return message;
+    }
+    const nextMessage = updateMessage(message);
+    if (nextMessage === message) {
+      return message;
+    }
+    changed = true;
+    return nextMessage;
+  });
+  return { messages: nextMessages, changed };
+};
+
+const filePatchChangesFile = (file: UploadedFile, patch: FilePatch): boolean =>
+  (
+    [
+      'fileUri',
+      'fileApiName',
+      'uploadState',
+      'fileApiExpirationTime',
+      'fileApiKeyFingerprint',
+      'error',
+      'transferStrategy',
+      'omittedFromApiHistory',
+    ] as const
+  ).some((key) => key in patch && file[key] !== patch[key]);
+
+const applyHistoryFilePatch = (
+  messages: ChatMessage[],
+  group: HistoryFileGroup,
+  patch: FilePatch,
+): { messages: ChatMessage[]; changed: boolean } =>
+  mapMatchingMessages(messages, group, (message) => {
+    const nextFiles = message.files?.map((file) => (fileBelongsToGroup(file, group) ? { ...file, ...patch } : file));
+    const nextApiParts = message.apiParts?.map((part) =>
+      partBelongsToGroup(part, group) && part.fileData
+        ? {
+            ...part,
+            fileData: {
+              ...part.fileData,
+              fileUri: patch.fileUri ?? part.fileData.fileUri,
+            },
+          }
+        : part,
+    );
+    const filesChanged = Boolean(
+      message.files?.some((file) => fileBelongsToGroup(file, group) && filePatchChangesFile(file, patch)),
+    );
+    const partsChanged = Boolean(
+      message.apiParts?.some(
+        (part) =>
+          partBelongsToGroup(part, group) && part.fileData?.fileUri !== (patch.fileUri ?? part.fileData?.fileUri),
+      ),
+    );
+    if (!filesChanged && !partsChanged) {
+      return message;
+    }
+
+    return {
+      ...message,
+      files: nextFiles,
+      apiParts: nextApiParts,
+    };
+  });
+
+const degradeHistoryFile = (
+  messages: ChatMessage[],
+  group: HistoryFileGroup,
+  translate: (key: string) => string,
+): { messages: ChatMessage[]; changed: boolean } => {
+  const fileName = group.representative.name;
+  const note = formatHistoryFileApiUnavailablePartText(fileName);
+  const patch: FilePatch = createFileReferenceUnavailablePatch(
+    formatMessageSenderText(translate('messageSenderHistoryFileReferenceUnavailable'), { filename: fileName }),
+  );
+
+  return mapMatchingMessages(messages, group, (message) => ({
+    ...message,
+    files: message.files?.map((file) => (fileBelongsToGroup(file, group) ? { ...file, ...patch } : file)),
+    apiParts: message.apiParts?.map((part) => (partBelongsToGroup(part, group) ? { text: note } : part)),
+  }));
+};
+
+const resolveRemoteFileReference = async (
+  file: UploadedFile,
+  apiKey: string,
+  abortSignal: AbortSignal,
+): Promise<ResolvedRemoteFile> => {
+  const fileApiName = getGeminiFilesApiName(file);
+  if (!fileApiName) {
+    return { kind: 'active', patch: {} };
+  }
+
+  const uploadableFile = toUploadableFile(file);
+  // Files API access is scoped to the uploading key's project: once the key
+  // changed, a local backup must be re-uploaded right away — metadata probing
+  // would only yield 403. Without a backup we still probe, since keys from the
+  // same project remain valid.
+  const keyChanged = isFileApiKeyMismatch(file, apiKey);
+  if (!keyChanged || !uploadableFile) {
+    if (!keyChanged && isGeminiFilesApiReferenceStillValid(file)) {
+      return { kind: 'active', patch: {} };
+    }
+
+    if (!shouldRefreshGeminiFilesApiReferenceFromExpiration(file)) {
+      try {
+        const metadata = await getFileMetadataApi(apiKey, fileApiName);
+
+        if (metadata?.state === 'ACTIVE') {
+          return { kind: 'active', patch: buildActivePatchFromMetadata(metadata, file, apiKey) };
+        }
+
+        if (metadata && metadata.state !== 'FAILED') {
+          const lifecycle = getUploadLifecycleForGeminiState(metadata.state);
+          return {
+            kind: 'wait',
+            fileName: file.name,
+            patch: {
+              ...lifecycle,
+              fileUri: metadata.uri ?? file.fileUri,
+              fileApiName: metadata.name ?? file.fileApiName,
+              fileApiExpirationTime: toFileApiExpirationTime((metadata as { expirationTime?: unknown }).expirationTime),
+              fileApiKeyFingerprint: getApiKeyFingerprint(apiKey),
+            } as FilePatch,
+          };
+        }
+      } catch (error) {
+        if (!isFilesApiAccessDeniedError(error)) {
+          logService.warn('Could not verify Files API reference before send; leaving history unchanged.', {
+            fileName: file.name,
+            fileApiName,
+            error,
+          });
+          return { kind: 'verify-failed', fileName: file.name };
+        }
+        logService.warn(
+          'Files API reference is not accessible with the current key; falling back to re-upload when a local backup exists.',
+          {
+            fileName: file.name,
+            fileApiName,
+            error,
+          },
+        );
+      }
+    }
+  }
+
+  if (!uploadableFile) {
+    return { kind: 'needs-backup' };
+  }
+
+  try {
+    const uploadedFile = await uploadFileApi(
+      apiKey,
+      uploadableFile,
+      file.type || uploadableFile.type || 'application/octet-stream',
+      file.name,
+      abortSignal,
+    );
+    const lifecycle = getUploadLifecycleForGeminiState(uploadedFile.state);
+    const error =
+      lifecycle.uploadState === 'failed'
+        ? formatGeminiFileApiProcessingError(uploadedFile, 'File API processing failed')
+        : undefined;
+    const patch = {
+      ...lifecycle,
+      progress: 100,
+      fileUri: uploadedFile.uri,
+      fileApiName: uploadedFile.name,
+      rawFile: file.rawFile ?? uploadableFile,
+      error,
+      omittedFromApiHistory: undefined,
+      fileApiExpirationTime: toFileApiExpirationTime((uploadedFile as { expirationTime?: unknown }).expirationTime),
+      fileApiKeyFingerprint: getApiKeyFingerprint(apiKey),
+    } as FilePatch;
+
+    if (lifecycle.uploadState !== 'active') {
+      return { kind: 'wait', patch, fileName: file.name };
+    }
+
+    return { kind: 'uploaded', patch };
+  } catch (error) {
+    logService.error('Failed to refresh Files API reference before send.', {
+      fileName: file.name,
+      fileApiName,
+      error,
+    });
+    return {
+      kind: 'refresh-failed',
+      fileName: file.name,
+      patch: {
+        isProcessing: false,
+        uploadState: 'failed',
+        error: getErrorMessage(error),
+      },
+    };
+  }
+};
+
+const isBlockingResolution = (
+  resolved: ResolvedRemoteFile,
+): resolved is Extract<ResolvedRemoteFile, { kind: 'wait' | 'refresh-failed' | 'verify-failed' }> =>
+  resolved.kind === 'wait' || resolved.kind === 'refresh-failed' || resolved.kind === 'verify-failed';
+
+const blockingErrorKey = (
+  resolved: Extract<ResolvedRemoteFile, { kind: 'wait' | 'refresh-failed' | 'verify-failed' }>,
+): FileApiReferenceErrorKey => {
+  if (resolved.kind === 'wait') {
+    return 'messageSenderWaitForFiles';
+  }
+  if (resolved.kind === 'verify-failed') {
+    return 'messageSenderFileReferenceVerifyFailed';
+  }
+  return 'messageSenderFileReferenceRefreshFailed';
+};
 
 export const ensureFilesApiReferences = async ({
   files,
@@ -98,73 +443,31 @@ export const ensureFilesApiReferences = async ({
   let nextFiles = files;
 
   for (const file of files) {
-    if (!usesRemoteFileReference(file) || !file.fileApiName) {
+    if (!usesGeminiFilesApiReference(file)) {
       continue;
     }
 
     const currentFile = nextFiles.find((candidate) => candidate.id === file.id) ?? file;
-    if (!currentFile) {
-      // File was removed from nextFiles by an earlier iteration's patch; skip it.
-      continue;
-    }
-    const fileApiName = currentFile.fileApiName;
-    if (!fileApiName) {
-      continue;
-    }
-    let shouldRefresh = shouldRefreshFromKnownExpiration(currentFile);
+    const resolved = await resolveRemoteFileReference(currentFile, apiKey, abortSignal);
 
-    if (!shouldRefresh) {
-      try {
-        const metadata = await getFileMetadataApi(apiKey, fileApiName);
-
-        if (metadata?.state === 'ACTIVE') {
-          nextFiles = applyFilePatch(
-            nextFiles,
-            currentFile.id,
-            buildActivePatchFromMetadata(metadata, currentFile),
-            onFileUpdate,
-          );
-          continue;
-        }
-
-        if (metadata && metadata.state !== 'FAILED') {
-          const lifecycle = getUploadLifecycleForGeminiState(metadata.state);
-          nextFiles = applyFilePatch(
-            nextFiles,
-            currentFile.id,
-            {
-              ...lifecycle,
-              fileUri: metadata.uri ?? currentFile.fileUri,
-              fileApiName: metadata.name ?? currentFile.fileApiName,
-              fileApiExpirationTime: getFileApiExpirationTime(metadata),
-            } as FilePatch,
-            onFileUpdate,
-          );
-          return {
-            ok: false,
-            files: nextFiles,
-            errorKey: 'messageSenderWaitForFiles',
-            fileName: currentFile.name,
-          };
-        }
-
-        shouldRefresh = true;
-      } catch (error) {
-        logService.warn('Could not verify Files API reference before send; attempting refresh from local backup.', {
-          fileName: currentFile.name,
-          fileApiName,
-          error,
-        });
-        shouldRefresh = true;
+    if (resolved.kind === 'active' || resolved.kind === 'uploaded') {
+      if (Object.keys(resolved.patch).length > 0) {
+        nextFiles = applyFilePatch(nextFiles, currentFile.id, resolved.patch, onFileUpdate);
       }
-    }
-
-    if (!shouldRefresh) {
       continue;
     }
 
-    const uploadableFile = toUploadableFile(currentFile);
-    if (!uploadableFile) {
+    if (resolved.kind === 'wait') {
+      nextFiles = applyFilePatch(nextFiles, currentFile.id, resolved.patch, onFileUpdate);
+      return {
+        ok: false,
+        files: nextFiles,
+        errorKey: 'messageSenderWaitForFiles',
+        fileName: resolved.fileName,
+      };
+    }
+
+    if (resolved.kind === 'needs-backup') {
       return {
         ok: false,
         files: nextFiles,
@@ -173,73 +476,74 @@ export const ensureFilesApiReferences = async ({
       };
     }
 
-    nextFiles = applyFilePatch(
-      nextFiles,
-      currentFile.id,
-      { isProcessing: true, uploadState: 'uploading', error: undefined },
-      onFileUpdate,
-    );
-
-    try {
-      const uploadedFile = await uploadFileApi(
-        apiKey,
-        uploadableFile,
-        currentFile.type || uploadableFile.type || 'application/octet-stream',
-        currentFile.name,
-        abortSignal,
-      );
-      const lifecycle = getUploadLifecycleForGeminiState(uploadedFile.state);
-      const error = lifecycle.uploadState === 'failed' ? 'File API processing failed' : undefined;
-
-      nextFiles = applyFilePatch(
-        nextFiles,
-        currentFile.id,
-        {
-          ...lifecycle,
-          progress: 100,
-          fileUri: uploadedFile.uri,
-          fileApiName: uploadedFile.name,
-          rawFile: currentFile.rawFile ?? uploadableFile,
-          error,
-          fileApiExpirationTime: getFileApiExpirationTime(uploadedFile),
-        } as FilePatch,
-        onFileUpdate,
-      );
-
-      if (lifecycle.uploadState !== 'active') {
-        return {
-          ok: false,
-          files: nextFiles,
-          errorKey: 'messageSenderWaitForFiles',
-          fileName: currentFile.name,
-        };
-      }
-    } catch (error) {
-      logService.error('Failed to refresh Files API reference before send.', {
-        fileName: currentFile.name,
-        fileApiName,
-        error,
-      });
-      nextFiles = applyFilePatch(
-        nextFiles,
-        currentFile.id,
-        {
-          isProcessing: false,
-          uploadState: 'failed',
-          error: getErrorMessage(error),
-        },
-        onFileUpdate,
-      );
+    if (resolved.kind === 'verify-failed') {
       return {
         ok: false,
         files: nextFiles,
-        errorKey: 'messageSenderFileReferenceRefreshFailed',
-        fileName: currentFile.name,
+        errorKey: 'messageSenderFileReferenceVerifyFailed',
+        fileName: resolved.fileName,
       };
     }
+
+    nextFiles = applyFilePatch(nextFiles, currentFile.id, resolved.patch, onFileUpdate);
+    return {
+      ok: false,
+      files: nextFiles,
+      errorKey: 'messageSenderFileReferenceRefreshFailed',
+      fileName: resolved.fileName,
+    };
   }
 
   return { ok: true, files: nextFiles };
+};
+
+export const ensureHistoryFilesApiReferences = async ({
+  messages,
+  apiKey,
+  abortSignal,
+  translate,
+}: EnsureHistoryFilesApiReferencesParams): Promise<EnsureHistoryFilesApiReferencesResult> => {
+  const groups = collectHistoryFileGroups(messages);
+  if (groups.length === 0) {
+    return { ok: true, messages, changed: false };
+  }
+
+  const resolutions = await Promise.all(
+    groups.map(async (group) => ({
+      group,
+      resolved: await resolveRemoteFileReference(group.representative, apiKey, abortSignal),
+    })),
+  );
+
+  const blocking = resolutions.find((item) => isBlockingResolution(item.resolved));
+  if (blocking && isBlockingResolution(blocking.resolved)) {
+    return {
+      ok: false,
+      messages,
+      errorKey: blockingErrorKey(blocking.resolved),
+      fileName: blocking.resolved.fileName,
+    };
+  }
+
+  let nextMessages = messages;
+  let changed = false;
+
+  for (const { group, resolved } of resolutions) {
+    if (resolved.kind === 'needs-backup') {
+      const applied = degradeHistoryFile(nextMessages, group, translate);
+      nextMessages = applied.messages;
+      changed = changed || applied.changed;
+      continue;
+    }
+
+    if (resolved.kind === 'active' || resolved.kind === 'uploaded') {
+      const applied = applyHistoryFilePatch(nextMessages, group, resolved.patch);
+      nextMessages = applied.messages;
+      changed = changed || applied.changed;
+    }
+  }
+
+  return { ok: true, messages: changed ? nextMessages : messages, changed };
 };
 
 export const formatFileReferenceErrorMessage = (

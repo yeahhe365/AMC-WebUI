@@ -26,6 +26,7 @@ export const createHistorySidebarProps = (overrides: Partial<HistorySidebarProps
   onRenameGroup: vi.fn(),
   onMoveSessionToGroup: vi.fn(),
   onToggleGroupExpansion: vi.fn(),
+  onNewChatInGroup: vi.fn(),
   onOpenSettingsModal: vi.fn(),
   themeId: 'pearl',
   newChatShortcut: '',

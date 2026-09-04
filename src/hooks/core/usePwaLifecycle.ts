@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { AppSettings } from '@/types';
 import { logService } from '@/services/logService';
+import { toastInfo } from '@/stores/toastStore';
 import { getManualInstallMessage, getPwaInstallState } from '@/pwa/install';
 import { loadRegisterSW } from '@/pwa/loadRegisterSw';
 import { registerPwa, type UpdateServiceWorker } from '@/pwa/register';
@@ -126,7 +127,7 @@ export const usePwaLifecycle = ({ language }: UsePwaLifecycleProps) => {
 
     if (installState.state === 'manual') {
       const manualMessage = getManualInstallMessage(language);
-      window.alert(manualMessage);
+      toastInfo(manualMessage);
       logService.info('PWA install instructions shown for manual-install browser.');
     }
   };

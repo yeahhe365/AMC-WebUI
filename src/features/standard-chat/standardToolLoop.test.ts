@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { Part } from '@google/genai';
 import type { ChatHistoryItem } from '@/types';
 import { createUploadedFile } from '@/test/data/factories';
-import { runStandardToolLoop } from './standardToolLoop';
+import { runStandardToolLoop, DEFAULT_TOOL_LOOP_ROUNDS } from './standardToolLoop';
 
 describe('runStandardToolLoop', () => {
   it('returns immediately when the model responds without function calls', async () => {
@@ -559,5 +560,149 @@ describe('runStandardToolLoop', () => {
         renderedContent: '<div>beta widget</div>',
       },
     });
+  });
+
+  it('fires live-surface callbacks per iteration: calls started before responses settle', async () => {
+    const initialContents: ChatHistoryItem[] = [{ role: 'user', parts: [{ text: 'Do two things' }] }];
+    const toolCallMessage = {
+      role: 'model' as const,
+      parts: [
+        {
+          functionCall: {
+            id: `call-${1}`,
+            name: 'run_local_python',
+            args: { code: '1' },
+          },
+        },
+      ],
+    };
+    let resolveFirstHandler: ((value: { response: unknown }) => void) | undefined;
+    const runTurn = vi
+      .fn()
+      .mockResolvedValueOnce({
+        modelContent: toolCallMessage,
+        parts: [],
+        functionCalls: [{ id: 'call-1', name: 'run_local_python', args: { code: '1' } }],
+      })
+      .mockResolvedValueOnce({
+        modelContent: { role: 'model' as const, parts: [{ text: 'done' }] },
+        parts: [{ text: 'done' }],
+        functionCalls: [],
+      });
+    const clientFunctions = {
+      run_local_python: {
+        declaration: { name: 'run_local_python', description: 'test' },
+        handler: vi.fn(
+          () =>
+            new Promise<{ response: unknown }>((resolve) => {
+              resolveFirstHandler = resolve;
+            }),
+        ),
+      },
+    };
+    const events: string[] = [];
+    const onToolCallsStarted = vi.fn((_modelContent: ChatHistoryItem) => {
+      events.push('calls-started');
+    });
+    const onToolResponsesSettled = vi.fn((_parts: Part[]) => {
+      events.push('responses-settled');
+    });
+
+    const loopPromise = runStandardToolLoop({
+      initialContents,
+      clientFunctions,
+      runTurn,
+      onToolCallsStarted,
+      onToolResponsesSettled,
+    });
+
+    // The calls-started callback fires while the handler is still pending.
+    await Promise.resolve();
+    expect(events).toEqual(['calls-started']);
+    expect(onToolCallsStarted).toHaveBeenCalledWith(toolCallMessage);
+
+    resolveFirstHandler?.({ response: { ok: true } });
+    await loopPromise;
+
+    expect(events).toEqual(['calls-started', 'responses-settled']);
+    expect(onToolResponsesSettled).toHaveBeenCalledTimes(1);
+    const parts = onToolResponsesSettled.mock.calls[0][0];
+    expect(parts[0]?.functionResponse?.name).toBe('run_local_python');
+  });
+});
+
+describe('runStandardToolLoop round cap', () => {
+  const makeCallTurn = (round: number) => ({
+    modelContent: {
+      role: 'model' as const,
+      parts: [{ functionCall: { id: `call-${round}`, name: 'tick', args: { round } } }],
+    },
+    parts: [] as Part[],
+    thoughts: undefined,
+    functionCalls: [{ id: `call-${round}`, name: 'tick', args: { round } }],
+    usage: undefined,
+    grounding: undefined,
+    urlContext: undefined,
+  });
+
+  it('stops gracefully after maxToolRounds rounds, keeping completed rounds and appending a notice', async () => {
+    // Sentinel: without a round cap the loop keeps calling runTurn forever and
+    // trips this error, failing the test deterministically.
+    let calls = 0;
+    const runTurn = vi.fn(async () => {
+      calls += 1;
+      if (calls > 3) throw new Error('SENTINEL_LIMIT');
+      return makeCallTurn(calls);
+    });
+    const handler = vi.fn(async () => ({ response: { ok: true } }));
+
+    const result = await runStandardToolLoop({
+      initialContents: [],
+      clientFunctions: {
+        tick: {
+          declaration: { name: 'tick', description: 'Endless caller.' },
+          handler,
+        },
+      },
+      runTurn,
+      maxToolRounds: 3,
+    });
+
+    // Rounds 1 and 2 executed their tool calls; round 3's calls are not run.
+    expect(runTurn).toHaveBeenCalledTimes(3);
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(result.toolMessages).toHaveLength(2);
+
+    const noticeParts = result.finalTurn.parts.filter(
+      (part) => typeof part.text === 'string' && part.text.includes('tool'),
+    );
+    expect(noticeParts).toHaveLength(1);
+  });
+
+  it('applies the default round cap when maxToolRounds is not provided', async () => {
+    let calls = 0;
+    const runTurn = vi.fn(async () => {
+      calls += 1;
+      // Literal 50: the constant doesn't exist yet before implementation, and
+      // an undefined sentinel comparison would never fire (runaway loop).
+      if (calls > 50) throw new Error('SENTINEL_LIMIT');
+      return makeCallTurn(calls);
+    });
+    const handler = vi.fn(async () => ({ response: { ok: true } }));
+
+    const result = await runStandardToolLoop({
+      initialContents: [],
+      clientFunctions: {
+        tick: {
+          declaration: { name: 'tick', description: 'Endless caller.' },
+          handler,
+        },
+      },
+      runTurn,
+    });
+
+    expect(runTurn).toHaveBeenCalledTimes(DEFAULT_TOOL_LOOP_ROUNDS);
+    expect(handler).toHaveBeenCalledTimes(DEFAULT_TOOL_LOOP_ROUNDS - 1);
+    expect(result.finalTurn.parts.some((part) => typeof part.text === 'string')).toBe(true);
   });
 });

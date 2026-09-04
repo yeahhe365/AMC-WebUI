@@ -90,6 +90,68 @@ export const usePortaledMenu = ({
     };
   }, [computeMenuPosition, isOpen, targetWindow]);
 
+  useEffect(() => {
+    if (!isOpen || !targetWindow) return;
+
+    const getMenuItems = (): HTMLElement[] =>
+      Array.from(
+        menuRef.current?.querySelectorAll<HTMLElement>('button:not([disabled]), [role="menuitem"]:not([disabled])') ??
+          [],
+      );
+
+    const focusMenuItem = (items: HTMLElement[], index: number) => {
+      const item = items[index];
+      if (item) item.focus();
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.isComposing) return;
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setIsOpen(false);
+        buttonRef.current?.focus();
+        return;
+      }
+
+      if (event.key === 'Tab') {
+        setIsOpen(false);
+        return;
+      }
+
+      const navigationKeys = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
+      if (!navigationKeys.includes(event.key)) return;
+
+      const items = getMenuItems();
+      if (items.length === 0) return;
+
+      event.preventDefault();
+      const activeIndex = items.indexOf(targetWindow.document.activeElement as HTMLElement);
+
+      if (event.key === 'Home') {
+        focusMenuItem(items, 0);
+        return;
+      }
+      if (event.key === 'End') {
+        focusMenuItem(items, items.length - 1);
+        return;
+      }
+
+      if (activeIndex === -1) {
+        focusMenuItem(items, event.key === 'ArrowDown' ? 0 : items.length - 1);
+        return;
+      }
+
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      focusMenuItem(items, (activeIndex + delta + items.length) % items.length);
+    };
+
+    targetWindow.document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      targetWindow.document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, targetWindow]);
+
   const closeMenu = useCallback(() => {
     setIsOpen(false);
   }, []);

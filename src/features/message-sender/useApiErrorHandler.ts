@@ -1,11 +1,26 @@
 import { useCallback } from 'react';
 import { logService } from '@/services/logService';
 import { type SavedChatSession } from '@/types';
-import { updateMessageInSession } from '@/utils/chat/sessionMutations';
+import { updateMessageInSession, updateSessionById } from '@/utils/chat/sessionMutations';
+import { invalidateSessionFilesApiReferences } from '@/utils/chat/geminiFilesApi';
 import { useI18n } from '@/contexts/I18nContext';
 import { formatMessageSenderText } from './i18nFormat';
 
 type SessionsUpdater = (updater: (prev: SavedChatSession[]) => SavedChatSession[]) => void;
+
+// An aborted/errored reply with thoughts but no settled thinking time gets a
+// fallback duration so the header still shows how long reasoning ran, matching
+// the abort path (finalizeMessages) which computes it on stream completion.
+const fallbackThinkingTimeMs = (message: {
+  thoughts?: string;
+  thinkingTimeMs?: number;
+  generationStartTime?: Date;
+}): number | undefined => {
+  if (!message.thoughts?.trim() || message.thinkingTimeMs !== undefined || !message.generationStartTime) {
+    return undefined;
+  }
+  return new Date().getTime() - message.generationStartTime.getTime();
+};
 
 export const useApiErrorHandler = (updateAndPersistSessions: SessionsUpdater) => {
   const { t } = useI18n();
@@ -18,6 +33,7 @@ export const useApiErrorHandler = (updateAndPersistSessions: SessionsUpdater) =>
       errorPrefix?: string,
       partialContent?: string,
       partialThoughts?: string,
+      recordCompletion?: boolean,
     ) => {
       const resolvedErrorPrefix =
         !errorPrefix || errorPrefix === 'Error' ? t('messageSenderApiErrorPrefix') : errorPrefix;
@@ -36,6 +52,8 @@ export const useApiErrorHandler = (updateAndPersistSessions: SessionsUpdater) =>
               thoughts: partialThoughts !== undefined ? partialThoughts : message.thoughts,
               isLoading: false,
               generationEndTime: new Date(),
+              stoppedByUser: true,
+              thinkingTimeMs: fallbackThinkingTimeMs(message),
             })),
           );
         }
@@ -43,14 +61,18 @@ export const useApiErrorHandler = (updateAndPersistSessions: SessionsUpdater) =>
       }
 
       let errorMessage = t('messageSenderUnknownError');
+      const quoteAsApiError = !(error instanceof Error && error.name === 'EmptyReplyError');
       if (error instanceof Error) {
-        errorMessage =
-          error.name === 'SilentError'
-            ? t('messageSenderApiKeyNotConfigured')
-            : formatMessageSenderText(t('messageSenderErrorWithPrefix'), {
-                prefix: resolvedErrorPrefix,
-                message: error.message,
-              });
+        if (error.name === 'SilentError') {
+          errorMessage = t('messageSenderApiKeyNotConfigured');
+        } else if (error.name === 'EmptyReplyError') {
+          errorMessage = error.message;
+        } else {
+          errorMessage = formatMessageSenderText(t('messageSenderErrorWithPrefix'), {
+            prefix: resolvedErrorPrefix,
+            message: error.message,
+          });
+        }
       } else {
         errorMessage = formatMessageSenderText(t('messageSenderErrorWithPrefix'), {
           prefix: resolvedErrorPrefix,
@@ -59,16 +81,37 @@ export const useApiErrorHandler = (updateAndPersistSessions: SessionsUpdater) =>
       }
 
       updateAndPersistSessions((previousSessions) =>
-        updateMessageInSession(previousSessions, sessionId, modelMessageId, (message) => ({
-          ...message,
-          role: 'error',
-          content:
-            (partialContent !== undefined ? partialContent : message.content || '').trim() + `\n\n[${errorMessage}]`,
-          thoughts: partialThoughts !== undefined ? partialThoughts : message.thoughts,
-          isLoading: false,
-          generationEndTime: new Date(),
-        })),
+        updateSessionById(previousSessions, sessionId, (session) => {
+          const sessionsWithMessageUpdated = updateMessageInSession([session], sessionId, modelMessageId, (message) => {
+            const partial = (partialContent !== undefined ? partialContent : message.content || '').trim();
+            const errorBody = quoteAsApiError ? `[${errorMessage}]` : errorMessage;
+            const content = quoteAsApiError || partial ? `${partial}\n\n${errorBody}` : errorBody;
+
+            return {
+              ...message,
+              role: 'error',
+              content,
+              thoughts: partialThoughts !== undefined ? partialThoughts : message.thoughts,
+              isLoading: false,
+              generationEndTime: new Date(),
+              thinkingTimeMs: fallbackThinkingTimeMs(message),
+            };
+          });
+
+          const updatedSession = sessionsWithMessageUpdated[0] ?? session;
+          return invalidateSessionFilesApiReferences(updatedSession, error);
+        }),
       );
+
+      // 仅标准聊天流的错误写入完成标记(TTS/图片编辑等乐观 pipeline 的调用
+      // 方不传该参数,保持 out-of-scope)。AbortError 已在上面提前返回。
+      // 动态导入避免把 chatStore 的全依赖链(含 rehydrateSessionFiles 等)拉到
+      // 本模块的静态依赖,使按模块 mock 的测试无需为此补齐导出。
+      if (recordCompletion) {
+        void import('@/stores/chatStore').then(({ useChatStore }) => {
+          useChatStore.getState().markSessionCompleted(sessionId, 'error');
+        });
+      }
     },
     [t, updateAndPersistSessions],
   );

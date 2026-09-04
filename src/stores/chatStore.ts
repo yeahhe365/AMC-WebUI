@@ -7,6 +7,7 @@ import {
   type ChatSettingsUpdater,
 } from '@/types';
 import { dbService } from '@/services/db/dbService';
+import { DEFAULT_CHAT_SETTINGS } from '@/constants/settingsDefaults';
 import { logService } from '@/services/logService';
 import { rehydrateSessionFiles } from '@/utils/chat/session';
 import { syncActiveSessionRoute, type SessionHistoryMode } from './sessionRouteSync';
@@ -17,6 +18,14 @@ import {
   updateMessageInSession as updateMessageInSessions,
   updateSessionById as updateSessionByIdInSessions,
 } from '@/utils/chat/sessionMutations';
+import {
+  finishActiveGenerationJob,
+  hasActiveGenerationJobForSession,
+  holdSessionLoadingForGenerationHandoff,
+  unregisterActiveGenerationJob,
+} from '@/features/message-sender/activeGenerationJobs';
+import { abortServerStreamJob } from '@/features/stream-jobs/streamAbort';
+import { clearPendingStreamJob, readPendingStreamJob } from '@/features/stream-jobs/amcStreamJobs';
 import { mergeSessionMetadata } from './sessionRefresh';
 import {
   createVirtualFullSessions,
@@ -25,6 +34,7 @@ import {
 } from './sessionPersistence';
 import { persistSessionChanges } from './sessionPersistenceEffects';
 import { setupChatStoreSync } from './chatStoreSync';
+import { setupLastActiveSessionSync } from './lastActiveSessionSync';
 import { createChatUiSlice, type ChatUiSliceActions, type ChatUiSliceState } from './chatStoreSlices';
 import { resolveUpdaterOrValue, type UpdaterOrValue } from './stateUpdaters';
 
@@ -47,6 +57,7 @@ interface ChatState extends ChatUiSliceState {
   savedGroups: ChatGroup[];
   activeSessionId: string | null;
   activeMessages: ChatMessage[];
+  pendingLockedApiKey: string | null;
 
   _activeJobs: { current: Map<string, AbortController> };
   _userScrolledUp: { current: boolean };
@@ -89,8 +100,21 @@ interface ChatActions extends ChatUiSliceActions {
   refreshSessions: () => Promise<void>;
   refreshGroups: () => Promise<void>;
   setSessionLoading: (sessionId: string, isLoading: boolean) => void;
+  markSessionCompleted: (sessionId: string, outcome: 'success' | 'error') => void;
+  markSessionViewed: (sessionId: string) => void;
   getFileOperationGeneration: () => number;
   invalidateFileOperations: () => void;
+
+  /** 停止当前会话的生成。纯 store action:读 `_activeJobs`/`activeMessages`/`loadingSessionIds`,不再依赖 hook 闭包。 */
+  stopGenerating: (options?: {
+    silent?: boolean;
+    skipLoadingUpdate?: boolean;
+  }) => 'stopped' | 'no_local_job' | 'not_loading';
+  /** 取消消息编辑:清空编辑态与文件选择,重置 editMode。 */
+  cancelEdit: () => void;
+
+  /** Updates an uploaded file by ID across composer selectedFiles and session messages */
+  updateUploadedFile: (fileId: string, patch: Partial<UploadedFile>) => void;
 
   setCurrentChatSettings: ChatSettingsUpdater;
 }
@@ -100,6 +124,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
   savedGroups: [],
   activeSessionId: null,
   activeMessages: [],
+  pendingLockedApiKey: null,
 
   ...createChatUiSlice<ChatState & ChatActions>(set),
 
@@ -119,7 +144,10 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
 
   setActiveSessionId: (value, options) => {
     const nextValue = resolveUpdaterOrValue(value, get().activeSessionId);
-    set({ activeSessionId: nextValue });
+    set({
+      activeSessionId: nextValue,
+      ...(nextValue !== get().activeSessionId ? { pendingLockedApiKey: null } : {}),
+    });
     syncActiveSessionRoute(nextValue, options?.history ?? 'auto');
   },
 
@@ -180,9 +208,17 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
             )
           : state.savedSessions;
 
+      // 新一轮生成使旧的完成标记失效:本地清除即可(不广播,新一轮完成时会
+      // 重新广播新的完成状态)。若该会话正好没有旧标记则保持原对象避免重渲染。
+      const completedSessions =
+        isLoading && sessionId in state.completedSessions
+          ? Object.fromEntries(Object.entries(state.completedSessions).filter(([key]) => key !== sessionId))
+          : state.completedSessions;
+
       return {
         loadingSessionIds: next,
         savedSessions: nextSavedSessions,
+        completedSessions,
       };
     });
 
@@ -195,10 +231,125 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     });
   },
 
+  markSessionCompleted: (sessionId, outcome) => {
+    // 广播总是发送,让其他标签页各自判断是否需要显示(他们可能不在该会话页)。
+    broadcastSyncMessage({ type: 'SESSION_COMPLETED', sessionId, outcome });
+    // 本标签页正在实时观看该会话的生成完成,不需要提醒,跳过本地写入。
+    if (get().activeSessionId === sessionId) {
+      return;
+    }
+    set((state) => ({
+      completedSessions: { ...state.completedSessions, [sessionId]: outcome },
+    }));
+  },
+
+  markSessionViewed: (sessionId) => {
+    broadcastSyncMessage({ type: 'SESSION_VIEWED', sessionId });
+    set((state) => {
+      if (!(sessionId in state.completedSessions)) {
+        return state;
+      }
+      const next = { ...state.completedSessions };
+      delete next[sessionId];
+      return { completedSessions: next };
+    });
+  },
+
   getFileOperationGeneration: () => _fileOperationGeneration,
 
   invalidateFileOperations: () => {
     _fileOperationGeneration += 1;
+  },
+
+  stopGenerating: (options = {}) => {
+    const { silent = false, skipLoadingUpdate = false } = options;
+    const {
+      activeSessionId,
+      activeMessages,
+      _activeJobs: activeJobs,
+      setSessionLoading,
+      updateAndPersistSessions,
+    } = get();
+    const isLoading = activeSessionId ? get().loadingSessionIds.has(activeSessionId) : false;
+
+    if (!activeSessionId || !isLoading) return 'not_loading';
+
+    const loadingMessage = activeMessages.find((message) => message.isLoading);
+    if (loadingMessage) {
+      const generationId = loadingMessage.id;
+      const controller = activeJobs.current.get(generationId);
+
+      if (controller) {
+        logService.warn(
+          `User stopped generation for session ${activeSessionId}, job ${generationId}. Silent: ${silent}`,
+        );
+        controller.abort();
+
+        // Also ask the api container to abort the upstream Gemini
+        // connection (the stream journal keeps the upstream alive across
+        // browser disconnects). Fire-and-forget; the local abort drives UI.
+        // The job secret must be read before the pending record is cleared.
+        void abortServerStreamJob(generationId, {
+          jobSecret: readPendingStreamJob(activeSessionId)?.secret,
+        });
+        clearPendingStreamJob(activeSessionId);
+
+        if (!silent) {
+          updateAndPersistSessions((prev) =>
+            updateMessageInSessions(prev, activeSessionId, generationId, {
+              isLoading: false,
+              generationEndTime: new Date(),
+              stoppedByUser: true,
+            }),
+          );
+        }
+
+        if (!skipLoadingUpdate) {
+          finishActiveGenerationJob({
+            activeJobs,
+            setSessionLoading,
+            sessionId: activeSessionId,
+            generationId,
+          });
+        } else {
+          holdSessionLoadingForGenerationHandoff(activeJobs, activeSessionId);
+          unregisterActiveGenerationJob(activeJobs, generationId);
+        }
+        return 'stopped';
+      }
+
+      logService.error(
+        `Could not find active job to stop for generationId: ${generationId}. Requesting cross-tab abort.`,
+      );
+      broadcastSyncMessage({ type: 'ABORT_GENERATION', sessionId: activeSessionId, originId: TAB_ID });
+      return 'no_local_job';
+    }
+
+    logService.warn(
+      `stopGenerating called for session ${activeSessionId}, but no loading message was found. Leaving other active jobs untouched.`,
+    );
+
+    if (hasActiveGenerationJobForSession(activeJobs, activeSessionId)) {
+      return 'stopped';
+    }
+
+    // Remote tab is loading (synced isLoading) without a local job.
+    // Broadcast the abort request and let the owner tab handle cleanup and
+    // broadcast the resulting SESSION_LOADING=false. The stale-check loop
+    // (clearStaleRemoteLoading, every 30s) will clean up orphaned entries
+    // if the owner tab crashed before it could respond.
+    broadcastSyncMessage({ type: 'ABORT_GENERATION', sessionId: activeSessionId, originId: TAB_ID });
+    return 'no_local_job';
+  },
+
+  cancelEdit: () => {
+    logService.info('User cancelled message edit.');
+    const { setCommandedInput, setSelectedFiles, setEditingMessageId, setEditMode, setAppFileError } = get();
+    setCommandedInput({ text: '', id: Date.now() });
+    setSelectedFiles([]);
+    setEditingMessageId(null);
+    setEditMode('resend'); // Reset to default
+    setAppFileError(null);
   },
 
   updateAndPersistSessions: (updater, options = {}) => {
@@ -210,6 +361,15 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     const newFullSessions = updater(virtualFullSessions);
 
     sortSessionsInPlace(newFullSessions);
+
+    // The streaming hot path calls updateAndPersistSessions idempotently on
+    // every chunk (thinkingSource/resume stamps). When the updater preserved
+    // every reference (no field actually changed), bail out before touching
+    // state, persistence, or any subscriber — the set() below would otherwise
+    // rebuild savedSessions and cascade re-renders through every consumer.
+    if (newFullSessions === virtualFullSessions) {
+      return;
+    }
 
     if (activeSessionId) {
       const newActiveSession = newFullSessions.find((session) => session.id === activeSessionId);
@@ -242,7 +402,20 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
 
     const metadataOnly = stripStoredSessionMessages(newFullSessions, activeSessionId, loadingSessionIds);
 
-    set({ savedSessions: metadataOnly });
+    // 会话被删除后不应残留完成标记(删除通过 updater 里的 filter 完成)。
+    // 常见路径(无删除)保持原对象引用,避免无谓重渲染。
+    const completedSessionIds = new Set(
+      virtualFullSessions
+        .map((session) => session.id)
+        .filter((sessionId) => !newFullSessions.some((session) => session.id === sessionId)),
+    );
+    set((state) => ({
+      savedSessions: metadataOnly,
+      completedSessions:
+        completedSessionIds.size > 0
+          ? Object.fromEntries(Object.entries(state.completedSessions).filter(([key]) => !completedSessionIds.has(key)))
+          : state.completedSessions,
+    }));
   },
 
   updateSessionById: (sessionId, updater, options) => {
@@ -290,6 +463,62 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     get().appendMessageToSession(activeSessionId, message, options);
   },
 
+  updateUploadedFile: (fileId, patch) => {
+    set((state) => {
+      let hasInSelected = false;
+      const nextSelected = state.selectedFiles.map((file) => {
+        if (file.id === fileId) {
+          hasInSelected = true;
+          return { ...file, ...patch };
+        }
+        return file;
+      });
+
+      let hasActiveChange = false;
+      const nextActiveMessages = state.activeMessages.map((message) => {
+        if (message.files && message.files.some((f) => f.id === fileId)) {
+          hasActiveChange = true;
+          return {
+            ...message,
+            files: message.files.map((f) => (f.id === fileId ? { ...f, ...patch } : f)),
+          };
+        }
+        return message;
+      });
+
+      let hasSessionChange = false;
+      const nextSessions = state.savedSessions.map((session) => {
+        let hasMsgChange = false;
+        const nextMessages = session.messages.map((message) => {
+          if (message.files && message.files.some((f) => f.id === fileId)) {
+            hasMsgChange = true;
+            return {
+              ...message,
+              files: message.files.map((f) => (f.id === fileId ? { ...f, ...patch } : f)),
+            };
+          }
+          return message;
+        });
+
+        if (hasMsgChange) {
+          hasSessionChange = true;
+          return { ...session, messages: nextMessages };
+        }
+        return session;
+      });
+
+      if (!hasInSelected && !hasActiveChange && !hasSessionChange) {
+        return state;
+      }
+
+      return {
+        selectedFiles: hasInSelected ? nextSelected : state.selectedFiles,
+        activeMessages: hasActiveChange ? nextActiveMessages : state.activeMessages,
+        savedSessions: hasSessionChange ? nextSessions : state.savedSessions,
+      };
+    });
+  },
+
   updateAndPersistGroups: (updater) => {
     const { savedGroups } = get();
     const newGroups = updater(savedGroups);
@@ -301,8 +530,15 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
   },
 
   setCurrentChatSettings: (updater) => {
-    const { activeSessionId } = get();
-    if (!activeSessionId) return;
+    const { activeSessionId, pendingLockedApiKey } = get();
+    if (!activeSessionId) {
+      const nextSettings = updater({
+        ...DEFAULT_CHAT_SETTINGS,
+        lockedApiKey: pendingLockedApiKey,
+      });
+      set({ pendingLockedApiKey: nextSettings.lockedApiKey ?? null });
+      return;
+    }
     get().updateAndPersistSessions((prevSessions) =>
       updateSessionByIdInSessions(prevSessions, activeSessionId, (session) => ({
         ...session,
@@ -317,3 +553,4 @@ setupChatStoreSync({
   localLoadingSessionIds: _localLoadingSessionIds,
   activeJobs: _activeJobs,
 });
+setupLastActiveSessionSync(useChatStore);

@@ -9,9 +9,18 @@ interface ToggleItemProps {
   onChange: (checked: boolean) => void;
   tooltip?: string;
   small?: boolean;
+  /** Optional inline control rendered after the label (e.g. a preview icon). */
+  labelTrailing?: React.ReactNode;
 }
 
-export const ToggleItem: React.FC<ToggleItemProps> = ({ label, checked, onChange, tooltip, small = false }) => {
+export const ToggleItem: React.FC<ToggleItemProps> = ({
+  label,
+  checked,
+  onChange,
+  tooltip,
+  small = false,
+  labelTrailing,
+}) => {
   const rowPaddingClass = small ? 'py-2' : 'py-3';
   const labelClass = small
     ? 'text-xs text-[var(--theme-text-secondary)]'
@@ -45,6 +54,11 @@ export const ToggleItem: React.FC<ToggleItemProps> = ({ label, checked, onChange
                 strokeWidth={1.5}
               />
             </Tooltip>
+          </div>
+        )}
+        {labelTrailing && (
+          <div onClick={(e) => e.stopPropagation()} className="flex flex-shrink-0 items-center">
+            {labelTrailing}
           </div>
         )}
       </div>

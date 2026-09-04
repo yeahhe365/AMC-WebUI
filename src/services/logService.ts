@@ -37,10 +37,36 @@ class LogServiceImpl {
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private activeFlushPromise: Promise<void> | null = null;
   private isClearing = false;
+  // Logging gate, default OFF: the module initializes before settings load,
+  // so constructor and early-call logs are dropped until settings confirm on.
+  private enabled = false;
 
   constructor() {
     this.pruneOldLogs();
+    // Dropped while disabled (default); persisted once settings flip enabled on.
     this.info('Log service initialized (IndexedDB Batched Mode).', { category: 'SYSTEM' });
+  }
+
+  /**
+   * Flips the logging gate. Wired by the settings store on load/save/cross-tab
+   * sync — never import the store here (it already imports this service; that
+   * would be a cycle). Enabling emits one confirm log (persisted, because the
+   * gate is already open by the time info() runs); disabling drops any
+   * un-flushed buffer and cancels the pending flush.
+   */
+  public setEnabled(value: boolean) {
+    if (value === this.enabled) return;
+    this.enabled = value;
+
+    if (value) {
+      this.info('Logging enabled.', { category: 'SYSTEM' });
+    } else {
+      this.logBuffer = [];
+      if (this.flushTimer) {
+        clearTimeout(this.flushTimer);
+        this.flushTimer = null;
+      }
+    }
   }
 
   private createLogEntry(level: LogLevel, category: LogCategory, message: string, data?: unknown): LogEntry {
@@ -234,18 +260,29 @@ class LogServiceImpl {
    * Category defaults to SYSTEM if not specified in options or inferred.
    */
   public info(message: string, options?: LogOptions | unknown) {
+    if (!this.enabled) return;
     const category = this.resolveCategory(message, options);
     const data = this.resolveData(options);
     this.queueLog(this.createLogEntry('INFO', category, message, data));
   }
 
   public warn(message: string, options?: LogOptions | unknown) {
+    if (!this.enabled) return;
     const category = this.resolveCategory(message, options);
     const data = this.resolveData(options);
     this.queueLog(this.createLogEntry('WARN', category, message, data));
   }
 
   public error(message: string, options?: ErrorLogOptions | unknown) {
+    // When disabled, errors still reach the browser console (it does not
+    // persist) so production issues stay inspectable, but nothing is queued or
+    // written to IndexedDB. The raw error (when provided) gives a full stack,
+    // not the serialized copy used for storage.
+    if (!this.enabled) {
+      const rawError = this.isErrorLogOptions(options) && options.error !== undefined ? options.error : options;
+      console.error(message, rawError);
+      return;
+    }
     const category = this.resolveCategory(message, options);
     // Extract 'error' object if passed explicitly for better stack tracing
     const dataCandidate = this.resolveData(options);
@@ -262,6 +299,7 @@ class LogServiceImpl {
   }
 
   public debug(message: string, options?: LogOptions | unknown) {
+    if (!this.enabled) return;
     const category = this.resolveCategory(message, options);
     const data = this.resolveData(options);
     this.queueLog(this.createLogEntry('DEBUG', category, message, data));

@@ -26,18 +26,28 @@ export function mergeSessionMetadata(
 
     const keepRuntimeMessages = shouldRetainRuntimeMessages(session.id, activeSessionId, loadingSessionIds);
 
+    // The refreshed metadata comes from the DB and is the source of truth for
+    // everything except in-flight runtime state. Spreading existing (in-memory)
+    // after session (DB) would silently revert remote edits such as group
+    // moves, pin toggles, renames and deletes on the other tab.
     return {
-      ...session,
       ...existing,
+      ...session,
       settings: {
-        ...session.settings,
         ...existing.settings,
+        ...session.settings,
       },
       messages: keepRuntimeMessages ? existing.messages : [],
     };
   });
 
-  const nextSessions = [...merged, ...previousById.values()];
+  // Sessions absent from the refreshed metadata were deleted on another tab.
+  // Only keep those with in-flight runtime work (active / loading); everything
+  // else would otherwise resurrect the deleted session in the sidebar.
+  const retainedRuntimeSessions = [...previousById.values()].filter((session) =>
+    shouldRetainRuntimeMessages(session.id, activeSessionId, loadingSessionIds),
+  );
+  const nextSessions = [...merged, ...retainedRuntimeSessions];
   sortSessionsInPlace(nextSessions);
   return nextSessions;
 }

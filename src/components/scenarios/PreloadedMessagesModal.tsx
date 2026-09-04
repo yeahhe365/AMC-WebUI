@@ -7,10 +7,12 @@ import { ConfirmationModal } from '@/components/modals/ConfirmationModal';
 import { ScenarioEditor } from './ScenarioEditor';
 import { ScenarioList } from './ScenarioList';
 import { useScenarioManager } from '@/hooks/scenarios/useScenarioManager';
+import { toastError, toastSuccess } from '@/stores/toastStore';
 import {
-  MODAL_CLOSE_BUTTON_DANGER_HOVER_CLASS,
-  SMALL_ICON_BUTTON_ROUND_CLASS,
   ICON_BUTTON_CLASS,
+  MODAL_CLOSE_BUTTON_CLASS,
+  SETTINGS_PRIMARY_ACTION_BUTTON_CLASS,
+  SMALL_ICON_BUTTON_ROUND_CLASS,
 } from '@/constants/buttonClasses';
 import { MENU_ITEM_BUTTON_CLASS, MENU_ITEM_DEFAULT_STATE_CLASS } from '@/constants/menuClasses';
 
@@ -22,7 +24,6 @@ interface PreloadedMessagesModalProps {
   onLoadScenario: (scenario: SavedScenario) => void;
 }
 
-const CLOSE_BUTTON_AUTO_FOCUS_DELAY_MS = 100;
 const SCENARIO_LOAD_CLOSE_DELAY_MS = 300;
 
 type ConfirmState = { kind: 'close' } | { kind: 'delete'; id: string } | { kind: 'none' };
@@ -41,22 +42,18 @@ export const PreloadedMessagesModal: React.FC<PreloadedMessagesModalProps> = ({
     editingScenario,
     searchQuery,
     setSearchQuery,
-    feedback,
     importInputRef,
     systemScenarioIds,
     builtInScenarioIds,
     hasUnsavedChanges,
-    showFeedback,
     actions,
   } = useScenarioManager({
     isOpen,
     savedScenarios,
     onSaveAllScenarios,
-    onClose,
     t,
   });
 
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const delayedCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
@@ -69,14 +66,6 @@ export const PreloadedMessagesModal: React.FC<PreloadedMessagesModalProps> = ({
       delayedCloseTimeoutRef.current = null;
     }
   }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      const timer = setTimeout(() => closeButtonRef.current?.focus(), CLOSE_BUTTON_AUTO_FOCUS_DELAY_MS);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [isOpen]);
 
   useEffect(() => () => clearDelayedCloseTimeout(), [clearDelayedCloseTimeout]);
 
@@ -100,7 +89,6 @@ export const PreloadedMessagesModal: React.FC<PreloadedMessagesModalProps> = ({
 
   useEffect(() => {
     if (!isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentional reset of ephemeral UI state when the modal closes.
       setConfirm({ kind: 'none' });
       setIsMoreMenuOpen(false);
     }
@@ -119,11 +107,11 @@ export const PreloadedMessagesModal: React.FC<PreloadedMessagesModalProps> = ({
 
   const handleLoadAndClose = (scenario: SavedScenario) => {
     if (scenario.messages.length === 0 && !scenario.systemInstruction?.trim()) {
-      showFeedback('error', t('scenariosFeedbackEmpty'));
+      toastError(t('scenariosFeedbackEmpty'));
       return;
     }
     onLoadScenario(scenario);
-    showFeedback('success', t('scenariosFeedbackLoaded'));
+    toastSuccess(t('scenariosFeedbackLoaded'));
     clearDelayedCloseTimeout();
     delayedCloseTimeoutRef.current = setTimeout(() => {
       delayedCloseTimeoutRef.current = null;
@@ -172,13 +160,14 @@ export const PreloadedMessagesModal: React.FC<PreloadedMessagesModalProps> = ({
       onClose={handleClose}
       noPadding
       ariaLabelledBy="scenarios-title"
-      contentClassName="w-full h-full sm:w-[95vw] sm:h-[90vh] sm:max-w-7xl sm:rounded-xl shadow-2xl flex flex-col overflow-hidden bg-[var(--theme-bg-primary)] border border-[var(--theme-border-primary)] transition-all"
+      contentClassName="w-full h-[100dvh] sm:h-[85vh] sm:max-h-[800px] sm:w-[90vw] max-w-6xl sm:rounded-xl overflow-hidden flex flex-col shadow-2xl bg-[var(--theme-bg-primary)] transition-all"
     >
-      <div className="flex flex-col h-full relative">
-        <div className="flex justify-between items-center px-4 sm:px-6 py-4 sm:py-5 bg-[var(--theme-bg-primary)] flex-shrink-0 z-10 border-b border-[var(--theme-border-secondary)]/50">
-          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+      <div className="relative flex h-full flex-col">
+        <div className="z-10 flex flex-shrink-0 items-center justify-between border-b border-[var(--theme-border-secondary)]/50 px-4 py-3 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             {view === 'editor' && (
               <button
+                type="button"
                 onClick={actions.handleCancelEdit}
                 className={`${SMALL_ICON_BUTTON_ROUND_CLASS} -ml-2 text-[var(--theme-text-secondary)]`}
                 aria-label={t('scenariosEditorBack')}
@@ -186,44 +175,32 @@ export const PreloadedMessagesModal: React.FC<PreloadedMessagesModalProps> = ({
                 <ArrowLeft size={20} />
               </button>
             )}
-            <h2
-              id="scenarios-title"
-              className="text-xl sm:text-2xl font-bold text-[var(--theme-text-primary)] tracking-tight truncate"
-            >
+            <h2 id="scenarios-title" className="truncate text-xl font-semibold text-[var(--theme-text-primary)]">
               {view === 'editor' ? editingScenario?.title || t('scenariosTitleCreate') : t('scenariosTitle')}
             </h2>
-            {view === 'editor' && (
-              <span
-                className={`hidden sm:inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide border ${isSystemScenario ? 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20' : 'bg-[var(--theme-bg-accent)]/10 text-[var(--theme-bg-accent)] border-[var(--theme-bg-accent)]/20'}`}
-              >
-                {isSystemScenario ? t('scenariosSystemPresetReadonlyBadge') : t('scenariosEditorBadge')}
+            {view === 'editor' && isSystemScenario && (
+              <span className="hidden text-xs font-medium text-[var(--theme-text-tertiary)] sm:inline">
+                {t('scenariosSystemPresetReadonlyBadge')}
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
             {view === 'list' && (
               <>
                 <button
+                  type="button"
                   onClick={actions.handleStartAddNew}
-                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold bg-[var(--theme-bg-accent)] hover:bg-[var(--theme-bg-accent-hover)] text-[var(--theme-text-accent)] rounded-xl transition-colors flex items-center gap-1.5 sm:gap-2 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
+                  className={SETTINGS_PRIMARY_ACTION_BUTTON_CLASS}
                 >
                   <Plus size={16} strokeWidth={2.5} />
                   <span className="hidden sm:inline">{t('scenariosCreateButton')}</span>
                   <span className="sm:hidden">{t('add')}</span>
                 </button>
 
-                <button
-                  onClick={actions.handleSaveAllAndClose}
-                  disabled={!hasUnsavedChanges}
-                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold bg-[var(--theme-bg-primary)] border border-[var(--theme-border-secondary)] text-[var(--theme-text-primary)] rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--theme-bg-tertiary)]"
-                  title={t('scenariosSaveAndCloseTitle')}
-                >
-                  <span>{t('scenariosSaveAll')}</span>
-                </button>
-
                 <div className="relative sm:hidden" ref={moreMenuRef}>
                   <button
+                    type="button"
                     onClick={() => setIsMoreMenuOpen((open) => !open)}
                     className={ICON_BUTTON_CLASS}
                     aria-label={t('scenariosMoreActions')}
@@ -235,9 +212,10 @@ export const PreloadedMessagesModal: React.FC<PreloadedMessagesModalProps> = ({
                   {isMoreMenuOpen && (
                     <div
                       role="menu"
-                      className="absolute right-0 top-full mt-1 z-20 w-40 bg-[var(--theme-bg-primary)] border border-[var(--theme-border-secondary)] rounded-md shadow-lg py-1"
+                      className="absolute right-0 top-full z-20 mt-1 w-40 rounded-md border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] py-1 shadow-lg"
                     >
                       <button
+                        type="button"
                         onClick={() => {
                           setIsMoreMenuOpen(false);
                           importInputRef.current?.click();
@@ -247,6 +225,7 @@ export const PreloadedMessagesModal: React.FC<PreloadedMessagesModalProps> = ({
                         <Upload size={14} /> <span>{t('import')}</span>
                       </button>
                       <button
+                        type="button"
                         onClick={() => {
                           setIsMoreMenuOpen(false);
                           actions.handleExportScenarios();
@@ -260,8 +239,9 @@ export const PreloadedMessagesModal: React.FC<PreloadedMessagesModalProps> = ({
                 </div>
 
                 <button
+                  type="button"
                   onClick={() => importInputRef.current?.click()}
-                  className="hidden sm:block p-2 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] rounded-xl transition-colors"
+                  className={`hidden sm:inline-flex ${ICON_BUTTON_CLASS}`}
                   title={t('import')}
                   aria-label={t('import')}
                 >
@@ -276,8 +256,9 @@ export const PreloadedMessagesModal: React.FC<PreloadedMessagesModalProps> = ({
                 />
 
                 <button
+                  type="button"
                   onClick={actions.handleExportScenarios}
-                  className="hidden sm:block p-2 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] rounded-xl transition-colors"
+                  className={`hidden sm:inline-flex ${ICON_BUTTON_CLASS}`}
                   title={t('export')}
                   aria-label={t('export')}
                 >
@@ -287,33 +268,17 @@ export const PreloadedMessagesModal: React.FC<PreloadedMessagesModalProps> = ({
             )}
 
             <button
-              ref={closeButtonRef}
+              type="button"
               onClick={handleClose}
-              className={`${MODAL_CLOSE_BUTTON_DANGER_HOVER_CLASS} rounded-xl`}
+              className={MODAL_CLOSE_BUTTON_CLASS}
               aria-label={t('scenariosCloseAria')}
             >
-              <X size={22} />
+              <X size={18} />
             </button>
           </div>
         </div>
 
-        {feedback && (
-          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-top-4 duration-300 pointer-events-none">
-            <div
-              className={`px-5 py-2.5 rounded-full text-sm font-semibold shadow-xl border flex items-center gap-2.5 ${
-                feedback.type === 'success'
-                  ? 'bg-[var(--theme-bg-success)] text-[var(--theme-text-success)] border-[var(--theme-text-success)]/20'
-                  : feedback.type === 'error'
-                    ? 'bg-[var(--theme-bg-error)] text-[var(--theme-text-danger)] border-[var(--theme-text-danger)]/20'
-                    : 'bg-[var(--theme-bg-info)] text-[var(--theme-text-info)] border-[var(--theme-text-info)]/20'
-              }`}
-            >
-              {feedback.message}
-            </div>
-          </div>
-        )}
-
-        <div className="flex-grow flex flex-col min-h-0 bg-[var(--theme-bg-secondary)] p-3 sm:p-4 md:px-6 md:py-5 overflow-hidden">
+        <div className="flex min-h-0 flex-grow flex-col overflow-hidden bg-[var(--theme-bg-secondary)] p-3 sm:p-4 md:px-6 md:py-5">
           {view === 'list' ? (
             <ScenarioList
               scenarios={scenarios}

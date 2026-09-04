@@ -52,6 +52,13 @@ const interfaceEntries: SettingsSearchEntry[] = [
     groupKey: 'settingsInputToolbar',
   },
   {
+    id: 'interface-show-voice',
+    tab: 'interface',
+    labelKey: 'settingsShowVoiceInputButtonLabel',
+    descriptionKey: 'settingsShowVoiceInputButtonTooltip',
+    groupKey: 'settingsInputToolbar',
+  },
+  {
     id: 'interface-chat-behavior',
     tab: 'interface',
     labelKey: 'settingsChatBehavior',
@@ -144,6 +151,13 @@ const interfaceEntries: SettingsSearchEntry[] = [
     groupKey: 'settingsRenderingPreview',
   },
   {
+    id: 'interface-unwrap-html',
+    tab: 'interface',
+    labelKey: 'settingsUnwrapMislabeledHtmlLabel',
+    descriptionKey: 'settingsUnwrapMislabeledHtmlTooltip',
+    groupKey: 'settingsRenderingPreview',
+  },
+  {
     id: 'interface-notifications',
     tab: 'interface',
     labelKey: 'settingsNotificationsFeedback',
@@ -161,6 +175,13 @@ const interfaceEntries: SettingsSearchEntry[] = [
     tab: 'interface',
     labelKey: 'settingsEnableCompletionSoundLabel',
     descriptionKey: 'settingsEnableCompletionSoundTooltip',
+    groupKey: 'settingsNotificationsFeedback',
+  },
+  {
+    id: 'interface-completion-sound-background-only',
+    tab: 'interface',
+    labelKey: 'settingsCompletionSoundBackgroundOnlyLabel',
+    descriptionKey: 'settingsCompletionSoundBackgroundOnlyTooltip',
     groupKey: 'settingsNotificationsFeedback',
   },
   {
@@ -192,17 +213,52 @@ const modelsEntries: SettingsSearchEntry[] = [
     groupKey: 'settingsTabModels',
   },
   {
-    id: 'models-thinking',
+    id: 'models-top-p',
     tab: 'models',
-    labelKey: 'settingsThinkingMode',
-    descriptionKey: 'settingsThinkingModeTooltip',
+    labelKey: 'settingsTopP',
+    descriptionKey: 'chatBehaviorTopPTooltip',
     groupKey: 'settingsTabModels',
   },
   {
-    id: 'models-show-thoughts',
+    id: 'models-top-k',
     tab: 'models',
-    labelKey: 'settingsShowThoughts',
-    descriptionKey: 'settingsShowThoughtsTooltip',
+    labelKey: 'settingsTopK',
+    descriptionKey: 'settingsTopKTooltip',
+    groupKey: 'settingsTabModels',
+  },
+  {
+    id: 'models-max-output-tokens',
+    tab: 'models',
+    labelKey: 'settingsMaxOutputTokens',
+    descriptionKey: 'settingsMaxOutputTokensTooltip',
+    groupKey: 'settingsTabModels',
+  },
+  {
+    id: 'models-stop-sequences',
+    tab: 'models',
+    labelKey: 'settingsStopSequences',
+    descriptionKey: 'settingsStopSequencesTooltip',
+    groupKey: 'settingsTabModels',
+  },
+  {
+    id: 'models-presence-penalty',
+    tab: 'models',
+    labelKey: 'settingsPresencePenalty',
+    descriptionKey: 'settingsPresencePenaltyTooltip',
+    groupKey: 'settingsTabModels',
+  },
+  {
+    id: 'models-frequency-penalty',
+    tab: 'models',
+    labelKey: 'settingsFrequencyPenalty',
+    descriptionKey: 'settingsFrequencyPenaltyTooltip',
+    groupKey: 'settingsTabModels',
+  },
+  {
+    id: 'models-seed',
+    tab: 'models',
+    labelKey: 'settingsSeed',
+    descriptionKey: 'settingsSeedTooltip',
     groupKey: 'settingsTabModels',
   },
   {
@@ -210,6 +266,20 @@ const modelsEntries: SettingsSearchEntry[] = [
     tab: 'models',
     labelKey: 'settingsMediaResolution',
     descriptionKey: 'settingsMediaResolutionTooltip',
+    groupKey: 'settingsTabModels',
+  },
+  {
+    id: 'models-raw-mode',
+    tab: 'models',
+    labelKey: 'settingsRawModeLabel',
+    descriptionKey: 'settingsRawModeTooltip',
+    groupKey: 'settingsTabModels',
+  },
+  {
+    id: 'models-hide-thinking',
+    tab: 'models',
+    labelKey: 'settingsHideThinkingInContextLabel',
+    descriptionKey: 'settingsHideThinkingInContextTooltip',
     groupKey: 'settingsTabModels',
   },
   {
@@ -238,6 +308,13 @@ const modelsEntries: SettingsSearchEntry[] = [
     labelKey: 'settingsTabLiveArtifacts',
     groupKey: 'settingsTabModels',
   },
+  {
+    id: 'selectionAskModel',
+    tab: 'models',
+    labelKey: 'selectionAskModel',
+    descriptionKey: 'selectionAskModelDesc',
+    groupKey: 'settingsTabModels',
+  },
 ];
 
 const apiEntries: SettingsSearchEntry[] = [
@@ -256,7 +333,7 @@ const apiEntries: SettingsSearchEntry[] = [
   {
     id: 'api-third-party',
     tab: 'api',
-    labelKey: 'settingsApiModeOpenAICompatible',
+    labelKey: 'settingsApiModeThirdParty',
     descriptionKey: 'settingsOpenAICompatibleToggleHelp',
     groupKey: 'settingsTabApi',
   },
@@ -326,6 +403,13 @@ const dataEntries: SettingsSearchEntry[] = [
     id: 'data-logs',
     tab: 'data',
     labelKey: 'settingsViewLogsAndUsage',
+    groupKey: 'settingsSystemTools',
+  },
+  {
+    id: 'data-enable-logging',
+    tab: 'data',
+    labelKey: 'settingsEnableLogging',
+    descriptionKey: 'settingsEnableLoggingDescription',
     groupKey: 'settingsSystemTools',
   },
   {
@@ -410,3 +494,9 @@ export const SETTINGS_SEARCH_CATALOG: SettingsSearchEntry[] = [
   ...shortcutsEntries,
   ...aboutEntries,
 ];
+
+/** DOM id of the container holding the rendered search results. */
+export const SETTINGS_SEARCH_RESULTS_ID = 'settings-search-results';
+
+/** DOM id of the flat-index result option, referenced by aria-activedescendant. */
+export const settingsSearchOptionId = (index: number): string => `settings-search-option-${index}`;

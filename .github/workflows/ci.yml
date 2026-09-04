@@ -15,28 +15,30 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npm run format:check
-      - run: npm run typecheck
-      - run: npm run lint
-      - run: npm run knip
-      - run: npm audit --omit=dev --audit-level=moderate
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run format:check
+      - run: pnpm run typecheck
+      - run: pnpm run lint
+      - run: pnpm run knip
+      - run: pnpm audit --prod --audit-level=moderate
 
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npm run test
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run test
 
   build:
     runs-on: ubuntu-latest
@@ -44,13 +46,14 @@ jobs:
     needs: [lint-and-typecheck, test]
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: npm run build:api
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: pnpm run build:api
       - uses: actions/upload-artifact@v4
         with:
           name: production-build
@@ -65,13 +68,14 @@ jobs:
     needs: [lint-and-typecheck, test]
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - run: npm run build:api
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+      - run: pnpm run build:api
 
   e2e:
     runs-on: ubuntu-latest
@@ -79,13 +83,14 @@ jobs:
     needs: [build]
     steps:
       - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - run: google-chrome --version
-      - run: npm run test:e2e
+      - run: pnpm run test:e2e
 
   docker-build:
     runs-on: ubuntu-latest

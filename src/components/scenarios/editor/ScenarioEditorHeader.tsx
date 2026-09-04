@@ -65,7 +65,7 @@ export const ScenarioEditorHeader: React.FC<ScenarioEditorHeaderProps> = ({
             onClick={onSave}
             disabled={isSaveDisabled}
             title={t('scenariosEditorSaveScenarioTitle')}
-            className="px-3 sm:px-5 py-2 bg-[var(--theme-bg-accent)] hover:bg-[var(--theme-bg-accent-hover)] text-[var(--theme-text-accent)] rounded-xl font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm hover:-translate-y-0.5 active:translate-y-0 flex-shrink-0"
+            className="px-3 sm:px-5 py-2 bg-[var(--theme-bg-accent)] hover:bg-[var(--theme-bg-accent-hover)] text-[var(--theme-text-accent)] rounded-lg font-semibold text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-shrink-0"
           >
             <Save size={16} strokeWidth={2.5} />
             <span className="hidden sm:inline">{t('scenariosEditorSaveScenario')}</span>
@@ -83,9 +83,7 @@ export const ScenarioEditorHeader: React.FC<ScenarioEditorHeaderProps> = ({
               {t('scenariosEditorCategoryLabel')}
             </label>
             <div className="relative">
-              <span
-                className={`absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${activeMeta.chipClass.split(' ')[0]}`}
-              >
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--theme-text-tertiary)]">
                 <ActiveCategoryIcon size={12} strokeWidth={2.5} />
               </span>
               <select

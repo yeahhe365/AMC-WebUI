@@ -36,7 +36,6 @@ describe('useChatSessionActions', () => {
         activeSessionId: 'session-1',
         isLoading: false,
         updateAndPersistSessions,
-        setCurrentChatSettings: vi.fn(),
         setSelectedFiles: vi.fn(),
         handleStopGenerating: vi.fn(),
         startNewChat: vi.fn(),

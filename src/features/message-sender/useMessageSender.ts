@@ -1,25 +1,33 @@
 import { type MutableRefObject, useCallback, useMemo } from 'react';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import {
   type AppSettings,
   type ChatMessage,
   type UploadedFile,
   type ChatSettings as IndividualChatSettings,
   type ImageOutputMode,
-  type ImagePersonGeneration,
 } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
 import { logService } from '@/services/logService';
 import { formatApiKeyErrorMessage } from '@/utils/apiKeySelection';
+import { useChatStore } from '@/stores/chatStore';
 import { isServerCodeExecutionMode } from '@/utils/codeExecution';
 import { getModelCapabilities } from '@/utils/model/modelCapabilities';
 import { resolveChatApiRoute } from '@/utils/chatApiRoute';
+import { updateSessionById } from '@/utils/chat/sessionMutations';
+import { sessionHasGeminiFilesApiReferences, usesGeminiFilesApiReference } from '@/utils/chat/geminiFilesApi';
 
-import { ensureFilesApiReferences, formatFileReferenceErrorMessage } from './fileApiReference';
+import {
+  ensureFilesApiReferences,
+  ensureHistoryFilesApiReferences,
+  formatFileReferenceErrorMessage,
+} from './fileApiReference';
 import { sendImageEditMessage } from './imageEditStrategy';
-import { prepareFilesForOpenAICompatibleMode } from './openaiCompatibleFiles';
+import { prepareFilesForOpenAICompatibleMode, prepareHistoryForOpenAICompatibleMode } from './openaiCompatibleFiles';
 import { validateMessageBeforeSend } from './sendMessageValidation';
 import { createSenderStoreActions } from './senderStoreActions';
 import { sendStandardMessage } from './standardChatStrategy';
+import { sendTranscribeMessage } from './transcribeStrategy';
 import { sendTtsMessage } from './ttsStrategy';
 import { useChatStreamHandler } from './useChatStreamHandler';
 import { useMessageLifecycle } from './useMessageLifecycle';
@@ -38,11 +46,10 @@ interface MessageSenderProps {
   aspectRatio: string;
   imageSize?: string;
   imageOutputMode: ImageOutputMode;
-  personGeneration: ImagePersonGeneration;
   userScrolledUpRef: MutableRefObject<boolean>;
   activeSessionId: string | null;
   sessionKeyMapRef: MutableRefObject<Map<string, string>>;
-  language: 'en' | 'zh';
+  language: SupportedLanguage;
 }
 
 export const useMessageSender = (props: MessageSenderProps) => {
@@ -59,7 +66,6 @@ export const useMessageSender = (props: MessageSenderProps) => {
     aspectRatio,
     imageSize,
     imageOutputMode,
-    personGeneration,
     userScrolledUpRef,
     activeSessionId,
     sessionKeyMapRef,
@@ -82,6 +88,7 @@ export const useMessageSender = (props: MessageSenderProps) => {
     getStreamHandlers,
     activeJobs,
     sessionKeyMapRef,
+    setSessionLoading,
   });
 
   const { runMessageLifecycle } = useMessageLifecycle({
@@ -108,7 +115,15 @@ export const useMessageSender = (props: MessageSenderProps) => {
       settingsOverride?: IndividualChatSettings;
     }) => {
       const textToUse = overrideOptions?.text ?? '';
-      const filesToUse = overrideOptions?.files ?? selectedFiles;
+      // Prefer explicitly-passed files, then the live store value when the
+      // closure's selectedFiles has gone stale. In the pending-submission flush
+      // path handleSendMessage can run before React commits the new files, so
+      // the closed-over selectedFiles may still show isProcessing: true; reading
+      // the store here lets a send that would otherwise be blocked (and its text
+      // silently dropped) proceed with the real current files.
+      const storeSelectedFiles = useChatStore.getState().selectedFiles;
+      const filesToUse =
+        overrideOptions?.files ?? (selectedFiles === storeSelectedFiles ? selectedFiles : storeSelectedFiles);
       const effectiveEditingId = overrideOptions?.editingId ?? editingMessageId;
       const isContinueMode = overrideOptions?.isContinueMode ?? false;
       const isFastMode = overrideOptions?.isFastMode ?? false;
@@ -118,11 +133,11 @@ export const useMessageSender = (props: MessageSenderProps) => {
       const activeModelId = apiRoute.modelId;
       const capabilities = getModelCapabilities(activeModelId);
       const isTtsModel = capabilities.isTtsModel;
-      const isImageEditModel = capabilities.isFlashImageModel;
+      const isTranscribeModel = capabilities.isTranscribeModel;
       const isGemini3Image = capabilities.isGemini3ImageModel;
       const permissions = capabilities.permissions ?? {
         canAcceptAttachments: !isTtsModel && !capabilities.isNativeAudioModel,
-        requiresTextPrompt: isTtsModel || isImageEditModel || isGemini3Image,
+        requiresTextPrompt: isTtsModel || isGemini3Image,
       };
 
       logService.info(`Sending message with model ${activeModelId}`, {
@@ -141,8 +156,8 @@ export const useMessageSender = (props: MessageSenderProps) => {
         permissions,
         isContinueMode,
         isServerCodeExecutionEnabled,
-        isImageEditModel,
         isGemini3Image,
+        isTranscribeModel,
         activeModelId,
         t,
       });
@@ -161,9 +176,14 @@ export const useMessageSender = (props: MessageSenderProps) => {
         activeModelId,
         apiRoute,
         files: filesToUse,
+        historyMessages: messages,
         keySettings: sessionToUpdate,
         generationId: continueTargetMessage ? (effectiveEditingId ?? undefined) : undefined,
-        generationStartTime: continueTargetMessage?.generationStartTime,
+        // Continue reuses the target's generation id so stream state stays
+        // aligned, but the turn starts fresh: a new generationStartTime keeps
+        // timing metrics (TTFT, thinking time, elapsed time) measured from this
+        // run, not from when the target message was originally generated.
+        generationStartTime: undefined,
         messages: {
           noModelSelected: t('messageSenderNoModelSelected'),
           noModelTitle: t('messageSenderErrorSessionTitle'),
@@ -175,27 +195,73 @@ export const useMessageSender = (props: MessageSenderProps) => {
         return;
       }
       const { keyToUse, shouldLockKey, generationId, abortController: newAbortController } = request;
-      const fileReferenceResult =
-        apiRoute.apiMode === 'third-party'
-          ? prepareFilesForOpenAICompatibleMode(filesToUse)
-          : await ensureFilesApiReferences({
-              files: filesToUse,
-              apiKey: keyToUse,
-              abortSignal: newAbortController.signal,
-              onFileUpdate: (fileId, patch) => {
-                if (overrideOptions?.files !== undefined) {
-                  return;
-                }
+      let filesReadyForSend = filesToUse;
+      const isAnyFileUploading = filesToUse.some((file) => file.uploadState === 'uploading' || file.isProcessing);
 
-                setSelectedFiles((prev) => prev.map((file) => (file.id === fileId ? { ...file, ...patch } : file)));
-              },
-            });
+      if (!isAnyFileUploading && filesToUse.length > 0) {
+        const fileReferenceResult =
+          apiRoute.apiMode === 'third-party'
+            ? prepareFilesForOpenAICompatibleMode(filesToUse)
+            : await ensureFilesApiReferences({
+                files: filesToUse,
+                apiKey: keyToUse,
+                abortSignal: newAbortController.signal,
+                onFileUpdate: (fileId, patch) => {
+                  if (overrideOptions?.files !== undefined) {
+                    return;
+                  }
 
-      if (!fileReferenceResult.ok) {
-        setAppFileError(formatFileReferenceErrorMessage(fileReferenceResult, t));
-        return;
+                  setSelectedFiles((prev) => prev.map((file) => (file.id === fileId ? { ...file, ...patch } : file)));
+                },
+              });
+
+        if (!fileReferenceResult.ok) {
+          setAppFileError(formatFileReferenceErrorMessage(fileReferenceResult, t));
+          return;
+        }
+        filesReadyForSend = fileReferenceResult.files;
       }
-      const filesReadyForSend = fileReferenceResult.files;
+      let messagesForTurn = messages;
+
+      const persistHistoryIfChanged = (nextMessages: ChatMessage[], changed: boolean) => {
+        if (!changed || !activeSessionId) {
+          return;
+        }
+
+        const refreshedById = new Map(nextMessages.map((message) => [message.id, message]));
+        const keepLockedApiKey =
+          sessionHasGeminiFilesApiReferences(nextMessages) ||
+          filesReadyForSend.some((file) => usesGeminiFilesApiReference(file));
+        updateAndPersistSessions((prev) =>
+          updateSessionById(prev, activeSessionId, (session) => ({
+            ...session,
+            messages: session.messages.map((message) => refreshedById.get(message.id) ?? message),
+            settings: keepLockedApiKey ? session.settings : { ...session.settings, lockedApiKey: null },
+          })),
+        );
+      };
+
+      if (apiRoute.apiMode === 'third-party' && !isTtsModel) {
+        const historyReferenceResult = await prepareHistoryForOpenAICompatibleMode({
+          messages,
+          translate: t,
+        });
+        messagesForTurn = historyReferenceResult.messages;
+        persistHistoryIfChanged(historyReferenceResult.messages, historyReferenceResult.changed);
+      } else if (apiRoute.apiMode !== 'third-party' && !isTtsModel) {
+        const historyReferenceResult = await ensureHistoryFilesApiReferences({
+          messages,
+          apiKey: keyToUse,
+          abortSignal: newAbortController.signal,
+          translate: t,
+        });
+        if (!historyReferenceResult.ok) {
+          setAppFileError(formatFileReferenceErrorMessage(historyReferenceResult, t));
+          return;
+        }
+        messagesForTurn = historyReferenceResult.messages;
+        persistHistoryIfChanged(historyReferenceResult.messages, historyReferenceResult.changed);
+      }
 
       if (appSettings.isAutoScrollOnSendEnabled) {
         userScrolledUpRef.current = false;
@@ -221,9 +287,31 @@ export const useMessageSender = (props: MessageSenderProps) => {
         return;
       }
 
-      if (isImageEditModel || (isGemini3Image && appSettings.generateQuadImages)) {
-        const editIndex = effectiveEditingId ? messages.findIndex((message) => message.id === effectiveEditingId) : -1;
-        const historyMessages = editIndex !== -1 ? messages.slice(0, editIndex) : messages;
+      if (isTranscribeModel) {
+        await sendTranscribeMessage({
+          keyToUse,
+          activeSessionId,
+          generationId,
+          abortController: newAbortController,
+          appSettings,
+          currentChatSettings: sessionToUpdate,
+          text: textToUse.trim(),
+          files: filesReadyForSend,
+          shouldLockKey,
+          updateAndPersistSessions,
+          setActiveSessionId,
+          runMessageLifecycle,
+          t,
+        });
+        if (editingMessageId) setEditingMessageId(null);
+        return;
+      }
+
+      if (isGemini3Image && appSettings.generateQuadImages) {
+        const editIndex = effectiveEditingId
+          ? messagesForTurn.findIndex((message) => message.id === effectiveEditingId)
+          : -1;
+        const historyMessages = editIndex !== -1 ? messagesForTurn.slice(0, editIndex) : messagesForTurn;
         await sendImageEditMessage({
           keyToUse,
           activeSessionId,
@@ -238,7 +326,6 @@ export const useMessageSender = (props: MessageSenderProps) => {
           aspectRatio,
           imageSize,
           imageOutputMode,
-          personGeneration,
           shouldLockKey,
           updateAndPersistSessions,
           setActiveSessionId,
@@ -253,13 +340,12 @@ export const useMessageSender = (props: MessageSenderProps) => {
         props: {
           appSettings,
           currentChatSettings: sessionToUpdate,
-          messages,
+          messages: messagesForTurn,
           setEditingMessageId,
           setAppFileError,
           aspectRatio,
           imageSize,
           imageOutputMode,
-          personGeneration,
           userScrolledUpRef,
           activeSessionId,
           sessionKeyMapRef,
@@ -289,7 +375,6 @@ export const useMessageSender = (props: MessageSenderProps) => {
       aspectRatio,
       imageSize,
       imageOutputMode,
-      personGeneration,
       userScrolledUpRef,
       activeSessionId,
       sessionKeyMapRef,

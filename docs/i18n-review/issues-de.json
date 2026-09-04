@@ -1,0 +1,534 @@
+[
+  {
+    "key": "settingsFilesApiTooltip",
+    "current": "Gilt für Dateien, die nach dem Ändern dieser Einstellung hinzugefügt wurden. Ein bevorzugt Files API. Aus sendet Inhalte wenn möglich inline; zu große Dateien können weiterhin Files API verwenden.",
+    "suggested": "Gilt für Dateien, die nach dem Ändern dieser Einstellung hinzugefügt werden. Bei „Ein“ wird Files API bevorzugt. Bei „Aus“ werden Inhalte wenn möglich inline gesendet; zu große Dateien können weiterhin Files API verwenden.",
+    "reason": "MISTRANSLATION: 'On prefers Files API. Off sends content inline' was translated word-for-word so 'Ein/Aus' read as sentence subjects – nonsense German that will confuse users. Also missing comma before the infinitive/'wenn möglich' clause.",
+    "severity": "high"
+  },
+  {
+    "key": "liveStatusReconnectingAutomatically",
+    "current": "Automatisch erneut verbinden",
+    "suggested": "Verbindung wird automatisch wiederhergestellt",
+    "reason": "MISTRANSLATION of aspect: English status 'Reconnecting automatically' rendered as verb phrase that reads like an action/button label; sibling key liveStatusReconnectingAttempt uses noun style. Status banner needs process description.",
+    "severity": "medium"
+  },
+  {
+    "key": "audioRecorderTitle",
+    "current": "Stimmrekorder",
+    "suggested": "Sprachrekorder",
+    "reason": "UNNATURAL + INCONSISTENCY: 'Stimmrekorder' is not established German; the app otherwise uses the 'Sprach-' family (Spracheingabe, Spracherkennung, Speech-to-Text-Modell). Voice Recorder → Sprachrekorder.",
+    "severity": "medium"
+  },
+  {
+    "key": "tts_style_gentle",
+    "current": "Sanftmütig",
+    "suggested": "Sanft",
+    "reason": "UNNATURAL: 'sanftmütig' means meek/mild-tempered (of people/animals), not a voice quality; wrong connotation for a TTS style. Use 'Sanft' and differentiate Smooth as 'Geschmeidig'.",
+    "severity": "medium"
+  },
+  {
+    "key": "tts_style_soft",
+    "current": "Sanft",
+    "suggested": "Weich",
+    "reason": "INCONSISTENCY: identical German 'Sanft' used for both Soft and Smooth (tts_style_smooth); users cannot distinguish the styles. Soft → 'Weich'.",
+    "severity": "medium"
+  },
+  {
+    "key": "tts_style_smooth",
+    "current": "Sanft",
+    "suggested": "Geschmeidig",
+    "reason": "INCONSISTENCY: duplicate of tts_style_soft ('Sanft'); after Gentle='Sanft' three styles would collide. Smooth → 'Geschmeidig'.",
+    "severity": "medium"
+  },
+  {
+    "key": "pwaUpdateRefreshPrompt",
+    "current": "Aktualisieren, um die installierte Shell und die neuesten Ressourcen zu aktualisieren.",
+    "suggested": "Neu laden, um die installierte Shell und die neuesten Ressourcen zu aktualisieren.",
+    "reason": "UNNATURAL: same verb twice in one sentence ('Aktualisieren … zu aktualisieren'). Refresh = 'Neu laden' elsewhere (errorBoundaryReload, htmlPreviewReload).",
+    "severity": "medium"
+  },
+  {
+    "key": "historySidebarClose",
+    "current": "Historie-Seitenleiste schließen",
+    "suggested": "Verlauf-Seitenleiste schließen",
+    "reason": "INCONSISTENCY: History = 'Verlauf' in all other keys (historyTitle, historySearchPlaceholder, historyEmpty 'Chat-Verlauf', settingsImportHistory 'Verlauf importieren'); only this pair uses 'Historie'.",
+    "severity": "medium"
+  },
+  {
+    "key": "historySidebarOpen",
+    "current": "Historie-Seitenleiste öffnen",
+    "suggested": "Verlauf-Seitenleiste öffnen",
+    "reason": "INCONSISTENCY: see historySidebarClose – unify on 'Verlauf'.",
+    "severity": "medium"
+  },
+  {
+    "key": "scrollPreviousTurn",
+    "current": "Zum vorherigen Durchgang scrollen",
+    "suggested": "Zum vorherigen Turn scrollen",
+    "reason": "INCONSISTENCY: 'turn' kept as 'Turn' everywhere else (helpCmdRetry, messageSenderEmptyReply, settingsAlwaysKeepThinkingInContextTooltip); only this pair translates it as 'Durchgang'.",
+    "severity": "medium"
+  },
+  {
+    "key": "scrollNextTurn",
+    "current": "Zum nächsten Durchgang scrollen",
+    "suggested": "Zum nächsten Turn scrollen",
+    "reason": "INCONSISTENCY: see scrollPreviousTurn – unify on 'Turn'.",
+    "severity": "medium"
+  },
+  {
+    "key": "scenariosTitle",
+    "current": "Vordefinierte Szenarien",
+    "suggested": "Voreingestellte Szenarien",
+    "reason": "INCONSISTENCY: same source 'Preset Scenarios' as scenariosManageAria/scenariosManageTitle ('Voreingestellte Szenarien') and matches 'System-Voreinstellung' badge; this key deviates with 'Vordefinierte Szenarien'.",
+    "severity": "medium"
+  },
+  {
+    "key": "helpCmdFast",
+    "current": "Schnellen Denkmodus umschalten",
+    "suggested": "Schnellmodus umschalten",
+    "reason": "INCONSISTENCY: Fast Mode = 'Schnellmodus' in sendMessageFastSuffix, headerReasoningMinimalFastTitle, headerThinkingMinimalFastTitle; helpCmdFast invents 'Denkmodus'.",
+    "severity": "medium"
+  },
+  {
+    "key": "uploadFailedWithMessage",
+    "current": "Hochladen fehlgeschlagen: {message}",
+    "suggested": "Upload fehlgeschlagen: {message}",
+    "reason": "INCONSISTENCY/UNNATURAL: nominalized verb 'Hochladen fehlgeschlagen' is clumsy; app otherwise uses noun 'Upload' (uploadMissingApiKey, messageSenderFileUploadFailedBeforeSend 'Anhang-Upload', settingsFilesApiDesc).",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsLiveArtifactsFontSize",
+    "current": "Live Artifacts Basisgröße",
+    "suggested": "Basisgröße für Live Artifacts",
+    "reason": "FORMAT/COMPOUND: unhyphenated mix of English brand + German noun violates German compound spelling; needs per-word hyphens ('Live-Artifacts-Basisgröße') or a prepositional form.",
+    "severity": "medium"
+  },
+  {
+    "key": "uploadCancelledByUser",
+    "current": "Hochladen vom Benutzer abgebrochen.",
+    "suggested": "Upload vom Benutzer abgebrochen.",
+    "reason": "INCONSISTENCY: same Upload/Hochladen family as uploadFailedWithMessage; noun 'Upload' preferred.",
+    "severity": "low"
+  },
+  {
+    "key": "uploadCancelled",
+    "current": "Hochladen abgebrochen.",
+    "suggested": "Upload abgebrochen.",
+    "reason": "INCONSISTENCY: see uploadFailedWithMessage – unify error texts on 'Upload'.",
+    "severity": "low"
+  },
+  {
+    "key": "messageSenderEmptyReplyWithThoughts",
+    "current": "Das Modell hat diesen Turn ohne sichtbare Antwort beendet (nur Reasoning wurde erzeugt). Du kannst es erneut versuchen oder das Thinking-Level senken und erneut versuchen.",
+    "suggested": "Das Modell hat diesen Turn ohne sichtbare Antwort beendet (nur Reasoning wurde erzeugt). Du kannst es erneut versuchen oder die Thinking-Stufe senken und erneut versuchen.",
+    "reason": "INCONSISTENCY: 'Thinking-Level' here vs 'Thinking-Stufe' in headerThinkingToggleAria / Reasoning-Stufe in settingsThinkingModePreset.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsSystemAudioRecordingLabel",
+    "current": "System-Audio in Aufnahmen einschließen",
+    "suggested": "Systemaudio in Aufnahmen einschließen",
+    "reason": "INCONSISTENCY: audioRecorder* keys consistently write 'Systemaudio' (one word); this key alone uses 'System-Audio'.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsLiveArtifactsSystemPromptHelp",
+    "current": "Der Live Artifacts-Button, Vorschläge und automatische Visualisierungen verwenden den Prompt für die ausgewählte Version.",
+    "suggested": "Die Live Artifacts-Schaltfläche, Vorschläge und automatischen Visualisierungen verwenden den Prompt für die ausgewählte Version.",
+    "reason": "INCONSISTENCY: lone 'Button' vs consistent 'Schaltfläche' in settingsShowInput*Label/Tooltip keys.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsTemperature",
+    "current": "Temperature",
+    "suggested": "Temperatur",
+    "reason": "UNTRANSLATED: real English word identical to source; standard German ML term is 'Temperatur' (as used by Google AI Studio DE). Top P / Top K may stay, but Temperature has an established German equivalent.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsMcpTransportHttp",
+    "current": "HTTP (Streamable, SSE fallback)",
+    "suggested": "HTTP (Streamable, SSE-Fallback)",
+    "reason": "FORMAT: German noun compound requires capitalization and hyphen: 'SSE-Fallback'.",
+    "severity": "low"
+  },
+  {
+    "key": "headerModelSelectorTooltipAction",
+    "current": "Klicken zum Ändern oder 'Tab' drücken zum Wechseln",
+    "suggested": "Klicken zum Ändern oder ‚Tab‘ drücken zum Wechseln",
+    "reason": "PUNCTUATION: English straight single quotes; German keyboard-key quotation would use ‚…‘ (or drop quotes). Also clunky double-infinitive phrasing.",
+    "severity": "low"
+  },
+  {
+    "key": "selectedFileUploading",
+    "current": "Hochladen {percent}%",
+    "suggested": "Wird hochgeladen {percent} %",
+    "reason": "FORMAT: German typesetting puts a (thin) space before '%'; status phrasing 'Wird hochgeladen …' matches other progress strings (e.g. folderProcessing). Placeholder {percent} untouched.",
+    "severity": "low"
+  },
+  {
+    "key": "audioRecorderAccessingMicrophone",
+    "current": "Auf Mikrofon wird zugegriffen...",
+    "suggested": "Auf das Mikrofon wird zugegriffen...",
+    "reason": "GRAMMAR: passive construction requires the article ('auf das Mikrofon').",
+    "severity": "low"
+  },
+  {
+    "key": "fileProcessingTimedOut",
+    "current": "Dateiverarbeitung hat Zeitüberschreitung erreicht.",
+    "suggested": "Zeitüberschreitung bei der Dateiverarbeitung.",
+    "reason": "UNNATURAL: literal calque of 'timed out'; idiomatic German is the noun phrase.",
+    "severity": "low"
+  },
+  {
+    "key": "imageSizeSetTitle",
+    "current": "Größe einstellen auf",
+    "suggested": "Größe einstellen:",
+    "reason": "UNNATURAL: source concatenates value after string ('{title} {value}'), producing 'Größe einstellen auf 1:1'; colon form reads naturally.",
+    "severity": "low"
+  },
+  {
+    "key": "shortcutsNone",
+    "current": "Kein",
+    "suggested": "Kein Tastenkürzel",
+    "reason": "UNNATURAL: truncated gendered adjective shown standalone as the current-shortcut value; incomplete wording.",
+    "severity": "low"
+  },
+  {
+    "key": "thinkingText",
+    "current": "Denke nach...",
+    "suggested": "Nachdenken...",
+    "reason": "UNNATURAL: ambiguous between first person and imperative; noun-style status ('Nachdenken...') matches sibling statuses like 'Transkription läuft...' / 'Titel wird generiert...'.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsDataImportsExports",
+    "current": "Importieren und Exportieren",
+    "suggested": "Import & Export",
+    "reason": "INCONSISTENCY: all other settings section headers keep the EN 'X & Y' pattern verbatim (API & Verbindungen, Diagnose & App, Daten & App, Oberfläche & Interaktion …); this one verbalizes.",
+    "severity": "low"
+  },
+  {
+    "key": "chatBehaviorSystemPromptPlaceholder",
+    "current": "z. B., Du bist ein präziser, prägnanter Assistent, der Anforderungen proaktiv klärt.",
+    "suggested": "z. B.: Du bist ein präziser, prägnanter Assistent, der Anforderungen proaktiv klärt.",
+    "reason": "PUNCTUATION: comma directly after 'z. B.' is nonstandard; use colon to introduce the example sentence.",
+    "severity": "low"
+  },
+  {
+    "key": "usagePricingNote",
+    "current": "Strenger offizieller Modus: Preise enthalten nur Datensätze mit exaktem Abrechnungsnachweis, entweder aus den Modalitätsdetails des Anbieters oder aus der nachgewiesenen lokalen reinen Text-Anfrage/Antwort-Struktur. Zeilen können einen Teilbetrag mit der Anzahl nicht verfügbarer Datensätze anzeigen, wenn ältere oder nicht unterstützte Datensätze nicht bepreist werden können. Explizite Cache-Speichergebühren sind ausgeschlossen, da die Cache-TTL nicht gespeichert wird.",
+    "suggested": "Strenger offizieller Modus: Preise enthalten nur Datensätze mit exaktem Abrechnungsnachweis, entweder aus den Modalitätsdetails des Anbieters oder aus der nachgewiesenen lokalen reinen Text-Anfrage-/Antwortstruktur. Zeilen können einen Teilbetrag mit der Anzahl nicht verfügbarer Datensätze anzeigen, wenn ältere oder nicht unterstützte Datensätze nicht mit Preisen versehen werden können. Explizite Cache-Speichergebühren sind ausgeschlossen, da die Cache-TTL nicht gespeichert wird.",
+    "reason": "UNNATURAL: anglicism 'bepreist' (from 'to price'); not standard German. Replace with 'mit Preisen versehen'. Minor compound cleanup included.",
+    "severity": "low"
+  },
+  {
+    "key": "suggestionExplainDesc",
+    "current": "Bitte erkläre das folgende Konzept in einfacher Sprache. Verwende Analogien oder Beispiele aus dem Alltag zum besseren Verständnis und vermeide zu viel Fachsprache, damit auch Anfänger ohne Vorkenntnisse es leicht verstehen können:",
+    "suggested": "Bitte erkläre das folgende Konzept in einfacher Sprache. Verwende Analogien oder Beispiele aus dem Alltag zum besseren Verständnis und vermeide zu viel Fachsprache, damit es auch Anfänger ohne Vorkenntnisse leicht verstehen können:",
+    "reason": "UNNATURAL: marked word order; pronoun 'es' belongs earlier in the clause ('damit es auch Anfänger … leicht verstehen').",
+    "severity": "low"
+  },
+  {
+    "key": "tts_style_knowledgeable",
+    "current": "Kundig",
+    "suggested": "Sachkundig",
+    "reason": "UNNATURAL: bare 'Kundig' is archaic/rare as a standalone label; 'Sachkundig' is the natural adjective for knowledgeable.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsLocalAppDataLoading",
+    "current": "Lokale Speichernutzung wird berechnet…",
+    "suggested": "Lokale Speichernutzung wird berechnet...",
+    "reason": "FORMAT: single-character ellipsis '…' while ~50 comparable keys use three dots '...'; normalize ellipsis style app-wide.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsSearchPlaceholder",
+    "current": "Einstellungen durchsuchen…",
+    "suggested": "Einstellungen durchsuchen...",
+    "reason": "FORMAT: ellipsis character inconsistent with rest of app (see settingsLocalAppDataLoading); note EN mirrors this, fix both sides together.",
+    "severity": "low"
+  },
+  {
+    "key": "usageLoading",
+    "current": "Nutzungsdaten werden geladen…",
+    "suggested": "Nutzungsdaten werden geladen...",
+    "reason": "FORMAT: ellipsis character inconsistent with rest of app (see settingsLocalAppDataLoading).",
+    "severity": "low"
+  },
+  {
+    "key": "createTextUnsavedMessage",
+    "current": "Ihre ungespeicherten Änderungen gehen verloren.",
+    "suggested": "Deine ungespeicherten Änderungen gehen verloren.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "screenCaptureUnsupported",
+    "current": "Ihr Browser unterstützt keine Bildschirmaufnahme.",
+    "suggested": "Dein Browser unterstützt keine Bildschirmaufnahme.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "logViewerClearMessage",
+    "current": "Möchten Sie wirklich alle Protokolle und Nutzungsstatistiken aus der Datenbank löschen?",
+    "suggested": "Möchtest du wirklich alle Protokolle und Nutzungsstatistiken aus der Datenbank löschen?",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "welcomeGreeting",
+    "current": "Wie kann ich Ihnen heute helfen?",
+    "suggested": "Wie kann ich dir heute helfen?",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "liveArtifactInteractionEnum",
+    "current": "Wählen Sie eine zulässige Option.",
+    "suggested": "Wähle eine zulässige Option.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "filePreviewCopyFailed",
+    "current": "Kopieren in die Zwischenablage fehlgeschlagen. Ihr Browser unterstützt diese Funktion möglicherweise nicht oder benötigt Berechtigungen.",
+    "suggested": "Kopieren in die Zwischenablage fehlgeschlagen. Dein Browser unterstützt diese Funktion möglicherweise nicht oder benötigt Berechtigungen.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "filePreviewDiscardUnsavedMessage",
+    "current": "Ihre ungespeicherten Bearbeitungen gehen verloren.",
+    "suggested": "Deine ungespeicherten Änderungen gehen verloren.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys) Identical EN source is rendered differently in createTextUnsavedMessage ('Änderungen' vs 'Bearbeitungen') – unify.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsOpenAICompatibleToggleHelp",
+    "current": "Fügen Sie OpenAI-kompatible oder Anthropic-Verbindungen hinzu. Jede hat ihren eigenen Schlüssel, ihre eigene URL und Modelle. Gemini bleibt im Block darüber.",
+    "suggested": "Füge OpenAI-kompatible oder Anthropic-Verbindungen hinzu. Jede hat ihren eigenen Schlüssel, ihre eigene URL und Modelle. Gemini bleibt im Block darüber.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsOpenAICompatibleManageModelsHelp",
+    "current": "Verwalten Sie Modell-IDs mit Suche, Batch-Einfügen und Abruf-Vorschau vor dem Import.",
+    "suggested": "Verwalte Modell-IDs mit Suche, Batch-Einfügen und Abruf-Vorschau vor dem Import.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsOpenAICompatibleBatchPastePlaceholder",
+    "current": "Fügen Sie Modell-IDs getrennt durch Kommas, Leerzeichen oder neue Zeilen ein.",
+    "suggested": "Füge Modell-IDs getrennt durch Kommas, Leerzeichen oder neue Zeilen ein.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsOpenAICompatibleModelImportNoSelection",
+    "current": "Wählen Sie zu importierende Modelle aus.",
+    "suggested": "Wähle zu importierende Modelle aus.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsOpenAICompatibleFetchedPreviewEmpty",
+    "current": "Rufen Sie Modelle ab, um sie in der Vorschau anzuzeigen und zu importieren.",
+    "suggested": "Rufe Modelle ab, um sie in der Vorschau anzuzeigen und zu importieren.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsFetchModelListNeedsKeyAndUrl",
+    "current": "Fügen Sie einen API-Schlüssel und eine Base URL hinzu, um Modelle abzurufen.",
+    "suggested": "Füge einen API-Schlüssel und eine Base URL hinzu, um Modelle abzurufen.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsOpenAICompatibleModelIdHelp",
+    "current": "Legen Sie die API-Modell-ID und einen optionalen Anzeigenamen fest. Der Anzeigename erscheint in der Haupt-Modellauswahl; leere Namen fallen auf die Modell-ID zurück.",
+    "suggested": "Lege die API-Modell-ID und einen optionalen Anzeigenamen fest. Der Anzeigename erscheint in der Haupt-Modellauswahl; leere Namen fallen auf die Modell-ID zurück.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsApiKeyHelpText",
+    "current": "Sie können mehrere Schlüssel eingeben, einen pro Zeile. Für jede neue Chat-Sitzung wird ein Schlüssel der Reihe nach verwendet.",
+    "suggested": "Du kannst mehrere Schlüssel eingeben, einen pro Zeile. Für jede neue Chat-Sitzung wird ein Schlüssel der Reihe nach verwendet.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "apiConfigDefaultInfo",
+    "current": "API-Einstellungen aus der Umgebung werden verwendet. Aktivieren Sie dies, um sie zu überschreiben.",
+    "suggested": "API-Einstellungen aus der Umgebung werden verwendet. Aktiviere diese Option, um sie zu überschreiben.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "apiConfigKeyPlaceholder",
+    "current": "Geben Sie Ihre Gemini API-Schlüssel ein",
+    "suggested": "Gib deine Gemini API-Schlüssel ein",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "apiConfigOpenaiKeyPlaceholder",
+    "current": "Geben Sie Ihre OpenAI-kompatiblen API-Schlüssel ein",
+    "suggested": "Gib deine OpenAI-kompatiblen API-Schlüssel ein",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "apiConfigMissingEnvKey",
+    "current": "Kein API-Schlüssel in der Umgebung gefunden. Aktivieren Sie dies, um mit Ihrem eigenen Schlüssel fortzufahren.",
+    "suggested": "Kein API-Schlüssel in der Umgebung gefunden. Aktiviere diese Option, um mit deinem eigenen Schlüssel fortzufahren.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsLiveAutomaticHelp",
+    "current": "Live verwendet Ihren Browser-API-Schlüssel direkt für seine WebSocket-Verbindung.",
+    "suggested": "Live verwendet deinen Browser-API-Schlüssel direkt für seine WebSocket-Verbindung.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "thirdPartyApiKeyHelp",
+    "current": "Getrennt von Gemini API-Schlüsseln gespeichert. Geben Sie den Schlüssel für diese Verbindung ein.",
+    "suggested": "Getrennt von Gemini API-Schlüsseln gespeichert. Gib den Schlüssel für diese Verbindung ein.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "thirdPartyConnectionsEmpty",
+    "current": "Noch keine Drittanbieter-Verbindungen. Fügen Sie einen Anbieter oder ein Gateway hinzu, um ihn neben Gemini zu verwenden.",
+    "suggested": "Noch keine Drittanbieter-Verbindungen. Füge einen Anbieter oder ein Gateway hinzu, um diese neben Gemini zu verwenden.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys) Also fixes pronoun agreement: 'ihn' cannot cover both 'einen Anbieter' (masc.) and 'ein Gateway' (neut.) → 'diese'.",
+    "severity": "medium"
+  },
+  {
+    "key": "thirdPartyRemoveConnectionInUse",
+    "current": "Chats, die diese Verbindung noch verwenden, werden blockiert, bis Sie ein anderes Modell wählen.",
+    "suggested": "Chats, die diese Verbindung noch verwenden, werden blockiert, bis du ein anderes Modell wählst.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "apiRuntimeThirdPartyConnectionMissing",
+    "current": "Die Drittanbieter-Verbindung dieses Chats wurde entfernt. Wählen Sie ein anderes Modell, um fortzufahren.",
+    "suggested": "Die Drittanbieter-Verbindung dieses Chats wurde entfernt. Wähle ein anderes Modell, um fortzufahren.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "apiRuntimeThirdPartyConnectionDisabled",
+    "current": "Die Drittanbieter-Verbindung dieses Chats ist deaktiviert. Aktivieren Sie sie oder wählen Sie ein anderes Modell.",
+    "suggested": "Die Drittanbieter-Verbindung dieses Chats ist deaktiviert. Aktiviere sie oder wähle ein anderes Modell.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsUnwrapMislabeledHtmlTooltip",
+    "current": "Wenn ein als text/css/markdown gekennzeichneter Codeblock ein vollständiges HTML-Dokument oder Live Artifacts-Markup enthält, rendern Sie ihn als Live-Vorschau statt als reinen Quelltext. Deaktivieren Sie diese Option, um diese Blöcke immer als Code anzuzeigen.",
+    "suggested": "Wenn ein als text/css/markdown gekennzeichneter Codeblock ein vollständiges HTML-Dokument oder Live Artifacts-Markup enthält, wird er als Live-Vorschau statt als reiner Quelltext gerendert. Deaktiviere diese Option, um diese Blöcke immer als Code anzuzeigen.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsNotificationsUnsupported",
+    "current": "Desktop-Benachrichtigungen werden von Ihrem Browser nicht unterstützt.",
+    "suggested": "Desktop-Benachrichtigungen werden von deinem Browser nicht unterstützt.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsNotificationsBlocked",
+    "current": "Benachrichtigungen werden von Ihrem Browser blockiert. Bitte aktivieren Sie sie in Ihren Browser-Einstellungen, um diese Funktion zu nutzen.",
+    "suggested": "Benachrichtigungen werden von deinem Browser blockiert. Bitte aktiviere sie in deinen Browser-Einstellungen, um diese Funktion zu nutzen.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsCopySelectionFormattingTooltip",
+    "current": "Wenn aktiviert, behalten kopierte Nachrichtenauswahlen die Markdown-Formatierung. Deaktivieren Sie die Option, um nur den ausgewählten Klartext zu kopieren.",
+    "suggested": "Wenn aktiviert, behalten kopierte Nachrichtenauswahlen die Markdown-Formatierung. Deaktiviere die Option, um nur den ausgewählten Klartext zu kopieren.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsResetConfirm",
+    "current": "Möchten Sie wirklich alle Einstellungen auf die Standardwerte zurücksetzen? Dies betrifft nicht den Chatverlauf, API-Schlüssel, Drittanbieter-API-Anbieter oder MCP-Server. Ihre aktuellen Änderungen gehen verloren.",
+    "suggested": "Möchtest du wirklich alle Einstellungen auf die Standardwerte zurücksetzen? Dies betrifft nicht den Chatverlauf, API-Schlüssel, Drittanbieter-API-Anbieter oder MCP-Server. Deine aktuellen Änderungen gehen verloren.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsClearHistoryConfirm",
+    "current": "Möchten Sie wirklich den gesamten Chatverlauf und alle Gruppen löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "suggested": "Möchtest du wirklich den gesamten Chatverlauf und alle Gruppen löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsClearCacheConfirm",
+    "current": "Möchten Sie wirklich alle Anwendungsdaten löschen?nnDadurch werden entfernt:n- Gespeicherte Einstellungenn- Chatverlaufn- Vorgeladene SzenariennnDiese Aktion kann nicht rückgängig gemacht werden.",
+    "suggested": "Möchtest du wirklich alle Anwendungsdaten löschen?nnDadurch werden entfernt:n- Gespeicherte Einstellungenn- Chatverlaufn- Vorgeladene SzenariennnDiese Aktion kann nicht rückgängig gemacht werden.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys) (Source contains literal 'nn'/'n' linebreak artifacts; mirrored from EN, not a DE defect.)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsImportHistoryConfirm",
+    "current": "Der importierte Chatverlauf wird mit Ihren aktuellen Daten zusammengeführt. Doppelte Sitzungen (nach ID) werden übersprungen, um Ihre vorhandenen Chats zu erhalten. Möchten Sie fortfahren?",
+    "suggested": "Der importierte Chatverlauf wird mit deinen aktuellen Daten zusammengeführt. Doppelte Sitzungen (nach ID) werden übersprungen, um deine vorhandenen Chats zu erhalten. Möchtest du fortfahren?",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsClearLogsConfirm",
+    "current": "Möchten Sie wirklich alle Systemprotokolle löschen?",
+    "suggested": "Möchtest du wirklich alle Systemprotokolle löschen?",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsFilesApiDesc",
+    "current": "Wählen Sie, ob neu hinzugefügte Dateien Files API-Uploads oder Inline-Bereitstellung bevorzugen. Textdateien werden wenn möglich als Text gesendet; Binärdateien verwenden Base64-Inline-Daten. Inline-Anfragen sind auf 100MB begrenzt, oder 50MB für PDFs; zu große Dateien fallen weiterhin auf Files API zurück.",
+    "suggested": "Wähle, ob neu hinzugefügte Dateien Files-API-Uploads oder Inline-Bereitstellung bevorzugen. Textdateien werden, wenn möglich, als Text gesendet; Binärdateien verwenden Base64-Inline-Daten. Inline-Anfragen sind auf 100 MB begrenzt, für PDFs auf 50 MB; zu große Dateien fallen weiterhin auf Files API zurück.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys) Also adds required commas around 'wenn möglich' and DIN 5008 spacing '100 MB'/'50 MB'.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsLiveArtifactsSystemPromptPlaceholder",
+    "current": "Der aktuelle integrierte Prompt erscheint hier; bearbeiten Sie ihn, um diese Version anzupassen.",
+    "suggested": "Der aktuelle integrierte Prompt erscheint hier; bearbeite ihn, um diese Version anzupassen.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsNoModelsInList",
+    "current": "Noch keine Modelle in der Liste. Fügen Sie eines hinzu oder setzen Sie auf die Standardwerte zurück.",
+    "suggested": "Noch keine Modelle in der Liste. Füge eines hinzu oder setze auf die Standardwerte zurück.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsModelListRequiresModel",
+    "current": "Fügen Sie vor dem Speichern mindestens ein Modell hinzu.",
+    "suggested": "Füge vor dem Speichern mindestens ein Modell hinzu.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsResetModelListConfirm",
+    "current": "Die Modell-Liste auf Standardwerte zurücksetzen? Dadurch werden Ihre benutzerdefinierten Ergänzungen entfernt.",
+    "suggested": "Die Modell-Liste auf Standardwerte zurücksetzen? Dadurch werden deine benutzerdefinierten Ergänzungen entfernt.",
+    "reason": "INCONSISTENCY: formal Sie-form while the app predominantly addresses users with du-form (composer, messages, suggestions, scenarios, safety, shortcuts; explicit du in ~20+ keys)",
+    "severity": "medium"
+  }
+]

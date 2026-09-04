@@ -215,11 +215,15 @@ describe('project structure boundaries', () => {
 
   it('keeps E2E IndexedDB seed versions aligned with the production schema', () => {
     const productionVersion = extractConstNumber(readProjectFile('src/services/db/dbSchema.ts'), 'DB_VERSION');
-    const harnessVersion = extractConstNumber(readProjectFile('e2e/helpers/appHarness.ts'), 'DB_VERSION');
     const sidebarVersion = extractConstNumber(readProjectFile('e2e/sidebar-interactions.spec.ts'), 'DB_VERSION');
+    const harnessSource = readProjectFile('e2e/helpers/appHarness.ts');
 
-    expect(harnessVersion).toBe(productionVersion);
     expect(sidebarVersion).toBe(productionVersion);
+    // The harness consumes the production schema module instead of keeping a
+    // parallel hardcoded copy of the database constants.
+    expect(harnessSource).toContain("from '@/services/db/dbSchema'");
+    expect(harnessSource).not.toContain("'AllModelChatDB'");
+    expect(harnessSource).not.toMatch(/const\s+DB_(?:NAME|VERSION)\s*=/);
   });
 
   it('keeps Live API hook names on the same Api casing as the rest of the codebase', () => {

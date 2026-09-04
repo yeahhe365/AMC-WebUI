@@ -1,187 +1,205 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
-import { SETTINGS_INPUT_CLASS } from '@/constants/formClasses';
 import { Toggle } from '@/components/shared/Toggle';
-import { getOpenAICompatibleBaseUrlWarning } from '@/services/api/openaiCompatibleUrls';
-import type { AppSettings, ThirdPartyApiSettings, ThirdPartyProviderId } from '@/types';
+import { SETTINGS_PRIMARY_ACTION_BUTTON_CLASS } from '@/constants/buttonClasses';
 import {
-  THIRD_PARTY_PROVIDER_IDS,
-  THIRD_PARTY_PROVIDER_LABELS,
-  getThirdPartyProviderConfig,
-  updateThirdPartyProviderConfig,
+  THIRD_PARTY_TEMPLATE_IDS,
+  type AppSettings,
+  type ThirdPartyApiSettings,
+  type ThirdPartyConnection,
+  type ThirdPartyTemplateId,
+} from '@/types';
+import {
+  addThirdPartyConnection,
+  createConnectionFromTemplate,
+  createConnectionId,
+  createDefaultThirdPartyApiSettings,
+  getConnectionDisplayTemplateId,
+  getThirdPartyConnectionStatus,
+  isThirdPartyConnectionInUse,
+  removeThirdPartyConnection,
+  updateThirdPartyConnection,
 } from '@/utils/thirdPartyApiProviders';
-import { ApiKeyInput } from './ApiKeyInput';
-import { ApiConnectionTester } from './ApiConnectionTester';
-import { OpenAICompatibleModelListEditor } from './OpenAICompatibleModelListEditor';
+import { getThirdPartyTemplateLogo } from '@/components/shared/ModelIcon';
+import { useChatStore } from '@/stores/chatStore';
+import { ThirdPartyAddConnectionDialog } from './ThirdPartyAddConnectionDialog';
+import { ThirdPartyConnectionEditor } from './ThirdPartyConnectionEditor';
 
 interface ThirdPartyApiSettingsPanelProps {
   settings: AppSettings;
   onUpdateSettings: (partial: Partial<AppSettings>) => void;
-  onResetConnectionTest: () => void;
-  onTestConnection: () => void;
-  testStatus: 'idle' | 'testing' | 'success' | 'error';
-  testMessage: string | null;
-  hasEnvKey: boolean;
 }
 
 export const ThirdPartyApiSettingsPanel: React.FC<ThirdPartyApiSettingsPanelProps> = ({
   settings,
   onUpdateSettings,
-  onResetConnectionTest,
-  onTestConnection,
-  testStatus,
-  testMessage,
 }) => {
   const { t } = useI18n();
-  const [expandedProvider, setExpandedProvider] = useState<ThirdPartyProviderId | null>(
-    settings.thirdPartyApi?.activeProvider ?? null,
-  );
-
-  const thirdPartyApi = settings.thirdPartyApi;
-  const activeConfig = getThirdPartyProviderConfig(settings);
-  const expandedId = expandedProvider ?? settings.thirdPartyApi?.activeProvider ?? 'openai';
-  const expandedConfig = thirdPartyApi?.providers?.[expandedId] ?? activeConfig;
+  const connections = settings.thirdPartyApi?.connections ?? [];
+  const [expandedConnectionId, setExpandedConnectionId] = useState<string | null>(null);
+  const [isAddOpen, setIsAddOpen] = useState(false);
 
   const updateThirdPartyApi = (next: ThirdPartyApiSettings) => {
     onUpdateSettings({ thirdPartyApi: next });
   };
 
-  const handleToggleEnabled = (providerId: ThirdPartyProviderId) => {
-    const provider = thirdPartyApi?.providers?.[providerId];
-    const nextEnabled = !provider?.enabled;
-    updateThirdPartyApi(updateThirdPartyProviderConfig(thirdPartyApi, providerId, { enabled: nextEnabled }));
+  const currentSettings = settings.thirdPartyApi ?? createDefaultThirdPartyApiSettings();
+
+  const handleToggleEnabled = (connection: ThirdPartyConnection) => {
+    updateThirdPartyApi(updateThirdPartyConnection(currentSettings, connection.id, { enabled: !connection.enabled }));
   };
 
-  const updateField = <K extends keyof typeof expandedConfig>(key: K, value: (typeof expandedConfig)[K]) => {
-    updateThirdPartyApi(updateThirdPartyProviderConfig(thirdPartyApi, expandedId, { [key]: value }));
-    onResetConnectionTest();
+  const handleAddTemplate = (templateId: ThirdPartyTemplateId) => {
+    const connection = createConnectionFromTemplate(templateId, currentSettings.connections, createConnectionId());
+    updateThirdPartyApi(addThirdPartyConnection(currentSettings, connection));
+    setExpandedConnectionId(connection.id);
+    setIsAddOpen(false);
+  };
+
+  const connectionStatus = (connection: ThirdPartyConnection) => {
+    const status = getThirdPartyConnectionStatus(connection);
+    if (status === 'disabled') {
+      return {
+        label: t('thirdPartyConnectionDisabled'),
+        className: 'bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-secondary)]',
+      };
+    }
+    if (status === 'missing-key') {
+      return {
+        label: t('thirdPartyApiKeyMissing'),
+        className: 'bg-[var(--theme-bg-warning)] text-[var(--theme-text-warning)]',
+      };
+    }
+    if (status === 'missing-url') {
+      return {
+        label: t('thirdPartyApiUrlMissing'),
+        className: 'bg-[var(--theme-bg-warning)] text-[var(--theme-text-warning)]',
+      };
+    }
+    return {
+      label: t('thirdPartyApiReady'),
+      className: 'bg-[var(--theme-bg-success)] text-[var(--theme-text-success)]',
+    };
   };
 
   return (
-    <div className="space-y-3">
-      <div className="space-y-1.5">
-        {THIRD_PARTY_PROVIDER_IDS.map((providerId) => {
-          const config = thirdPartyApi?.providers?.[providerId];
-          const isEnabled = config?.enabled === true;
-          const hasKey = !!config?.apiKey;
-          const isExpanded = expandedId === providerId;
+    <div className="space-y-3" data-settings-item="api-provider">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--theme-text-primary)]">{t('settingsApiModeThirdParty')}</h3>
+          <p className="text-xs text-[var(--theme-text-secondary)] mt-0.5">{t('settingsOpenAICompatibleToggleHelp')}</p>
+        </div>
+        {connections.length > 0 && (
+          <button
+            type="button"
+            data-testid="third-party-add-connection"
+            className={SETTINGS_PRIMARY_ACTION_BUTTON_CLASS}
+            onClick={() => setIsAddOpen(true)}
+          >
+            <Plus size={14} />
+            {t('thirdPartyAddConnection')}
+          </button>
+        )}
+      </div>
 
-          return (
-            <div
-              key={providerId}
-              className={`rounded-lg border transition-all ${
-                isEnabled
-                  ? 'border-[var(--theme-border-focus)] bg-[var(--theme-bg-tertiary)]/30'
-                  : 'border-[var(--theme-border-secondary)]/40 bg-[var(--theme-bg-tertiary)]/10'
-              }`}
+      <div className="space-y-1.5" data-settings-item="api-third-party">
+        <ThirdPartyAddConnectionDialog
+          isOpen={isAddOpen}
+          onClose={() => setIsAddOpen(false)}
+          onSelectTemplate={handleAddTemplate}
+          templates={THIRD_PARTY_TEMPLATE_IDS}
+        />
+
+        {connections.length === 0 && !isAddOpen ? (
+          <div className="rounded-lg border border-dashed border-[var(--theme-border-secondary)] px-3 py-6 text-center space-y-3">
+            <p className="text-sm text-[var(--theme-text-secondary)]">{t('thirdPartyConnectionsEmpty')}</p>
+            <button
+              type="button"
+              data-testid="third-party-add-connection"
+              className={SETTINGS_PRIMARY_ACTION_BUTTON_CLASS}
+              onClick={() => setIsAddOpen(true)}
             >
-              <div className="flex items-center gap-2 p-2.5">
-                <div className="flex-shrink-0">
-                  <Toggle
-                    checked={isEnabled}
-                    onChange={() => handleToggleEnabled(providerId)}
-                    ariaLabel={`${THIRD_PARTY_PROVIDER_LABELS[providerId]} ${t('enable')}`}
-                  />
-                </div>
+              <Plus size={14} />
+              {t('thirdPartyAddConnection')}
+            </button>
+          </div>
+        ) : (
+          connections.map((connection) => {
+            const isExpanded = expandedConnectionId === connection.id;
+            const status = connectionStatus(connection);
+            const displayTemplateId = getConnectionDisplayTemplateId(connection);
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    const nextExpanded = isExpanded ? null : providerId;
-                    setExpandedProvider(nextExpanded);
-                    // Sync activeProvider so test-connection targets this provider.
-                    if (nextExpanded) {
-                      updateThirdPartyApi({ ...thirdPartyApi, activeProvider: nextExpanded });
-                    }
-                  }}
-                  className="flex items-center gap-1.5 flex-1 min-w-0 cursor-pointer"
-                >
-                  {isExpanded ? (
-                    <ChevronDown size={14} className="text-[var(--theme-text-tertiary)]" strokeWidth={2} />
-                  ) : (
-                    <ChevronRight size={14} className="text-[var(--theme-text-tertiary)]" strokeWidth={2} />
-                  )}
-                  <span className="text-sm font-medium text-[var(--theme-text-primary)] truncate">
-                    {THIRD_PARTY_PROVIDER_LABELS[providerId]}
-                  </span>
-                  {isEnabled && !hasKey && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--theme-status-warning-bg)] text-[var(--theme-status-warning-text)]">
-                      {t('thirdPartyApiKeyMissing')}
-                    </span>
-                  )}
-                  {isEnabled && hasKey && (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-[var(--theme-status-success-bg)] text-[var(--theme-status-success-text)]">
-                      {t('thirdPartyApiReady')}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {isExpanded && (
-                <div className="px-2.5 pb-2.5 space-y-3 border-t border-[var(--theme-border-secondary)]/30 pt-3">
-                  <ApiKeyInput
-                    apiKey={expandedConfig.apiKey}
-                    setApiKey={(value) => updateField('apiKey', value)}
-                    label={t('thirdPartyApiKey')}
-                    placeholder={t('apiConfigOpenaiKeyPlaceholder')}
-                    helpText={t('thirdPartyApiKeyHelp')}
-                  />
-
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="third-party-base-url-input"
-                      className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)]"
-                    >
-                      {t('thirdPartyApiBaseUrl')}
-                    </label>
-                    <input
-                      id="third-party-base-url-input"
-                      type="text"
-                      value={expandedConfig.baseUrl || ''}
-                      onChange={(e) => updateField('baseUrl', e.target.value)}
-                      className={`w-full p-3 rounded-lg border transition-all duration-200 focus:ring-2 focus:ring-offset-0 text-sm custom-scrollbar font-mono ${SETTINGS_INPUT_CLASS}`}
-                      aria-label={t('thirdPartyApiBaseUrl')}
+            return (
+              <div
+                key={connection.id}
+                data-testid={`connection-${connection.id}-card`}
+                className={`rounded-lg border transition-all ${
+                  connection.enabled
+                    ? 'border-[var(--theme-border-focus)] bg-[var(--theme-bg-tertiary)]/30'
+                    : 'border-[var(--theme-border-secondary)]/40 bg-[var(--theme-bg-tertiary)]/10'
+                }`}
+              >
+                <div className="flex items-center gap-2 p-2.5">
+                  <div className="flex-shrink-0">
+                    <Toggle
+                      checked={connection.enabled}
+                      onChange={() => handleToggleEnabled(connection)}
+                      ariaLabel={`${connection.name} ${t('enable')}`}
                     />
-                    {expandedConfig.protocol === 'openai-compatible' &&
-                      (() => {
-                        const warning = getOpenAICompatibleBaseUrlWarning(expandedConfig.baseUrl);
-                        if (warning === 'chat-completions-endpoint') {
-                          return (
-                            <p className="text-xs text-[var(--theme-status-warning-text)]">
-                              {t('thirdPartyApiBaseUrlChatCompletionsWarning')}
-                            </p>
-                          );
-                        }
-                        if (warning === 'models-endpoint') {
-                          return (
-                            <p className="text-xs text-[var(--theme-status-warning-text)]">
-                              {t('thirdPartyApiBaseUrlModelsWarning')}
-                            </p>
-                          );
-                        }
-                        return null;
-                      })()}
                   </div>
-
-                  <OpenAICompatibleModelListEditor
-                    models={expandedConfig.models}
-                    selectedModelId={expandedConfig.modelId}
-                    onModelsChange={(models) => updateField('models', models)}
-                    onSelectedModelChange={(modelId) => updateField('modelId', modelId)}
-                  />
-
-                  <ApiConnectionTester
-                    onTest={onTestConnection}
-                    testStatus={testStatus}
-                    testMessage={testMessage}
-                    isTestDisabled={testStatus === 'testing' || !expandedConfig.apiKey}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setExpandedConnectionId(isExpanded ? null : connection.id)}
+                    className="flex items-center gap-1.5 flex-1 min-w-0 cursor-pointer"
+                  >
+                    {isExpanded ? (
+                      <ChevronDown size={14} className="text-[var(--theme-text-secondary)]" strokeWidth={2} />
+                    ) : (
+                      <ChevronRight size={14} className="text-[var(--theme-text-secondary)]" strokeWidth={2} />
+                    )}
+                    <img
+                      src={getThirdPartyTemplateLogo(displayTemplateId)}
+                      alt=""
+                      width={18}
+                      height={18}
+                      draggable={false}
+                      className="flex-shrink-0 object-contain"
+                      style={{ width: 18, height: 18 }}
+                    />
+                    <span className="text-sm font-medium text-[var(--theme-text-primary)] truncate">
+                      {connection.name}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--theme-bg-secondary)] text-[var(--theme-text-secondary)]">
+                      {connection.protocol === 'anthropic'
+                        ? t('thirdPartyProtocolAnthropic')
+                        : t('thirdPartyProtocolOpenAI')}
+                    </span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${status.className}`}>{status.label}</span>
+                  </button>
                 </div>
-              )}
-            </div>
-          );
-        })}
+
+                {isExpanded && (
+                  <ThirdPartyConnectionEditor
+                    connection={connection}
+                    isInUse={isThirdPartyConnectionInUse(
+                      connection.id,
+                      useChatStore.getState().savedSessions,
+                      settings.providerId,
+                    )}
+                    onChange={(updates) =>
+                      updateThirdPartyApi(updateThirdPartyConnection(currentSettings, connection.id, updates))
+                    }
+                    onRemove={() => {
+                      updateThirdPartyApi(removeThirdPartyConnection(currentSettings, connection.id));
+                      setExpandedConnectionId((current) => (current === connection.id ? null : current));
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

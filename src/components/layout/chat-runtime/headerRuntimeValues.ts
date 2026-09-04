@@ -1,10 +1,10 @@
 import { useCallback, useMemo } from 'react';
 
 import type { AppViewModel } from '@/hooks/app/useApp';
-import type { ThirdPartyProviderId } from '@/types';
-import { getEnabledThirdPartyProviders } from '@/utils/thirdPartyApiProviders';
+import type { ChatProviderId } from '@/types';
+import { buildProviderAwareModelList } from '@/utils/thirdPartyApiProviders';
 import { resolveChatApiRoute } from '@/utils/chatApiRoute';
-import { isThirdPartyApiActive } from '@/utils/thirdPartyApiActive';
+import { buildNewTabHref } from '@/utils/chat/lastActiveSession';
 import type { ChatHeaderRuntimeValue } from './chatRuntimeTypes';
 
 interface HeaderRuntimeValuesOptions {
@@ -16,27 +16,10 @@ interface HeaderRuntimeValuesOptions {
 const buildHeaderModels = (
   appSettings: AppViewModel['appSettings'],
   apiModels: AppViewModel['chatState']['apiModels'],
+  currentChatSettings: AppViewModel['chatState']['currentChatSettings'],
 ) => {
-  const seenIds = new Set<string>();
   const geminiModels = apiModels.map((model) => ({ ...model, apiMode: 'gemini-native' as const }));
-  // Third-party models show in the header whenever their provider is enabled,
-  // regardless of the top-level apiMode selector — picking one switches modes.
-  const thirdPartyModels = getEnabledThirdPartyProviders(appSettings).flatMap(({ id, config }) =>
-    config.models.map((model) => ({
-      ...model,
-      apiMode: 'third-party' as const,
-      providerId: id,
-    })),
-  );
-
-  return [...geminiModels, ...thirdPartyModels].filter((model) => {
-    if (seenIds.has(model.id)) {
-      return false;
-    }
-
-    seenIds.add(model.id);
-    return true;
-  });
+  return buildProviderAwareModelList(appSettings, geminiModels, currentChatSettings);
 };
 
 export const useChatHeaderRuntimeValues = ({
@@ -46,103 +29,55 @@ export const useChatHeaderRuntimeValues = ({
 }: HeaderRuntimeValuesOptions) => {
   const {
     appSettings,
-    setAppSettings,
     chatState,
     pipState,
     handleLoadLiveArtifactsPromptAndSave,
     isLiveArtifactsPromptActive,
     isLiveArtifactsPromptBusy,
-    handleSetThinkingLevel,
     getCurrentModelDisplayName,
   } = app;
 
-  const gemmaReasoningEnabled = chatState.currentChatSettings.showThoughts;
-  const onToggleGemmaReasoning = useCallback(() => {
-    const nextGemmaReasoningEnabled = !gemmaReasoningEnabled;
-
-    setAppSettings((prev) => ({
-      ...prev,
-      showThoughts: nextGemmaReasoningEnabled,
-    }));
-
-    chatState.setCurrentChatSettings((prev) => ({
-      ...prev,
-      showThoughts: nextGemmaReasoningEnabled,
-    }));
-  }, [chatState, gemmaReasoningEnabled, setAppSettings]);
+  // Destructure the chatState members into stable local references so the
+  // callbacks and memo below are not invalidated by the whole chatState object
+  // changing identity on every render (see inputRuntimeValues.ts for details).
+  const {
+    currentChatSettings,
+    apiModels,
+    isAppDraggingOver,
+    modelsLoadingError,
+    handleAppDragEnter,
+    handleAppDragOver,
+    handleAppDragLeave,
+    handleAppDrop,
+    startNewChat,
+    activeSessionId,
+    handleSelectModelInHeader,
+  } = chatState;
 
   const currentModelName = getCurrentModelDisplayName();
-  const currentApiRoute = resolveChatApiRoute(appSettings, chatState.currentChatSettings);
-  const isOpenAICompatibleMode = currentApiRoute.apiMode === 'third-party';
-  const isGlobalThirdPartyMode = isThirdPartyApiActive(appSettings);
-  // Map of modelId → providerId for all enabled third-party models.
-  const thirdPartyModelProviders = useMemo(() => {
-    const map = new Map<string, string>();
-    getEnabledThirdPartyProviders(appSettings).forEach(({ id, config }) => {
-      config.models.forEach((model) => {
-        if (!map.has(model.id)) {
-          map.set(model.id, id);
-        }
-      });
-    });
-    return map;
-  }, [appSettings]);
-  const thirdPartyModelIds = useMemo(() => new Set(thirdPartyModelProviders.keys()), [thirdPartyModelProviders]);
-  const geminiModelIds = useMemo(() => new Set(chatState.apiModels.map((model) => model.id)), [chatState.apiModels]);
+  const currentApiRoute = resolveChatApiRoute(appSettings, currentChatSettings);
   const headerAvailableModels = useMemo(
-    () => buildHeaderModels(appSettings, chatState.apiModels),
-    [appSettings, chatState.apiModels],
+    () => buildHeaderModels(appSettings, apiModels, currentChatSettings),
+    [appSettings, apiModels, currentChatSettings],
   );
   const headerSelectedModelId = currentApiRoute.modelId;
+  // Picking a model only affects the active session's (providerId, modelId) —
+  // it no longer flips a global apiMode/isThirdPartyApiEnabled.
   const handleHeaderSelectModel = useCallback(
-    (modelId: string) => {
-      const isThirdPartyModel = thirdPartyModelIds.has(modelId);
-      const isGeminiModel = geminiModelIds.has(modelId);
-
-      if (isThirdPartyModel && (!isGeminiModel || isOpenAICompatibleMode)) {
-        const providerId = thirdPartyModelProviders.get(modelId) as ThirdPartyProviderId | undefined;
-        if (providerId) {
-          setAppSettings((prev) => ({
-            ...prev,
-            isThirdPartyApiEnabled: true,
-            apiMode: 'third-party',
-            thirdPartyApi: {
-              ...prev.thirdPartyApi,
-              activeProvider: providerId,
-            },
-          }));
-        }
-        chatState.handleSelectModelInHeader(modelId);
-        return;
-      }
-
-      if (isGlobalThirdPartyMode) {
-        setAppSettings((prev) => ({
-          ...prev,
-          apiMode: 'gemini-native',
-        }));
-      }
-      chatState.handleSelectModelInHeader(modelId);
+    (modelId: string, providerId?: ChatProviderId) => {
+      handleSelectModelInHeader(modelId, providerId);
     },
-    [
-      chatState,
-      geminiModelIds,
-      isGlobalThirdPartyMode,
-      isOpenAICompatibleMode,
-      thirdPartyModelIds,
-      thirdPartyModelProviders,
-      setAppSettings,
-    ],
+    [handleSelectModelInHeader],
   );
 
   const header = useMemo<ChatHeaderRuntimeValue>(
     () => ({
-      isAppDraggingOver: chatState.isAppDraggingOver,
-      modelsLoadingError: chatState.modelsLoadingError,
-      handleAppDragEnter: chatState.handleAppDragEnter,
-      handleAppDragOver: chatState.handleAppDragOver,
-      handleAppDragLeave: chatState.handleAppDragLeave,
-      handleAppDrop: chatState.handleAppDrop,
+      isAppDraggingOver,
+      modelsLoadingError,
+      handleAppDragEnter,
+      handleAppDragOver,
+      handleAppDragLeave,
+      handleAppDrop,
       currentModelName,
       availableModels: headerAvailableModels,
       selectedModelId: headerSelectedModelId,
@@ -150,29 +85,35 @@ export const useChatHeaderRuntimeValues = ({
       isLiveArtifactsPromptBusy: !!isLiveArtifactsPromptBusy,
       isPipSupported: pipState.isPipSupported,
       isPipActive: pipState.isPipActive,
-      onNewChat: chatState.startNewChat,
+      onNewChat: startNewChat,
+      newChatHref: buildNewTabHref(activeSessionId),
       onOpenScenariosModal,
       onToggleHistorySidebar,
       onLoadLiveArtifactsPrompt: handleLoadLiveArtifactsPromptAndSave,
       onSelectModel: handleHeaderSelectModel,
-      onSetThinkingLevel: handleSetThinkingLevel,
-      onToggleGemmaReasoning,
       onTogglePip: pipState.togglePip,
     }),
     [
-      chatState,
+      activeSessionId,
       currentModelName,
+      handleAppDragEnter,
+      handleAppDragLeave,
+      handleAppDragOver,
+      handleAppDrop,
       handleHeaderSelectModel,
       handleLoadLiveArtifactsPromptAndSave,
-      handleSetThinkingLevel,
       headerAvailableModels,
       headerSelectedModelId,
+      isAppDraggingOver,
       isLiveArtifactsPromptActive,
       isLiveArtifactsPromptBusy,
+      modelsLoadingError,
       onOpenScenariosModal,
-      onToggleGemmaReasoning,
       onToggleHistorySidebar,
-      pipState,
+      pipState.isPipActive,
+      pipState.isPipSupported,
+      pipState.togglePip,
+      startNewChat,
     ],
   );
 

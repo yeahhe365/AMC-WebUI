@@ -1,11 +1,11 @@
-import { logService } from '@/services/logService';
-import React, { useEffect, useState, useRef } from 'react';
+import React from 'react';
 import { Loader2 } from 'lucide-react';
 import { type UploadedFile } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
 import { LARGE_FILE_PREVIEW_LENGTH_THRESHOLD } from './markdownPreviewPolicy';
 import { MarkdownFileViewer } from './MarkdownFileViewer';
 import { VirtualSourceViewer } from './VirtualSourceViewer';
+import { useTextFileContent } from './useTextFileContent';
 
 interface TextFileViewerProps {
   file: UploadedFile;
@@ -27,37 +27,12 @@ export const TextFileViewer: React.FC<TextFileViewerProps> = ({
   onLoad,
 }) => {
   const { t } = useI18n();
-  const [localContent, setLocalContent] = useState<string | null>(null);
-  const hasProvidedContent = content !== undefined && content !== null;
-  const [isLoading, setIsLoading] = useState(() => !hasProvidedContent && !!file.dataUrl);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (hasProvidedContent) {
-      return;
-    }
-
-    if (file.dataUrl) {
-      fetch(file.dataUrl)
-        .then((response) => response.text())
-        .then((text) => {
-          setLocalContent(text);
-          if (onLoad) onLoad(text);
-          setIsLoading(false);
-        })
-        .catch((error) => {
-          logService.error('Failed to load text content', error);
-          setLocalContent(t('filePreviewFailedTextContent'));
-          setIsLoading(false);
-        });
-    }
-  }, [file, hasProvidedContent, onLoad, t]);
-
-  useEffect(() => {
-    if (isEditable && textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [isEditable]);
+  const { localContent, hasProvidedContent, isLoading, textareaRef } = useTextFileContent(file, content, onLoad, {
+    isEditable,
+    errorLogLabel: 'Failed to load text content',
+    ignoreStaleResponses: false,
+    fetchTrigger: 'file',
+  });
 
   if (renderMode === 'markdown') {
     return (

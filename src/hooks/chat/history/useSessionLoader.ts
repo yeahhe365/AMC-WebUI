@@ -25,6 +25,11 @@ import { focusChatInput } from '@/utils/chat-input/focus';
 
 type SessionLoaderHistoryOptions = Pick<SetActiveSessionOptions, 'history'>;
 
+interface StartNewChatOptions extends SessionLoaderHistoryOptions {
+  /** 新会话要归属的分组 id；不传保持原行为（未分组）。 */
+  groupId?: string | null;
+}
+
 interface UseSessionLoaderProps {
   appSettings: AppSettings;
   setSavedSessions: Dispatch<SetStateAction<SavedChatSession[]>>;
@@ -139,6 +144,9 @@ export const useSessionLoader = ({
       setEditingMessageId(null);
       focusChatInput(0);
 
+      // 用户打开该会话 = 已查看,清除侧边栏完成标记(并广播让其他标签页同步清除)。
+      useChatStore.getState().markSessionViewed(rehydrated.id);
+
       return rehydrated;
     },
     [
@@ -152,26 +160,19 @@ export const useSessionLoader = ({
   );
 
   const startNewChat = useCallback(
-    (explicitTemplateSession?: SavedChatSession, options?: SessionLoaderHistoryOptions) => {
+    (explicitTemplateSession?: SavedChatSession, options?: StartNewChatOptions) => {
       sessionViewRequestIdRef.current += 1;
       const history = options?.history ?? 'push';
+      const targetGroupId = options?.groupId ?? null;
       setAppFileError(null);
       useChatStore.getState().invalidateFileOperations();
 
       if (activeChat && activeChat.messages.length === 0 && !activeChat.settings.systemInstruction) {
         logService.info('Already on an empty chat, reusing session.');
         userScrolledUpRef.current = false;
-        const settingsForReusedChat = buildSettingsForNewChat(explicitTemplateSession, {
+        const settingsForReusedChat = buildSettingsForNewChat(explicitTemplateSession ?? activeChat, {
           excludeTemplateSessionId: activeSessionId,
         });
-        if (!explicitTemplateSession) {
-          const currentEmptyChatSettings = normalizeSessionModel(activeChat).settings;
-          settingsForReusedChat.modelId = currentEmptyChatSettings.modelId;
-          settingsForReusedChat.thinkingBudget = currentEmptyChatSettings.thinkingBudget;
-          settingsForReusedChat.thinkingLevel = currentEmptyChatSettings.thinkingLevel;
-          settingsForReusedChat.ttsVoice = currentEmptyChatSettings.ttsVoice;
-          settingsForReusedChat.mediaResolution = currentEmptyChatSettings.mediaResolution;
-        }
 
         setCommandedInput({ text: '', id: Date.now(), mode: 'replace' });
         setSelectedFiles([]);
@@ -188,6 +189,8 @@ export const useSessionLoader = ({
                     timestamp: Date.now(),
                     messages: [],
                     settings: settingsForReusedChat,
+                    // 空会话已在目标分组时为无操作；在其它/未分组时移入目标分组，避免产生幽灵空会话。
+                    groupId: targetGroupId,
                   }
                 : session,
             ),
@@ -203,9 +206,10 @@ export const useSessionLoader = ({
 
       retainOutgoingSessionDraft();
 
-      const settingsForNewChat = buildSettingsForNewChat(explicitTemplateSession);
+      // 默认以当前页会话为模板，保证模型与工具设置和当前页一致。
+      const settingsForNewChat = buildSettingsForNewChat(explicitTemplateSession ?? activeChat);
 
-      const newSession = createNewSession(settingsForNewChat);
+      const newSession = createNewSession(settingsForNewChat, [], 'New Chat', targetGroupId, 'default');
 
       setActiveMessages([]);
       setActiveSessionId(newSession.id, { history });
@@ -232,7 +236,6 @@ export const useSessionLoader = ({
       setAppFileError,
       buildSettingsForNewChat,
       retainOutgoingSessionDraft,
-      normalizeSessionModel,
     ],
   );
 

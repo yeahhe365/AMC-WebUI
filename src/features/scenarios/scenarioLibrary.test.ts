@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  CONTENT_AND_ACADEMIC_SCENARIOS,
+  FIRST_TIER_SCENARIOS,
   annaScenario,
   eniManualPasteScenario,
   fopScenario,
   pyriteScenario,
   reasonerScenario,
   unrestrictedScenario,
+  videoModerationScenario,
   voxelScenario,
 } from '@/constants/defaultScenarios';
 import {
@@ -49,26 +52,35 @@ describe('scenarioLibrary', () => {
 
     expect(result.didChange).toBe(true);
     // cyberpunk pruned as deprecated; reasoner is a system scenario so filtered out;
-    // voxel and jailbreak scenarios seeded from the new v2 flag (old v1 flags ignored)
+    // first-tier, voxel and jailbreak scenarios seeded from their respective flags
     expect(result.userScenarios.map((s) => s.id)).toEqual([
+      ...FIRST_TIER_SCENARIOS.map((s) => s.id),
       voxelScenario.id,
       fopScenario.id,
       unrestrictedScenario.id,
       pyriteScenario.id,
       annaScenario.id,
       eniManualPasteScenario.id,
+      ...CONTENT_AND_ACADEMIC_SCENARIOS.map((s) => s.id),
+      videoModerationScenario.id,
     ]);
     expect(result.savedScenarios.map((scenario) => scenario.id)).toEqual([
       ...SYSTEM_SCENARIO_IDS,
+      ...FIRST_TIER_SCENARIOS.map((s) => s.id),
       voxelScenario.id,
       fopScenario.id,
       unrestrictedScenario.id,
       pyriteScenario.id,
       annaScenario.id,
       eniManualPasteScenario.id,
+      ...CONTENT_AND_ACADEMIC_SCENARIOS.map((s) => s.id),
+      videoModerationScenario.id,
     ]);
-    expect(storage.setItem).toHaveBeenCalledWith('hasSeededPlayablePresets_v1', 'true');
-    expect(storage.setItem).toHaveBeenCalledWith('hasSeededJailbreakPresets_v2', 'true');
+    expect(storage.setItem).toHaveBeenCalledWith('hasSeededFirstTierPresets_v3', 'true');
+    expect(storage.setItem).toHaveBeenCalledWith('hasSeededPlayablePresets_v3', 'true');
+    expect(storage.setItem).toHaveBeenCalledWith('hasSeededJailbreakPresets_v3', 'true');
+    expect(storage.setItem).toHaveBeenCalledWith('hasSeededContentAcademicPresets_v2', 'true');
+    expect(storage.setItem).toHaveBeenCalledWith('hasSeededVideoModerationPresets_v1', 'true');
   });
 
   it('seeds jailbreak and persona override presets by default', () => {
@@ -77,24 +89,33 @@ describe('scenarioLibrary', () => {
     const result = initializeScenarioState([], storage);
 
     expect(result.userScenarios.map((s) => s.id)).toEqual([
+      ...FIRST_TIER_SCENARIOS.map((s) => s.id),
       voxelScenario.id,
       fopScenario.id,
       unrestrictedScenario.id,
       pyriteScenario.id,
       annaScenario.id,
       eniManualPasteScenario.id,
+      ...CONTENT_AND_ACADEMIC_SCENARIOS.map((s) => s.id),
+      videoModerationScenario.id,
     ]);
     expect(result.savedScenarios.map((scenario) => scenario.id)).toEqual([
       ...SYSTEM_SCENARIO_IDS,
+      ...FIRST_TIER_SCENARIOS.map((s) => s.id),
       voxelScenario.id,
       fopScenario.id,
       unrestrictedScenario.id,
       pyriteScenario.id,
       annaScenario.id,
       eniManualPasteScenario.id,
+      ...CONTENT_AND_ACADEMIC_SCENARIOS.map((s) => s.id),
+      videoModerationScenario.id,
     ]);
-    expect(storage.setItem).toHaveBeenCalledWith('hasSeededPlayablePresets_v1', 'true');
-    expect(storage.setItem).toHaveBeenCalledWith('hasSeededJailbreakPresets_v2', 'true');
+    expect(storage.setItem).toHaveBeenCalledWith('hasSeededFirstTierPresets_v3', 'true');
+    expect(storage.setItem).toHaveBeenCalledWith('hasSeededPlayablePresets_v3', 'true');
+    expect(storage.setItem).toHaveBeenCalledWith('hasSeededJailbreakPresets_v3', 'true');
+    expect(storage.setItem).toHaveBeenCalledWith('hasSeededContentAcademicPresets_v2', 'true');
+    expect(storage.setItem).toHaveBeenCalledWith('hasSeededVideoModerationPresets_v1', 'true');
   });
 
   it('preserves jailbreak presets that are no longer deprecated', () => {
@@ -107,7 +128,13 @@ describe('scenarioLibrary', () => {
         { id: 'eni-manual-paste-scenario-2026-04-12', title: 'ENI', messages: [] },
         { id: 'custom-scenario', title: 'Custom Scenario', messages: [] },
       ],
-      createStorage({ hasSeededPlayablePresets_v1: 'true' }),
+      createStorage({
+        hasSeededPlayablePresets_v3: 'true',
+        hasSeededFirstTierPresets_v3: 'true',
+        hasSeededJailbreakPresets_v3: 'true',
+        hasSeededContentAcademicPresets_v2: 'true',
+        hasSeededVideoModerationPresets_v1: 'true',
+      }),
     );
 
     // None pruned — jailbreak scenarios are no longer in the deprecated list

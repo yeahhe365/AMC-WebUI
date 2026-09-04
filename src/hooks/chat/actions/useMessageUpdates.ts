@@ -45,8 +45,6 @@ interface LiveModelStreamInput {
   type: 'content' | 'thought';
 }
 
-const LIVE_API_INITIAL_FIRST_TOKEN_TIME_MS = 0;
-
 const hasLiveTranscriptPayload = ({
   apiPart,
   audioUrl,
@@ -90,6 +88,7 @@ const getMessageUpdatesFromStreamState = (
   files: streamState.files.length ? streamState.files : undefined,
   apiParts: streamState.apiParts.length ? streamState.apiParts : undefined,
   firstTokenTimeMs: streamState.firstTokenTimeMs ?? fallbackFirstTokenTimeMs,
+  thinkingActive: streamState.thinkingActive ? true : undefined,
 });
 
 export const useMessageUpdates = ({
@@ -243,7 +242,6 @@ export const useMessageUpdates = ({
                 const generationStartTime = new Date();
                 const newMessage = createMessage(role === 'user' ? 'user' : 'model', '', {
                   isLoading: true,
-                  firstTokenTimeMs: LIVE_API_INITIAL_FIRST_TOKEN_TIME_MS,
                   generationStartTime,
                   audioSrc: audioUrl || undefined,
                   audioAutoplay: audioUrl ? false : undefined,
@@ -256,10 +254,7 @@ export const useMessageUpdates = ({
                   });
                   streamState = reduceLiveModelStreamInput(streamState, { apiPart, generatedFiles, text, type });
                   liveStreamStateRefs.current.model = streamState;
-                  Object.assign(
-                    newMessage,
-                    getMessageUpdatesFromStreamState(streamState, LIVE_API_INITIAL_FIRST_TOKEN_TIME_MS),
-                  );
+                  Object.assign(newMessage, getMessageUpdatesFromStreamState(streamState));
                 } else {
                   newMessage.content = type === 'content' ? text : '';
                   newMessage.thoughts = type === 'thought' ? text : undefined;
@@ -303,10 +298,16 @@ export const useMessageUpdates = ({
                     getMessageUpdatesFromStreamState(streamState, existingMessage.firstTokenTimeMs),
                   );
 
-                  if (streamState.thoughts && !existingMessage.thinkingTimeMs && streamState.firstContentPartTime) {
-                    updates.thinkingTimeMs =
-                      streamState.firstContentPartTime.getTime() -
-                      (existingMessage.generationStartTime || existingMessage.timestamp).getTime();
+                  // Commit the thinking duration once the model switches to
+                  // visible output (last content part), and clear it again if
+                  // it re-enters thinking so the live timer resumes.
+                  if (streamState.thoughts && existingMessage.generationStartTime) {
+                    const startMs = (existingMessage.generationStartTime || existingMessage.timestamp).getTime();
+                    if (streamState.lastContentPartTime && !streamState.thinkingActive) {
+                      updates.thinkingTimeMs = streamState.lastContentPartTime.getTime() - startMs;
+                    } else if (streamState.thinkingActive) {
+                      updates.thinkingTimeMs = undefined;
+                    }
                   }
                 } else if (text) {
                   if (type === 'thought') {
@@ -345,7 +346,12 @@ export const useMessageUpdates = ({
                 // Finalize thinking time if not already set (e.g. if the message was ONLY thoughts)
                 let finalThinkingTime = updatedMessage.thinkingTimeMs;
                 if (updatedMessage.thoughts && !finalThinkingTime && updatedMessage.generationStartTime) {
-                  finalThinkingTime = new Date().getTime() - updatedMessage.generationStartTime.getTime();
+                  const streamState = liveStreamStateRefs.current.model;
+                  const startMs = updatedMessage.generationStartTime.getTime();
+                  finalThinkingTime =
+                    streamState?.lastThoughtChunkTimeMs !== undefined
+                      ? streamState.lastThoughtChunkTimeMs
+                      : new Date().getTime() - startMs;
                 }
 
                 messages[messageIndex] = {
@@ -353,6 +359,7 @@ export const useMessageUpdates = ({
                   isLoading: false,
                   generationEndTime: new Date(),
                   thinkingTimeMs: finalThinkingTime,
+                  thinkingActive: undefined,
                 };
               }
               // Reset tracking ref for this role so next transcript starts a new message bubble

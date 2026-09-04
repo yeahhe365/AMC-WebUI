@@ -3,11 +3,13 @@ import type { Dispatch, SetStateAction } from 'react';
 import { ACTIVE_CHAT_SESSION_ID_KEY } from '@/constants/storageKeys';
 import { dbService } from '@/services/db/dbService';
 import { logService } from '@/services/logService';
+import { readLastActiveSessionSnapshot } from '@/utils/chat/lastActiveSession';
 import type { SetActiveSessionOptions } from '@/stores/chatStore';
 import type { AppSettings, ChatGroup, ChatMessage, ChatSettings, SavedChatSession } from '@/types';
 import { rehydrateSessionFiles } from '@/utils/chat/session';
 import {
   createSettingsForNewChat,
+  resolveNewTabTemplate,
   sanitizeSessionModel,
   sortSessionsByPinnedAndTimestamp,
 } from './sessionLoaderSettings';
@@ -75,6 +77,18 @@ const resolveInitialActiveSessionId = (metadataList: SavedChatSession[]) => {
   return null;
 };
 
+/**
+ * 读取新标签页 URL 上的 ?from= 参数（来源标签页正在查看的会话 id）。
+ * 由 Logo/新聊天入口的 `buildNewTabHref` 写入；读取失败时安全返回 null。
+ */
+const readFromSessionParam = (): string | null => {
+  try {
+    return new URLSearchParams(window.location.search).get('from');
+  } catch {
+    return null;
+  }
+};
+
 const mergeLoadedSessionMetadata = (
   currentSessions: SavedChatSession[],
   sortedMetadata: SavedChatSession[],
@@ -117,12 +131,14 @@ export const loadInitialSessionData = async ({
   updateAndPersistSessions,
   startNewChat,
 }: LoadInitialSessionDataOptions) => {
+  let initialActiveId: string | null = null;
+
   try {
     logService.info('Attempting to load chat history metadata from IndexedDB.');
 
     const [metadataList, groups] = await Promise.all([dbService.getAllSessionMetadata(), dbService.getAllGroups()]);
 
-    let initialActiveId = resolveInitialActiveSessionId(metadataList);
+    initialActiveId = resolveInitialActiveSessionId(metadataList);
 
     if (initialActiveId) {
       const fullActiveSession = await dbService.getSession(initialActiveId);
@@ -140,13 +156,30 @@ export const loadInitialSessionData = async ({
     const sortedList = sortSessionsByPinnedAndTimestamp(metadataList.map(sanitizeSessionModel));
 
     setSavedSessions((prev) => mergeLoadedSessionMetadata(prev, sortedList));
-    setSavedGroups(groups.map((group) => ({ ...group, isExpanded: group.isExpanded ?? true })));
+    // Backfill orderKey for legacy groups that lack it (old DB rows).
+    const groupsWithOrder = groups.map((group, index) => ({
+      ...group,
+      isExpanded: group.isExpanded ?? true,
+      orderKey: group.orderKey ?? String(index).padStart(6, '0'),
+    }));
+    // Normalize to ensure consistent ordering on first load after upgrade.
+    groupsWithOrder.sort((leftGroup, rightGroup) => {
+      if (leftGroup.orderKey && rightGroup.orderKey) return leftGroup.orderKey.localeCompare(rightGroup.orderKey);
+      return rightGroup.timestamp - leftGroup.timestamp;
+    });
+    const normalizedGroups = groupsWithOrder.map((group, index) => ({
+      ...group,
+      orderKey: String(index).padStart(6, '0'),
+    }));
+    setSavedGroups(normalizedGroups);
 
     if (!initialActiveId) {
+      const fromSessionId = readFromSessionParam();
       const mostRecent = sortedList[0];
       let reused = false;
 
-      if (mostRecent) {
+      // 显式 ?from 时跳过空会话复用（用户意图明确：从来源会话开新会话）。
+      if (mostRecent && !fromSessionId) {
         const fullSession = await dbService.getSession(mostRecent.id);
         if (
           fullSession &&
@@ -178,11 +211,27 @@ export const loadInitialSessionData = async ({
 
       if (!reused) {
         logService.info('No active session found or empty session to reuse, starting fresh chat.');
-        startNewChat(sortedList.length > 0 ? sortedList[0] : undefined, { history: 'replace' });
+
+        // 以 ?from 会话优先，其次"最后活跃会话"快照，最后最近会话作为模板。
+        startNewChat(
+          resolveNewTabTemplate({
+            fromSessionId,
+            snapshot: readLastActiveSessionSnapshot(),
+            sortedSessions: sortedList,
+          }),
+          { history: 'replace' },
+        );
       }
     }
   } catch (error) {
+    // A transient DB read failure (e.g. an IndexedDB transaction hiccup while
+    // loading the active session) must not nuke the user's current conversation:
+    // startNewChat clears activeMessages. Only fall back to a fresh chat when no
+    // active session was being restored in the first place.
     logService.error('Error loading chat history:', error);
-    startNewChat(undefined, { history: 'replace' });
+
+    if (!initialActiveId) {
+      startNewChat(undefined, { history: 'replace' });
+    }
   }
 };

@@ -131,13 +131,6 @@ export const WelcomeScreen: React.FC = () => {
   return (
     <div className="flex flex-col items-center justify-center min-h-full w-full max-w-4xl mx-auto px-4 pb-20 sm:pb-28">
       <div className="w-full flex flex-col items-center">
-        {/* Decorative gradient orb — neutral only, no accent/blue tint */}
-        <div
-          className="w-24 h-24 sm:w-28 sm:h-28 rounded-full mb-6 sm:mb-8 opacity-20 blur-2xl"
-          style={{
-            background: 'radial-gradient(circle, var(--theme-text-secondary) 0%, transparent 70%)',
-          }}
-        />
         <h1 className="text-3xl md:text-4xl font-medium text-center welcome-message-animate tracking-tight min-h-[3rem] flex items-center justify-center text-[var(--theme-text-primary)]">
           <WelcomeEasterEggText text={t('welcomeGreeting')} />
         </h1>

@@ -1,0 +1,373 @@
+[
+  {
+    "key": "videoSettingsFps",
+    "current": "采样率（FPS）",
+    "suggested": "帧率（FPS）",
+    "reason": "MISTRANSLATION: en \"Frame Rate (FPS)\" is 帧率, not 采样率 (sampling rate). Wrong technical term; users configuring video frame sampling will be confused.",
+    "severity": "high"
+  },
+  {
+    "key": "uploadStarting",
+    "current": "正在开始…",
+    "suggested": "正在上传…",
+    "reason": "UNNATURAL: \"正在开始…\" is redundant Chinese no native UI uses for an upload progress state (en \"Starting...\").",
+    "severity": "medium"
+  },
+  {
+    "key": "cancelPendingUploadSendAria",
+    "current": "取消上传后发送",
+    "suggested": "取消上传后自动发送",
+    "reason": "AMBIGUOUS: readable as both 取消[上传后发送] (intended) and [取消上传]后发送. Adding 自动 removes the wrong parse (en \"Cancel sending after upload\"). Same text in cancelPendingUploadSendTitle.",
+    "severity": "medium"
+  },
+  {
+    "key": "cancelPendingUploadSendTitle",
+    "current": "取消上传后发送",
+    "suggested": "取消上传后自动发送",
+    "reason": "AMBIGUOUS: see cancelPendingUploadSendAria — readable as \"[cancel upload] then send\".",
+    "severity": "medium"
+  },
+  {
+    "key": "scenariosEditorAddMessageAs",
+    "current": "添加消息身份",
+    "suggested": "以此身份添加消息",
+    "reason": "UNNATURAL: \"添加消息身份\" is a confusing label for the en \"Add Message As\" role picker (User/Model); reads as if adding an identity.",
+    "severity": "medium"
+  },
+  {
+    "key": "suggestionHtmlTitle",
+    "current": "可视化整理",
+    "suggested": "Live Artifacts",
+    "reason": "MISTRANSLATION/INCONSISTENCY: en title is the feature name \"Live Artifacts\", kept untranslated everywhere else (helpCmdArtifacts, liveArtifactsPromptActive/Inactive*, settingsTabLiveArtifacts, settingsLiveArtifactsSectionTitle, suggestionHtmlDesc/Short). Translating only this card title as 可视化整理 breaks the link to the feature.",
+    "severity": "medium"
+  },
+  {
+    "key": "ttsError",
+    "current": "语音生成失败",
+    "suggested": "TTS 失败",
+    "reason": "INCONSISTENCY family TTS: kept as \"TTS\" in ttsReadAloud (朗读（TTS）) and ttsDirectorNotesTitle (TTS 导演备注), but translated 语音生成 here and in messageSenderTtsErrorPrefix. Pick one form.",
+    "severity": "medium"
+  },
+  {
+    "key": "messageSenderTtsErrorPrefix",
+    "current": "语音生成错误",
+    "suggested": "TTS 错误",
+    "reason": "INCONSISTENCY family TTS: en \"TTS Error\"; see ttsError — TTS is kept elsewhere (朗读（TTS）, TTS 导演备注).",
+    "severity": "medium"
+  },
+  {
+    "key": "messageSenderImageEditHistoryMissingGeneratedImage",
+    "current": "之前生成的图片已无法从历史记录中恢复。请重新附加这张图片，或开启新的图片编辑回合。",
+    "suggested": "之前生成的图片已无法从历史记录中恢复。请重新附加这张图片，或开启新的图片编辑轮次。",
+    "reason": "INCONSISTENCY family turn: turn → 轮 everywhere else (这一轮 in messageSenderEmptyReply/WithThoughts, 上一轮 in helpCmdRetry, 上一轮/下一轮 in scrollPreviousTurn/scrollNextTurn) but 回合 here.",
+    "severity": "medium"
+  },
+  {
+    "key": "helpCmdClear",
+    "current": "清除当前聊天",
+    "suggested": "清空当前聊天",
+    "reason": "INCONSISTENCY family Clear: data-clearing actions use 清空 (tokenModalClear/ClearAll, logViewerClearButton/ClearTitle, settingsClearLogs/ClearLogsConfirm, queuedSubmissionClearAll, clearInputAria/Title, settingsClearSystemPrompt, shortcutsClear/ClearAria), while 清除 is used here and for search fields (historySearchClearAria, scenariosClearSearch, settingsSearchClearAria). Use 清空 for clearing conversation content.",
+    "severity": "medium"
+  },
+  {
+    "key": "thirdPartyRemoveHeader",
+    "current": "删除请求头",
+    "suggested": "移除请求头",
+    "reason": "INCONSISTENCY family Remove: Remove → 移除 in selectedFileRemoveFile, removeQuoteAria, queuedSubmissionRemove, settingsMcpRemoveServer, settingsRemoveModel, settingsResetModelListConfirm; 删除 should stay reserved for Delete.",
+    "severity": "medium"
+  },
+  {
+    "key": "thirdPartyRemoveConnection",
+    "current": "删除连接",
+    "suggested": "移除连接",
+    "reason": "INCONSISTENCY family Remove: see thirdPartyRemoveHeader — 移除 is the established translation of Remove.",
+    "severity": "medium"
+  },
+  {
+    "key": "thirdPartyRemoveConnectionConfirm",
+    "current": "确定删除此连接？",
+    "suggested": "确定移除此连接？",
+    "reason": "INCONSISTENCY family Remove: en \"Remove this connection?\"; align with 移除 (see thirdPartyRemoveHeader/Connection).",
+    "severity": "medium"
+  },
+  {
+    "key": "exportChat",
+    "current": "导出对话",
+    "suggested": "导出聊天",
+    "reason": "INCONSISTENCY family Chat: chat → 聊天 in newChat(新聊天), historyRecentChats(最近聊天), shortcutsSearchChats(搜索聊天), historyEmpty(暂无聊天记录), helpCmdClear(当前聊天), but 对话 in exportChat/exportChatTitle, settingsDataHistory, settingsClearHistory, shortcutsNewChat, isAutoTitleEnabled, settingsScopeDefaults, historyShowMoreChats, and 会话 in settingsScopeCurrentChat. Recommended convention: chat→聊天, conversation→对话, session→会话.",
+    "severity": "medium"
+  },
+  {
+    "key": "exportChatTitle",
+    "current": "导出对话",
+    "suggested": "导出聊天",
+    "reason": "INCONSISTENCY family Chat: see exportChat.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsDataHistory",
+    "current": "对话",
+    "suggested": "聊天",
+    "reason": "INCONSISTENCY family Chat: en \"Chats\"; sidebar/history use 聊天 (最近聊天, 搜索聊天), data section uses 对话. See exportChat.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsClearHistory",
+    "current": "删除对话与分组",
+    "suggested": "删除聊天与分组",
+    "reason": "INCONSISTENCY family Chat: en \"Delete Chats and Groups\"; see exportChat.",
+    "severity": "medium"
+  },
+  {
+    "key": "shortcutsNewChat",
+    "current": "开始新对话",
+    "suggested": "开始新聊天",
+    "reason": "INCONSISTENCY family Chat: en \"Start New Chat\"; newChat button itself is 新聊天. See exportChat.",
+    "severity": "medium"
+  },
+  {
+    "key": "isAutoTitleEnabled",
+    "current": "自动命名新对话",
+    "suggested": "自动命名新聊天",
+    "reason": "INCONSISTENCY family Chat: en \"Auto-name New Chats\"; see exportChat.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsScopeCurrentChat",
+    "current": "当前会话",
+    "suggested": "当前聊天",
+    "reason": "INCONSISTENCY family Chat: en \"Current Chat\"; helpCmdClear says 当前聊天 while this scope tab says 当前会话 (session→会话 elsewhere means live/session features like 实时会话). See exportChat.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsScopeDefaults",
+    "current": "新对话默认值",
+    "suggested": "新聊天默认值",
+    "reason": "INCONSISTENCY family Chat: en \"New Chat Defaults\"; see exportChat.",
+    "severity": "medium"
+  },
+  {
+    "key": "historyShowMoreChats",
+    "current": "再显示 {count} 个对话",
+    "suggested": "再显示 {count} 个聊天",
+    "reason": "INCONSISTENCY family Chat: en \"Show {count} more chats\" in the history sidebar which otherwise says 聊天. See exportChat.",
+    "severity": "medium"
+  },
+  {
+    "key": "suggestionTranslateDesc",
+    "current": "你是一位精通中英文的专业翻译。请将以下文本进行互译（中文转英文，英文转中文）。要求信达雅，保留原意和语气，不要添加任何解释或多余的符号：",
+    "suggested": "您是一位精通中英文的专业翻译。请将以下文本进行互译（中文转英文，英文转中文）。要求信达雅，保留原意和语气，不要添加任何解释或多余的符号：",
+    "reason": "INCONSISTENCY pronoun: UI overwhelmingly uses 您 (16 keys, e.g. settingsResetConfirm, settingsClearHistoryConfirm, apiConfigKeyPlaceholder, videoSettingsTipTimestamp, fileIdAdderNotFound) but 你 appears here and in scenariosConfirmCloseMessage.",
+    "severity": "medium"
+  },
+  {
+    "key": "scenariosConfirmCloseMessage",
+    "current": "你有未保存的更改，关闭后将丢失。",
+    "suggested": "您有未保存的更改，关闭后将丢失。",
+    "reason": "INCONSISTENCY pronoun: 你 vs 您 — see suggestionTranslateDesc; rest of UI uses 您.",
+    "severity": "medium"
+  },
+  {
+    "key": "appDragDropRelease",
+    "current": "释放以上传支持的文件",
+    "suggested": "松开以上传支持的文件",
+    "reason": "UNNATURAL: 释放 for releasing mouse/finger is stiff; standard Chinese drag-and-drop wording is 松开以上传 (en \"Release to upload supported files\").",
+    "severity": "low"
+  },
+  {
+    "key": "chatInputPlaceholder",
+    "current": "询问任何问题",
+    "suggested": "随时提问…",
+    "reason": "UNNATURAL+FORMAT: literal \"询问任何问题\" is stiff placeholder Chinese, and the en trailing ellipsis (\"Ask anything...\") was dropped unlike all sibling placeholders.",
+    "severity": "low"
+  },
+  {
+    "key": "queueMessageAria",
+    "current": "排队下一条消息",
+    "suggested": "将下一条消息加入队列",
+    "reason": "UNNATURAL: verb 排队 does not take 消息 as a direct object this way (en \"Queue next message\").",
+    "severity": "low"
+  },
+  {
+    "key": "queueMessageTitle",
+    "current": "排队下一条消息",
+    "suggested": "将下一条消息加入队列",
+    "reason": "UNNATURAL: see queueMessageAria.",
+    "severity": "low"
+  },
+  {
+    "key": "selectedFileMoveTextToInput",
+    "current": "移到输入框",
+    "suggested": "将文本移到输入框",
+    "reason": "OMISSION: en \"Move text to input\" — the object 文本 is dropped, making the action vague.",
+    "severity": "low"
+  },
+  {
+    "key": "toolsLocalPythonCombinationNotice",
+    "current": "这个模型不能在同一次请求里同时组合内置工具和 Pyodide。建议分开使用，以获得更稳定的结果。",
+    "suggested": "这个模型不能在同一次请求里同时组合内置工具和 Pyodide。建议分开使用，以获得最佳效果。",
+    "reason": "MEANING SHIFT: \"for best results\" rendered as 更稳定的结果 (more stable results) instead of 最佳结果/最佳效果.",
+    "severity": "low"
+  },
+  {
+    "key": "alwaysKeepThinkingShort",
+    "current": "思维链",
+    "suggested": "保留",
+    "reason": "MEANING SHIFT: en short label \"Keep\" (of Keep Thinking in Context) drops the verb in zh; 思维链 names the object but not the toggle action.",
+    "severity": "low"
+  },
+  {
+    "key": "queuedSubmissionCountTitle",
+    "current": "{count} 条排队",
+    "suggested": "已排队 {count} 条",
+    "reason": "UNNATURAL: \"{count} 条排队\" reads oddly; standard word order is 已排队 {count} 条 (en \"{count} queued\").",
+    "severity": "low"
+  },
+  {
+    "key": "mapsExpand",
+    "current": "全屏",
+    "suggested": "展开",
+    "reason": "MEANING SHIFT: en \"Expand\" translated as 全屏 (fullscreen); if the action truly goes fullscreen the en should say so, otherwise 展开 matches.",
+    "severity": "low"
+  },
+  {
+    "key": "htmlPreviewDemoSubtitle",
+    "current": "完整演示",
+    "suggested": "无限制演示",
+    "reason": "MEANING SHIFT: \"Unrestricted demo\" (no sandbox restrictions) became 完整演示 (complete demo), losing the actual guarantee.",
+    "severity": "low"
+  },
+  {
+    "key": "tts_style_smooth",
+    "current": "平滑",
+    "suggested": "圆润",
+    "reason": "UNNATURAL: 平滑 describes surfaces/textures; for a voice style \"Smooth\" the natural Chinese voice descriptor is 圆润 (or 流畅).",
+    "severity": "low"
+  },
+  {
+    "key": "audioRecorderRecordingStatus",
+    "current": "录制中",
+    "suggested": "录音中",
+    "reason": "INCONSISTENCY: the audio recorder family uses 录音 (开始录音/停止录音/取消录音/保存录音/预览录音); status \"Recording\" alone says 录制中 (shortcutsRecording 录制中 is a different context — shortcut recording).",
+    "severity": "low"
+  },
+  {
+    "key": "tokenModalReady",
+    "current": "准备计算",
+    "suggested": "可以开始计算",
+    "reason": "UNNATURAL: \"准备计算\" is an awkward status for \"Ready to calculate\"; reads as an imperative rather than a ready-state.",
+    "severity": "low"
+  },
+  {
+    "key": "logViewerLoadOlder",
+    "current": "加载更早日志",
+    "suggested": "加载更早的日志",
+    "reason": "UNNATURAL: missing 的 — 更早日志 misparses; standard is 加载更早的日志 (en \"Load older logs\").",
+    "severity": "low"
+  },
+  {
+    "key": "scenariosUseButtonTitle",
+    "current": "加载该场景到聊天",
+    "suggested": "将此场景加载到聊天",
+    "reason": "UNNATURAL: 加载该场景到聊天 lacks the 把/将 coverb; natural phrasing is 将此场景加载到聊天.",
+    "severity": "low"
+  },
+  {
+    "key": "scenariosDuplicateTitle",
+    "current": "创建副本",
+    "suggested": "复制场景",
+    "reason": "OMISSION/INCONSISTENCY: sibling arias name the object (导出场景/删除场景/查看场景) but \"Duplicate scenario\" drops 场景; 创建副本 duplicates historyDuplicate's phrasing for chats.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsManageModelsTitle",
+    "current": "模型列表",
+    "suggested": "模型库",
+    "reason": "MEANING SHIFT: \"Model Library\" rendered as plain 列表 (list); 库 conveys library and distinguishes it from 编辑列表/保存列表 on the same screen.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsGemmaReasoningTooltip",
+    "current": "Gemma 4 在 Gemini API 中这里使用 thinkingConfig.thinkingLevel，两档分别是 MINIMAL 和 HIGH。",
+    "suggested": "Gemma 4 在 Gemini API 上使用 thinkingConfig.thinkingLevel，此处支持两档：MINIMAL 和 HIGH。",
+    "reason": "UNNATURAL: \"在 Gemini API 中这里使用\" stacks two locatives; word order needs fixing.",
+    "severity": "low"
+  },
+  {
+    "key": "chatBehaviorTempTooltip",
+    "current": "控制随机性。较低的值（~0.2）使模型更具确定性和专注性。较高的值（~1.0）使其更具创造性和多样性。",
+    "suggested": "控制随机性。较低的值（~0.2）使模型输出更确定、更聚焦；较高的值（~1.0）使其更具创造性和多样性。",
+    "reason": "UNNATURAL: 更具确定性和专注性 is translationese for \"more deterministic and focused\".",
+    "severity": "low"
+  },
+  {
+    "key": "chatBehaviorTopPTooltip",
+    "current": "通过从概率质量中采样来控制多样性。较低的值（~0.1）使模型的选择非常集中，而较高的值（~0.95）则允许更多变化。",
+    "suggested": "通过按累积概率进行采样来控制多样性。较低的值（~0.1）使模型的选择非常集中，而较高的值（~0.95）则允许更多变化。",
+    "reason": "UNNATURAL: 从概率质量中采样 is a literal rendering of \"sampling from a probability mass\"; 按累积概率采样 is the standard Chinese ML phrasing.",
+    "severity": "low"
+  },
+  {
+    "key": "headerModelSelectorTooltipAction",
+    "current": "点击更改，或按 'Tab' 键循环切换",
+    "suggested": "点击更改，或按“Tab”键循环切换",
+    "reason": "PUNCTUATION: halfwidth single quotes around Tab in Chinese text; use fullwidth curly quotes （“Tab”）.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsEnableMermaidRenderingTooltip",
+    "current": "将标记为 'mermaid' 的代码块渲染成图表。",
+    "suggested": "将标记为“mermaid”的代码块渲染成图表。",
+    "reason": "PUNCTUATION: halfwidth single quotes in Chinese sentence; use fullwidth quotes.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsEnableGraphvizRenderingTooltip",
+    "current": "将标记为 'graphviz' 或 'dot' 的代码块渲染成图表。",
+    "suggested": "将标记为“graphviz”或“dot”的代码块渲染成图表。",
+    "reason": "PUNCTUATION: halfwidth single quotes in Chinese sentence; use fullwidth quotes (matches mermaid tooltip fix).",
+    "severity": "low"
+  },
+  {
+    "key": "suggestionHtmlDesc",
+    "current": "请使用 Live Artifacts，将提供的信息整理成结构化、响应式的 HTML 产物。请保留所有重要信息：",
+    "suggested": "请使用 Live Artifacts，将提供的信息整理成结构化、响应式的 HTML 作品。请保留所有重要信息：",
+    "reason": "INCONSISTENCY family artifact: artifact → 产物 here, in suggestionHtmlShort (创建实时 HTML 产物) and settingsLiveArtifactsFontSizeTooltip (产物内容); 产物 is a stiff calque, 作品 (or keeping \"Artifacts\") is the established Chinese UI term.",
+    "severity": "low"
+  },
+  {
+    "key": "headerNewChatAria",
+    "current": "开始新聊天会话",
+    "suggested": "开始新的聊天会话",
+    "reason": "UNNATURAL: 新聊天会话 without 的 is clipped; 开始新的聊天会话 (or simply 开始新聊天) reads naturally.",
+    "severity": "low"
+  },
+  {
+    "key": "logCategoryAuth",
+    "current": "鉴权",
+    "suggested": "授权",
+    "reason": "INCONSISTENCY family Auth: Auth → 授权 in settingsMcpAuth but 鉴权 in this log category. Either is defensible alone; pick one term across the app.",
+    "severity": "low"
+  },
+  {
+    "key": "usageLast7Days",
+    "current": "近 7 天",
+    "suggested": "最近 7 天",
+    "reason": "INCONSISTENCY: history7Days renders \"Previous 7 Days\" as 最近 7 天 while usage filter renders \"Last 7 Days\" as 近 7 天; same concept, two styles.",
+    "severity": "low"
+  },
+  {
+    "key": "usageLast30Days",
+    "current": "近 30 天",
+    "suggested": "最近 30 天",
+    "reason": "INCONSISTENCY: see usageLast7Days vs history30Days (最近 30 天).",
+    "severity": "low"
+  },
+  {
+    "key": "tokenModalClearAll",
+    "current": "全部清空",
+    "suggested": "清空全部",
+    "reason": "INCONSISTENCY: \"Clear All\" → 全部清空 here but 清空全部 in queuedSubmissionClearAll; unify word order.",
+    "severity": "low"
+  }
+]

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_APP_SETTINGS } from '@/constants/settingsDefaults';
 import type { SavedChatSession } from '@/types';
 import { useSuggestions } from './useSuggestions';
-import { createDefaultThirdPartyApiSettings } from '@/utils/thirdPartyApiProviders';
+import { createThirdPartyConnection } from '@/test/data/factories';
 
 const { generateSuggestionsApiMock, getGeminiKeyForRequestMock } = vi.hoisted(() => ({
   generateSuggestionsApiMock: vi.fn(),
@@ -18,13 +18,7 @@ vi.mock('@/utils/apiKeySelection', () => ({
   getGeminiKeyForRequest: getGeminiKeyForRequestMock,
 }));
 
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
-const createSession = (): SavedChatSession => ({
+const createSession = (overrides: Partial<SavedChatSession> = {}): SavedChatSession => ({
   id: 'session-1',
   title: 'Routing',
   timestamp: 1,
@@ -46,6 +40,7 @@ const createSession = (): SavedChatSession => ({
       timestamp: new Date('2026-05-09T00:00:01.000Z'),
     },
   ],
+  ...overrides,
 });
 
 describe('useSuggestions', () => {
@@ -55,25 +50,28 @@ describe('useSuggestions', () => {
     generateSuggestionsApiMock.mockResolvedValue(['Show example', 'Compare options', 'What can fail?']);
   });
 
-  it('uses a Gemini key instead of the OpenAI sticky key while OpenAI-compatible mode is active', async () => {
+  it('does not reuse a Gemini sticky key when the session routes third-party', async () => {
     const updateMessageInSession = vi.fn();
     const sessionKeyMapRef = {
-      current: new Map([['session-1', 'openai-key']]),
+      current: new Map([['session-1', 'gemini-sticky-key']]),
     };
     const appSettings = {
       ...DEFAULT_APP_SETTINGS,
-      isThirdPartyApiEnabled: true,
-      apiMode: 'third-party' as const,
       apiKey: 'gemini-key',
       thirdPartyApi: {
-        activeProvider: 'openai' as const,
-        providers: {
-          ...createDefaultThirdPartyApiSettings().providers,
-          openai: { ...createDefaultThirdPartyApiSettings().providers.openai, apiKey: 'openai-key' },
-        },
+        connections: [createThirdPartyConnection({ id: 'openai', apiKey: 'openai-key', enabled: true })],
       },
     };
-    const activeChat = createSession();
+    // The active session routes third-party (providerId openai). The Gemini
+    // sticky key from a previous Gemini chat must NOT be reused — suggestions
+    // get a fresh Gemini key via getGeminiKeyForRequest.
+    const activeChat = createSession({
+      settings: {
+        ...DEFAULT_APP_SETTINGS,
+        modelId: 'gpt-5.6-sol',
+        providerId: 'openai',
+      },
+    });
     let isLoading = true;
 
     const { rerender, unmount } = renderHook(() =>

@@ -47,12 +47,17 @@ const normalizeMimeType = (mimeType?: string): string => (mimeType || '').trim()
 
 const normalizeFileName = (name?: string): string => (name || '').trim().toLowerCase();
 
-const getFileExtension = (filename?: string): string => {
-  const parts = normalizeFileName(filename).split('.');
-  if (parts.length <= 1) return '';
+const FILE_EXTENSION_PATTERN = /^\.[a-z0-9]{1,16}$/;
 
-  const extension = parts.pop();
-  return extension ? `.${extension}` : '';
+const getFileExtension = (filename?: string): string => {
+  const name = normalizeFileName(filename);
+  const lastDotIndex = name.lastIndexOf('.');
+  if (lastDotIndex <= 0) return '';
+
+  const extension = name.slice(lastDotIndex);
+  // Version numbers in titles (e.g. "Gemini 3.8 Flash 专项核验") contain dots
+  // but are not suffixes. Only compact alphanumeric tails count as extensions.
+  return FILE_EXTENSION_PATTERN.test(extension) ? extension : '';
 };
 
 const isYoutubeMimeType = (mimeType?: string): boolean => normalizeMimeType(mimeType) === 'video/youtube-link';
@@ -84,10 +89,31 @@ export const isPdfMimeType = (mimeType?: string): boolean =>
 const isPdfFile = (file: FileKindInput): boolean =>
   isPdfMimeType(file.type) || normalizeFileName(file.name).endsWith('.pdf');
 
+const isKnownNonTextMimeType = (mimeType?: string): boolean => {
+  const normalized = normalizeMimeType(mimeType);
+  if (!normalized) return false;
+  return (
+    isImageMimeType(normalized) ||
+    isAudioMimeType(normalized) ||
+    isVideoMimeType(normalized) ||
+    isPdfMimeType(normalized) ||
+    SUPPORTED_DOC_MIME_TYPES.includes(normalized) ||
+    SUPPORTED_PRESENTATION_MIME_TYPES.includes(normalized) ||
+    SUPPORTED_ARCHIVE_MIME_TYPES.includes(normalized) ||
+    (SUPPORTED_SPREADSHEET_MIME_TYPES.includes(normalized) && normalized !== 'text/csv')
+  );
+};
+
 export const isTextFile = (file: FileTypeInput): boolean => {
   const fileExtension = getFileExtension(file.name);
   const mimeType = normalizeMimeType(file.type);
-  return SUPPORTED_TEXT_MIME_TYPES.includes(mimeType) || TEXT_BASED_EXTENSIONS.includes(fileExtension);
+  if (SUPPORTED_TEXT_MIME_TYPES.includes(mimeType) || TEXT_BASED_EXTENSIONS.includes(fileExtension)) {
+    return true;
+  }
+  // Browsers often omit a MIME type (or send octet-stream) for names like
+  // Dockerfile / LICENSE / Makefile. Treat those as text unless the OS already
+  // labelled a real media/document type.
+  return !fileExtension && !isKnownNonTextMimeType(mimeType);
 };
 
 export const isMarkdownFile = (file: FileTypeInput): boolean => {

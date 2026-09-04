@@ -7,6 +7,7 @@ import { useWindowContext } from '@/contexts/WindowContext';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 import { triggerDownload } from '@/utils/export/core';
 import { useClickOutside } from '@/hooks/useClickOutside';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS } from '@/constants/focusClasses';
 import { Z_INDEX_TABLE_FULLSCREEN } from '@/constants/layout';
 import {
@@ -52,8 +53,34 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
   const { document: targetDocument } = useWindowContext();
   const tableRef = useRef<HTMLTableElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const fullscreenRef = useRef<HTMLDivElement>(null);
+  const fullscreenTriggerRef = useRef<HTMLButtonElement>(null);
+  // Distinguishes "first mount" from "fullscreen just closed": on mount the
+  // inline trigger is already focused/focusable but the effect would steal
+  // focus from wherever the user is typing, so only refocus on the actual
+  // fullscreen → inline transition edge.
+  const wasFullscreenRef = useRef(false);
 
   useClickOutside(menuRef, () => setShowDownloadMenu(false));
+  useFocusTrap(fullscreenRef, isFullscreen, {
+    document: targetDocument,
+    restoreFocusTo: fullscreenTriggerRef.current,
+  });
+
+  // The inline trigger unmounts while the fullscreen portal is open, so the
+  // focus-trap's saved element reference goes stale. When fullscreen closes,
+  // refocus the freshly re-mounted trigger button.
+  useEffect(() => {
+    if (isFullscreen) {
+      wasFullscreenRef.current = true;
+      return undefined;
+    }
+    if (wasFullscreenRef.current) {
+      wasFullscreenRef.current = false;
+      fullscreenTriggerRef.current?.focus();
+    }
+    return undefined;
+  }, [isFullscreen]);
 
   const toggleFullscreen = () => setIsFullscreen(!isFullscreen);
 
@@ -75,6 +102,15 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
   const handleCopyMarkdown = async () => {
     if (!tableRef.current) return;
     try {
+      // GFM has no syntax for merged cells; turndown expands them into empty
+      // placeholders and the structure is lost. Fall back to raw HTML so a copy
+      // always round-trips the actual table content.
+      if (tableRef.current.querySelector('[rowspan],[colspan]')) {
+        await navigator.clipboard.writeText(tableRef.current.outerHTML);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), COPY_FEEDBACK_MS);
+        return;
+      }
       const { convertHtmlToMarkdown } = await import('@/utils/htmlToMarkdown');
       const markdown = convertHtmlToMarkdown(tableRef.current.outerHTML);
       await navigator.clipboard.writeText(markdown);
@@ -101,7 +137,8 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
       })
       .join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    // UTF-8 BOM so Excel detects the encoding and does not garble CJK text.
+    const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = createManagedObjectUrl(blob);
     triggerDownload(url, `table-export-${Date.now()}.csv`);
     setShowDownloadMenu(false);
@@ -122,23 +159,24 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
   };
 
   const isRichHtmlTable = hasRawHtmlInlineStyle(node) || hasInlineStyle(children);
-  const tableClassName = [className, isRichHtmlTable ? 'rich-html-table' : 'min-w-full w-max text-left']
-    .filter(Boolean)
-    .join(' ');
-  const inlineContainerClassName = isRichHtmlTable
-    ? 'relative group/table my-4 w-full max-w-full overflow-visible'
-    : 'relative group/table my-4 w-full max-w-full rounded-xl border border-[var(--theme-border-secondary)]/70 bg-[var(--theme-bg-primary)]/40 overflow-visible';
+  const tableClassName = [className, isRichHtmlTable ? 'rich-html-table' : 'text-left'].filter(Boolean).join(' ');
+  const inlineContainerClassName = 'relative group/table my-4 w-full max-w-full overflow-visible';
+  // Linear style: frameless — the wrapper only provides horizontal scrolling.
+  const inlineScrollClassName =
+    'overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--theme-scrollbar-thumb)] scrollbar-track-transparent w-full';
   const fullscreenContainerClassName = isRichHtmlTable
-    ? 'w-full max-w-6xl mx-auto markdown-body p-0 my-0'
-    : 'w-full max-w-6xl mx-auto bg-[var(--theme-bg-primary)] rounded-lg shadow-xl overflow-hidden border border-[var(--theme-border-secondary)] markdown-body p-0 my-0';
+    ? 'w-full max-w-6xl mx-auto markdown-body p-0 my-0 overflow-x-auto max-h-full'
+    : 'w-full max-w-6xl mx-auto bg-[var(--theme-bg-primary)] rounded-lg shadow-xl border border-[var(--theme-border-secondary)] markdown-body p-0 my-0 overflow-auto max-h-full';
 
   // When fullscreen, we use a portal and a specific layout.
   if (isFullscreen) {
     return createPortal(
       <div
+        ref={fullscreenRef}
         data-table-fullscreen-overlay="true"
         role="dialog"
         aria-modal="true"
+        aria-label={t('tableFullscreenAria')}
         className={`fixed inset-0 ${Z_INDEX_TABLE_FULLSCREEN} bg-[var(--theme-bg-secondary)] text-[var(--theme-text-primary)] p-4 sm:p-10 overflow-auto overscroll-contain flex flex-col items-center animate-in fade-in duration-200`}
       >
         <div className="fixed top-4 right-4 flex gap-2 z-50">
@@ -147,7 +185,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
             className={`p-1.5 rounded-lg bg-[var(--theme-bg-primary)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] shadow-sm border border-[var(--theme-border-secondary)] transition-colors ${FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS}`}
             title={isCopied ? t('copied') : t('tableCopyMarkdown')}
           >
-            {isCopied ? <Check size={16} className="text-green-500" /> : <Copy size={16} />}
+            {isCopied ? <Check size={16} className="text-[var(--theme-text-success)]" /> : <Copy size={16} />}
           </button>
 
           <div className="relative" ref={menuRef}>
@@ -165,14 +203,14 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
                   onClick={handleDownloadCSV}
                   className={`${MENU_ITEM_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS} px-4 py-3 gap-3`}
                 >
-                  <FileText size={16} className="text-blue-500" />
+                  <FileText size={16} className="text-[var(--theme-text-tertiary)]" />
                   <span>{t('exportToCSV')}</span>
                 </button>
                 <button
                   onClick={handleDownloadExcel}
                   className={`${MENU_ITEM_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS} px-4 py-3 gap-3`}
                 >
-                  <FileSpreadsheet size={16} className="text-green-500" />
+                  <FileSpreadsheet size={16} className="text-[var(--theme-text-success)]" />
                   <span>{t('exportToExcel')}</span>
                 </button>
               </div>
@@ -189,11 +227,9 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
         </div>
 
         <div className={fullscreenContainerClassName} data-rich-html-table-container={isRichHtmlTable || undefined}>
-          <div className="overflow-x-auto">
-            <table ref={tableRef} className={tableClassName} {...props}>
-              {children}
-            </table>
-          </div>
+          <table ref={tableRef} className={tableClassName} {...props}>
+            {children}
+          </table>
         </div>
       </div>,
       targetDocument.body,
@@ -206,7 +242,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
       data-rich-html-table-container={isRichHtmlTable || undefined}
       data-table-actions-scope="true"
     >
-      <div className="overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-[var(--theme-scrollbar-thumb)] scrollbar-track-transparent w-full">
+      <div className={inlineScrollClassName}>
         <table ref={tableRef} className={tableClassName} {...props}>
           {children}
         </table>
@@ -219,7 +255,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
           className={`p-1.5 rounded-md text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors ${FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS}`}
           title={isCopied ? t('copied') : t('tableCopyMarkdown')}
         >
-          {isCopied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+          {isCopied ? <Check size={14} className="text-[var(--theme-text-success)]" /> : <Copy size={14} />}
         </button>
 
         <div className="relative" ref={menuRef}>
@@ -237,14 +273,14 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
                 onClick={handleDownloadCSV}
                 className={`${MENU_ITEM_COMPACT_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS}`}
               >
-                <FileText size={14} className="text-blue-500" />
+                <FileText size={14} className="text-[var(--theme-text-tertiary)]" />
                 <span>{t('exportToCSV')}</span>
               </button>
               <button
                 onClick={handleDownloadExcel}
                 className={`${MENU_ITEM_COMPACT_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS}`}
               >
-                <FileSpreadsheet size={14} className="text-green-500" />
+                <FileSpreadsheet size={14} className="text-[var(--theme-text-success)]" />
                 <span>{t('exportToExcel')}</span>
               </button>
             </div>
@@ -252,6 +288,7 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
         </div>
 
         <button
+          ref={fullscreenTriggerRef}
           onClick={toggleFullscreen}
           aria-label={t('tableFullscreenAria')}
           className={`p-1.5 rounded-md text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors ${FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS}`}

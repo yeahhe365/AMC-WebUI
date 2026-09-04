@@ -4,7 +4,9 @@ import { formatApiKeyErrorMessage, getGeminiKeyForRequest } from '@/utils/apiKey
 import { logService } from '@/services/logService';
 import { POLLING_INTERVAL_MS, MAX_POLLING_DURATION_MS } from '@/services/api/filePollingConfig';
 import { getFileMetadataApi } from '@/services/api/fileApi';
+import { formatGeminiFileApiProcessingError } from '@/utils/chat/geminiFilesApi';
 import { useI18n } from '@/contexts/I18nContext';
+import { useChatStore } from '@/stores/chatStore';
 
 const MAX_POLLING_BACKOFF_MULTIPLIER = 8;
 
@@ -27,6 +29,9 @@ export const useFilePolling = ({
   currentChatSettings,
 }: UseFilePollingProps) => {
   const { t } = useI18n();
+  const activeMessages = useChatStore((state) => state.activeMessages);
+  const savedSessions = useChatStore((state) => state.savedSessions);
+  const updateUploadedFile = useChatStore((state) => state.updateUploadedFile);
 
   // Stable refs — read inside interval closures without re-triggering the effect.
   const selectedFilesRef = useRef(selectedFiles);
@@ -48,13 +53,41 @@ export const useFilePolling = ({
   const lastPollingAttempt = useRef<Map<string, number>>(new Map());
   const pollingStartTimes = useRef<Map<string, number>>(new Map());
 
+  // Derive all candidate files across selectedFiles, activeMessages, and saved session messages
+  const eligibleFilesMap = new Map<string, UploadedFile>();
+  for (const file of selectedFiles) {
+    if (file.uploadState === 'processing_api' && !file.error && file.fileApiName) {
+      eligibleFilesMap.set(file.id, file);
+    }
+  }
+  for (const message of activeMessages) {
+    if (message.files) {
+      for (const file of message.files) {
+        if (file.uploadState === 'processing_api' && !file.error && file.fileApiName) {
+          eligibleFilesMap.set(file.id, file);
+        }
+      }
+    }
+  }
+  for (const session of savedSessions) {
+    for (const message of session.messages) {
+      if (message.files) {
+        for (const file of message.files) {
+          if (file.uploadState === 'processing_api' && !file.error && file.fileApiName) {
+            eligibleFilesMap.set(file.id, file);
+          }
+        }
+      }
+    }
+  }
+
+  const eligibleFilesRef = useRef(eligibleFilesMap);
+  eligibleFilesRef.current = eligibleFilesMap;
+
   // Derive a stable string of file IDs that need polling.
   // This is the ONLY effect dependency — progress updates, file additions, etc.
   // do NOT change this value, so the effect is not rebuilt on every state change.
-  const pollingTargetIds = selectedFiles
-    .filter((file) => file.uploadState === 'processing_api' && !file.error && file.fileApiName)
-    .map((file) => file.id)
-    .join('\n');
+  const pollingTargetIds = Array.from(eligibleFilesMap.keys()).sort().join('\n');
 
   useEffect(() => {
     const intervals = pollingIntervals.current;
@@ -83,7 +116,8 @@ export const useFilePolling = ({
     for (const fileId of filesThatShouldPoll) {
       if (filesCurrentlyPolling.has(fileId)) continue;
 
-      const fileToPoll = selectedFilesRef.current.find((file) => file.id === fileId);
+      const fileToPoll =
+        eligibleFilesRef.current.get(fileId) ?? selectedFilesRef.current.find((file) => file.id === fileId);
       if (!fileToPoll?.fileApiName) continue;
 
       const fileApiName = fileToPoll.fileApiName;
@@ -107,12 +141,18 @@ export const useFilePolling = ({
         const fileStartTime = startTimes.get(fileId) ?? startTime;
         if (now - fileStartTime > MAX_POLLING_DURATION_MS) {
           logService.error(`Polling timed out for file ${fileApiName}`);
+          const timeoutMsg = tRef.current('fileProcessingTimedOut');
+          updateUploadedFile(fileId, {
+            error: timeoutMsg,
+            uploadState: 'failed',
+            isProcessing: false,
+          });
           setSelectedFilesRef.current((prev) =>
             prev.map((selectedFile) =>
               selectedFile.id === fileId
                 ? {
                     ...selectedFile,
-                    error: tRef.current('fileProcessingTimedOut'),
+                    error: timeoutMsg,
                     uploadState: 'failed',
                     isProcessing: false,
                   }
@@ -133,6 +173,11 @@ export const useFilePolling = ({
         if ('error' in keyResult) {
           logService.error(`Polling for ${fileApiName} stopped: ${keyResult.error}`);
           const errorMessage = formatApiKeyErrorMessage(keyResult.error, tRef.current);
+          updateUploadedFile(fileId, {
+            error: errorMessage,
+            uploadState: 'failed',
+            isProcessing: false,
+          });
           setSelectedFilesRef.current((prev) =>
             prev.map((selectedFile) =>
               selectedFile.id === fileId
@@ -149,6 +194,7 @@ export const useFilePolling = ({
           if (metadata?.state === 'ACTIVE') {
             logService.info(`File ${fileApiName} is now ACTIVE.`);
             failures.delete(fileId);
+            updateUploadedFile(fileId, { uploadState: 'active', isProcessing: false });
             setSelectedFilesRef.current((prev) =>
               prev.map((selectedFile) =>
                 selectedFile.id === fileId
@@ -159,12 +205,22 @@ export const useFilePolling = ({
           } else if (metadata?.state === 'FAILED') {
             logService.error(`File ${fileApiName} processing FAILED on backend.`);
             failures.delete(fileId);
+            const errorMsg = formatGeminiFileApiProcessingError(
+              metadata,
+              tRef.current('fileProcessingBackendFailed'),
+              tRef.current('fileProcessingBackendFailedWithMessage'),
+            );
+            updateUploadedFile(fileId, {
+              error: errorMsg,
+              uploadState: 'failed',
+              isProcessing: false,
+            });
             setSelectedFilesRef.current((prev) =>
               prev.map((selectedFile) =>
                 selectedFile.id === fileId
                   ? {
                       ...selectedFile,
-                      error: tRef.current('fileProcessingBackendFailed'),
+                      error: errorMsg,
                       uploadState: 'failed',
                       isProcessing: false,
                     }
@@ -189,7 +245,7 @@ export const useFilePolling = ({
     }
     // No cleanup here — incremental start/stop above handles file changes.
     // Full cleanup is done by the unmount-only effect below.
-  }, [pollingTargetIds]);
+  }, [pollingTargetIds, updateUploadedFile]);
 
   // Clear all polling state only when the component unmounts.
   useEffect(() => {

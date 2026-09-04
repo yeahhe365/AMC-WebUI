@@ -96,6 +96,59 @@ describe('sessionPersistenceEffects', () => {
     expect(saveSession).not.toHaveBeenCalled();
   });
 
+  it('skips saving an inactive stripped session when its persisted record is missing, without blocking other saves', async () => {
+    const renamed = createSavedChatSessionMetadata({ id: 'renamed', title: 'Renamed', messages: [] });
+    const healthy = createSavedChatSessionMetadata({
+      id: 'healthy',
+      messages: [{ id: 'message', role: 'user', content: 'Hi', timestamp: new Date() }],
+    });
+    const saveSession = vi.fn();
+
+    await persistSessionChanges({
+      modifiedSessions: [renamed, healthy],
+      deletedSessionIds: [],
+      activeSessionId: null,
+      sessionPersistVersions: new Map(),
+      getSession: vi.fn(async (sessionId: string) =>
+        sessionId === 'renamed' ? undefined : createSavedChatSessionMetadata({ id: 'healthy', messages: [] }),
+      ),
+      saveSession,
+      deleteSession: vi.fn(),
+      broadcastSyncMessage: vi.fn(),
+    });
+
+    expect(saveSession).toHaveBeenCalledTimes(1);
+    expect(saveSession).toHaveBeenCalledWith(expect.objectContaining({ id: 'healthy' }));
+  });
+
+  it('skips saving an inactive stripped session when the DB read fails, without blocking other saves', async () => {
+    const failing = createSavedChatSessionMetadata({ id: 'failing', title: 'Renamed', messages: [] });
+    const healthy = createSavedChatSessionMetadata({
+      id: 'healthy',
+      messages: [{ id: 'message', role: 'user', content: 'Hi', timestamp: new Date() }],
+    });
+    const saveSession = vi.fn();
+
+    await persistSessionChanges({
+      modifiedSessions: [failing, healthy],
+      deletedSessionIds: [],
+      activeSessionId: null,
+      sessionPersistVersions: new Map(),
+      getSession: vi.fn(async (sessionId: string) => {
+        if (sessionId === 'failing') {
+          throw new Error('IndexedDB read failed');
+        }
+        return createSavedChatSessionMetadata({ id: 'healthy', messages: [] });
+      }),
+      saveSession,
+      deleteSession: vi.fn(),
+      broadcastSyncMessage: vi.fn(),
+    });
+
+    expect(saveSession).toHaveBeenCalledTimes(1);
+    expect(saveSession).toHaveBeenCalledWith(expect.objectContaining({ id: 'healthy' }));
+  });
+
   it('deletes removed sessions and broadcasts a sessions update', async () => {
     const deleteSession = vi.fn();
     const broadcastSyncMessage = vi.fn();

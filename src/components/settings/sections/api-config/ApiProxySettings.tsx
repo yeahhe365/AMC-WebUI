@@ -35,12 +35,12 @@ export const ApiProxySettings: React.FC<ApiProxySettingsProps> = ({
   const previewUrl = buildGeminiRequestPreviewUrl(currentBaseUrl, DEFAULT_MODEL_ID, 'generateContent');
 
   return (
-    <div className="space-y-3 pt-2">
+    <div className="space-y-3 pt-2" data-settings-item="api-proxy">
       <div className="flex items-center justify-between py-2">
         <div className="flex items-center gap-2">
           <label
             htmlFor="use-api-proxy-toggle"
-            className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)] cursor-pointer"
+            className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-secondary)] cursor-pointer"
           >
             {t('settingsApiProxyLabel')}
           </label>
@@ -48,7 +48,7 @@ export const ApiProxySettings: React.FC<ApiProxySettingsProps> = ({
             <button
               type="button"
               onClick={handleResetProxy}
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors border text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] border-transparent hover:border-[var(--theme-border-secondary)]"
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors border text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] border-transparent hover:border-[var(--theme-border-secondary)]"
               title={t('settingsApiProxyReset')}
             >
               <RotateCcw size={10} strokeWidth={1.5} />
@@ -78,12 +78,12 @@ export const ApiProxySettings: React.FC<ApiProxySettingsProps> = ({
           />
 
           <div className="mt-3 p-3 rounded-lg bg-[var(--theme-bg-tertiary)]/30 border border-[var(--theme-border-secondary)]">
-            <div className="flex gap-2 text-xs text-[var(--theme-text-tertiary)] mb-1.5">
+            <div className="flex gap-2 text-xs text-[var(--theme-text-secondary)] mb-1.5">
               <AlertCircle size={14} className="flex-shrink-0 mt-0.5" strokeWidth={1.5} />
               <span>{t('settingsApiProxyPreview')}</span>
             </div>
             <div className="flex items-start gap-2 pl-5">
-              <ArrowRight size={12} className="mt-1 text-[var(--theme-text-tertiary)]" />
+              <ArrowRight size={12} className="mt-1 text-[var(--theme-text-secondary)]" />
               <code className="font-mono text-xs text-[var(--theme-text-primary)] break-all leading-relaxed">
                 {previewUrl}
               </code>

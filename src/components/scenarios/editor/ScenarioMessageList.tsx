@@ -36,7 +36,7 @@ export const ScenarioMessageList: React.FC<ScenarioMessageListProps> = ({
   useEffect(() => {
     if (!editingMessageId) return;
     const target = messages.find((message) => message.id === editingMessageId);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentionally mirror the edited message content into local draft state.
+
     setDraft(target ? target.content : '');
   }, [editingMessageId, messages]);
 

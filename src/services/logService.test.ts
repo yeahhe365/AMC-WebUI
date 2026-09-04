@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+vi.unmock('./logService');
 import { createDeferred } from '@/test/render/renderer';
 
 const { mockAddApiUsageRecord, mockAddLogs, mockPruneLogs, mockClearLogs, mockClearApiUsage, mockGetLogs } = vi.hoisted(
@@ -31,7 +32,7 @@ const flushMicrotasks = async () => {
 };
 
 describe('logService', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
     localStorage.clear();
@@ -41,6 +42,11 @@ describe('logService', () => {
     mockClearLogs.mockResolvedValue(undefined);
     mockClearApiUsage.mockResolvedValue(undefined);
     mockGetLogs.mockResolvedValue([]);
+    // The gate defaults OFF; the persistence-focused tests below assume the
+    // enabled path, so open it before each case. Dedicated gating tests reset
+    // it back to disabled explicitly.
+    const { logService } = await import('./logService');
+    logService.setEnabled(true);
   });
 
   it('writes timestamped usage records to IndexedDB when token usage is recorded', async () => {
@@ -189,5 +195,75 @@ describe('logService', () => {
     expect(mockClearLogs).toHaveBeenCalledTimes(1);
     expect(mockClearApiUsage).toHaveBeenCalledTimes(1);
     expect(mockAddLogs).toHaveBeenCalledTimes(1);
+  });
+
+  // ── isLoggingEnabled gate (default OFF) ──
+
+  it('defaults to disabled and drops info/warn/debug until enabled', async () => {
+    const { logService } = await import('./logService');
+    // beforeEach opened the gate; close it to exercise the default-off path.
+    logService.setEnabled(false);
+    await logService.getRecentLogs();
+    mockAddLogs.mockClear();
+
+    logService.info('dropped info');
+    logService.warn('dropped warn');
+    logService.debug('dropped debug');
+    await logService.getRecentLogs();
+
+    expect(mockAddLogs).not.toHaveBeenCalled();
+  });
+
+  it('records a confirm log when enabled and drops the buffer when disabled', async () => {
+    const { logService } = await import('./logService');
+    await logService.getRecentLogs();
+    mockAddLogs.mockClear();
+
+    // Enable from a disabled base: the confirm log must persist (the gate is
+    // already open when info() runs, so it is not gated away).
+    logService.setEnabled(false);
+    logService.setEnabled(true);
+    await logService.getRecentLogs();
+
+    expect(mockAddLogs).toHaveBeenCalledWith([expect.objectContaining({ level: 'INFO', message: 'Logging enabled.' })]);
+  });
+
+  it('flushes buffered logs to DB once enabled', async () => {
+    const { logService } = await import('./logService');
+    logService.setEnabled(false);
+    await logService.getRecentLogs();
+    mockAddLogs.mockClear();
+
+    logService.info('before enable');
+    await logService.getRecentLogs();
+    expect(mockAddLogs).not.toHaveBeenCalled();
+
+    logService.setEnabled(true);
+    logService.info('after enable');
+    await logService.getRecentLogs();
+    expect(mockAddLogs).toHaveBeenCalledWith([
+      expect.objectContaining({ message: 'Logging enabled.' }),
+      expect.objectContaining({ message: 'after enable' }),
+    ]);
+  });
+
+  it('calls console.error (not the DB) while disabled', async () => {
+    const { logService } = await import('./logService');
+    logService.setEnabled(false);
+    await logService.getRecentLogs();
+    mockAddLogs.mockClear();
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const boom = new Error('kaput');
+      logService.error('Streaming exploded', { error: boom });
+      await logService.getRecentLogs();
+
+      expect(mockAddLogs).not.toHaveBeenCalled();
+      // The disabled branch passes the raw error through (options.error is
+      // unwrapped for the console), so the stack stays intact.
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Streaming exploded', boom);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });

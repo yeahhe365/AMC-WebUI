@@ -35,7 +35,7 @@ describe('useModels', () => {
     });
   });
 
-  it('keeps legacy Gemini 2.5 Flash preview models in persisted custom lists', () => {
+  it('keeps legacy Gemini 2.5 Flash preview models in persisted custom lists and reconciles new defaults', () => {
     localStorage.setItem(
       'custom_model_list_v1',
       JSON.stringify([
@@ -46,10 +46,25 @@ describe('useModels', () => {
 
     const { result, unmount } = renderHook(() => useModels());
 
-    expect(result.current.apiModels.map((model) => model.id)).toEqual([
-      'gemini-2.5-flash-preview-09-2025',
-      'gemini-3-flash-preview',
-    ]);
+    expect(result.current.apiModels.some((model) => model.id === 'gemini-2.5-flash-preview-09-2025')).toBe(true);
+    expect(result.current.apiModels.some((model) => model.id === 'gemini-3.5-transcribe')).toBe(true);
+    unmount();
+  });
+
+  it('automatically reconciles newly added official models into user custom model list', () => {
+    useModelPreferencesStore.setState({
+      customModels: [
+        { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', isPinned: true },
+        { id: 'custom-gpt-4o', name: 'Custom GPT-4o' },
+      ],
+      legacyModelPreferencesHydrated: true,
+    });
+
+    const { result, unmount } = renderHook(() => useModels());
+
+    expect(result.current.apiModels.some((m) => m.id === 'gemini-3.5-transcribe')).toBe(true);
+    expect(result.current.apiModels.some((m) => m.id === 'custom-gpt-4o')).toBe(true);
+    expect(result.current.apiModels.some((m) => m.id === 'gemini-3.7-flash')).toBe(true);
     unmount();
   });
 
@@ -82,6 +97,23 @@ describe('useModels', () => {
     });
 
     expect(result.current.apiModels).toEqual([{ id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview' }]);
+    unmount();
+  });
+
+  it('omits Gemini 3.7 Flash by default but retains it when manually added by the user', () => {
+    const { result, unmount } = renderHook(() => useModels());
+
+    expect(result.current.apiModels.some((m) => m.id === 'gemini-3.7-flash')).toBe(false);
+    expect(result.current.apiModels.some((m) => m.id === 'gemini-3.8-flash')).toBe(true);
+
+    act(() => {
+      result.current.setApiModels([
+        ...result.current.apiModels,
+        { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', isPinned: true },
+      ]);
+    });
+
+    expect(result.current.apiModels.some((m) => m.id === 'gemini-3.7-flash')).toBe(true);
     unmount();
   });
 });

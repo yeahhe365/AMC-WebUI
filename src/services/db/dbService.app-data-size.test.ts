@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.unmock('./dbService');
 import { createChatSettings } from '@/test/data/factories';
 
 const createSession = () => {

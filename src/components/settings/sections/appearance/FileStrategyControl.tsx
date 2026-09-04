@@ -25,7 +25,7 @@ export const FileStrategyControl: React.FC<FileStrategyControlProps> = ({ settin
           {t('settingsFilesApiTitle')}
         </label>
         <Tooltip text={t('settingsFilesApiTooltip')}>
-          <Info size={14} className="cursor-help text-[var(--theme-text-tertiary)]" strokeWidth={1.5} />
+          <Info size={14} className="cursor-help text-[var(--theme-text-secondary)]" strokeWidth={1.5} />
         </Tooltip>
       </div>
       <p className="mb-3 text-xs leading-relaxed text-[var(--theme-text-secondary)] opacity-80">

@@ -1,14 +1,29 @@
 import {
+  academicPaperPolisherScenario,
   annaScenario,
+  audioDossierScenario,
+  codebaseAuditorScenario,
+  dataAnalystScenario,
+  diagramArchitectScenario,
   eniManualPasteScenario,
   fopScenario,
   formalScenario,
+  interactiveAppScenario,
+  liveOralCoachScenario,
+  longformEssayistScenario,
   pyriteScenario,
   reasonerScenario,
+  resumeOptimizerScenario,
+  shortVideoScriptScenario,
   socraticScenario,
+  spatialRoboticsScenario,
   succinctScenario,
   unrestrictedScenario,
+  videoModerationScenario,
+  viralHeadlineArchitectScenario,
+  visualPromptScenario,
   voxelScenario,
+  xiaohongshuCopywriterScenario,
 } from '@/constants/defaultScenarios';
 import { type SavedScenario } from '@/types';
 
@@ -37,12 +52,40 @@ const SYSTEM_SCENARIOS: SavedScenario[] = [reasonerScenario, succinctScenario, s
 
 const USER_SCENARIO_SEEDS: UserScenarioSeed[] = [
   {
-    flag: 'hasSeededPlayablePresets_v1',
+    flag: 'hasSeededFirstTierPresets_v3',
+    scenarios: [
+      dataAnalystScenario,
+      diagramArchitectScenario,
+      interactiveAppScenario,
+      codebaseAuditorScenario,
+      audioDossierScenario,
+      spatialRoboticsScenario,
+      liveOralCoachScenario,
+      visualPromptScenario,
+    ],
+  },
+  {
+    flag: 'hasSeededPlayablePresets_v3',
     scenarios: [voxelScenario],
   },
   {
-    flag: 'hasSeededJailbreakPresets_v2',
+    flag: 'hasSeededJailbreakPresets_v3',
     scenarios: [fopScenario, unrestrictedScenario, pyriteScenario, annaScenario, eniManualPasteScenario],
+  },
+  {
+    flag: 'hasSeededContentAcademicPresets_v2',
+    scenarios: [
+      academicPaperPolisherScenario,
+      resumeOptimizerScenario,
+      xiaohongshuCopywriterScenario,
+      longformEssayistScenario,
+      shortVideoScriptScenario,
+      viralHeadlineArchitectScenario,
+    ],
+  },
+  {
+    flag: 'hasSeededVideoModerationPresets_v1',
+    scenarios: [videoModerationScenario],
   },
 ];
 
@@ -96,8 +139,34 @@ export const initializeScenarioState = (
       continue;
     }
 
-    const existingIds = new Set(userScenarios.map((scenario) => scenario.id));
-    const newScenarios = seed.scenarios.filter((scenario) => !existingIds.has(scenario.id));
+    const existingIndexMap = new Map(userScenarios.map((scenario, index) => [scenario.id, index]));
+    const newScenarios: SavedScenario[] = [];
+
+    for (const seedScenario of seed.scenarios) {
+      const existingIdx = existingIndexMap.get(seedScenario.id);
+      if (existingIdx !== undefined) {
+        const existing = userScenarios[existingIdx];
+        const shouldUpdateTitle =
+          (existing.messages.length === 0 || existing.id === eniManualPasteScenario.id) &&
+          existing.title !== seedScenario.title &&
+          seedScenario.title.endsWith(existing.title);
+        const shouldUpdateCategory =
+          existing.messages.length === 0 &&
+          seedScenario.category !== undefined &&
+          existing.category !== seedScenario.category;
+
+        if (shouldUpdateTitle || shouldUpdateCategory) {
+          userScenarios[existingIdx] = {
+            ...existing,
+            ...(shouldUpdateTitle ? { title: seedScenario.title } : {}),
+            ...(shouldUpdateCategory ? { category: seedScenario.category } : {}),
+          };
+          didChange = true;
+        }
+      } else {
+        newScenarios.push(seedScenario);
+      }
+    }
 
     if (newScenarios.length > 0) {
       userScenarios = [...userScenarios, ...newScenarios];

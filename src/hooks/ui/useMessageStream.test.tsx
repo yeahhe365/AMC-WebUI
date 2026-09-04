@@ -1,16 +1,12 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useMessageStream } from './useMessageStream';
-import { installTestAnimationFrameController, type TestAnimationFrameController } from '@/test/browser/animationFrames';
-import { streamingStore } from '@/services/streamingStore';
+import { streamingStore, STREAM_NOTIFY_INTERVAL_MS } from '@/stores/streamingStore';
 import { renderHook } from '@/test/render/renderer';
 
 describe('useMessageStream', () => {
-  let animationFrames: TestAnimationFrameController;
-
   beforeEach(() => {
     vi.useFakeTimers();
-    animationFrames = installTestAnimationFrameController();
     streamingStore.clear('message-stream');
     streamingStore.clear('stale-stream');
     streamingStore.clear('active-stream');
@@ -38,7 +34,6 @@ describe('useMessageStream', () => {
       streamingStore.updateContent('message-stream', 'Hello');
       streamingStore.updateThoughts('message-stream', 'Thinking');
     });
-    animationFrames.flushScheduledFrames(16);
 
     expect(result.current.streamContent).toBe('Hello');
     expect(result.current.streamThoughts).toBe('Thinking');
@@ -52,7 +47,7 @@ describe('useMessageStream', () => {
     unmount();
   });
 
-  it('batches high-frequency stream notifications into a single animation frame', () => {
+  it('batches high-frequency stream notifications into a single throttled flush', () => {
     const listener = vi.fn();
     const unsubscribe = streamingStore.subscribe('batched-stream', listener);
 
@@ -62,12 +57,12 @@ describe('useMessageStream', () => {
 
     expect(streamingStore.getContent('batched-stream')).toBe('Hello');
     expect(streamingStore.getThoughts('batched-stream')).toBe('Thinking');
-    expect(listener).not.toHaveBeenCalled();
-    expect(animationFrames.scheduledFrameCount).toBe(1);
-
-    animationFrames.flushScheduledFrames(16);
-
+    // Leading flush delivered the first update synchronously.
     expect(listener).toHaveBeenCalledTimes(1);
+
+    // The remaining updates coalesce into a single trailing flush.
+    vi.advanceTimersByTime(STREAM_NOTIFY_INTERVAL_MS);
+    expect(listener).toHaveBeenCalledTimes(2);
 
     unsubscribe();
   });

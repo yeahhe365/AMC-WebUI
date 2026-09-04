@@ -87,4 +87,14 @@ describe('loadConfig', () => {
       good: { baseUrl: 'https://api.example.com', apiKey: 'k' },
     });
   });
+
+  it('parses GEMINI_API_KEY and LIVE_GEMINI_API_KEY from environment', () => {
+    const config = loadConfig({
+      GEMINI_API_KEY: '  general-key  ',
+      LIVE_GEMINI_API_KEY: '  live-key  ',
+    });
+
+    expect(config.geminiApiKey).toBe('general-key');
+    expect(config.liveGeminiApiKey).toBe('live-key');
+  });
 });

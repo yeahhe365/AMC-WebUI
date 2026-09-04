@@ -1,12 +1,12 @@
 import { useCallback } from 'react';
-import type { AppSettings, ChatSettings as IndividualChatSettings, UploadedFile } from '@/types';
+import type { AppSettings, ChatMessage, ChatSettings as IndividualChatSettings, UploadedFile } from '@/types';
 import { DEFAULT_CHAT_SETTINGS } from '@/constants/settingsDefaults';
 import { logService } from '@/services/logService';
 import { getKeyForRequest } from '@/utils/apiKeySelection';
 import type { ChatApiRoute } from '@/utils/chatApiRoute';
 import { generateUniqueId } from '@/utils/chat/ids';
-import { usesRemoteFileReference } from '@/utils/chat/fileTransferStrategy';
 import { createMessage, createNewSession } from '@/utils/chat/session';
+import { sessionHasGeminiFilesApiReferences, usesGeminiFilesApiReference } from '@/utils/chat/geminiFilesApi';
 import type { SessionsUpdater } from './messageSenderTypes';
 
 export interface PreparedModelRequest {
@@ -35,6 +35,7 @@ interface PrepareModelRequestParams {
   activeModelId: string;
   apiRoute?: ChatApiRoute;
   files: UploadedFile[];
+  historyMessages?: ChatMessage[];
   messages: ModelRequestMessages;
   keySettings?: IndividualChatSettings;
   keyOptions?: { skipIncrement?: boolean };
@@ -51,7 +52,7 @@ interface UseModelRequestRunnerParams {
 }
 
 const hasLockableActiveFile = (files: UploadedFile[]) =>
-  files.some((file) => usesRemoteFileReference(file) && file.fileUri && file.uploadState === 'active');
+  files.some((file) => usesGeminiFilesApiReference(file) && file.fileUri && file.uploadState === 'active');
 
 export const useModelRequestRunner = ({
   appSettings,
@@ -76,6 +77,7 @@ export const useModelRequestRunner = ({
       activeModelId,
       apiRoute,
       files,
+      historyMessages,
       messages,
       keySettings = currentChatSettings,
       keyOptions,
@@ -103,7 +105,9 @@ export const useModelRequestRunner = ({
         ok: true,
         keyToUse: keyResult.key,
         isNewKey: keyResult.isNewKey,
-        shouldLockKey: keyResult.isNewKey && hasLockableActiveFile(files),
+        shouldLockKey:
+          keyResult.isNewKey &&
+          (hasLockableActiveFile(files) || sessionHasGeminiFilesApiReferences(historyMessages ?? [])),
         generationId: generationId ?? generateUniqueId(),
         generationStartTime: generationStartTime ?? new Date(),
         abortController: new AbortController(),

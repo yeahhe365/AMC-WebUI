@@ -13,6 +13,7 @@ interface ExecuteConfiguredApiRequestOptions<T> {
   errorLabel?: string;
   abortSignal?: AbortSignal;
   httpOptions?: GeminiClientHttpOptions;
+  routingOverrides?: { directGoogleApi?: boolean };
   run: (context: ApiExecutorContext) => Promise<T>;
 }
 
@@ -34,13 +35,16 @@ export const executeConfiguredApiRequest = async <T>({
   errorLabel = label,
   abortSignal,
   httpOptions,
+  routingOverrides,
   run,
 }: ExecuteConfiguredApiRequestOptions<T>): Promise<T> => {
   throwIfAborted(abortSignal, `${label} cancelled by user before starting.`);
   logService.info(label);
 
   try {
-    const client = await getConfiguredApiClient(apiKey, httpOptions);
+    const client = routingOverrides
+      ? await getConfiguredApiClient(apiKey, httpOptions, routingOverrides)
+      : await getConfiguredApiClient(apiKey, httpOptions);
     throwIfAborted(abortSignal, `${label} cancelled by user.`);
     const result = await run({ client });
     throwIfAborted(abortSignal, `${label} cancelled by user.`);

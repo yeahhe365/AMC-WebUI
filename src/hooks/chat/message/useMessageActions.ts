@@ -5,19 +5,11 @@ import { CHAT_INPUT_TEXTAREA_SELECTOR } from '@/constants/layout';
 import { cleanupFilePreviewUrls } from '@/utils/file/filePreviewUrls';
 import { getVisibleChatMessages } from '@/utils/chat/visibility';
 import { cloneMessagesWithFreshIds, createNewSession } from '@/utils/chat/session';
-import { updateMessageInSession, updateSessionById } from '@/utils/chat/sessionMutations';
-import {
-  finishActiveGenerationJob,
-  hasActiveGenerationJobForSession,
-  holdSessionLoadingForGenerationHandoff,
-  releaseSessionLoadingForGenerationHandoff,
-  unregisterActiveGenerationJob,
-} from '@/features/message-sender/activeGenerationJobs';
+import { updateSessionById } from '@/utils/chat/sessionMutations';
+import { releaseSessionLoadingForGenerationHandoff } from '@/features/message-sender/activeGenerationJobs';
 import { isGenerationLeaseHeldByOther } from '@/features/message-sender/generationLease';
-import { broadcastSyncMessage } from '@/stores/chatSyncChannel';
-import { TAB_ID } from '@/stores/tabIdentity';
-import { abortServerStreamJob } from '@/features/stream-jobs/streamAbort';
-import { clearPendingStreamJob } from '@/features/stream-jobs/amcStreamJobs';
+import { useChatStore } from '@/stores/chatStore';
+import { useI18n } from '@/contexts/I18nContext';
 
 type CommandedInputSetter = Dispatch<SetStateAction<InputCommand | null>>;
 type SessionsUpdater = (updater: (prev: SavedChatSession[]) => SavedChatSession[]) => void;
@@ -29,7 +21,7 @@ type SendMessageFunc = (overrideOptions?: {
   isContinueMode?: boolean;
 }) => Promise<void>;
 
-interface MessageActionsProps {
+interface UseMessageActionsOptions {
   messages: ChatMessage[];
   isLoading: boolean;
   activeSessionId: string | null;
@@ -63,90 +55,25 @@ export const useMessageActions = ({
   userScrolledUpRef,
   handleSendMessage,
   setSessionLoading,
-}: MessageActionsProps) => {
+}: UseMessageActionsOptions) => {
+  const { t } = useI18n();
   /**
    * @returns `stopped` when a local job was aborted; `no_local_job` when loading is remote/orphan
    * (and a cross-tab abort was requested); `not_loading` when nothing to stop.
+   *
+   * 薄封装:唯一实现在 `chatStore.stopGenerating`,签名与副作用时序与其完全一致。
+   * 通过 `getState()` 在调用时刻读取最新 store 状态,不订阅、不随渲染重建。
    */
   const handleStopGenerating = useCallback(
-    (options: { silent?: boolean; skipLoadingUpdate?: boolean } = {}): 'stopped' | 'no_local_job' | 'not_loading' => {
-      const { silent = false, skipLoadingUpdate = false } = options;
-      if (!activeSessionId || !isLoading) return 'not_loading';
-
-      const loadingMessage = messages.find((message) => message.isLoading);
-      if (loadingMessage) {
-        const generationId = loadingMessage.id;
-        const controller = activeJobs.current.get(generationId);
-
-        if (controller) {
-          logService.warn(
-            `User stopped generation for session ${activeSessionId}, job ${generationId}. Silent: ${silent}`,
-          );
-          controller.abort();
-
-          // Also ask the api container to abort the upstream Gemini
-          // connection (the stream journal keeps the upstream alive across
-          // browser disconnects). Fire-and-forget; the local abort drives UI.
-          void abortServerStreamJob(generationId);
-          clearPendingStreamJob(activeSessionId);
-
-          if (!silent) {
-            updateAndPersistSessions((prev) =>
-              updateMessageInSession(prev, activeSessionId, generationId, {
-                isLoading: false,
-                generationEndTime: new Date(),
-                stoppedByUser: true,
-              }),
-            );
-          }
-
-          if (!skipLoadingUpdate) {
-            finishActiveGenerationJob({
-              activeJobs,
-              setSessionLoading,
-              sessionId: activeSessionId,
-              generationId,
-            });
-          } else {
-            holdSessionLoadingForGenerationHandoff(activeJobs, activeSessionId);
-            unregisterActiveGenerationJob(activeJobs, generationId);
-          }
-          return 'stopped';
-        }
-
-        logService.error(
-          `Could not find active job to stop for generationId: ${generationId}. Requesting cross-tab abort.`,
-        );
-        broadcastSyncMessage({ type: 'ABORT_GENERATION', sessionId: activeSessionId, originId: TAB_ID });
-        return 'no_local_job';
-      }
-
-      logService.warn(
-        `handleStopGenerating called for session ${activeSessionId}, but no loading message was found. Leaving other active jobs untouched.`,
-      );
-
-      if (hasActiveGenerationJobForSession(activeJobs, activeSessionId)) {
-        return 'stopped';
-      }
-
-      // Remote tab is loading (synced isLoading) without a local job.
-      broadcastSyncMessage({ type: 'ABORT_GENERATION', sessionId: activeSessionId, originId: TAB_ID });
-      if (!skipLoadingUpdate) {
-        setSessionLoading(activeSessionId, false);
-      }
-      return 'no_local_job';
-    },
-    [activeSessionId, isLoading, messages, activeJobs, updateAndPersistSessions, setSessionLoading],
+    (options: { silent?: boolean; skipLoadingUpdate?: boolean } = {}): 'stopped' | 'no_local_job' | 'not_loading' =>
+      useChatStore.getState().stopGenerating(options),
+    [],
   );
 
+  /** 薄封装:唯一实现在 `chatStore.cancelEdit`,清空编辑态与文件选择并重置 editMode。 */
   const handleCancelEdit = useCallback(() => {
-    logService.info('User cancelled message edit.');
-    setCommandedInput({ text: '', id: Date.now() });
-    setSelectedFiles([]);
-    setEditingMessageId(null);
-    setEditMode('resend'); // Reset to default
-    setAppFileError(null);
-  }, [setCommandedInput, setSelectedFiles, setEditingMessageId, setEditMode, setAppFileError]);
+    useChatStore.getState().cancelEdit();
+  }, []);
 
   const handleEditMessage = useCallback(
     (messageId: string, mode: 'update' | 'resend' = 'resend') => {
@@ -239,7 +166,7 @@ export const useMessageActions = ({
             sessionId: activeSessionId,
             stopResult,
           });
-          setAppFileError('This chat is generating in another tab. Stop it there first, or wait for it to finish.');
+          setAppFileError(t('chatGeneratingInOtherTab'));
           return;
         }
       } else if (isGenerationLeaseHeldByOther(activeSessionId)) {
@@ -273,6 +200,7 @@ export const useMessageActions = ({
       activeJobs,
       setSessionLoading,
       setAppFileError,
+      t,
     ],
   );
 
@@ -323,7 +251,7 @@ export const useMessageActions = ({
             sessionId: activeSessionId,
             stopResult,
           });
-          setAppFileError('This chat is generating in another tab. Stop it there first, or wait for it to finish.');
+          setAppFileError(t('chatGeneratingInOtherTab'));
           return;
         }
       } else if (isGenerationLeaseHeldByOther(activeSessionId)) {
@@ -352,6 +280,7 @@ export const useMessageActions = ({
       setCommandedInput,
       setAppFileError,
       setEditingMessageId,
+      t,
     ],
   );
 
@@ -380,6 +309,7 @@ export const useMessageActions = ({
           normalizedMessages,
           `${sourceSession.title} (Fork)`,
           sourceSession.groupId ?? null,
+          'manual',
         );
         forkedSessionId = forkedSession.id;
         return [forkedSession, ...prev];

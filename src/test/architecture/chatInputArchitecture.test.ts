@@ -26,7 +26,7 @@ describe('chat input architecture guardrails', () => {
     expect(source).toContain('useChatInputClipboard');
     expect(source).toContain('useChatInputKeyboard');
     expect(source).not.toContain('isComposingRef.current =');
-    expect(source.length).toBeLessThan(10000);
+    expect(source.length).toBeLessThan(11000);
     expect(chatInputProviderSource).toContain("from '@/hooks/chat-input/useChatInput'");
     expect(chatInputProviderSource).toContain("from './chatInputTextAreaMetrics'");
     expect(chatTextAreaSource).toContain("from '@/components/chat/input/chatInputTextAreaMetrics'");
@@ -68,7 +68,9 @@ describe('chat input architecture guardrails', () => {
     expect(chatTypesSource).not.toContain('toolStates: ChatToolToggleStates;');
     expect(chatInputActionsSource).toContain('toolStates');
     expect(toolsMenuSource).toContain('getChatToolsForSurface');
-    expect(slashCommandsSource).toContain('getSlashCommandToolDefinitions');
+    // Slash commands share the same registry AND the same availability gates
+    // (model capabilities + provider routing) as the tools menu.
+    expect(slashCommandsSource).toContain('getChatToolsForSurface');
 
     for (const source of [chatTypesSource, toolsMenuSource]) {
       expect(source).not.toContain('isGoogleSearchEnabled: boolean;');

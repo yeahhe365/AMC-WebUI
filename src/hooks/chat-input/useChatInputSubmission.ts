@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { type AppSettings, type UploadedFile, type ChatSettings } from '@/types';
-import { areFilesStillProcessing, buildPendingChatInputSubmission } from '@/utils/chat-input/pendingSubmission';
+import { buildPendingChatInputSubmission } from '@/utils/chat-input/pendingSubmission';
 import { useLiveModeHandler, type LiveModeApi } from './useLiveModeHandler';
 import { useMessageQueue } from './useMessageQueue';
 
@@ -172,12 +172,13 @@ export const useChatInputSubmission = ({
 
   const {
     canQueueMessage,
-    activeQueuedSubmission,
+    activeQueuedSubmissions,
     queueCurrentSubmission,
-    queuePendingSubmission,
     cancelPendingSubmission,
     restoreQueuedSubmission,
     removeQueuedSubmission,
+    removeAllQueuedSubmissions,
+    reorderQueuedSubmissions,
   } = useMessageQueue({
     activeSessionId,
     modelId: currentChatSettings.modelId,
@@ -216,8 +217,10 @@ export const useChatInputSubmission = ({
         isFastMode,
       });
 
-      if (areFilesStillProcessing(selectedFiles)) {
-        queuePendingSubmission(submission);
+      if (
+        selectedFiles.some((file) => file.uploadState === 'failed' || file.uploadState === 'cancelled' || !!file.error)
+      ) {
+        setAppFileError(uploadFailureMessage);
         return;
       }
 
@@ -237,10 +240,11 @@ export const useChatInputSubmission = ({
       editingMessageId,
       inputText,
       isEditing,
-      queuePendingSubmission,
       quotes,
       selectedFiles,
+      setAppFileError,
       ttsContext,
+      uploadFailureMessage,
     ],
   );
 
@@ -254,11 +258,13 @@ export const useChatInputSubmission = ({
 
   return {
     canQueueMessage,
-    activeQueuedSubmission,
+    activeQueuedSubmissions,
     queueCurrentSubmission,
     cancelPendingUploadSend: cancelPendingSubmission,
     restoreQueuedSubmission,
     removeQueuedSubmission,
+    removeAllQueuedSubmissions,
+    reorderQueuedSubmissions,
     handleSubmit,
     handleFastSubmit,
     performSubmit,

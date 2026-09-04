@@ -8,6 +8,8 @@ export const LiveControls: React.FC = () => {
   const {
     isLiveConnected,
     isLiveMuted,
+    isLiveTranslate,
+    isLiveTranscribe,
     onStartLiveSession,
     onDisconnectLiveSession,
     onToggleLiveMute,
@@ -27,15 +29,20 @@ export const LiveControls: React.FC = () => {
   const stopVideoLabel = t('liveStopVideo');
   const muteLabel = isLiveMuted ? t('liveUnmuteMicrophone') : t('liveMuteMicrophone');
   const sessionLabel = isLiveConnected ? t('liveEndSession') : t('liveStartSession');
+  const idleButtonClass = `${CHAT_INPUT_BUTTON_CLASS} bg-transparent text-[var(--theme-icon-settings)] hover:bg-[var(--theme-bg-tertiary)]`;
+  const activeSourceClass = `${CHAT_INPUT_BUTTON_CLASS} bg-[var(--theme-bg-accent)]/10 text-[var(--theme-text-primary)]`;
+  const dangerButtonClass = `${CHAT_INPUT_BUTTON_CLASS} bg-[var(--theme-bg-danger)]/10 text-[var(--theme-text-danger)] hover:bg-[var(--theme-bg-danger)]/20`;
+
+  const supportsLiveVideo = !isLiveTranslate && !isLiveTranscribe;
 
   return (
     <>
-      {onStartLiveCamera && (
+      {supportsLiveVideo && onStartLiveCamera && (
         <button
           type="button"
           onClick={onStartLiveCamera}
           disabled={disabled || liveVideoSource === 'camera'}
-          className={`${CHAT_INPUT_BUTTON_CLASS} ${liveVideoSource === 'camera' ? 'bg-purple-500/10 text-purple-500' : 'bg-transparent text-[var(--theme-icon-settings)] hover:bg-[var(--theme-bg-tertiary)]'}`}
+          className={liveVideoSource === 'camera' ? activeSourceClass : idleButtonClass}
           aria-label={cameraLabel}
           title={cameraLabel}
         >
@@ -43,12 +50,12 @@ export const LiveControls: React.FC = () => {
         </button>
       )}
 
-      {onStartLiveScreenShare && (
+      {supportsLiveVideo && onStartLiveScreenShare && (
         <button
           type="button"
           onClick={onStartLiveScreenShare}
           disabled={disabled || liveVideoSource === 'screen'}
-          className={`${CHAT_INPUT_BUTTON_CLASS} ${liveVideoSource === 'screen' ? 'bg-purple-500/10 text-purple-500' : 'bg-transparent text-[var(--theme-icon-settings)] hover:bg-[var(--theme-bg-tertiary)]'}`}
+          className={liveVideoSource === 'screen' ? activeSourceClass : idleButtonClass}
           aria-label={screenShareLabel}
           title={screenShareLabel}
         >
@@ -61,7 +68,7 @@ export const LiveControls: React.FC = () => {
           type="button"
           onClick={onStopLiveVideo}
           disabled={disabled}
-          className={`${CHAT_INPUT_BUTTON_CLASS} bg-red-500/10 text-red-500 hover:bg-red-500/20`}
+          className={dangerButtonClass}
           aria-label={stopVideoLabel}
           title={stopVideoLabel}
         >
@@ -74,7 +81,7 @@ export const LiveControls: React.FC = () => {
           type="button"
           onClick={onToggleLiveMute}
           disabled={disabled}
-          className={`${CHAT_INPUT_BUTTON_CLASS} ${isLiveMuted ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-transparent text-[var(--theme-icon-settings)] hover:bg-[var(--theme-bg-tertiary)]'}`}
+          className={isLiveMuted ? dangerButtonClass : idleButtonClass}
           aria-label={muteLabel}
           title={muteLabel}
         >
@@ -87,7 +94,7 @@ export const LiveControls: React.FC = () => {
           type="button"
           onClick={handleSessionClick}
           disabled={disabled}
-          className={`${CHAT_INPUT_BUTTON_CLASS} ${isLiveConnected ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20 animate-pulse' : 'bg-purple-500/10 text-purple-500 hover:bg-purple-500/20'}`}
+          className={isLiveConnected ? dangerButtonClass : idleButtonClass}
           aria-label={sessionLabel}
           title={sessionLabel}
         >

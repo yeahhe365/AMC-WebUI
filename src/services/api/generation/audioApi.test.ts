@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { blobToBase64Mock, generateContentMock, getConfiguredApiClientMock } = vi.hoisted(() => ({
   blobToBase64Mock: vi.fn(),
@@ -13,12 +13,6 @@ vi.mock('@/services/api/apiClient', () => ({
 vi.mock('@/utils/file/fileEncoding', () => ({
   blobToBase64: blobToBase64Mock,
 }));
-
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
 
 import { generateSpeechApi, transcribeAudioApi } from './audioApi';
 
@@ -102,6 +96,82 @@ Jane: Thanks, it is great to be here.`,
   });
 });
 
+describe('generateSpeechApi timeout', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('passes an abort signal into the generateContent config so a stalled request can be cancelled', async () => {
+    generateContentMock.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [{ inlineData: { data: 'pcm-audio' } }],
+          },
+        },
+      ],
+    });
+
+    await generateSpeechApi(
+      'api-key',
+      'gemini-3.1-flash-tts-preview',
+      'Say hello',
+      'Aoede',
+      new AbortController().signal,
+    );
+
+    const request = generateContentMock.mock.calls[0][0];
+    expect(request.config.abortSignal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('rejects with a timeout error when the request exceeds the wall-clock budget', async () => {
+    vi.useFakeTimers();
+
+    generateContentMock.mockImplementation(
+      () =>
+        new Promise((_resolve) => {
+          // Never settles — simulates a stalled upstream.
+        }),
+    );
+
+    const promise = generateSpeechApi(
+      'api-key',
+      'gemini-3.1-flash-tts-preview',
+      'Say hello',
+      'Aoede',
+      new AbortController().signal,
+    );
+
+    const assertRejects = expect(promise).rejects.toThrow('timed out');
+
+    vi.advanceTimersByTime(30_000 + 1);
+
+    await assertRejects;
+  });
+
+  it('does not leak the timeout timer after a normal request settles', async () => {
+    vi.useFakeTimers();
+
+    generateContentMock.mockResolvedValue({
+      candidates: [{ content: { parts: [{ inlineData: { data: 'pcm-audio' } }] } }],
+    });
+
+    await generateSpeechApi(
+      'api-key',
+      'gemini-3.1-flash-tts-preview',
+      'Say hello',
+      'Aoede',
+      new AbortController().signal,
+    );
+
+    // Advancing far past the budget must not reject a settled request.
+    await expect(
+      Promise.race([Promise.resolve('done'), new Promise((r) => setTimeout(() => r('tick'), 0))]),
+    ).resolves.toBe('done');
+    vi.advanceTimersByTime(60_000);
+  });
+});
+
 describe('transcribeAudioApi request config', () => {
   const audioFile = new File(['voice'], 'voice.mp3', { type: 'audio/mpeg' });
 
@@ -116,56 +186,52 @@ describe('transcribeAudioApi request config', () => {
     generateContentMock.mockResolvedValue({ text: 'hello world' });
   });
 
-  it('instructs the model to transcribe voice input without translating or rewriting it', async () => {
-    await transcribeAudioApi('api-key', audioFile, 'gemini-3-flash-preview');
+  it('sends dedicated transcription payload with audio and prompt parts without developer instruction or thinking config', async () => {
+    await transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe');
 
-    expect(generateContentMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        contents: {
-          parts: [
-            { text: 'Transcribe voice input exactly.' },
-            {
-              inlineData: {
-                mimeType: 'audio/mpeg',
-                data: 'base64-audio',
-              },
+    expect(generateContentMock).toHaveBeenCalledWith({
+      model: 'gemini-3.5-transcribe',
+      contents: {
+        parts: [
+          { text: 'Transcribe voice input exactly.' },
+          {
+            inlineData: {
+              mimeType: 'audio/mpeg',
+              data: 'base64-audio',
             },
-          ],
-        },
-        config: expect.objectContaining({
-          systemInstruction: expect.stringContaining('只做 ASR'),
-        }),
-      }),
-    );
-
-    const request = generateContentMock.mock.calls[0][0];
-    expect(request.config.systemInstruction).toContain('保持原始语言和混合语言');
-    expect(request.config.systemInstruction).toContain('不要翻译、总结、回答、解释或描述音频');
-    expect(request.config.systemInstruction).toContain(
-      '尽量保留原词、语气词、代码、命令、URL、邮箱、数字、单位和专有名词',
-    );
-    expect(request.config.systemInstruction).toContain('不要补写音频中不存在的内容');
+          },
+        ],
+      },
+    });
   });
 
   it('returns an empty string when the model finds no recognizable speech', async () => {
     generateContentMock.mockResolvedValue({ text: '' });
 
-    await expect(transcribeAudioApi('api-key', audioFile, 'gemini-3-flash-preview')).resolves.toBe('');
+    await expect(transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe')).resolves.toBe('');
   });
 
-  it('uses LOW thinking for Gemini 3.1 Pro transcription because Pro does not support MINIMAL', async () => {
-    await transcribeAudioApi('api-key', audioFile, 'gemini-3.1-pro-preview');
-
-    expect(generateContentMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        config: expect.objectContaining({
-          thinkingConfig: {
-            includeThoughts: false,
-            thinkingLevel: 'LOW',
+  it('extracts transcription text from structured audioTranscription parts', async () => {
+    generateContentMock.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                audioTranscription: {
+                  text: '你好，这是语音转录测试',
+                },
+              },
+            ],
+            role: 'model',
           },
-        }),
-      }),
-    );
+          finishReason: 'STOP',
+        },
+      ],
+    });
+
+    const result = await transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe');
+    expect(result).toBe('你好，这是语音转录测试');
   });
 
   it('rejects unsupported Gemini audio MIME types before building the inline audio part', async () => {
@@ -177,5 +243,61 @@ describe('transcribeAudioApi request config', () => {
 
     expect(blobToBase64Mock).not.toHaveBeenCalled();
     expect(generateContentMock).not.toHaveBeenCalled();
+  });
+
+  it('normalizes legacy bare language codes to BCP-47 in the prompt and config', async () => {
+    await transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe', { language: 'zh' });
+
+    const call = generateContentMock.mock.calls[0][0];
+    expect(call.contents.parts[0].text).toContain('Primary language: cmn-Hans-CN.');
+    expect(call.config.audioTranscriptionConfig.languageCodes).toEqual(['cmn-Hans-CN']);
+  });
+
+  it('keeps already-canonical BCP-47 language codes untouched in prompt and config', async () => {
+    await transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe', { language: 'yue-Hant-HK' });
+
+    const call = generateContentMock.mock.calls[0][0];
+    expect(call.contents.parts[0].text).toContain('Primary language: yue-Hant-HK.');
+    expect(call.config.audioTranscriptionConfig.languageCodes).toEqual(['yue-Hant-HK']);
+  });
+
+  it('rejects with the prompt block reason instead of silently returning an empty transcript', async () => {
+    generateContentMock.mockResolvedValue({ promptFeedback: { blockReason: 'SAFETY' } });
+
+    await expect(transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe')).rejects.toThrow('SAFETY');
+  });
+
+  it('reports the actual finish reason without claiming a safety block', async () => {
+    generateContentMock.mockResolvedValue({ candidates: [{ finishReason: 'RECITATION' }] });
+
+    await expect(transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe')).rejects.toThrow('RECITATION');
+    await expect(transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe')).rejects.not.toThrow(/safety/i);
+  });
+
+  it('caps the custom vocabulary list at the model limit of 1000 terms', async () => {
+    const vocabulary = Array.from({ length: 1200 }, (_, index) => `term${index}`).join(', ');
+
+    await transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe', { customVocabulary: vocabulary });
+
+    const config = generateContentMock.mock.calls[0][0].config;
+    expect(config.audioTranscriptionConfig.customVocabulary).toHaveLength(1000);
+  });
+
+  it('keeps the custom vocabulary prompt instruction aligned with the capped list', async () => {
+    const vocabulary = Array.from({ length: 1200 }, (_, index) => `term${index}`).join(', ');
+
+    await transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe', { customVocabulary: vocabulary });
+
+    const call = generateContentMock.mock.calls[0][0];
+    expect(call.contents.parts[0].text).toContain('Custom vocabulary: term0, term1, term2');
+    expect(call.contents.parts[0].text).not.toContain('term1000');
+  });
+
+  it('sends speaker diarization as the documented `diarization` field', async () => {
+    await transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe', { speakerLabels: true });
+
+    const config = generateContentMock.mock.calls[0][0].config;
+    expect(config.audioTranscriptionConfig.diarization).toBe(true);
+    expect(config.audioTranscriptionConfig.speakerLabels).toBeUndefined();
   });
 });

@@ -5,12 +5,6 @@ import { setupStoreStateReset } from '@/test/stores/reset';
 import { ToolsMenu } from './ToolsMenu';
 import { createChatToolToggleStatesFromFlags } from '@/test/chat-tools/fixtures';
 
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
 const toolUtilityActions = {
   onCountTokens: () => {},
 };
@@ -71,7 +65,7 @@ describe('ToolsMenu', () => {
     expect(document.body.textContent).not.toContain('Add YouTube Video');
   });
 
-  it('hides unsupported built-in tools for Gemma models', () => {
+  it('hides all unsupported built-in tools for Gemma models', () => {
     act(() => {
       renderer.root.render(
         <ToolsMenu
@@ -90,11 +84,46 @@ describe('ToolsMenu', () => {
       toolsButton?.click();
     });
 
-    expect(document.body.textContent).toContain('Web Search');
-    expect(document.body.textContent).toContain('Deep Search');
-    expect(document.body.textContent).toContain('Pyodide');
+    // Gemma supports no API tools — no grounding, no function calling — so
+    // only the provider-agnostic helpers remain.
+    expect(document.body.textContent).not.toContain('Web Search');
+    expect(document.body.textContent).not.toContain('Deep Search');
+    expect(document.body.textContent).not.toContain('Maps');
+    expect(document.body.textContent).not.toContain('Pyodide');
     expect(document.body.textContent).not.toContain('Code Execution');
     expect(document.body.textContent).not.toContain('URL Context');
+    expect(document.body.textContent).toContain('Token Calculator');
+  });
+
+  it('hides Gemini built-in tools on third-party provider routes', () => {
+    act(() => {
+      renderer.root.render(
+        <ToolsMenu
+          currentModelId="gemini-2.5-flash"
+          providerId="openai"
+          toolStates={createChatToolToggleStatesFromFlags({ googleSearch: true, codeExecution: true })}
+          toolUtilityActions={toolUtilityActions}
+          disabled={false}
+        />,
+      );
+    });
+
+    const toolsButton = document.querySelector('button[aria-label="Tools"]') as HTMLButtonElement | null;
+    expect(toolsButton).not.toBeNull();
+
+    act(() => {
+      toolsButton?.click();
+    });
+
+    // Third-party request builders never read the Gemini tool settings, so
+    // offering them would only produce dead toggles.
+    expect(document.body.textContent).not.toContain('Web Search');
+    expect(document.body.textContent).not.toContain('Maps');
+    expect(document.body.textContent).not.toContain('Code Execution');
+    expect(document.body.textContent).not.toContain('Deep Search');
+    expect(document.body.textContent).not.toContain('URL Context');
+    expect(document.body.textContent).not.toContain('Pyodide');
+    expect(document.body.textContent).not.toContain('Token Calculator');
   });
 
   it('shows a combination notice when local Python and built-in tools are enabled on non-Gemini-3 models', () => {

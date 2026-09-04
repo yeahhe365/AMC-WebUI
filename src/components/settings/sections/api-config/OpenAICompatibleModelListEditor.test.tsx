@@ -1,7 +1,8 @@
-import { act } from 'react';
+import { act, useState } from 'react';
 import { setupProviderTestRenderer as setupTestRenderer } from '@/test/render/providerRenderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setupStoreStateReset } from '@/test/stores/reset';
+import type { ModelOption } from '@/types';
 import { OpenAICompatibleModelListEditor } from './OpenAICompatibleModelListEditor';
 
 const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement | null | undefined, value: string) => {
@@ -9,6 +10,38 @@ const setInputValue = (input: HTMLInputElement | HTMLTextAreaElement | null | un
   const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
   descriptor?.set?.call(input, value);
   input?.dispatchEvent(new Event('input', { bubbles: true }));
+};
+
+// A stateful parent harness: models/selectedModelId live in useState and are fed
+// back through onModelsChange, exactly like the real settings flow. Without
+// this, the editor never sees its own commits and the focus-loss regression
+// (sourceModelsKey captured the pre-commit external key) cannot reproduce.
+const StatefulEditorHarness = ({
+  initialModels,
+  initialSelectedModelId,
+}: {
+  initialModels: ModelOption[];
+  initialSelectedModelId: string;
+}) => {
+  const [models, setModels] = useState(initialModels);
+  const [selectedModelId, setSelectedModelId] = useState(initialSelectedModelId);
+
+  return (
+    <OpenAICompatibleModelListEditor
+      models={models}
+      selectedModelId={selectedModelId}
+      onModelsChange={setModels}
+      onSelectedModelChange={setSelectedModelId}
+    />
+  );
+};
+
+const typeIntoInput = (input: HTMLInputElement, nextValue: string) => {
+  act(() => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+    descriptor?.set?.call(input, nextValue);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
 };
 
 describe('OpenAICompatibleModelListEditor', () => {
@@ -307,5 +340,159 @@ describe('OpenAICompatibleModelListEditor', () => {
       { id: 'deepseek-chat', name: 'deepseek-chat' },
     ]);
     expect(document.body.textContent).toContain('Imported 1 models.');
+  });
+
+  it('explains why fetch is disabled when the connection is missing a key or URL', () => {
+    act(() => {
+      renderer.root.render(
+        <OpenAICompatibleModelListEditor
+          models={[{ id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', isPinned: true }]}
+          selectedModelId="gpt-5.6-sol"
+          onModelsChange={vi.fn()}
+          onSelectedModelChange={vi.fn()}
+          onFetchModelsForImportPreview={vi.fn()}
+          isFetchModelsDisabled
+        />,
+      );
+    });
+
+    const fetchButton = Array.from(renderer.container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Fetch Models'),
+    );
+    expect(fetchButton?.getAttribute('disabled')).not.toBeNull();
+    expect(fetchButton?.getAttribute('title')).toBe('Add an API key and Base URL to fetch models.');
+  });
+
+  describe('focus retention during editing (regression)', () => {
+    it('keeps focus on the Model ID input across consecutive keystrokes', () => {
+      act(() => {
+        renderer.root.render(
+          <StatefulEditorHarness
+            initialModels={[{ id: 'gpt-4', name: 'GPT-4', isPinned: true }]}
+            initialSelectedModelId="gpt-4"
+          />,
+        );
+      });
+
+      const idInput = renderer.container.querySelector<HTMLInputElement>(
+        'input[data-openai-compatible-model-id-input="true"]',
+      );
+      expect(idInput).not.toBeNull();
+      const originalNode = idInput;
+
+      typeIntoInput(idInput!, 'gpt-4');
+      typeIntoInput(idInput!, 'gpt-4.');
+      typeIntoInput(idInput!, 'gpt-4.5');
+
+      // The input node must be the same element the whole time — a remount
+      // (sourceModelsKey mismatch → fresh random rowId → new <input> node)
+      // would detach focus and replace the node.
+      const idInputAfter = renderer.container.querySelector<HTMLInputElement>(
+        'input[data-openai-compatible-model-id-input="true"]',
+      );
+      expect(idInputAfter).toBe(originalNode);
+      expect(idInputAfter?.value).toBe('gpt-4.5');
+    });
+
+    it('keeps focus on the Model Name input across consecutive keystrokes', () => {
+      act(() => {
+        renderer.root.render(
+          <StatefulEditorHarness
+            initialModels={[{ id: 'gpt-4', name: 'GPT', isPinned: true }]}
+            initialSelectedModelId="gpt-4"
+          />,
+        );
+      });
+
+      const nameInput = renderer.container.querySelector<HTMLInputElement>(
+        'input[data-openai-compatible-model-name-input="true"]',
+      );
+      expect(nameInput).not.toBeNull();
+      const originalNode = nameInput;
+
+      typeIntoInput(nameInput!, 'GPT-');
+      typeIntoInput(nameInput!, 'GPT-4');
+      typeIntoInput(nameInput!, 'GPT-4 Turbo');
+
+      const nameInputAfter = renderer.container.querySelector<HTMLInputElement>(
+        'input[data-openai-compatible-model-name-input="true"]',
+      );
+      expect(nameInputAfter).toBe(originalNode);
+      expect(nameInputAfter?.value).toBe('GPT-4 Turbo');
+    });
+
+    it('retains focus on a new row after adding and keeps typing', () => {
+      act(() => {
+        renderer.root.render(
+          <StatefulEditorHarness
+            initialModels={[{ id: 'gpt-4', name: 'GPT-4', isPinned: true }]}
+            initialSelectedModelId="gpt-4"
+          />,
+        );
+      });
+
+      act(() => {
+        const addButton = Array.from(renderer.container.querySelectorAll('button')).find((button) =>
+          button.textContent?.includes('Add Model'),
+        );
+        addButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const idInputs = Array.from(
+        renderer.container.querySelectorAll<HTMLInputElement>('input[data-openai-compatible-model-id-input="true"]'),
+      );
+      expect(idInputs.length).toBe(2);
+      const secondRowInput = idInputs[1];
+      const secondRowOriginal = secondRowInput;
+
+      typeIntoInput(secondRowInput, 'd');
+      typeIntoInput(secondRowInput, 'deepseek');
+      typeIntoInput(secondRowInput, 'deepseek-chat');
+
+      const idInputsAfter = Array.from(
+        renderer.container.querySelectorAll<HTMLInputElement>('input[data-openai-compatible-model-id-input="true"]'),
+      );
+      expect(idInputsAfter.length).toBe(2);
+      expect(idInputsAfter[1]).toBe(secondRowOriginal);
+      expect(idInputsAfter[1].value).toBe('deepseek-chat');
+    });
+
+    it('retains focus when removing a non-active row and editing the remaining one', () => {
+      act(() => {
+        renderer.root.render(
+          <StatefulEditorHarness
+            initialModels={[
+              { id: 'gpt-4', name: 'GPT-4', isPinned: true },
+              { id: 'gpt-4.5', name: 'GPT-4.5' },
+            ]}
+            initialSelectedModelId="gpt-4"
+          />,
+        );
+      });
+
+      const removeButtons = Array.from(renderer.container.querySelectorAll('button')).filter((button) =>
+        button.getAttribute('title')?.includes('Remove Model'),
+      );
+      expect(removeButtons.length).toBe(2);
+
+      act(() => {
+        // Remove the SECOND (non-active) row.
+        removeButtons[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+
+      const idInput = renderer.container.querySelector<HTMLInputElement>(
+        'input[data-openai-compatible-model-id-input="true"]',
+      );
+      const originalNode = idInput;
+
+      typeIntoInput(idInput!, 'gpt-');
+      typeIntoInput(idInput!, 'gpt-4.5');
+
+      const idInputAfter = renderer.container.querySelector<HTMLInputElement>(
+        'input[data-openai-compatible-model-id-input="true"]',
+      );
+      expect(idInputAfter).toBe(originalNode);
+      expect(idInputAfter?.value).toBe('gpt-4.5');
+    });
   });
 });

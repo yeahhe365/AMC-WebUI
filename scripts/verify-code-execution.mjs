@@ -92,7 +92,7 @@ async function main() {
     throw new Error('GEMINI_API_KEY is required.');
   }
 
-  const model = process.env.CODE_EXECUTION_MODEL || 'gemini-2.5-flash';
+  const model = process.env.CODE_EXECUTION_MODEL || 'gemini-3.8-flash';
   const ai = new GoogleGenAI({ apiKey });
 
   const tempCsvPath = path.join(os.tmpdir(), `codex-code-execution-${Date.now()}.csv`);

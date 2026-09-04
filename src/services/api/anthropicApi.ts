@@ -1,85 +1,43 @@
 import type { UsageMetadata } from '@google/genai';
-import { readResponseErrorMessage, toError } from '@/utils/errorMessage';
-import { deduplicateModelsById } from '@/utils/model/modelSorting';
 import type { ModelOption, NonStreamMessageSender, StreamMessageSender } from '@/types';
-import { logService } from '@/services/logService';
 import { buildAnthropicRequestBody } from './anthropicMessages';
 import { extractAnthropicMessageText, extractAnthropicMessageThoughts } from './anthropicResponses';
 import { readAnthropicStreamEvents } from './anthropicStream';
 import {
   asAnthropicChatConfig,
   mapAnthropicUsage,
-  type AnthropicModelsResponsePayload,
   type AnthropicResponsePayload,
   type AnthropicStreamEvent,
 } from './anthropicTypes';
 import { buildAnthropicMessagesUrl, buildAnthropicModelsUrl } from './anthropicUrls';
+import {
+  createApiRequestInitFactory,
+  executeNonStreamChatRequest,
+  executeStreamChatRequest,
+  fetchProviderModelOptions,
+} from './requestFactory';
 
 const ANTHROPIC_VERSION = '2023-06-01';
 
-// Tag every request with the provider id so the api container's third-party
-// proxy can look up the correct upstream route. Defaults to "anthropic".
-const THIRD_PARTY_PROVIDER_HEADER = 'x-third-party-provider';
-// In pure-BYOK mode (no server route table entry), the browser supplies the
-// provider's real baseUrl here so the proxy can forward without a configured
-// THIRD_PARTY_ROUTES entry.
-const THIRD_PARTY_BASE_URL_HEADER = 'x-third-party-base-url';
-
-const createRequestInit = (
-  apiKey: string,
-  body: Record<string, unknown>,
-  abortSignal: AbortSignal,
-  providerId?: string | null,
-  baseUrl?: string | null,
-): RequestInit => ({
-  method: 'POST',
-  headers: {
-    'x-api-key': apiKey,
-    'anthropic-version': ANTHROPIC_VERSION,
-    'content-type': 'application/json',
-    ...(providerId ? { [THIRD_PARTY_PROVIDER_HEADER]: providerId } : {}),
-    ...(baseUrl ? { [THIRD_PARTY_BASE_URL_HEADER]: baseUrl } : {}),
-  },
-  body: JSON.stringify(body),
-  signal: abortSignal,
+const anthropicAuthHeaders = (apiKey: string): Record<string, string> => ({
+  'x-api-key': apiKey,
+  'anthropic-version': ANTHROPIC_VERSION,
 });
 
-const createGetRequestInit = (
-  apiKey: string,
-  abortSignal: AbortSignal,
-  providerId?: string | null,
-  baseUrl?: string | null,
-): RequestInit => ({
-  method: 'GET',
-  headers: {
-    'x-api-key': apiKey,
-    'anthropic-version': ANTHROPIC_VERSION,
-    ...(providerId ? { [THIRD_PARTY_PROVIDER_HEADER]: providerId } : {}),
-    ...(baseUrl ? { [THIRD_PARTY_BASE_URL_HEADER]: baseUrl } : {}),
-  },
-  signal: abortSignal,
-});
+const { createRequestInit, createGetRequestInit } = createApiRequestInitFactory(anthropicAuthHeaders);
 
 export const fetchAnthropicModels = async (
   apiKey: string,
   baseUrl: string | null | undefined,
   abortSignal: AbortSignal,
   providerId?: string | null,
-): Promise<ModelOption[]> => {
-  const response = await fetch(
-    buildAnthropicModelsUrl(baseUrl),
-    createGetRequestInit(apiKey, abortSignal, providerId, baseUrl),
-  );
-  if (!response.ok) {
-    throw new Error(await readResponseErrorMessage(response, 'Anthropic'));
-  }
-  const payload = (await response.json()) as AnthropicModelsResponsePayload;
-  const rawModels = (payload.data ?? [])
-    .map((item) => (typeof item.id === 'string' ? item.id.trim() : ''))
-    .filter((id) => id.length > 0)
-    .map((id) => ({ id, name: id }));
-  return deduplicateModelsById(rawModels);
-};
+  extraHeaders?: Record<string, string> | null,
+): Promise<ModelOption[]> =>
+  fetchProviderModelOptions({
+    url: buildAnthropicModelsUrl(baseUrl),
+    requestInit: createGetRequestInit(apiKey, abortSignal, providerId, baseUrl, extraHeaders),
+    errorContextLabel: 'Anthropic',
+  });
 
 export const sendAnthropicMessageNonStream: NonStreamMessageSender = async (
   apiKey,
@@ -94,36 +52,27 @@ export const sendAnthropicMessageNonStream: NonStreamMessageSender = async (
   providerId,
 ) => {
   const anthropicConfig = asAnthropicChatConfig(config);
-  try {
-    if (abortSignal.aborted) {
-      onComplete([], undefined, undefined, undefined, undefined);
-      return;
-    }
-    const response = await fetch(
-      buildAnthropicMessagesUrl(anthropicConfig.baseUrl),
+  await executeNonStreamChatRequest<AnthropicResponsePayload>({
+    requestUrl: () => buildAnthropicMessagesUrl(anthropicConfig.baseUrl),
+    requestInit: () =>
       createRequestInit(
         apiKey,
         buildAnthropicRequestBody(modelId, history, parts, anthropicConfig, role, false),
         abortSignal,
         providerId,
         anthropicConfig.baseUrl,
+        anthropicConfig.extraHeaders,
       ),
-    );
-    if (!response.ok) {
-      throw new Error(await readResponseErrorMessage(response, 'Anthropic'));
-    }
-    const payload = (await response.json()) as AnthropicResponsePayload;
-    if (abortSignal.aborted) {
-      onComplete([], undefined, undefined, undefined, undefined);
-      return;
-    }
-    const text = extractAnthropicMessageText(payload);
-    const thoughts = extractAnthropicMessageThoughts(payload);
-    onComplete(text ? [{ text }] : [], thoughts, mapAnthropicUsage(payload.usage), undefined, undefined);
-  } catch (error) {
-    logService.error('Anthropic non-stream request failed:', error);
-    onError(toError(error));
-  }
+    errorContextLabel: 'Anthropic',
+    failureLogLabel: 'Anthropic non-stream request failed:',
+    abortSignal,
+    onError,
+    onComplete,
+    toCompletionArgs: (payload) => {
+      const text = extractAnthropicMessageText(payload);
+      return [text ? [{ text }] : [], extractAnthropicMessageThoughts(payload), mapAnthropicUsage(payload.usage)];
+    },
+  });
 };
 
 export const sendAnthropicMessageStream: StreamMessageSender = async (
@@ -142,43 +91,52 @@ export const sendAnthropicMessageStream: StreamMessageSender = async (
 ) => {
   const anthropicConfig = asAnthropicChatConfig(config);
   let finalUsage: UsageMetadata | undefined;
-  try {
-    if (abortSignal.aborted) {
-      onComplete(undefined, undefined, undefined);
-      return;
-    }
-    const response = await fetch(
-      buildAnthropicMessagesUrl(anthropicConfig.baseUrl),
+  await executeStreamChatRequest({
+    requestUrl: () => buildAnthropicMessagesUrl(anthropicConfig.baseUrl),
+    requestInit: () =>
       createRequestInit(
         apiKey,
         buildAnthropicRequestBody(modelId, history, parts, anthropicConfig, role, true),
         abortSignal,
         providerId,
         anthropicConfig.baseUrl,
+        anthropicConfig.extraHeaders,
       ),
-    );
-    if (!response.ok) {
-      throw new Error(await readResponseErrorMessage(response, 'Anthropic'));
-    }
-    await readAnthropicStreamEvents(response, abortSignal, (event: AnthropicStreamEvent) => {
-      if (event.type === 'content_block_delta' && event.delta?.text) {
-        onPart({ text: event.delta.text });
-      }
-      if (event.type === 'content_block_delta' && event.delta?.type === 'thinking_delta' && event.delta.thinking) {
-        onThoughtChunk(event.delta.thinking);
-      }
-      if (event.usage) {
-        const usage = mapAnthropicUsage(event.usage);
-        if (usage) finalUsage = usage;
-      }
-      if (event.type === 'message_delta' && event.usage) {
-        const usage = mapAnthropicUsage(event.usage);
-        if (usage) finalUsage = usage;
-      }
-    });
-    onComplete(finalUsage, undefined, undefined);
-  } catch (error) {
-    logService.error('Anthropic stream request failed:', error);
-    onError(toError(error));
-  }
+    errorContextLabel: 'Anthropic',
+    failureLogLabel: 'Anthropic stream request failed:',
+    abortSignal,
+    onError,
+    onComplete,
+    readStream: async (response) => {
+      // Anthropic 把完整 usage 拆在两个事件里：message_start 携带 input_tokens，
+      // message_delta 只带累计 output_tokens；必须合并才能得到真实的 token 统计。
+      let inputTokens: number | undefined;
+      await readAnthropicStreamEvents(response, abortSignal, (event: AnthropicStreamEvent) => {
+        if (event.type === 'content_block_delta' && event.delta?.text) {
+          onPart({ text: event.delta.text });
+        }
+        if (event.type === 'content_block_delta' && event.delta?.type === 'thinking_delta' && event.delta.thinking) {
+          onThoughtChunk(event.delta.thinking);
+        }
+        // 流中 error 事件（如 overloaded_error）：不抛出会把截断的回答当成功收尾。
+        // 抛出让 executeStreamChatRequest 走 onError，已流出的部分内容由上层保留。
+        if (event.type === 'error') {
+          throw new Error(event.error?.message || 'Anthropic stream error');
+        }
+        if (event.type === 'message_start' && event.message?.usage) {
+          inputTokens = event.message.usage.input_tokens;
+          const startUsage = mapAnthropicUsage(event.message.usage);
+          if (startUsage) finalUsage = startUsage;
+        }
+        if (event.usage) {
+          const usage = mapAnthropicUsage({
+            input_tokens: event.usage.input_tokens ?? inputTokens,
+            output_tokens: event.usage.output_tokens,
+          });
+          if (usage) finalUsage = usage;
+        }
+      });
+      return finalUsage;
+    },
+  });
 };

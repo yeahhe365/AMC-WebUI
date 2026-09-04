@@ -1,31 +1,25 @@
 import React from 'react';
 import { useI18n } from '@/contexts/I18nContext';
-import { type AppSettings } from '@/types';
+import type { AppSettings } from '@/types';
+import { SUPPORTED_LANGUAGES, LANGUAGE_META } from '@/i18n/languageRegistry';
+import { Select } from '@/components/shared/Select';
 import {
-  SETTINGS_SECTION_CARD_CLASS,
   SETTINGS_SEGMENTED_ACTIVE_CLASS,
   SETTINGS_SEGMENTED_IDLE_CLASS,
   SETTINGS_SEGMENTED_TRACK_CLASS,
+  SETTINGS_SECTION_CARD_CLASS,
 } from '@/constants/designTokens';
 
-interface ThemeLanguageSelectorProps {
+export const ThemeLanguageSelector: React.FC<{
   settings: AppSettings;
   onUpdate: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
-}
-
-export const ThemeLanguageSelector: React.FC<ThemeLanguageSelectorProps> = ({ settings, onUpdate }) => {
+}> = ({ settings, onUpdate }) => {
   const { t } = useI18n();
   const themeOptions = [
     { id: 'system', labelKey: 'settingsThemeSystem' },
     { id: 'onyx', labelKey: 'settingsThemeDark' },
     { id: 'graphite', labelKey: 'settingsThemeGray' },
     { id: 'pearl', labelKey: 'settingsThemeLight' },
-  ] as const;
-
-  const languageOptions = [
-    { id: 'system', label: t('settingsLanguageSystem') },
-    { id: 'en', label: t('settingsLanguageEn') },
-    { id: 'zh', label: t('settingsLanguageZh') },
   ] as const;
 
   return (
@@ -57,20 +51,21 @@ export const ThemeLanguageSelector: React.FC<ThemeLanguageSelectorProps> = ({ se
         data-settings-item="interface-language"
       >
         <span className="text-sm font-medium text-[var(--theme-text-primary)]">{t('settingsLanguage')}</span>
-        <div className={SETTINGS_SEGMENTED_TRACK_CLASS} role="group" aria-label={t('settingsLanguage')}>
-          {languageOptions.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => onUpdate('language', option.id as AppSettings['language'])}
-              className={
-                settings.language === option.id ? SETTINGS_SEGMENTED_ACTIVE_CLASS : SETTINGS_SEGMENTED_IDLE_CLASS
-              }
-            >
-              {option.label}
-            </button>
+        <Select
+          id="interface-language-select"
+          label={t('settingsLanguage')}
+          hideLabel
+          value={settings.language}
+          onChange={(e) => onUpdate('language', e.target.value as AppSettings['language'])}
+          wrapperClassName="w-44"
+        >
+          <option value="system">{t('settingsLanguageSystem')}</option>
+          {SUPPORTED_LANGUAGES.map((id) => (
+            <option key={id} value={id}>
+              {LANGUAGE_META[id].nativeLabel}
+            </option>
           ))}
-        </div>
+        </Select>
       </div>
     </div>
   );

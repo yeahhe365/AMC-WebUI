@@ -55,7 +55,10 @@ export const useMessageLifecycle = ({
 }: UseMessageLifecycleParams) => {
   const { handleApiError } = useApiErrorHandler(updateAndPersistSessions);
 
-  const createLifecycleLoadingModelMessage = useCallback(createLoadingModelMessage, []);
+  const createLifecycleLoadingModelMessage = useCallback(
+    (params: LoadingModelMessageParams) => createLoadingModelMessage(params),
+    [],
+  );
 
   const startMessageLifecycle = useCallback(
     (sessionId: string, generationId: string, abortController: AbortController): boolean => {

@@ -30,12 +30,6 @@ const { localStorageMock } = vi.hoisted(() => {
   return { localStorageMock: mock };
 });
 
-vi.mock('@/services/db/dbService', async () => {
-  const { createDbServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createDbServiceMockModule();
-});
-
 vi.mock('@/utils/chat/ids', () => ({
   generateUniqueId: () => 'generated-id',
 }));
@@ -50,12 +44,6 @@ vi.mock('@/utils/chat/session', () => ({
     timestamp: Date.now(),
   })),
 }));
-
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
 
 describe('usePreloadedScenarios', () => {
   beforeEach(() => {

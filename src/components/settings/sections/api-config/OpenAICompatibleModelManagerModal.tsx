@@ -53,14 +53,14 @@ export const OpenAICompatibleModelManagerModal: React.FC<OpenAICompatibleModelMa
             >
               {t('settingsOpenAICompatibleManageModels')}
             </h3>
-            <p className="mt-0.5 text-xs text-[var(--theme-text-tertiary)]">
+            <p className="mt-0.5 text-xs text-[var(--theme-text-secondary)]">
               {t('settingsOpenAICompatibleManageModelsHelp')}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-[var(--theme-text-tertiary)] transition-colors hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)]"
+            className="rounded-md p-1.5 text-[var(--theme-text-secondary)] transition-colors hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)]"
             aria-label={t('close')}
           >
             <X size={18} />

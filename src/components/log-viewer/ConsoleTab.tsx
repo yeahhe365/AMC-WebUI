@@ -14,9 +14,18 @@ interface ConsoleTabProps {
   hasMore: boolean;
   onFetchMore: () => void;
   onClear: () => void;
+  /** Set when the logging toggle is off, so the empty state explains why. */
+  loggingDisabled?: boolean;
 }
 
-export const ConsoleTab: React.FC<ConsoleTabProps> = ({ logs, isLoading, hasMore, onFetchMore, onClear }) => {
+export const ConsoleTab: React.FC<ConsoleTabProps> = ({
+  logs,
+  isLoading,
+  hasMore,
+  onFetchMore,
+  onClear,
+  loggingDisabled = false,
+}) => {
   const { t } = useI18n();
   const [filterText, setFilterText] = useState('');
   const [activeCategory, setActiveCategory] = useState<LogCategory | 'ALL'>('ALL');
@@ -116,6 +125,7 @@ export const ConsoleTab: React.FC<ConsoleTabProps> = ({ logs, isLoading, hasMore
           <div className="flex flex-col items-center justify-center h-full text-[var(--theme-text-tertiary)] opacity-50">
             <Terminal size={48} className="mb-2" />
             <p>{t('logViewerNoLogs')}</p>
+            {loggingDisabled && <p className="mt-2 text-xs opacity-80">{t('logViewerLoggingDisabledHint')}</p>}
           </div>
         ) : (
           filteredLogs.map((log) => <LogRow key={log.id || log.timestamp.toISOString()} log={log} />)

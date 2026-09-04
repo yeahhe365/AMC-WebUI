@@ -10,6 +10,7 @@ import { base64ToBlob, blobToBase64 } from '@/utils/file/fileEncoding';
 import { getVisibleChatMessages } from './visibility';
 import { createManagedObjectUrl, releaseManagedObjectUrlsByOwner } from '@/services/objectUrlManager';
 import { TAB_ID } from '@/stores/tabIdentity';
+import { redactExportedSessionSettings } from '@/utils/secretRedaction';
 
 const logSessionWarning = (message: string, data?: unknown) => {
   console.warn(`[session] ${message}`, data);
@@ -39,9 +40,11 @@ export const createNewSession = (
   messages: ChatMessage[] = [],
   title: string = 'New Chat',
   groupId: string | null = null,
+  titleSource: SavedChatSession['titleSource'] = 'default',
 ): SavedChatSession => ({
   id: generateUniqueId(),
   title,
+  titleSource,
   messages,
   settings,
   timestamp: Date.now(),
@@ -74,24 +77,34 @@ export const cloneMessagesWithFreshIds = (messages: ChatMessage[]): ChatMessage[
   }));
 };
 
+const TITLE_MAX_WORDS = 7;
+const TITLE_MAX_SPACELESS_CHARS = 30;
+
+/** Take the first N words; for spaceless text (e.g. CJK) truncate by character count. */
+const truncateTitleText = (content: string, maxSpacelessChars = TITLE_MAX_SPACELESS_CHARS): string => {
+  const trimmed = content.trim();
+  const words = trimmed.split(/\s+/);
+  if (words.length > TITLE_MAX_WORDS) {
+    return words.slice(0, TITLE_MAX_WORDS).join(' ') + '...';
+  }
+  // Spaceless text (Chinese/Japanese etc.) cannot be shortened by word-splitting — truncate by chars.
+  if (words.length === 1 && trimmed.length > maxSpacelessChars) {
+    return trimmed.slice(0, maxSpacelessChars) + '…';
+  }
+  return trimmed;
+};
+
 export const generateSessionTitle = (messages: ChatMessage[]): string => {
   const visibleMessages = getVisibleChatMessages(messages);
   const firstUserMessage = visibleMessages.find((message) => message.role === 'user' && message.content.trim() !== '');
   if (firstUserMessage) {
-    return (
-      firstUserMessage.content.split(/\s+/).slice(0, 7).join(' ') +
-      (firstUserMessage.content.split(/\s+/).length > 7 ? '...' : '')
-    );
+    return truncateTitleText(firstUserMessage.content);
   }
   const firstModelMessage = visibleMessages.find(
     (message) => message.role === 'model' && message.content.trim() !== '',
   );
   if (firstModelMessage) {
-    return (
-      'Model: ' +
-      firstModelMessage.content.split(/\s+/).slice(0, 5).join(' ') +
-      (firstModelMessage.content.split(/\s+/).length > 5 ? '...' : '')
-    );
+    return 'Model: ' + truncateTitleText(firstModelMessage.content);
   }
   const firstFile = visibleMessages.find((message) => message.files && message.files.length > 0)?.files?.[0];
   if (firstFile) {
@@ -280,6 +293,7 @@ const serializeFileForPortableExport = async (file: UploadedFile): Promise<Uploa
 
 export const serializeSessionForPortableExport = async (session: SavedChatSession): Promise<SavedChatSession> => ({
   ...session,
+  settings: redactExportedSessionSettings(session.settings),
   messages: await Promise.all(session.messages.map(serializeMessageForPortableExport)),
 });
 
@@ -346,6 +360,9 @@ export const performOptimisticSessionUpdate = (
     ...session,
     messages: finalMessages,
     title: title || session.title,
+    // A freshly-heuristic title returns the session to the auto-titlable state;
+    // otherwise preserve the existing origin (manual/auto stay untouched).
+    titleSource: title ? 'default' : session.titleSource,
     settings: updatedSettings,
     timestamp: newMessages.length > 0 ? Date.now() : session.timestamp,
   };

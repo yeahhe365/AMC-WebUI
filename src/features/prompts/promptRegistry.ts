@@ -1,8 +1,9 @@
 import { LOCAL_PYTHON_SYSTEM_PROMPT } from './localPython';
 import type { LiveArtifactsPromptMode } from '@/types';
 
-type PromptLanguage = 'en' | 'zh';
-type LiveArtifactsPromptTheme = 'dark' | 'light';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
+
+type PromptLanguage = SupportedLanguage;
 type LiveArtifactsPromptModule = typeof import('./liveArtifacts');
 
 const LIVE_ARTIFACTS_PROMPT_MARKERS = [
@@ -36,9 +37,11 @@ export const isBboxSystemInstruction = (instruction?: string | null) =>
 export const isHdGuideSystemInstruction = (instruction?: string | null) =>
   !!instruction && instruction.includes(HD_GUIDE_PROMPT_MARKER);
 
+// Languages without a dedicated Live Artifacts prompt (ja, ko, es, fr, de)
+// fall back to the EN prompt via the `?? .en` lookup below, hence Partial.
 const LIVE_ARTIFACT_PROMPT_EXPORT_BY_MODE: Record<
   LiveArtifactsPromptMode,
-  Record<PromptLanguage, keyof LiveArtifactsPromptModule>
+  { en: keyof LiveArtifactsPromptModule } & Partial<Record<PromptLanguage, keyof LiveArtifactsPromptModule>>
 > = {
   inline: {
     en: 'LIVE_ARTIFACTS_INLINE_SYSTEM_PROMPT_EN',
@@ -49,10 +52,10 @@ const LIVE_ARTIFACT_PROMPT_EXPORT_BY_MODE: Record<
 export const loadLiveArtifactsSystemPrompt = async (
   language: PromptLanguage = 'zh',
   mode: LiveArtifactsPromptMode = 'inline',
-  _theme?: LiveArtifactsPromptTheme,
 ) => {
   const prompts = await import('./liveArtifacts');
-  return prompts[LIVE_ARTIFACT_PROMPT_EXPORT_BY_MODE[mode][language]];
+  const key = LIVE_ARTIFACT_PROMPT_EXPORT_BY_MODE[mode][language] ?? LIVE_ARTIFACT_PROMPT_EXPORT_BY_MODE[mode].en;
+  return prompts[key];
 };
 
 export const loadDeepSearchSystemPrompt = async () => (await import('./deepSearch')).DEEP_SEARCH_SYSTEM_PROMPT;

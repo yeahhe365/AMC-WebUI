@@ -2,6 +2,7 @@ import { act } from 'react';
 import { setupProviderTestRenderer as setupTestRenderer } from '@/test/render/providerRenderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setupStoreStateReset } from '@/test/stores/reset';
+import type { ApiMode } from '@/types';
 import { ModelListEditor } from './ModelListEditor';
 
 describe('ModelListEditor', () => {
@@ -153,7 +154,7 @@ describe('ModelListEditor', () => {
               isPinned: true,
               apiMode: 'gemini-native',
             },
-            { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', isPinned: false, apiMode: 'openai-compatible' },
+            { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', isPinned: false, apiMode: 'openai-compatible' as ApiMode },
           ]}
           onSave={onSave}
           setIsEditingList={vi.fn()}

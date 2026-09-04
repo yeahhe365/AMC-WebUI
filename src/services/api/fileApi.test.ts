@@ -12,12 +12,6 @@ vi.mock('./apiClient', () => ({
   getConfiguredApiClientContext: getConfiguredApiClientContextMock,
 }));
 
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
 import { uploadFileApi } from './fileApi';
 
 const uploadXhr = createFakeResumableUploadXhr({

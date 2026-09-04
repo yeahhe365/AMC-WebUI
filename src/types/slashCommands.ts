@@ -3,4 +3,6 @@ export interface SlashCommand {
   description: string;
   icon: string;
   action: () => void;
+  isSelected?: boolean;
+  disabled?: boolean;
 }

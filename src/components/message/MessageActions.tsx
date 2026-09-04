@@ -1,22 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS } from '@/constants/focusClasses';
-import {
-  User,
-  AlertTriangle,
-  Edit3,
-  Trash2,
-  RotateCw,
-  Pencil,
-  CirclePlay,
-  MoreHorizontal,
-  GitBranch,
-} from 'lucide-react';
+import { User, AlertTriangle, Edit3, Trash2, RefreshCw, Pencil, CirclePlay, MoreHorizontal } from 'lucide-react';
 import { type ChatMessage } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
 import { ExportMessageButton } from './buttons/ExportMessageButton';
 import { MessageCopyButton } from './buttons/MessageCopyButton';
 import { useIsMobile, useResponsiveValue } from '@/hooks/useDevice';
 import { useWindowContext } from '@/contexts/WindowContext';
+import { IconBranch } from '@/components/icons';
 
 const AvatarWrapper: React.FC<{
   children: React.ReactNode;
@@ -182,7 +173,7 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
             aria-label={message.isLoading ? t('retryAndStopButtonTitle') : t('retryButtonTitle')}
             className={actionButtonClasses}
           >
-            <RotateCw size={actionIconSize} strokeWidth={2} />
+            <RefreshCw size={actionIconSize} strokeWidth={2} />
           </button>
         )}
 
@@ -234,7 +225,7 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
                     aria-label={t('forkMessageTitle')}
                     className={menuItemClasses}
                   >
-                    <GitBranch size={14} strokeWidth={2} />
+                    <IconBranch size={14} />
                     <span>{t('forkMessageTitle')}</span>
                   </button>
                 )}

@@ -215,4 +215,49 @@ describe('useDataExport history roundtrip', () => {
 
     exportHook.unmount();
   });
+
+  it('keeps non-sensitive stdio MCP env vars when exporting settings', async () => {
+    const exportHook = renderHook(() =>
+      useDataExport({
+        appSettings: createAppSettings({
+          mcpServers: [
+            {
+              id: 'local',
+              name: 'Local MCP',
+              enabled: true,
+              transport: 'stdio',
+              command: 'npx',
+              env: {
+                API_TOKEN: 'env-secret-value',
+                HOME: '/Users/tester',
+                LOG_LEVEL: 'debug',
+                DB_PASSWORD: 'another-secret',
+              },
+            },
+          ],
+        }),
+        savedGroups: [],
+        savedScenarios: [],
+        t: (key) => key,
+      }),
+    );
+
+    act(() => {
+      exportHook.result.current.handleExportSettings();
+    });
+
+    const exportedBlob = createObjectURLMock.mock.calls[0][0] as Blob;
+    const exported = JSON.parse(await exportedBlob.text()) as {
+      settings: {
+        mcpServers: Array<{ env?: Record<string, string> }>;
+      };
+    };
+
+    expect(exported.settings.mcpServers[0].env).toEqual({
+      HOME: '/Users/tester',
+      LOG_LEVEL: 'debug',
+    });
+
+    exportHook.unmount();
+  });
 });

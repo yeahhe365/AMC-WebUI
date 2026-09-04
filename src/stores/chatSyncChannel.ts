@@ -18,3 +18,13 @@ export function broadcastSyncMessage(syncMessage: SyncMessage) {
     // Ignore sync failures in unsupported or restricted environments.
   }
 }
+
+// Test-only reset helper to allow singleton isolation after centralized flush changes
+export function _resetSyncChannelForTests(): void {
+  try {
+    syncChannel?.close();
+  } catch {
+    // Ignore close failures in restricted contexts
+  }
+  syncChannel = null;
+}

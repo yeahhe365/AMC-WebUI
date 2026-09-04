@@ -35,13 +35,6 @@ export const createFileSystemDirectoryEntry = (
     },
   }) as unknown as FileSystemDirectoryEntry;
 
-export const createDataTransferItemsFromEntries = (entries: FileSystemEntry[]): DataTransferItemList =>
-  entries.map((entry) => ({
-    kind: 'file',
-    webkitGetAsEntry: () => entry,
-    getAsFile: () => (entry.isFile ? new File([''], entry.name) : null),
-  })) as unknown as DataTransferItemList;
-
 export const createFileSystemFileHandle = (name: string, content: string): FileSystemFileHandle =>
   ({
     kind: 'file',

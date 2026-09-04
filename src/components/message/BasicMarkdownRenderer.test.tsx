@@ -109,6 +109,63 @@ describe('BasicMarkdownRenderer', () => {
     expect(image?.getAttribute('src')).toBe('blob:generated-plot');
   });
 
+  it('renders server code execution blocks inside the code-execution card', () => {
+    renderMarkdown({
+      content:
+        '\n\n<pre class="code-exec-code"><code class="language-python">print(&quot;hi&quot;)&#10;&#10;print(&quot;bye&quot;)</code></pre>\n\n' +
+        '\n\n<div class="tool-result outcome-ok"><pre><code class="language-text">hi&#10;bye</code></pre></div>\n\n',
+      allowHtml: true,
+    });
+
+    const card = renderer.container.querySelector('[data-code-execution="true"]');
+    expect(card).not.toBeNull();
+
+    const text = renderer.container.textContent || '';
+    expect(text).toContain('Code Execution');
+    expect(text).toContain('Execution Complete');
+    // Blank code lines survive the single-line HTML block encoding.
+    expect(text).toContain('print("hi")');
+    expect(text).toContain('print("bye")');
+    expect(text).toContain('hi\nbye');
+
+    // Copy + download actions are always reachable (no hover gating).
+    expect(renderer.container.querySelector('button[title="Copy Output"]')).not.toBeNull();
+    expect(renderer.container.querySelector('button[title="Download Output"]')).not.toBeNull();
+  });
+
+  it('hides the legacy baked result header and shows the localized one instead', () => {
+    renderMarkdown({
+      content:
+        '<div class="tool-result outcome-ok"><strong>Execution Result (OUTCOME_OK):</strong><pre><code>out</code></pre></div>',
+      allowHtml: true,
+    });
+
+    const text = renderer.container.textContent || '';
+    expect(text).not.toContain('Execution Result (OUTCOME_OK)');
+    expect(text).toContain('Execution Complete');
+  });
+
+  it('shows the running state on the code-execution card while the sandbox has no result yet', () => {
+    renderMarkdown({
+      content: '\n\n<pre class="code-exec-code"><code class="language-python">x = 1</code></pre>\n\n',
+      allowHtml: true,
+      hasPendingCodeExecution: true,
+    });
+
+    const text = renderer.container.textContent || '';
+    expect(text).toContain('Running code…');
+    expect(renderer.container.querySelector('[aria-live="polite"]')).not.toBeNull();
+  });
+
+  it('keeps the localized result header for an unknown outcome', () => {
+    renderMarkdown({
+      content: '<div class="tool-result outcome-outcome_unspecified"><pre><code>?</code></pre></div>',
+      allowHtml: true,
+    });
+
+    expect(renderer.container.textContent).toContain('Execution Result Unknown');
+  });
+
   it('preserves safe inline styles in allowed raw html', () => {
     renderMarkdown({
       content:
@@ -200,7 +257,9 @@ describe('BasicMarkdownRenderer', () => {
 
     expect(table).not.toBeNull();
     expect(table?.className).not.toContain('rich-html-table');
-    expect(table?.className).toContain('w-max');
+    // Markdown tables carry no data-layout attribute; column sizing is
+    // table-layout: auto in CSS.
+    expect(table?.getAttribute('data-layout')).toBeNull();
   });
 
   it('strips raw html positioning attributes that can escape the markdown surface', () => {

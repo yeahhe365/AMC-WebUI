@@ -1,26 +1,23 @@
 import { logService } from '@/services/logService';
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Maximize2 } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import { useWindowContext } from '@/contexts/WindowContext';
+import { SMALL_ICON_BUTTON_CLASS } from '@/constants/buttonClasses';
 import {
   buildStreamingHtmlPreviewRenderPayload,
   buildHtmlPreviewSrcDoc,
   buildStreamingHtmlPreviewSrcDoc,
+  whenKatexReady,
   HTML_PREVIEW_CLEAR_SELECTION_EVENT,
-  HTML_PREVIEW_COPY_EVENT,
-  HTML_PREVIEW_DIAGNOSTIC_EVENT,
   HTML_PREVIEW_MESSAGE_CHANNEL,
   HTML_PREVIEW_STREAM_RENDER_EVENT,
 } from '@/utils/html-preview/previewDocument';
-import {
-  normalizeLiveArtifactFollowupPayload,
-  type LiveArtifactFollowupPayload,
-} from '@/utils/live-artifacts/liveArtifactFollowup';
-import {
-  createRelayedLiveArtifactSelectionDetail,
-  dispatchLiveArtifactSelection,
-  LIVE_ARTIFACT_CLEAR_SELECTION_EVENT,
-} from '@/utils/text-selection/liveArtifactSelection';
+import { HTML_PREVIEW_SANDBOX } from '@/utils/html-preview/previewPrivilege';
+import { useHtmlPreviewBridge } from '@/hooks/ui/useHtmlPreviewBridge';
+import { useHtmlPreviewGraphvizRelay } from '@/hooks/ui/useHtmlPreviewGraphvizRelay';
+import { type LiveArtifactFollowupPayload } from '@/utils/live-artifacts/liveArtifactFollowup';
+import { LIVE_ARTIFACT_CLEAR_SELECTION_EVENT } from '@/utils/text-selection/liveArtifactSelection';
 
 interface ArtifactFrameProps {
   html: string;
@@ -29,14 +26,8 @@ interface ArtifactFrameProps {
   baseFontSize?: number;
   themeId?: string;
   onFollowUp?: (payload: LiveArtifactFollowupPayload) => void;
+  onOpenPreview?: () => void;
 }
-
-type HtmlPreviewBridgeMessage = {
-  channel?: string;
-  event?: 'ready' | 'escape' | 'resize' | 'followup' | 'selection' | 'copy' | 'diagnostic';
-  height?: number;
-  payload?: unknown;
-};
 
 const MIN_FRAME_HEIGHT = 120;
 const DEFAULT_FRAME_HEIGHT = 320;
@@ -95,10 +86,16 @@ export const ArtifactFrame: React.FC<ArtifactFrameProps> = ({
   baseFontSize,
   themeId,
   onFollowUp,
+  onOpenPreview,
 }) => {
   const { t } = useI18n();
   const { window: targetWindow } = useWindowContext();
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  useHtmlPreviewGraphvizRelay({
+    iframeRef,
+    privilege: 'sanitized',
+    themeId,
+  });
   const latestStreamingHtmlRef = useRef(html);
   const isLoadingRef = useRef(isLoading);
   const lastPostedStreamingHtmlRef = useRef<string | null>(null);
@@ -114,14 +111,28 @@ export const ArtifactFrame: React.FC<ArtifactFrameProps> = ({
     heightCacheKey,
     height: readCachedFrameHeight(heightCacheKey, streamingHeightCacheKey),
   }));
+  // Incremented when KaTeX finishes loading so the final srcDoc (which embeds
+  // rendered math) is recomputed after the first render skipped the formulas.
+  const [katexReadyTick, setKatexReadyTick] = useState(0);
+  const finalSrcDoc = useMemo(() => {
+    // Guard: while streaming, the iframe renders `streamingSrcDoc` (live,
+    // chunk-by-chunk via postMessage) and `finalSrcDoc` is unused. Building it
+    // every chunk would re-run the full DOMParser + sanitize + inject pipeline
+    // for content the iframe cannot see yet. Deferring the build to the end of
+    // the stream keeps the heavy final pass off the hot path.
+    if (isLoading) {
+      return '';
+    }
+    // katexReadyTick is an intentional invalidation token: reading it ties the
+    // memo to the lazy KaTeX load so the first render (which skips formulas)
+    // is recomputed once the chunk has arrived.
+    void katexReadyTick;
+    return buildHtmlPreviewSrcDoc(html, { baseFontSize, themeId });
+  }, [baseFontSize, html, isLoading, katexReadyTick, themeId]);
   const frameHeight =
     frameHeightState.heightCacheKey === heightCacheKey
       ? frameHeightState.height
       : readCachedFrameHeight(heightCacheKey, streamingHeightCacheKey);
-  const finalSrcDoc = useMemo(
-    () => buildHtmlPreviewSrcDoc(html, { baseFontSize, themeId }),
-    [baseFontSize, html, themeId],
-  );
   const srcDoc = isLoading ? streamingSrcDoc : finalSrcDoc;
 
   useLayoutEffect(() => {
@@ -223,92 +234,80 @@ export const ArtifactFrame: React.FC<ArtifactFrameProps> = ({
   }, [clearStreamingFlushTimeout]);
 
   useEffect(() => {
-    const handleMessage = (event: MessageEvent<HtmlPreviewBridgeMessage>) => {
-      const data = event.data;
-      if (!data || data.channel !== HTML_PREVIEW_MESSAGE_CHANNEL) {
-        return;
-      }
-
-      // Sandboxed iframes without allow-same-origin post messages from the opaque origin "null".
-      if (event.origin !== 'null') {
-        return;
-      }
-
-      const iframeWindow = iframeRef.current?.contentWindow;
-      if (iframeWindow && event.source !== iframeWindow) {
-        return;
-      }
-
-      // Bridge ready means the streaming runner is listening — re-push HTML that may
-      // have been posted too early (or lost during Virtuoso remount).
-      if (data.event === 'ready') {
-        flushStreamingHtmlNow(true);
-        return;
-      }
-
-      if (data.event === 'selection') {
-        dispatchLiveArtifactSelection(
-          targetWindow,
-          createRelayedLiveArtifactSelectionDetail(iframeRef.current, data.payload),
-        );
-        return;
-      }
-
-      if (data.event === 'followup') {
-        const payload = normalizeLiveArtifactFollowupPayload(data.payload);
-        if (!payload) {
-          logService.warn('Ignored invalid Live Artifact follow-up payload.');
-          return;
+    if (isLoading) {
+      return;
+    }
+    // When the final srcDoc first meets a TeX delimiter, renderPreviewMath
+    // returns it unrendered and kicks off the lazy KaTeX load. Re-render once
+    // the chunk is available so embedded formulas appear. The promise resolves
+    // immediately after the first load, so this is a no-op on later frames.
+    let cancelled = false;
+    void whenKatexReady()
+      .then(() => {
+        if (!cancelled) {
+          setKatexReadyTick((tick) => tick + 1);
         }
-
-        onFollowUp?.(payload);
-        return;
-      }
-
-      if (data.event === HTML_PREVIEW_COPY_EVENT) {
-        const copyText =
-          data.payload && typeof data.payload === 'object' && 'text' in data.payload
-            ? (data.payload as { text?: unknown }).text
-            : undefined;
-        if (typeof copyText === 'string' && copyText.trim()) {
-          // The sandboxed iframe lacks allow-same-origin, so navigator.clipboard
-          // is unavailable there; the parent page writes to the clipboard instead.
-          targetWindow.navigator.clipboard?.writeText(copyText).catch((error: unknown) => {
-            logService.warn('Failed to copy Live Artifact text:', error);
-          });
-        }
-        return;
-      }
-
-      if (data.event === HTML_PREVIEW_DIAGNOSTIC_EVENT) {
-        logService.warn('Live Artifact preview diagnostic:', data.payload);
-        return;
-      }
-
-      if (data.event !== 'resize') {
-        return;
-      }
-
-      if (typeof data.height === 'number' && Number.isFinite(data.height)) {
-        const nextHeight = normalizeFrameHeight(data.height);
-        cacheFrameHeight(heightCacheKey, nextHeight);
-        if (heightCacheKey !== contentHeightCacheKey) {
-          cacheFrameHeight(contentHeightCacheKey, nextHeight);
-        }
-        if (streamingHeightCacheKey && heightCacheKey !== streamingHeightCacheKey) {
-          cacheFrameHeight(streamingHeightCacheKey, nextHeight);
-        }
-        setFrameHeightState((currentState) =>
-          currentState.heightCacheKey === heightCacheKey && currentState.height === nextHeight
-            ? currentState
-            : { heightCacheKey, height: nextHeight },
-        );
-      }
+      })
+      .catch(() => {
+        // The lazy KaTeX load failed (offline / chunk error). Nothing to tick:
+        // the next render that sees a math delimiter will attempt the load
+        // again, so the failure is not permanent.
+      });
+    return () => {
+      cancelled = true;
     };
+  }, [isLoading]);
 
-    targetWindow.addEventListener('message', handleMessage);
-    return () => targetWindow.removeEventListener('message', handleMessage);
-  }, [contentHeightCacheKey, flushStreamingHtmlNow, heightCacheKey, onFollowUp, streamingHeightCacheKey, targetWindow]);
+  const flushStreamingHtmlOnBridgeReady = useCallback(() => {
+    // Prefer refs so remount/load races always flush the latest streaming html.
+    flushStreamingHtmlNow(true);
+  }, [flushStreamingHtmlNow]);
+
+  const copyToParentClipboard = useCallback(
+    (text: string) => {
+      // The sandboxed iframe lacks allow-same-origin, so navigator.clipboard
+      // is unavailable there; the parent page writes to the clipboard instead.
+      targetWindow.navigator.clipboard?.writeText(text).catch((error: unknown) => {
+        logService.warn('Failed to copy Live Artifact text:', error);
+      });
+    },
+    [targetWindow],
+  );
+
+  const handleBridgeResize = useCallback(
+    (height: number) => {
+      const nextHeight = normalizeFrameHeight(height);
+      cacheFrameHeight(heightCacheKey, nextHeight);
+      // While streaming, only the streaming key is written so the content
+      // (final-html) cache is not polluted with intermediate frame heights.
+      // The streaming key is not derived from the message content, so each
+      // write replaces the same entry instead of churning the LRU.
+      if (!isLoading && heightCacheKey !== contentHeightCacheKey) {
+        cacheFrameHeight(contentHeightCacheKey, nextHeight);
+      }
+      if (streamingHeightCacheKey && heightCacheKey !== streamingHeightCacheKey) {
+        cacheFrameHeight(streamingHeightCacheKey, nextHeight);
+      }
+      setFrameHeightState((currentState) =>
+        currentState.heightCacheKey === heightCacheKey && currentState.height === nextHeight
+          ? currentState
+          : { heightCacheKey, height: nextHeight },
+      );
+    },
+    [contentHeightCacheKey, heightCacheKey, isLoading, streamingHeightCacheKey],
+  );
+
+  useHtmlPreviewBridge({
+    iframeRef,
+    targetWindow,
+    privilege: 'sanitized',
+    handlers: {
+      onReady: flushStreamingHtmlOnBridgeReady,
+      onResize: handleBridgeResize,
+      onCopy: copyToParentClipboard,
+      onFollowUp,
+    },
+  });
 
   useEffect(() => {
     const handleClearSelection = () => {
@@ -343,7 +342,7 @@ export const ArtifactFrame: React.FC<ArtifactFrameProps> = ({
           className="h-full w-full border-0 bg-transparent"
           // SECURITY: allow-same-origin is intentionally omitted (opaque origin).
           // allow-popups enables target="_blank" external links in Live Artifacts.
-          sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"
+          sandbox={HTML_PREVIEW_SANDBOX.sanitized}
           allow="clipboard-write"
           scrolling="no"
           onLoad={() => {
@@ -352,6 +351,17 @@ export const ArtifactFrame: React.FC<ArtifactFrameProps> = ({
           }}
         />
       </div>
+      {onOpenPreview && !isLoading && (
+        <button
+          type="button"
+          className={`${SMALL_ICON_BUTTON_CLASS} absolute right-2 top-2 z-10 border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)]/90 shadow-sm opacity-100 sm:opacity-0 sm:group-hover/artifact:opacity-100 sm:focus-visible:opacity-100 sm:group-focus-within/artifact:opacity-100`}
+          title={t('htmlPreviewOpenLarger')}
+          aria-label={t('htmlPreviewOpenLarger')}
+          onClick={onOpenPreview}
+        >
+          <Maximize2 size={16} strokeWidth={2} />
+        </button>
+      )}
     </div>
   );
 };

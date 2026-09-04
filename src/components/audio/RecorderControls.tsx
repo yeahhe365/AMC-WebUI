@@ -1,58 +1,66 @@
 import React from 'react';
-import { Mic, Square, Trash2, Check, Loader2, X } from 'lucide-react';
+import { Square, Trash2, Check, Loader2, X, Pause, Play, RotateCcw } from 'lucide-react';
 import { type RecorderState } from '@/features/audio/useAudioRecorder';
 import { useI18n } from '@/contexts/I18nContext';
 
 interface RecorderControlsProps {
   viewState: RecorderState;
-  isInitializing: boolean;
   isSaving: boolean;
-  onStart?: () => void;
+  isPaused: boolean;
   onStop: () => void;
   onCancel: () => void;
   onDiscard: () => void;
   onSave: () => void;
+  onPause: () => void;
+  onResume: () => void;
+  onRerecord: () => void;
 }
+
+const ICON_BUTTON_CLASS =
+  'w-11 h-11 flex items-center justify-center rounded-lg bg-[var(--theme-bg-tertiary)]/45 text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)] transition-colors';
 
 export const RecorderControls: React.FC<RecorderControlsProps> = ({
   viewState,
-  isInitializing,
   isSaving,
-  onStart,
+  isPaused,
   onStop,
   onCancel,
   onDiscard,
   onSave,
+  onPause,
+  onResume,
+  onRerecord,
 }) => {
   const { t } = useI18n();
 
-  if (viewState === 'idle' && !onStart) {
+  // The idle state restarts recording from the source list above, so it needs
+  // no footer actions of its own.
+  if (viewState === 'idle') {
     return null;
   }
 
   return (
     <div className="px-5 py-4 bg-[var(--theme-bg-primary)] flex justify-center gap-3">
-      {viewState === 'idle' && onStart && (
-        <button
-          onClick={onStart}
-          disabled={isInitializing}
-          className="flex items-center gap-2 px-5 py-2.5 bg-[var(--theme-bg-accent)] hover:bg-[var(--theme-bg-accent-hover)] text-[var(--theme-text-accent)] rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isInitializing ? <Loader2 size={20} className="animate-spin" /> : <Mic size={20} />}
-          {t('audioRecorderStartRecording')}
-        </button>
-      )}
-
       {viewState === 'recording' && (
         <>
           <button
             onClick={onCancel}
-            className="w-11 h-11 flex items-center justify-center rounded-lg bg-[var(--theme-bg-tertiary)]/45 text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)] transition-colors"
+            className={ICON_BUTTON_CLASS}
             title={t('audioRecorderCancelRecording')}
             aria-label={t('audioRecorderCancelRecording')}
           >
             <X size={20} />
           </button>
+
+          <button
+            onClick={isPaused ? onResume : onPause}
+            className={ICON_BUTTON_CLASS}
+            title={isPaused ? t('audioRecorderResume') : t('audioRecorderPause')}
+            aria-label={isPaused ? t('audioRecorderResume') : t('audioRecorderPause')}
+          >
+            {isPaused ? <Play size={18} fill="currentColor" /> : <Pause size={18} fill="currentColor" />}
+          </button>
+
           <button
             onClick={onStop}
             className="h-11 px-5 flex items-center justify-center gap-2 rounded-lg bg-red-500 hover:bg-red-600 text-white shadow-sm transition-colors"
@@ -74,6 +82,14 @@ export const RecorderControls: React.FC<RecorderControlsProps> = ({
           >
             <Trash2 size={18} />
             {t('audioRecorderDiscard')}
+          </button>
+          <button
+            onClick={onRerecord}
+            disabled={isSaving}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--theme-bg-tertiary)]/45 text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)] transition-colors disabled:opacity-50"
+          >
+            <RotateCcw size={18} />
+            {t('audioRecorderRerecord')}
           </button>
           <button
             onClick={onSave}

@@ -1,16 +1,19 @@
 import { useCallback } from 'react';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import { type SavedChatSession, type Theme } from '@/types';
 import { logService } from '@/services/logService';
+import { toastError } from '@/stores/toastStore';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 import { createChatExportElement } from './ChatExportRenderer';
 import { serializeSessionForPortableExport } from '@/utils/chat/session';
 import { triggerDownload } from '@/utils/export/core';
 import { buildChatExportFilename, createExportDateMeta, loadExportRuntime } from '@/utils/export/runtime';
+import { formatI18nErrorMessage } from '@/i18n/interpolate';
 
 interface UseChatSessionExportProps {
   activeChat: SavedChatSession | undefined;
   currentTheme: Theme;
-  language: 'en' | 'zh';
+  language: SupportedLanguage;
   t: (key: string) => string;
 }
 
@@ -33,6 +36,7 @@ export const useChatSessionExport = ({ activeChat, currentTheme, language, t }: 
         const chatClone = await prepareElementForExport(exportElement, {
           expandDetails: format === 'png',
           forPng: format === 'png',
+          themeId: currentTheme.id,
         });
 
         try {
@@ -50,7 +54,7 @@ export const useChatSessionExport = ({ activeChat, currentTheme, language, t }: 
                 scale: 2,
                 messages: {
                   imageTooLarge: t('exportImageTooLarge'),
-                  exportFailed: (message) => t('exportFailedWithMessage').replace('{message}', message),
+                  exportFailed: (message) => formatI18nErrorMessage(t, 'exportFailedWithMessage', message),
                 },
               },
             );
@@ -105,7 +109,7 @@ export const useChatSessionExport = ({ activeChat, currentTheme, language, t }: 
           triggerDownload(createManagedObjectUrl(blob), filename);
         } catch (error) {
           logService.error('Failed to export chat as JSON', { error });
-          alert(t('exportFailedTitle'));
+          toastError(t('exportFailedTitle'));
           return false;
         }
       }

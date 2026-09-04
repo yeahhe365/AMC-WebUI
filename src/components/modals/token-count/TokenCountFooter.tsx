@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '@/contexts/I18nContext';
 import { Loader2, Trash2, RefreshCw } from 'lucide-react';
+import { SETTINGS_PRIMARY_ACTION_BUTTON_CLASS } from '@/constants/buttonClasses';
 
 interface TokenCountFooterProps {
   tokenCount: number | null;
@@ -28,7 +29,7 @@ export const TokenCountFooter: React.FC<TokenCountFooterProps> = ({
             <span className="text-xs text-[var(--theme-text-tertiary)] font-medium uppercase tracking-wide">
               {t('tokenModalEstimatedTokens')}
             </span>
-            <span className="text-2xl font-bold text-[var(--theme-text-link)] font-mono tabular-nums">
+            <span className="text-lg font-semibold text-[var(--theme-text-primary)] font-mono tabular-nums">
               {tokenCount.toLocaleString()}{' '}
               <span className="text-sm font-sans font-normal text-[var(--theme-text-secondary)]">
                 {t('tokensUnit')}
@@ -45,7 +46,7 @@ export const TokenCountFooter: React.FC<TokenCountFooterProps> = ({
             <span className="text-xs text-[var(--theme-text-tertiary)] font-medium uppercase tracking-wide">
               {t('tokenModalVideoEstimate')}
             </span>
-            <span className="text-2xl font-bold text-[var(--theme-text-link)] font-mono tabular-nums">
+            <span className="text-lg font-semibold text-[var(--theme-text-primary)] font-mono tabular-nums">
               {videoTokenEstimate.toLocaleString()}{' '}
               <span className="text-sm font-sans font-normal text-[var(--theme-text-secondary)]">
                 {t('tokensUnit')}
@@ -68,7 +69,7 @@ export const TokenCountFooter: React.FC<TokenCountFooterProps> = ({
         <button
           onClick={onCalculate}
           disabled={isLoading || !hasContent}
-          className="px-5 py-2 text-sm font-bold bg-[var(--theme-bg-accent)] hover:bg-[var(--theme-bg-accent-hover)] text-[var(--theme-text-accent)] rounded-lg shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          className={SETTINGS_PRIMARY_ACTION_BUTTON_CLASS}
         >
           {isLoading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
           {t('tokenModalCount')}

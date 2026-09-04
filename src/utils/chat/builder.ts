@@ -7,6 +7,7 @@ import { blobToBase64, fileToString } from '@/utils/file/fileEncoding';
 import { getFileKindFlags, isImageMimeType, isTextFile } from '@/utils/file/fileTypeClassification';
 
 import { usesRemoteFileReference } from './fileTransferStrategy';
+import { formatHistoryFileApiUnavailablePartText } from './geminiFilesApi';
 import { stripReasoningMarkup } from './reasoning';
 
 export const GEMINI_IMAGE_HISTORY_REHYDRATION_ERROR =
@@ -17,7 +18,6 @@ const isGeminiImageHistoryTarget = (modelId?: string): boolean => {
 
   const normalizedId = normalizeModelId(modelId);
   return (
-    normalizedId.includes('gemini-2.5-flash-image') ||
     normalizedId === 'gemini-3-pro-image-preview' ||
     normalizedId === 'gemini-3.1-flash-image-preview' ||
     normalizedId === 'gemini-3.1-flash-lite-image'
@@ -71,6 +71,10 @@ const buildFilePart = async (
 ): Promise<{ file: UploadedFile; part: ContentPart | null }> => {
   const enrichedFile = { ...file };
   let part: ContentPart | null = null;
+
+  if (file.omittedFromApiHistory) {
+    return { file: enrichedFile, part: { text: formatHistoryFileApiUnavailablePartText(file.name) } };
+  }
 
   if (file.isProcessing || file.error || file.uploadState !== 'active') {
     return { file: enrichedFile, part };

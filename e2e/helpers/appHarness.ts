@@ -1,7 +1,15 @@
 import type { Page } from '@playwright/test';
+import {
+  DB_NAME,
+  DB_STORE_DEFS,
+  DB_VERSION,
+  FILES_STORE,
+  GROUPS_STORE,
+  KEY_VALUE_STORE,
+  SCENARIOS_STORE,
+  SESSIONS_STORE,
+} from '@/services/db/dbSchema';
 
-const DB_NAME = 'AllModelChatDB';
-const DB_VERSION = 5;
 const ACTIVE_SESSION_STORAGE_KEY = 'activeChatSessionId';
 
 interface SeededSession {
@@ -19,6 +27,55 @@ interface SeededSession {
 }
 
 type SeededAppSettings = Record<string, unknown>;
+
+/**
+ * Structured-clone-safe snapshot of the production IndexedDB schema. It is
+ * built from src/services/db/dbSchema.ts so the E2E seed cannot drift from the
+ * real migration path (store set, keyPaths, indexes), and it is passed into
+ * page.evaluate() as plain data because evaluate arguments must survive
+ * structured cloning — module references and closures do not.
+ */
+export interface SerializableDbSchema {
+  dbName: string;
+  dbVersion: number;
+  stores: Array<{
+    name: string;
+    options?: IDBObjectStoreParameters;
+    indexes?: Array<{ name: string; keyPath: string; unique: boolean }>;
+  }>;
+  seedStores: {
+    sessions: string;
+    files: string;
+    groups: string;
+    scenarios: string;
+    keyValue: string;
+  };
+}
+
+export const getSerializableDbSchema = (): SerializableDbSchema => ({
+  dbName: DB_NAME,
+  dbVersion: DB_VERSION,
+  stores: DB_STORE_DEFS.map((storeDef) => ({
+    name: storeDef.name,
+    ...(storeDef.options ? { options: { ...storeDef.options } } : {}),
+    ...(storeDef.indexes
+      ? {
+          indexes: storeDef.indexes.map((index) => ({
+            name: index.name,
+            keyPath: index.keyPath,
+            unique: index.unique ?? false,
+          })),
+        }
+      : {}),
+  })),
+  seedStores: {
+    sessions: SESSIONS_STORE,
+    files: FILES_STORE,
+    groups: GROUPS_STORE,
+    scenarios: SCENARIOS_STORE,
+    keyValue: KEY_VALUE_STORE,
+  },
+});
 
 export async function installMockPyodideWorker(page: Page) {
   await page.addInitScript(() => {
@@ -116,57 +173,40 @@ export async function seedAppState(
   await page.goto('/e2e-seed.html');
 
   await page.evaluate(
-    async ({ dbName, dbVersion, activeSessionStorageKey, session, appSettings }) => {
-      const sessionStoreName = 'sessions';
-      const filesStoreName = 'files';
-      const groupStoreName = 'groups';
-      const scenarioStoreName = 'scenarios';
-      const keyValueStoreName = 'keyValueStore';
-      const logsStoreName = 'logs';
-      const apiUsageStoreName = 'api_usage';
+    async ({ schema, activeSessionStorageKey, session, appSettings }) => {
+      const sessionStoreName = schema.seedStores.sessions;
+      const filesStoreName = schema.seedStores.files;
+      const groupStoreName = schema.seedStores.groups;
+      const scenarioStoreName = schema.seedStores.scenarios;
+      const keyValueStoreName = schema.seedStores.keyValue;
 
       await new Promise<void>((resolve) => {
-        const deleteRequest = indexedDB.deleteDatabase(dbName);
+        const deleteRequest = indexedDB.deleteDatabase(schema.dbName);
         deleteRequest.onsuccess = () => resolve();
         deleteRequest.onerror = () => resolve();
         deleteRequest.onblocked = () => resolve();
       });
 
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
-        const request = indexedDB.open(dbName, dbVersion);
+        const request = indexedDB.open(schema.dbName, schema.dbVersion);
 
         request.onupgradeneeded = () => {
           const nextDb = request.result;
 
-          if (!nextDb.objectStoreNames.contains(sessionStoreName)) {
-            nextDb.createObjectStore(sessionStoreName, { keyPath: 'id' });
-          }
-          if (!nextDb.objectStoreNames.contains(filesStoreName)) {
-            const filesStore = nextDb.createObjectStore(filesStoreName, { keyPath: 'id' });
-            filesStore.createIndex('sessionId', 'sessionId', { unique: false });
-          }
-          if (!nextDb.objectStoreNames.contains(groupStoreName)) {
-            nextDb.createObjectStore(groupStoreName, { keyPath: 'id' });
-          }
-          if (!nextDb.objectStoreNames.contains(scenarioStoreName)) {
-            nextDb.createObjectStore(scenarioStoreName, { keyPath: 'id' });
-          }
-          if (!nextDb.objectStoreNames.contains(keyValueStoreName)) {
-            nextDb.createObjectStore(keyValueStoreName);
-          }
-          if (!nextDb.objectStoreNames.contains(logsStoreName)) {
-            const logStore = nextDb.createObjectStore(logsStoreName, {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            logStore.createIndex('timestamp', 'timestamp', { unique: false });
-          }
-          if (!nextDb.objectStoreNames.contains(apiUsageStoreName)) {
-            const usageStore = nextDb.createObjectStore(apiUsageStoreName, {
-              keyPath: 'id',
-              autoIncrement: true,
-            });
-            usageStore.createIndex('timestamp', 'timestamp', { unique: false });
+          // Mirrors createStoreIfMissing() in src/services/db/dbSchema.ts with
+          // the same serialized store shapes, so the seeded DB is byte-for-byte
+          // the structure the production migration path would create.
+          for (const storeDef of schema.stores) {
+            if (nextDb.objectStoreNames.contains(storeDef.name)) {
+              continue;
+            }
+
+            const objectStore = storeDef.options
+              ? nextDb.createObjectStore(storeDef.name, storeDef.options)
+              : nextDb.createObjectStore(storeDef.name);
+            for (const index of storeDef.indexes ?? []) {
+              objectStore.createIndex(index.name, index.keyPath, { unique: index.unique });
+            }
           }
         };
 
@@ -211,8 +251,7 @@ export async function seedAppState(
       });
     },
     {
-      dbName: DB_NAME,
-      dbVersion: DB_VERSION,
+      schema: getSerializableDbSchema(),
       activeSessionStorageKey: ACTIVE_SESSION_STORAGE_KEY,
       session: options.session,
       appSettings: options.appSettings,

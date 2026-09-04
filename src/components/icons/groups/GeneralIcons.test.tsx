@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@/test/render/renderer';
-import { IconNewGroup, IconSidebarToggle } from './GeneralIcons';
+import { IconBranch, IconNewGroup, IconSidebarToggle } from './GeneralIcons';
 
 describe('GeneralIcons', () => {
   it('renders the sidebar toggle as two horizontal lines', () => {
@@ -27,5 +27,19 @@ describe('GeneralIcons', () => {
     expect(paths).toHaveLength(2);
     expect(paths[0]?.getAttribute('d')).toContain('M20 17');
     expect(paths[1]?.getAttribute('d')).toContain('M2 8v11');
+  });
+
+  it('renders the DSH branch glyph as a filled 16-grid path', () => {
+    const { container } = render(<IconBranch size={14} />);
+
+    const svg = container.querySelector('svg');
+    const paths = Array.from(container.querySelectorAll('path'));
+
+    expect(svg?.getAttribute('viewBox')).toBe('0 0 16 16');
+    expect(svg?.getAttribute('fill')).toBe('none');
+    expect(paths).toHaveLength(1);
+    expect(paths[0]?.getAttribute('fill')).toBe('currentColor');
+    expect(paths[0]?.getAttribute('fill-rule')).toBe('evenodd');
+    expect(paths[0]?.getAttribute('d')).toMatch(/^M13\.0762 1\.37207/);
   });
 });

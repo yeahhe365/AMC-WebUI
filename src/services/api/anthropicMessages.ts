@@ -1,7 +1,9 @@
 import type { Part } from '@google/genai';
 import type { ChatHistoryItem, ThinkingLevel } from '@/types';
 import { isImageMimeType } from '@/utils/file/fileTypeClassification';
+import { isAnthropicEffortModel } from '@/utils/model/modelCapabilities';
 import type { AnthropicChatConfig, AnthropicContentBlock, AnthropicMessage } from './anthropicTypes';
+import { appendSamplingParameters } from './requestFactory';
 
 const ANTHROPIC_FILE_DATA_ERROR = 'Anthropic mode cannot send Gemini Files API file references.';
 
@@ -73,26 +75,6 @@ const buildAnthropicMessages = (
 const ANTHROPIC_OUTPUT_TOKENS = 8192;
 const ANTHROPIC_MIN_THINKING_BUDGET = 1024;
 
-/**
- * Models that use adaptive thinking + output_config.effort.
- * Manual extended thinking (`thinking: { type: "enabled", budget_tokens }`) is rejected
- * on Claude Sonnet 5 / Opus 5 / Opus 4.8 / Fable 5 — use effort instead.
- */
-const isAnthropicEffortModel = (modelId: string): boolean => {
-  const id = modelId.toLowerCase();
-  if (/fable|mythos/.test(id)) {
-    return true;
-  }
-  // Claude 5 family and recent 4.6–4.8 Opus/Sonnet effort models.
-  if (
-    /claude-opus-5|claude-sonnet-5|claude-opus-4-[678]|claude-sonnet-4-6/.test(id) ||
-    /opus-5|sonnet-5|opus-4\.[678]|sonnet-4\.6/.test(id)
-  ) {
-    return true;
-  }
-  return false;
-};
-
 const mapThinkingLevelToAnthropicEffort = (level: ThinkingLevel | undefined): 'low' | 'medium' | 'high' => {
   switch (level) {
     case 'MINIMAL':
@@ -114,22 +96,29 @@ export const buildAnthropicRequestBody = (
   role: 'user' | 'model',
   stream: boolean,
 ): Record<string, unknown> => {
+  const customMaxTokens =
+    typeof config.maxOutputTokens === 'number' && config.maxOutputTokens > 0
+      ? config.maxOutputTokens
+      : ANTHROPIC_OUTPUT_TOKENS;
+
   const body: Record<string, unknown> = {
     model: modelId,
     messages: buildAnthropicMessages(history, parts, role),
     stream,
-    max_tokens: ANTHROPIC_OUTPUT_TOKENS,
+    max_tokens: customMaxTokens,
   };
 
   const systemInstruction = config.systemInstruction?.trim();
   if (systemInstruction) {
     body.system = systemInstruction;
   }
-  if (typeof config.temperature === 'number') {
-    body.temperature = config.temperature;
-  }
-  if (typeof config.topP === 'number') {
-    body['top_p'] = config.topP;
+  appendSamplingParameters(body, config);
+
+  if (Array.isArray(config.stopSequences) && config.stopSequences.length > 0) {
+    const validStops = config.stopSequences.map((s) => s.trim()).filter(Boolean);
+    if (validStops.length > 0) {
+      body.stop_sequences = validStops;
+    }
   }
 
   if (isAnthropicEffortModel(modelId)) {
@@ -140,6 +129,10 @@ export const buildAnthropicRequestBody = (
     const budgetTokens = Math.max(ANTHROPIC_MIN_THINKING_BUDGET, config.thinkingBudget);
     body.thinking = { type: 'enabled', budget_tokens: budgetTokens };
     body.max_tokens = budgetTokens + ANTHROPIC_OUTPUT_TOKENS;
+    // Anthropic rejects modified sampling while thinking is enabled (temperature
+    // must stay 1, top_p must be omitted) — drop both instead of failing the request.
+    delete body.temperature;
+    delete body.top_p;
   }
 
   return body;

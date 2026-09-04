@@ -671,4 +671,371 @@ describe('MCP routes', () => {
       },
     });
   });
+
+  it('reports per-server errors for structurally invalid MCP configs instead of silently dropping them', async () => {
+    const listTools = vi.fn(async () => [{ name: 'echo', description: 'Echo', inputSchema: {} }]);
+    const app = createServer(
+      {
+        geminiApiBase: 'https://example.test',
+        geminiApiKey: 'server-key',
+        enableMcpStdio: true,
+      },
+      {
+        mcpClient: {
+          listTools,
+          callTool: vi.fn(),
+        },
+      },
+    );
+    const started = serverCleanup.track(await startHttpServer(app));
+
+    const response = await fetch(`${started.baseUrl}/api/mcp/tools`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        servers: [
+          { id: 'no-command', name: 'No Command', enabled: true, transport: 'stdio' },
+          { id: 'no-name', enabled: true, transport: 'stdio', command: 'npx' },
+          { id: 'bad-transport', name: 'Bad Transport', enabled: true, transport: 'grpc' },
+          { id: 'no-url', name: 'No URL', enabled: true, transport: 'http' },
+          {
+            id: 'valid',
+            name: 'Valid',
+            enabled: true,
+            transport: 'stdio',
+            command: 'node',
+            args: ['server.js'],
+          },
+        ],
+      }),
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      servers: [
+        {
+          serverId: 'valid',
+          serverName: 'Valid',
+          tools: [{ name: 'echo', description: 'Echo', inputSchema: {} }],
+        },
+      ],
+      errors: [
+        { serverId: 'no-command', serverName: 'No Command', error: 'MCP stdio server requires a command.' },
+        { serverId: 'no-name', serverName: '(missing name)', error: 'MCP server configuration is missing a name.' },
+        {
+          serverId: 'bad-transport',
+          serverName: 'Bad Transport',
+          error: 'MCP server transport must be stdio, http, or sse.',
+        },
+        { serverId: 'no-url', serverName: 'No URL', error: 'MCP http/sse server requires a URL.' },
+      ],
+    });
+    expect(listTools).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns a distinct error when calling a tool on a disabled MCP server', async () => {
+    const callTool = vi.fn();
+    const app = createServer(
+      {
+        geminiApiBase: 'https://example.test',
+        geminiApiKey: 'server-key',
+      },
+      {
+        mcpClient: {
+          listTools: vi.fn(),
+          callTool,
+        },
+      },
+    );
+    const started = serverCleanup.track(await startHttpServer(app));
+
+    const response = await fetch(`${started.baseUrl}/api/mcp/call`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        server: {
+          id: 'remote',
+          name: 'Remote',
+          enabled: false,
+          transport: 'http',
+          url: 'https://mcp.example.com/mcp',
+        },
+        toolName: 'echo',
+        args: { text: 'hi' },
+      }),
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({ error: 'MCP server is disabled.' });
+    expect(callTool).not.toHaveBeenCalled();
+  });
+
+  it('GET /api/mcp/logs returns 200 ring', async () => {
+    const getLogs = vi.fn(() => [{ level: 'info', message: 'hi', timestamp: Date.now() }]);
+    const app = createServer(
+      {
+        geminiApiBase: 'https://example.test',
+        geminiApiKey: 'server-key',
+      },
+      {
+        mcpClient: {
+          listTools: vi.fn(),
+          callTool: vi.fn(),
+          getLogs,
+        } as any,
+      },
+    );
+    const started = serverCleanup.track(await startHttpServer(app));
+
+    const response = await fetch(`${started.baseUrl}/api/mcp/logs?serverId=s1`);
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(getLogs).toHaveBeenCalledWith('s1');
+    expect(body.logs).toEqual(expect.arrayContaining([expect.objectContaining({ message: 'hi' })]));
+    expect((body.logs as unknown[]).length).toBe(1);
+  });
+
+  it('GET /api/mcp/logs returns 400 when serverId is missing', async () => {
+    const app = createServer(
+      {
+        geminiApiBase: 'https://example.test',
+        geminiApiKey: 'server-key',
+      },
+      {
+        mcpClient: {
+          listTools: vi.fn(),
+          callTool: vi.fn(),
+          getLogs: vi.fn(() => []),
+        } as any,
+      },
+    );
+    const started = serverCleanup.track(await startHttpServer(app));
+
+    const response = await fetch(`${started.baseUrl}/api/mcp/logs`);
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({ error: 'serverId required' });
+  });
+
+  it('lists tools across servers concurrently so one slow server does not block the rest', async () => {
+    let fastServerStarted = false;
+    const listTools = vi.fn(async (server: { id: string }) => {
+      if (server.id === 'slow') {
+        // Resolve only once the other server's listing has begun.
+        await new Promise((resolve) => {
+          const check = () => (fastServerStarted ? resolve(undefined) : setTimeout(check, 5));
+          check();
+        });
+        return [{ name: 'slow_tool', description: 'Slow', inputSchema: {} }];
+      }
+      fastServerStarted = true;
+      return [{ name: 'fast_tool', description: 'Fast', inputSchema: {} }];
+    });
+    const app = createServer(
+      {
+        geminiApiBase: 'https://example.test',
+        geminiApiKey: 'server-key',
+      },
+      {
+        mcpClient: {
+          listTools,
+          callTool: vi.fn(),
+        },
+      },
+    );
+    const started = serverCleanup.track(await startHttpServer(app));
+
+    const response = await fetch(`${started.baseUrl}/api/mcp/tools`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        servers: [
+          { id: 'slow', name: 'Slow', enabled: true, transport: 'http', url: 'https://slow.example.com/mcp' },
+          { id: 'fast', name: 'Fast', enabled: true, transport: 'http', url: 'https://fast.example.com/mcp' },
+        ],
+      }),
+    });
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      servers: [
+        { serverId: 'slow', serverName: 'Slow', tools: [{ name: 'slow_tool', description: 'Slow', inputSchema: {} }] },
+        { serverId: 'fast', serverName: 'Fast', tools: [{ name: 'fast_tool', description: 'Fast', inputSchema: {} }] },
+      ],
+      errors: [],
+    });
+  });
+});
+
+describe('MCP server config hardening', () => {
+  const serverCleanup2 = createHttpServerCleanup();
+
+  afterEach(serverCleanup2.cleanup);
+
+  it('refuses dangerous stdio environment variables with a per-server error', async () => {
+    const callTool = vi.fn();
+    const app = createServer(
+      { geminiApiBase: 'https://example.test', geminiApiKey: 'k', enableMcpStdio: true },
+      { mcpClient: { listTools: vi.fn(), callTool } },
+    );
+    const started = serverCleanup2.track(await startHttpServer(app));
+
+    const response = await fetch(`${started.baseUrl}/api/mcp/tools`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        servers: [
+          {
+            id: 'evil',
+            name: 'Evil',
+            enabled: true,
+            transport: 'stdio',
+            command: 'npx',
+            env: { NODE_OPTIONS: '--require pwn', GOOD: '1' },
+          },
+        ],
+      }),
+    });
+    const body = (await response.json()) as { errors: Array<{ error: string }> };
+
+    expect(response.status).toBe(200);
+    expect(callTool).not.toHaveBeenCalled();
+    expect(body.errors).toHaveLength(1);
+    expect(body.errors[0].error).toMatch(/NODE_OPTIONS/);
+  });
+
+  it('passes configured timeout and longRunning through to the client bridge', async () => {
+    const callTool = vi.fn(async () => ({ content: [{ type: 'text', text: 'ok' }] }));
+    const app = createServer(
+      { geminiApiBase: 'https://example.test', geminiApiKey: 'k' },
+      { mcpClient: { listTools: vi.fn(), callTool } },
+    );
+    const started = serverCleanup2.track(await startHttpServer(app));
+
+    const server = {
+      id: 'slowish',
+      name: 'Slowish',
+      enabled: true,
+      transport: 'http',
+      url: 'https://s.example.com/mcp',
+      timeout: 300,
+      longRunning: true,
+    };
+    const response = await fetch(`${started.baseUrl}/api/mcp/call`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ server, toolName: 'long_task', args: {} }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(callTool).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'slowish', timeout: 300, longRunning: true }),
+      'long_task',
+      {},
+    );
+  });
+
+  it('streams progress notifications as NDJSON lines when the caller asks for them', async () => {
+    const callTool = vi.fn(async (_server, _toolName, _args, onProgress) => {
+      onProgress?.({ progress: 1, total: 2, message: 'halfway' });
+      onProgress?.({ progress: 2, total: 2 });
+      return { ok: true };
+    });
+    const app = createServer(
+      { geminiApiBase: 'https://example.test', geminiApiKey: 'k', enableMcpStdio: true },
+      { mcpClient: { listTools: vi.fn(), callTool } },
+    );
+    const started = serverCleanup.track(await startHttpServer(app));
+
+    const response = await fetch(`${started.baseUrl}/api/mcp/call`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/x-ndjson' },
+      body: JSON.stringify({
+        server: { id: 'fs', name: 'Filesystem', enabled: true, transport: 'stdio', command: 'npx' },
+        toolName: 'read_file',
+        args: { path: '/tmp/a.txt' },
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('application/x-ndjson');
+    const lines = (await response.text())
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(lines).toEqual([
+      { type: 'start' },
+      { type: 'progress', progress: 1, total: 2, message: 'halfway' },
+      { type: 'progress', progress: 2, total: 2 },
+      { type: 'result', result: { ok: true } },
+    ]);
+    expect(callTool).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'fs' }),
+      'read_file',
+      { path: '/tmp/a.txt' },
+      expect.any(Function),
+    );
+  });
+
+  it('reports mid-stream tool failures as a terminal error line', async () => {
+    const callTool = vi.fn(async (_server, _toolName, _args, onProgress) => {
+      onProgress?.({ message: 'starting' });
+      throw new Error('boom during execution');
+    });
+    const app = createServer(
+      { geminiApiBase: 'https://example.test', geminiApiKey: 'k', enableMcpStdio: true },
+      { mcpClient: { listTools: vi.fn(), callTool } },
+    );
+    const started = serverCleanup.track(await startHttpServer(app));
+
+    const response = await fetch(`${started.baseUrl}/api/mcp/call`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/x-ndjson' },
+      body: JSON.stringify({
+        server: { id: 'fs', name: 'Filesystem', enabled: true, transport: 'stdio', command: 'npx' },
+        toolName: 'read_file',
+        args: {},
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const lines = (await response.text())
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(lines).toEqual([
+      { type: 'start' },
+      { type: 'progress', message: 'starting' },
+      { type: 'error', error: 'boom during execution' },
+    ]);
+  });
+
+  it('keeps validation failures as plain JSON even when NDJSON was requested', async () => {
+    const callTool = vi.fn();
+    const app = createServer(
+      { geminiApiBase: 'https://example.test', geminiApiKey: 'k' },
+      { mcpClient: { listTools: vi.fn(), callTool } },
+    );
+    const started = serverCleanup.track(await startHttpServer(app));
+
+    const response = await fetch(`${started.baseUrl}/api/mcp/call`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/x-ndjson' },
+      body: JSON.stringify({
+        server: { id: 'fs', name: 'Filesystem', enabled: true, transport: 'stdio', command: 'npx' },
+        toolName: '',
+        args: {},
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get('content-type')).toContain('application/json');
+    expect((await response.json()) as Record<string, unknown>).toEqual({ error: 'MCP tool name is required.' });
+    expect(callTool).not.toHaveBeenCalled();
+  });
 });

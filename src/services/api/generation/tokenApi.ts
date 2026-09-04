@@ -44,11 +44,15 @@ export const countTokensApi = async (
   modelId: string,
   parts: Part[],
   config?: CountTokensConfig,
+  options?: { directGoogleApi?: boolean },
 ): Promise<number> => {
+  const contentHttpOptions = getHttpOptionsForContents([{ parts }]);
+
   return executeConfiguredApiRequest({
     apiKey,
     label: `Counting tokens for model ${modelId}...`,
     errorLabel: 'Error counting tokens:',
+    routingOverrides: options?.directGoogleApi ? { directGoogleApi: true } : undefined,
     run: async ({ client: ai }) => {
       // Sanitize parts to remove custom internal properties.
       // We MUST retain mediaResolution and videoMetadata as they significantly affect token counts
@@ -58,7 +62,7 @@ export const countTokensApi = async (
         delete (sanitized as { thoughtSignature?: unknown }).thoughtSignature;
         return sanitized as Part;
       });
-      const contents = [{ role: 'user', parts: sanitizedParts }];
+      const contents = [{ parts: sanitizedParts }] as ContentListUnion;
       const sanitizedConfig = sanitizeCountTokensConfig(config);
       const plainTextPrompt = extractSingleTextPrompt(sanitizedParts);
       const requestTokenCount = async (
@@ -122,6 +126,6 @@ export const countTokensApi = async (
 
       return response.totalTokens || 0;
     },
-    httpOptions: getHttpOptionsForContents([{ parts }]),
+    httpOptions: contentHttpOptions,
   });
 };

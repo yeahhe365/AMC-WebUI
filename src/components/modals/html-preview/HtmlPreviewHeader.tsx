@@ -1,23 +1,14 @@
 import React from 'react';
 import { useI18n } from '@/contexts/I18nContext';
-import {
-  Loader2,
-  Download,
-  Minimize,
-  X,
-  ZoomIn,
-  ZoomOut,
-  RotateCw,
-  Image as ImageIcon,
-  Expand,
-  Atom,
-} from 'lucide-react';
+import { Loader2, Download, Minimize, X, ZoomIn, ZoomOut, RotateCw, Image as ImageIcon, Expand } from 'lucide-react';
 import { IconHtml5 } from '@/components/icons';
 import { FOCUS_VISIBLE_RING_SECONDARY_OFFSET_CLASS } from '@/constants/focusClasses';
 import { ICON_BUTTON_CLASS, MODAL_CLOSE_BUTTON_DANGER_HOVER_CLASS } from '@/constants/buttonClasses';
+import type { HtmlPreviewPrivilege } from '@/utils/html-preview/previewPrivilege';
 
 interface HtmlPreviewHeaderProps {
   title: string;
+  privilege?: HtmlPreviewPrivilege;
   scale: number;
   isTrueFullscreen: boolean;
   isPreviewReady: boolean;
@@ -35,6 +26,7 @@ interface HtmlPreviewHeaderProps {
 
 export const HtmlPreviewHeader: React.FC<HtmlPreviewHeaderProps> = ({
   title,
+  privilege = 'unrestricted',
   scale,
   isTrueFullscreen,
   isPreviewReady,
@@ -50,17 +42,14 @@ export const HtmlPreviewHeader: React.FC<HtmlPreviewHeaderProps> = ({
   onClose,
 }) => {
   const { t } = useI18n();
-  const isReactPreview = title.toLowerCase().includes('react');
-  const HeaderIcon = isReactPreview ? Atom : IconHtml5;
-  const iconBgClass = isReactPreview ? 'bg-cyan-500/10 text-cyan-500' : 'bg-orange-500/10';
-  const subtitle = isReactPreview ? t('htmlPreviewReactApp') : t('htmlPreviewTitle');
+  const subtitle = privilege === 'sanitized' ? t('htmlPreviewArtifactSubtitle') : t('htmlPreviewDemoSubtitle');
   const iconBtnClass = `${ICON_BUTTON_CLASS} ${FOCUS_VISIBLE_RING_SECONDARY_OFFSET_CLASS} disabled:opacity-30 disabled:cursor-not-allowed`;
 
   return (
     <header className="h-[45px] px-4 flex items-center justify-between gap-4 bg-[var(--theme-bg-primary)] border-b border-[var(--theme-border-secondary)] z-10 select-none">
       <div className="flex items-center gap-3 min-w-0 overflow-hidden">
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${iconBgClass}`}>
-          <HeaderIcon size={20} />
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--theme-bg-tertiary)]/45 text-[var(--theme-text-tertiary)]">
+          <IconHtml5 size={20} />
         </div>
         <div className="flex flex-col min-w-0">
           <h2

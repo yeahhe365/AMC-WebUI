@@ -1,5 +1,12 @@
 import React from 'react';
-import { type IconProps, StrokeIcon } from '@/components/icons/iconPrimitives';
+import { Command } from 'lucide-react';
+import {
+  type IconProps,
+  StrokeIcon,
+  defaultSize,
+  defaultStroke,
+  defaultColor,
+} from '@/components/icons/iconPrimitives';
 
 // Data Management Icon (Database Stack)
 export const IconData: React.FC<IconProps> = (props) => (
@@ -19,15 +26,10 @@ export const IconAbout: React.FC<IconProps> = (props) => (
   </StrokeIcon>
 );
 
-// Shortcuts Icon (Keyboard)
-export const IconKeyboard: React.FC<IconProps> = (props) => (
-  <StrokeIcon {...props}>
-    <rect width="20" height="12" x="2" y="6" rx="2" />
-    <path d="M6 10h2" />
-    <path d="M10 10h2" />
-    <path d="M14 10h2" />
-    <path d="M12 14h.01" />
-    <path d="M16 14h.01" />
-    <path d="M8 14h.01" />
-  </StrokeIcon>
-);
+// Shortcuts Icon — 借鉴 Cherry Studio SettingsPage.tsx: icon={<Command />} (⌘)
+export const IconKeyboard: React.FC<IconProps> = ({
+  size = defaultSize,
+  strokeWidth = defaultStroke,
+  className,
+  color = defaultColor,
+}) => <Command size={size} strokeWidth={strokeWidth} className={className} color={color} />;

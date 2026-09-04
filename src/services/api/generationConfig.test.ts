@@ -4,14 +4,8 @@ import {
   buildGenerationConfig as buildGenerationConfigFromSettings,
   toCountTokensConfig,
 } from './generationConfig';
-import { DEFAULT_APP_SETTINGS } from '@/constants/settingsDefaults';
+import { DEFAULT_APP_SETTINGS, DEFAULT_CHAT_SETTINGS } from '@/constants/settingsDefaults';
 import { MediaResolution, type ThinkingLevel } from '@/types';
-
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
 
 vi.mock('@/utils/model/modelCapabilities', async () => {
   const actual = await vi.importActual<typeof import('@/utils/model/modelCapabilities')>(
@@ -20,7 +14,7 @@ vi.mock('@/utils/model/modelCapabilities', async () => {
 
   return {
     ...actual,
-    isGemini3Model: vi.fn((id: string) => id?.includes('gemini-3')),
+    isGemini3Model: vi.fn((id: string) => id?.includes('gemini-3') && !id?.includes('transcribe')),
     isGeminiRoboticsModel: vi.fn((id: string) => id?.includes('gemini-robotics-er')),
     isGemmaModel: vi.fn((id: string) => id?.toLowerCase().includes('gemma')),
   };
@@ -49,14 +43,11 @@ type LegacyGenerationConfigTestOptions = {
   mediaResolution?: MediaResolution;
   isLocalPythonEnabled?: boolean;
   imageOutputMode?: 'IMAGE_TEXT' | 'IMAGE_ONLY';
-  personGeneration?: 'ALLOW_ADULT' | 'ALLOW_ALL' | 'DONT_ALLOW';
 };
 
 const buildGenerationConfig = (
   optionsOrModelId:
-    | Parameters<typeof buildGenerationConfigFromSettings>[0]
-    | LegacyGenerationConfigTestOptions
-    | string,
+    Parameters<typeof buildGenerationConfigFromSettings>[0] | LegacyGenerationConfigTestOptions | string,
   systemInstruction = '',
   config: LegacyGenerationConfigTestOptions['config'] = {},
   showThoughts = false,
@@ -72,7 +63,6 @@ const buildGenerationConfig = (
   mediaResolution?: MediaResolution,
   isLocalPythonEnabled?: boolean,
   imageOutputMode?: 'IMAGE_TEXT' | 'IMAGE_ONLY',
-  personGeneration?: 'ALLOW_ADULT' | 'ALLOW_ALL' | 'DONT_ALLOW',
 ) => {
   if (typeof optionsOrModelId === 'object' && 'settings' in optionsOrModelId) {
     return buildGenerationConfigFromSettings(optionsOrModelId);
@@ -97,7 +87,6 @@ const buildGenerationConfig = (
           mediaResolution,
           isLocalPythonEnabled,
           imageOutputMode,
-          personGeneration,
         }
       : optionsOrModelId;
 
@@ -128,7 +117,6 @@ const buildGenerationConfig = (
     imageSize: options.imageSize,
     isLocalPythonEnabled: options.isLocalPythonEnabled,
     imageOutputMode: options.imageOutputMode,
-    personGeneration: options.personGeneration,
   });
 };
 
@@ -194,23 +182,6 @@ describe('buildGenerationConfig', () => {
     );
   });
 
-  it('returns image config for gemini-2.5-flash-image-preview', async () => {
-    const config = await buildGenerationConfig(
-      'gemini-2.5-flash-image-preview',
-      'sys',
-      baseConfig,
-      false,
-      0,
-      false,
-      false,
-      false,
-      undefined,
-      '1:1',
-      false,
-    );
-    expect(config.responseModalities).toEqual(['IMAGE', 'TEXT']);
-  });
-
   it('returns image config with imageSize for gemini-3-pro-image-preview', async () => {
     const config = await buildGenerationConfig(
       'gemini-3-pro-image-preview',
@@ -226,7 +197,7 @@ describe('buildGenerationConfig', () => {
       false,
       '2K',
     );
-    expect(config.responseModalities).toEqual(['IMAGE', 'TEXT']);
+    expect(config.responseModalities).toEqual(['TEXT', 'IMAGE']);
     expect(config.imageConfig!.imageSize).toBe('2K');
   });
 
@@ -362,7 +333,6 @@ describe('buildGenerationConfig', () => {
         mediaResolution?: unknown,
         isLocalPythonEnabled?: boolean,
         imageOutputMode?: string,
-        personGeneration?: string,
       ) => Promise<any>
     )(
       'gemini-3.1-flash-image-preview',
@@ -381,7 +351,6 @@ describe('buildGenerationConfig', () => {
       undefined,
       false,
       'IMAGE_ONLY',
-      'ALLOW_ADULT',
     );
 
     expect(config.responseModalities).toEqual(['IMAGE']);
@@ -407,53 +376,6 @@ describe('buildGenerationConfig', () => {
 
     expect(config.imageConfig).not.toHaveProperty('aspectRatio');
     expect(config.imageConfig!.imageSize).toBe('1K');
-  });
-
-  it('omits unsupported personGeneration for Gemini 2.5 image config', async () => {
-    const config = await (
-      buildGenerationConfig as unknown as (
-        modelId: string,
-        systemInstruction: string,
-        config: typeof baseConfig,
-        showThoughts: boolean,
-        thinkingBudget: number,
-        isGoogleSearchEnabled?: boolean,
-        isCodeExecutionEnabled?: boolean,
-        isUrlContextEnabled?: boolean,
-        thinkingLevel?: ThinkingLevel,
-        aspectRatio?: string,
-        isDeepSearchEnabled?: boolean,
-        imageSize?: string,
-        safetySettings?: unknown,
-        mediaResolution?: unknown,
-        isLocalPythonEnabled?: boolean,
-        imageOutputMode?: string,
-        personGeneration?: string,
-      ) => Promise<any>
-    )(
-      'gemini-2.5-flash-image',
-      'sys',
-      baseConfig,
-      false,
-      0,
-      false,
-      false,
-      false,
-      undefined,
-      '16:9',
-      false,
-      undefined,
-      undefined,
-      undefined,
-      false,
-      'IMAGE_TEXT',
-      'DONT_ALLOW',
-    );
-
-    expect(config.responseModalities).toEqual(['IMAGE', 'TEXT']);
-    expect(config.imageConfig).toEqual({
-      aspectRatio: '16:9',
-    });
   });
 
   it('includes thinkingConfig for Gemini 3 models', async () => {
@@ -537,31 +459,30 @@ describe('buildGenerationConfig', () => {
     expect(config.mediaResolution).toBe(MediaResolution.MEDIA_RESOLUTION_HIGH);
   });
 
-  it('includes thinkingConfig for gemini-2.5 models', async () => {
+  it('no longer sends a thinking budget for Gemini 2.5 models', async () => {
     const config = await buildGenerationConfig('gemini-2.5-flash', 'sys', baseConfig, false, 8000);
-    expect(config.thinkingConfig!.thinkingBudget).toBe(8000);
-    expect(config.thinkingConfig!.includeThoughts).toBe(true);
+    expect(config.thinkingConfig).toBeUndefined();
   });
 
-  it('includes thinkingBudget config for Gemini Robotics-ER 1.6', async () => {
-    const config = await buildGenerationConfig('gemini-robotics-er-1.6-preview', 'sys', baseConfig, false, 1024);
+  it('includes thinkingBudget config for Gemini Robotics-ER 2', async () => {
+    const config = await buildGenerationConfig('gemini-robotics-er-2-preview', 'sys', baseConfig, false, 1024);
     expect(config.thinkingConfig).toEqual({
       thinkingBudget: 1024,
       includeThoughts: true,
     });
   });
 
-  it('preserves auto thinking for Gemini Robotics-ER 1.6', async () => {
-    const config = await buildGenerationConfig('gemini-robotics-er-1.6-preview', 'sys', baseConfig, false, -1);
+  it('preserves auto thinking for Gemini Robotics-ER 2', async () => {
+    const config = await buildGenerationConfig('gemini-robotics-er-2-preview', 'sys', baseConfig, false, -1);
     expect(config.thinkingConfig).toEqual({
       includeThoughts: true,
       thinkingLevel: 'HIGH',
     });
   });
 
-  it('uses thinkingLevel when budget is 0 for Gemini Robotics-ER 1.6', async () => {
+  it('uses thinkingLevel when budget is 0 for Gemini Robotics-ER 2', async () => {
     const config = await buildGenerationConfig(
-      'gemini-robotics-er-1.6-preview',
+      'gemini-robotics-er-2-preview',
       'sys',
       baseConfig,
       false,
@@ -756,6 +677,19 @@ describe('buildGenerationConfig', () => {
     expect(hasUrlContext).toBeFalsy();
   });
 
+  it('does not add googleMaps for Gemma models', async () => {
+    const config = await buildGenerationConfigFromSettings({
+      settings: {
+        ...DEFAULT_CHAT_SETTINGS,
+        modelId: 'gemma-4-31b-it',
+        isGoogleMapsEnabled: true,
+      },
+    });
+
+    const hasGoogleMaps = config.tools?.some((tool) => 'googleMaps' in tool);
+    expect(hasGoogleMaps).toBeFalsy();
+  });
+
   it('sets systemInstruction to undefined when empty', async () => {
     const config = await buildGenerationConfig('gemini-3-flash-preview', '', baseConfig, false, 0);
     expect(config.systemInstruction).toBeUndefined();
@@ -887,7 +821,7 @@ describe('appendFunctionDeclarationsToTools', () => {
 
   it('keeps custom function declarations alongside built-in tools for Gemini Robotics models', () => {
     const config = appendFunctionDeclarationsToTools(
-      'gemini-robotics-er-1.6-preview',
+      'gemini-robotics-er-2-preview',
       { tools: [{ googleSearch: {} }] },
       [
         {
@@ -913,24 +847,39 @@ describe('appendFunctionDeclarationsToTools', () => {
     });
   });
 
-  it('does not enable server-side tool invocation circulation for function-only Gemini 3 configs', () => {
-    const config = appendFunctionDeclarationsToTools('gemini-3-flash-preview', {}, [
-      {
-        name: 'run_local_python',
-        description: 'Execute Python locally.',
-      },
-    ]);
+  it('does not attach mediaResolution or tools for Gemini 3.5 Transcribe', async () => {
+    const config = await buildGenerationConfig({
+      modelId: 'gemini-3.5-transcribe',
+      systemInstruction: 'Transcribe this audio',
+      config: { temperature: 1, topP: 0.95, topK: 64 },
+      showThoughts: false,
+      thinkingBudget: 0,
+      isGoogleSearchEnabled: true,
+      mediaResolution: MediaResolution.MEDIA_RESOLUTION_HIGH,
+    });
 
-    expect(config.tools).toEqual([
-      {
-        functionDeclarations: [
-          {
-            name: 'run_local_python',
-            description: 'Execute Python locally.',
-          },
-        ],
+    expect(config.mediaResolution).toBeUndefined();
+    expect(config.tools).toBeUndefined();
+    expect(config.thinkingConfig).toBeUndefined();
+  });
+
+  it('includes advanced generation parameters (maxOutputTokens, stopSequences, penalties, seed)', async () => {
+    const config = await buildGenerationConfigFromSettings({
+      settings: {
+        ...DEFAULT_APP_SETTINGS,
+        modelId: 'gemini-2.5-flash',
+        maxOutputTokens: 2048,
+        stopSequences: ['STOP', 'END'],
+        presencePenalty: 0.5,
+        frequencyPenalty: 0.8,
+        seed: 42,
       },
-    ]);
-    expect(config.toolConfig).toBeUndefined();
+    });
+
+    expect(config.maxOutputTokens).toBe(2048);
+    expect(config.stopSequences).toEqual(['STOP', 'END']);
+    expect(config.presencePenalty).toBe(0.5);
+    expect(config.frequencyPenalty).toBe(0.8);
+    expect(config.seed).toBe(42);
   });
 });

@@ -1,0 +1,22 @@
+allowBuilds:
+  '@google/genai': true
+  canvas: true
+  core-js: true
+  esbuild: true
+  protobufjs: true
+
+# 传递依赖安全下限（原 package.json 的 npm overrides 在 pnpm 下不生效，迁移至此）。
+# 用 caret 范围而非精确版本：作为"不低于已修复版本"的下限，避免把已解析的更新版本降级。
+# fast-uri 上限锁在 ^3：唯一消费方 ajv@8 声明 ^3，强制 4.x 会破坏其依赖声明。
+overrides:
+  dompurify: 3.4.13
+  protobufjs: ^7.6.5
+  hono: ^4.12.34
+  ws: ^8.20.2
+  uuid: ^14.0.0
+  serialize-javascript: ^7.0.5
+  postcss: ^8.5.25
+  fast-uri: ^3.1.5
+  body-parser: ^2.3.0
+  '@hono/node-server': ^2.0.12
+  pdfjs-dist: 4.8.69

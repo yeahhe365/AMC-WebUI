@@ -1,5 +1,5 @@
 export const SIDEBAR_ICON_BUTTON_CLASS =
-  'flex items-center justify-center p-2.5 rounded-lg text-[var(--theme-icon-history)] hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)]';
+  'flex items-center justify-center p-2.5 rounded-lg text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)]';
 
 export const SIDEBAR_CLICKABLE_ICON_BUTTON_CLASS = `${SIDEBAR_ICON_BUTTON_CLASS} cursor-pointer`;
 

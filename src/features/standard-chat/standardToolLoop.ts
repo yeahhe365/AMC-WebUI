@@ -26,7 +26,20 @@ interface RunStandardToolLoopOptions {
   clientFunctions: StandardClientFunctions;
   runTurn: (contents: ChatHistoryItem[]) => Promise<StandardToolTurnResult>;
   abortSignal?: AbortSignal;
-  maxIterations?: number;
+  /**
+   * Maximum number of model turns (rounds) before the loop stops gracefully.
+   * A model that repeats tool calls forever would otherwise issue billable API
+   * turns without end. When the cap is reached, every completed round is kept,
+   * the pending calls are not executed, and a notice text part is appended.
+   */
+  maxToolRounds?: number;
+  /**
+   * Fired the moment an iteration's calls begin executing, before any handler
+   * resolves, so the caller can surface live tool cards while tools run.
+   */
+  onToolCallsStarted?: (modelContent: ChatHistoryItem) => void;
+  /** Fired after an iteration's handlers have all settled, with their response parts. */
+  onToolResponsesSettled?: (functionResponseParts: Part[]) => void;
 }
 
 interface GroundingCarryover {
@@ -181,12 +194,24 @@ const mergeGroundingForFinalTurn = (finalGrounding: unknown, carryover: Groundin
   };
 };
 
+/**
+ * Round cap for the tool loop. Generous enough for long MCP workflows (multi-step
+ * file exploration, deep research chains); a hard throw would discard the whole
+ * turn, so hitting the cap returns the accumulated result with a notice instead.
+ */
+export const DEFAULT_TOOL_LOOP_ROUNDS = 50;
+
+const TOOL_LOOP_CAP_NOTICE =
+  '[Tool loop stopped: the model kept requesting tool calls after reaching the round limit, so the remaining calls were not executed. Try narrowing the task.]';
+
 export const runStandardToolLoop = async ({
   initialContents,
   clientFunctions,
   runTurn,
   abortSignal,
-  maxIterations = 8,
+  maxToolRounds,
+  onToolCallsStarted,
+  onToolResponsesSettled,
 }: RunStandardToolLoopOptions): Promise<{
   finalTurn: StandardToolTurnResult;
   toolMessages: StandardToolLoopMessagePair[];
@@ -198,9 +223,12 @@ export const runStandardToolLoop = async ({
   let aggregatedUsage: UsageMetadata | undefined;
   let groundingCarryover: GroundingCarryover | undefined;
   let aggregatedUrlContext: unknown;
+  const maxRounds = maxToolRounds ?? DEFAULT_TOOL_LOOP_ROUNDS;
+  let rounds = 0;
 
-  for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+  for (;;) {
     const turn = await runTurn(contents);
+    rounds += 1;
     aggregatedUsage = mergeUsageMetadata(aggregatedUsage, turn.usage);
     aggregatedUrlContext = mergeUrlContextMetadata(aggregatedUrlContext, turn.urlContext);
     const functionCalls = turn.functionCalls ?? [];
@@ -218,48 +246,79 @@ export const runStandardToolLoop = async ({
       };
     }
 
-    const functionResponseParts: Part[] = [];
-
-    for (const call of functionCalls) {
-      const clientFunction = call.name ? clientFunctions[call.name] : undefined;
-
-      if (!clientFunction) {
-        functionResponseParts.push({
-          functionResponse: {
-            id: call.id,
-            name: call.name || 'unknown',
-            response: {
-              error: `Function ${call.name || 'unknown'} not implemented client-side.`,
-            },
-          },
-        });
-        continue;
-      }
-
-      try {
-        const result = await clientFunction.handler(call.args, abortSignal ? { abortSignal } : undefined);
-        if (result.generatedFiles?.length) {
-          generatedFiles.push(...result.generatedFiles);
-        }
-        functionResponseParts.push({
-          functionResponse: {
-            id: call.id,
-            name: call.name,
-            response: toStructuredToolResponse(result.response),
-          },
-        });
-      } catch (error) {
-        functionResponseParts.push({
-          functionResponse: {
-            id: call.id,
-            name: call.name,
-            response: {
-              error: getErrorMessage(error),
-            },
-          },
-        });
-      }
+    // Cap reached: keep everything completed so far and stop without executing
+    // this turn's calls (every earlier round was a real, finished API turn).
+    if (rounds >= maxRounds) {
+      return {
+        finalTurn: {
+          ...turn,
+          parts: [...turn.parts, { text: TOOL_LOOP_CAP_NOTICE }],
+          usage: aggregatedUsage,
+          grounding: mergeGroundingForFinalTurn(turn.grounding, groundingCarryover),
+          urlContext: aggregatedUrlContext,
+        },
+        toolMessages,
+        generatedFiles,
+      };
     }
+
+    const functionResponseParts: Part[] = new Array(functionCalls.length);
+    onToolCallsStarted?.(turn.modelContent);
+    const results = await Promise.all(
+      functionCalls.map(async (call, idx) => {
+        const clientFunction = call.name ? clientFunctions[call.name] : undefined;
+        if (!clientFunction) {
+          return {
+            idx,
+            part: {
+              functionResponse: {
+                id: call.id,
+                name: call.name || 'unknown',
+                response: {
+                  error: `Function ${call.name || 'unknown'} not implemented client-side.`,
+                },
+              },
+            } as Part,
+            generatedFiles: [] as UploadedFile[],
+          };
+        }
+        try {
+          const result = await clientFunction.handler(call.args as unknown, abortSignal ? { abortSignal } : undefined);
+          return {
+            idx,
+            part: {
+              functionResponse: {
+                id: call.id,
+                name: call.name,
+                response: toStructuredToolResponse(result.response),
+              },
+            } as Part,
+            generatedFiles: result.generatedFiles ?? [],
+          };
+        } catch (error) {
+          return {
+            idx,
+            part: {
+              functionResponse: {
+                id: call.id,
+                name: call.name,
+                response: {
+                  error: getErrorMessage(error),
+                },
+              },
+            } as Part,
+            generatedFiles: [] as UploadedFile[],
+          };
+        }
+      }),
+    );
+    results
+      .sort((a, b) => a.idx - b.idx)
+      .forEach((r) => {
+        functionResponseParts[r.idx] = r.part as Part;
+        if (r.generatedFiles?.length) generatedFiles.push(...r.generatedFiles);
+      });
+    onToolResponsesSettled?.(functionResponseParts);
 
     toolMessages.push({
       modelContent: turn.modelContent,
@@ -276,6 +335,4 @@ export const runStandardToolLoop = async ({
     ];
     groundingCarryover = mergeGroundingCarryover(groundingCarryover, turn.grounding);
   }
-
-  throw new Error(`Exceeded maximum tool loop iterations (${maxIterations}).`);
 };

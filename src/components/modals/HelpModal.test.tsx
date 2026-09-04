@@ -42,4 +42,24 @@ describe('HelpModal', () => {
     expect(closeButton?.className).toContain('focus-visible:ring-2');
     expect(copyButton?.className).toContain('focus-visible:ring-2');
   });
+
+  it('uses a quiet search field and command rows', async () => {
+    await act(async () => {
+      renderer.root.render(
+        <HelpModal
+          isOpen
+          onClose={vi.fn()}
+          commands={[{ name: '/artifacts', description: 'Toggle Live Artifacts', icon: 'artifacts' }]}
+        />,
+      );
+    });
+
+    const searchInput = document.querySelector('input');
+    const html = document.body.innerHTML;
+
+    expect(searchInput?.getAttribute('type')).toBe('search');
+    expect(searchInput?.className).toContain('border-transparent');
+    expect(html).not.toContain('w-10 h-10');
+    expect(html).not.toContain('text-[var(--theme-text-link)]');
+  });
 });

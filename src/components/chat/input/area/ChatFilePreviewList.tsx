@@ -13,7 +13,7 @@ interface ChatFilePreviewListProps {
   isGemini3?: boolean;
 }
 
-export const ChatFilePreviewList: React.FC<ChatFilePreviewListProps> = ({
+const ChatFilePreviewListComponent: React.FC<ChatFilePreviewListProps> = ({
   selectedFiles,
   onRemove,
   onCancelUpload,
@@ -46,3 +46,5 @@ export const ChatFilePreviewList: React.FC<ChatFilePreviewListProps> = ({
     </div>
   );
 };
+
+export const ChatFilePreviewList = React.memo(ChatFilePreviewListComponent);

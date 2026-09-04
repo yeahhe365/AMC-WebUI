@@ -181,4 +181,39 @@ describe('useAppUi', () => {
 
     unmount();
   });
+
+  it('opens the sidebar on a high velocity flick from the edge', () => {
+    useUIStore.setState({ isHistorySidebarOpen: false });
+    const { result, unmount } = renderHook(() => useAppUi());
+
+    const edge = document.createElement('div');
+    document.body.appendChild(edge);
+
+    act(() => {
+      result.current.handleTouchStart(createTouchEvent(edge, 10, 10));
+      // Fast flick with 30px displacement
+      result.current.handleTouchEnd(createTouchEvent(edge, 40, 10));
+    });
+
+    expect(useUIStore.getState().isHistorySidebarOpen).toBe(true);
+
+    unmount();
+  });
+
+  it('ignores swipe gestures originating inside an input form element', () => {
+    useUIStore.setState({ isHistorySidebarOpen: false });
+    const { result, unmount } = renderHook(() => useAppUi());
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+
+    act(() => {
+      result.current.handleTouchStart(createTouchEvent(input, 10, 10));
+      result.current.handleTouchEnd(createTouchEvent(input, 120, 10));
+    });
+
+    expect(useUIStore.getState().isHistorySidebarOpen).toBe(false);
+
+    unmount();
+  });
 });

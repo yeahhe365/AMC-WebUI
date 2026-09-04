@@ -1,5 +1,7 @@
 import React from 'react';
 import { useI18n } from '@/contexts/I18nContext';
+import { SETTINGS_OUTLINE_BUTTON_CLASS, SETTINGS_PRIMARY_ACTION_BUTTON_CLASS } from '@/constants/buttonClasses';
+import { Z_INDEX_TOAST_VIEWPORT } from '@/constants/layout';
 
 interface PwaUpdateBannerProps {
   onRefresh: () => void;
@@ -10,25 +12,20 @@ export const PwaUpdateBanner: React.FC<PwaUpdateBannerProps> = ({ onRefresh, onD
   const { t } = useI18n();
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-xl rounded-2xl border border-slate-800/35 bg-slate-950 px-4 py-3 text-white shadow-2xl">
+    <div
+      role="status"
+      className={`fixed bottom-4 left-4 right-4 mx-auto max-w-xl rounded-xl border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] px-4 py-3 text-[var(--theme-text-primary)] ${Z_INDEX_TOAST_VIEWPORT}`}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="text-sm font-semibold">{t('aboutUpdateReady')}</p>
-          <p className="text-xs text-slate-300">{t('pwaUpdateRefreshPrompt')}</p>
+          <p className="text-sm font-medium">{t('aboutUpdateReady')}</p>
+          <p className="text-xs text-[var(--theme-text-secondary)]">{t('pwaUpdateRefreshPrompt')}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-medium text-slate-100 transition hover:bg-white/10"
-          >
+          <button type="button" onClick={onDismiss} className={SETTINGS_OUTLINE_BUTTON_CLASS}>
             {t('pwaUpdateLater')}
           </button>
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="rounded-lg bg-cyan-400 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-cyan-300"
-          >
+          <button type="button" onClick={onRefresh} className={SETTINGS_PRIMARY_ACTION_BUTTON_CLASS}>
             {t('refresh')}
           </button>
         </div>

@@ -1,14 +1,66 @@
+import { z } from 'zod';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import {
-  createPersistedStateStorage,
-  readPersistentStorageItem,
-  removePersistentStorageItem,
-} from './persistentStorage';
+import { readPersistentStorageItem, removePersistentStorageItem } from './persistentStorage';
+import { createSyncedPersist } from './syncedPersist';
 import { safeJsonParse } from '@/utils/safeJsonParse';
 import { resolveUpdaterOrValue, type UpdaterOrValue } from './stateUpdaters';
 
 const CHAT_DRAFT_STORE_STORAGE_KEY = 'all_model_chat_drafts_v1';
+
+// C2: zod schema + version/migrate demo — validates zustand persist wrapper {state:{drafts},version}
+export const chatDraftPersistedSchema = z
+  .object({
+    state: z.object({
+      drafts: z.record(
+        z.string(),
+        z.object({
+          inputText: z.string(),
+          quotes: z.array(z.string()),
+          ttsContext: z.string(),
+        }),
+      ),
+    }),
+    version: z.number().optional(),
+  })
+  .passthrough();
+
+type ChatDraftPersistedState = z.infer<typeof chatDraftPersistedSchema>;
+
+const normalizePersistedDrafts = (drafts: unknown): Record<string, ChatDraft> => {
+  if (!drafts || typeof drafts !== 'object' || Array.isArray(drafts)) return {};
+  const out: Record<string, ChatDraft> = {};
+  for (const [key, value] of Object.entries(drafts as Record<string, unknown>)) {
+    if (!key || !value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const candidate = value as Partial<ChatDraft>;
+    const normalized: ChatDraft = {
+      inputText: typeof candidate.inputText === 'string' ? candidate.inputText : '',
+      quotes: Array.isArray(candidate.quotes) ? candidate.quotes.filter((q): q is string => typeof q === 'string') : [],
+      ttsContext: typeof candidate.ttsContext === 'string' ? candidate.ttsContext : '',
+    };
+    if (normalized.inputText.trim() || normalized.quotes.length > 0 || normalized.ttsContext.trim()) {
+      out[key] = normalized;
+    }
+  }
+  return out;
+};
+
+export const migrateChatDraftPersistedState = (persisted: unknown, _version: number): ChatDraftPersistedState => {
+  const raw = (persisted ?? {}) as { state?: unknown; version?: unknown };
+  const drafts = (raw.state as { drafts?: unknown } | undefined)?.drafts;
+  return {
+    state: { drafts: normalizePersistedDrafts(drafts) },
+    version: 1,
+  };
+};
+
+const { storage: chatDraftSyncedStorage } = createSyncedPersist<ChatDraftPersistedState>(CHAT_DRAFT_STORE_STORAGE_KEY, {
+  debounceMs: 300,
+  enableCrossTabSync: false,
+  schema: chatDraftPersistedSchema,
+  version: 1,
+  migrate: migrateChatDraftPersistedState,
+});
 
 export interface ChatDraft {
   inputText: string;
@@ -168,12 +220,18 @@ export const useChatDraftStore = create<ChatDraftState & ChatDraftActions>()(
     }),
     {
       name: CHAT_DRAFT_STORE_STORAGE_KEY,
+      version: 1,
       // Tab-private: persist for refresh recovery, but do not cross-tab rehydrate
       // (would clobber in-progress input in other tabs).
-      storage: createJSONStorage(() => createPersistedStateStorage({ debounceMs: 300, notifyUpdate: () => {} })),
+      storage: createJSONStorage(() => chatDraftSyncedStorage),
       partialize: (state) => ({
         drafts: pruneEmptyDrafts(state.drafts),
       }),
+      migrate: (persistedState, version) => {
+        if (version === 1) return persistedState as ChatDraftState;
+        const maybe = persistedState as { drafts?: unknown };
+        return { drafts: normalizePersistedDrafts(maybe?.drafts) } as ChatDraftState;
+      },
     },
   ),
 );

@@ -2,13 +2,14 @@ import type { DragEvent, ReactNode } from 'react';
 import type { Part } from '@google/genai';
 
 import type { AppViewModel } from '@/hooks/app/useApp';
+import type { QuickTtsResult } from '@/hooks/chat/message/useTextToSpeechHandler';
 import type {
   ChatSettingsUpdater,
   LiveClientFunctions,
   MediaResolution,
   ModelOption,
   SideViewContent,
-  ThinkingLevel,
+  ChatProviderId,
   UploadedFile,
   VideoMetadata,
 } from '@/types';
@@ -28,12 +29,12 @@ export interface ChatHeaderRuntimeValue {
   isPipSupported: boolean;
   isPipActive: boolean;
   onNewChat: () => void;
+  /** 新聊天链接（携带 ?from 来源会话），Cmd/Ctrl+点击开新标签页时继承设置。 */
+  newChatHref: string;
   onOpenScenariosModal: () => void;
   onToggleHistorySidebar: () => void;
   onLoadLiveArtifactsPrompt: () => void;
-  onSelectModel: (modelId: string) => void;
-  onSetThinkingLevel: (level: ThinkingLevel) => void;
-  onToggleGemmaReasoning: () => void;
+  onSelectModel: (modelId: string, providerId?: ChatProviderId) => void;
   onTogglePip: () => void;
 }
 
@@ -52,7 +53,7 @@ export interface ChatMessageListRuntimeValue {
   onFollowUpSuggestionFill: (suggestion: string) => void;
   onContinueGeneration: (messageId: string) => void;
   onForkMessage: (messageId: string) => void;
-  onQuickTTS: (text: string) => Promise<string | null>;
+  onQuickTTS: (text: string) => Promise<QuickTtsResult>;
   onOpenSidePanel: (content: SideViewContent) => void;
 }
 
@@ -71,7 +72,7 @@ export interface ChatInputRuntimeValue {
   onToggleLiveArtifactsPrompt: () => void;
   onTogglePinCurrentSession: () => void;
   onRetryLastTurn: () => void;
-  onSelectModel: (modelId: string) => void;
+  onSelectModel: (modelId: string, providerId?: ChatProviderId) => void;
   availableModels: ModelOption[];
   onEditLastUserMessage: () => void;
   onTogglePip: () => void;

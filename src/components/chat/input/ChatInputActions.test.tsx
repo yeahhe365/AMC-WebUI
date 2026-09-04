@@ -61,6 +61,12 @@ vi.mock('./actions/RecordControls', () => ({
   RecordControls: () => null,
 }));
 
+vi.mock('./actions/ThinkingSpeedControl', () => ({
+  // Consumes the main chat-input context at render; the actions row is tested
+  // against scoped context providers only, so stub it like the other leaves.
+  ThinkingSpeedControl: () => null,
+}));
+
 vi.mock('./actions/ComposerAuxiliaryButtons', () => ({
   ComposerAuxiliaryButtons: ({ actions }: { actions: Array<{ id: string; testId?: string; action: () => void }> }) => {
     auxiliaryButtonsMock({ actions });
@@ -244,6 +250,23 @@ describe('ChatInputActions', () => {
     expect(attachmentMenuMock).toHaveBeenCalledWith(expect.objectContaining({ disabled: false }));
   });
 
+  it('hides attachments on live translate and live transcribe models', () => {
+    renderActions({ isLiveTranslate: true });
+    expect(attachmentMenuMock).not.toHaveBeenCalled();
+
+    attachmentMenuMock.mockClear();
+    renderActions({ isLiveTranscribe: true });
+    expect(attachmentMenuMock).not.toHaveBeenCalled();
+  });
+
+  it('hides MCP picker on image generation and native audio models', () => {
+    renderActions({ isImageGenerationModel: true });
+    expect(renderer.container.querySelector('[data-testid="mcp-picker-button"]')).toBeNull();
+
+    renderActions({ isNativeAudioModel: true });
+    expect(renderer.container.querySelector('[data-testid="mcp-picker-button"]')).toBeNull();
+  });
+
   it('forwards Live disconnect and video controls into the live controls', () => {
     mockCapabilities.value = {
       ...mockCapabilities.value,
@@ -298,7 +321,6 @@ describe('ChatInputActions', () => {
     expect(auxiliaryButtonsMock).toHaveBeenCalledWith(
       expect.objectContaining({
         actions: expect.arrayContaining([
-          expect.objectContaining({ id: 'fullscreen', action: lastActionsValue.onToggleFullscreen }),
           expect.objectContaining({ id: 'translate' }),
           expect.objectContaining({ id: 'clear' }),
           expect.objectContaining({ id: 'paste' }),

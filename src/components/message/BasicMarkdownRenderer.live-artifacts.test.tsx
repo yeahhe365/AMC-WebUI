@@ -181,7 +181,7 @@ describe('BasicMarkdownRenderer Live Artifacts', () => {
     expect(srcDoc).toContain('--amc-live-artifact-surface:#1c1c20');
   });
 
-  it('does not show inline action buttons over Live Artifact frames', () => {
+  it('does not show code-block chrome over Live Artifact frames', () => {
     renderMarkdown({
       content: '<section style="display:grid"><strong>Inline Artifact</strong></section>',
       allowHtml: true,
@@ -191,7 +191,9 @@ describe('BasicMarkdownRenderer Live Artifacts', () => {
 
     expect(artifactFrame).not.toBeNull();
     expect(artifactFrame?.querySelector('iframe[title="HTML Preview"]')).not.toBeNull();
-    expect(artifactFrame?.querySelector('button')).toBeNull();
+    expect(artifactFrame?.querySelector('[title="Open in Side Panel"]')).toBeNull();
+    expect(artifactFrame?.querySelector('[title="Copy content"]')).toBeNull();
+    expect(artifactFrame?.querySelector('button[title="Open larger preview"]')).not.toBeNull();
   });
 
   it('forwards valid Live Artifact follow-up payloads from the current iframe only', () => {

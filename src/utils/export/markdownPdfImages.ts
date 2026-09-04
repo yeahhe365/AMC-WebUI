@@ -80,3 +80,38 @@ export const getImageFormat = (dataUrl: string): 'PNG' | 'JPEG' | 'WEBP' => {
   if (dataUrl.startsWith('data:image/webp')) return 'WEBP';
   return 'JPEG';
 };
+
+const isDirectlyEmbeddablePdfImage = (dataUrl: string): boolean =>
+  dataUrl.startsWith('data:image/png') || /^data:image\/jpe?g/i.test(dataUrl);
+
+const rasterizeToPngDataUrl = (src: string): Promise<string | null> =>
+  new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, image.naturalWidth || image.width);
+      canvas.height = Math.max(1, image.naturalHeight || image.height);
+      const context = canvas.getContext('2d');
+      if (!context) {
+        resolve(null);
+        return;
+      }
+
+      context.drawImage(image, 0, 0);
+      try {
+        resolve(canvas.toDataURL('image/png'));
+      } catch {
+        resolve(null);
+      }
+    };
+    image.onerror = () => resolve(null);
+    image.src = src;
+  });
+
+export const ensurePdfEmbeddableImage = async (dataUrl: string): Promise<string | null> => {
+  if (isDirectlyEmbeddablePdfImage(dataUrl)) {
+    return dataUrl;
+  }
+
+  return rasterizeToPngDataUrl(dataUrl);
+};

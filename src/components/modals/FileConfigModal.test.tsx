@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { setupStoreStateReset } from '@/test/stores/reset';
 import { FileConfigModal } from './FileConfigModal';
-import { type UploadedFile } from '@/types';
+import { MediaResolution, type UploadedFile } from '@/types';
 
 const projectRoot = path.resolve(__dirname, '../../..');
 const modalPath = path.join(projectRoot, 'src/components/modals/FileConfigModal.tsx');
@@ -18,10 +18,23 @@ describe('FileConfigModal', () => {
     vi.clearAllMocks();
   });
 
-  const renderModal = (file: UploadedFile, onSave = vi.fn(), onClose = vi.fn(), isGemini3 = false) => {
+  const renderModal = (
+    file: UploadedFile,
+    onSave = vi.fn(),
+    onClose = vi.fn(),
+    isGemini3 = false,
+    globalMediaResolution?: MediaResolution,
+  ) => {
     act(() => {
       renderer.root.render(
-        <FileConfigModal isOpen onClose={onClose} file={file} onSave={onSave} isGemini3={isGemini3} />,
+        <FileConfigModal
+          isOpen
+          onClose={onClose}
+          file={file}
+          onSave={onSave}
+          isGemini3={isGemini3}
+          globalMediaResolution={globalMediaResolution}
+        />,
       );
     });
 
@@ -30,8 +43,7 @@ describe('FileConfigModal', () => {
 
   const getButtonByText = (text: string) => {
     return Array.from(document.querySelectorAll('button')).find((button) => button.textContent?.includes(text)) as
-      | HTMLButtonElement
-      | undefined;
+      HTMLButtonElement | undefined;
   };
 
   const setInputValue = (input: HTMLInputElement, value: string) => {
@@ -42,6 +54,10 @@ describe('FileConfigModal', () => {
     input.dispatchEvent(new Event('change', { bubbles: true }));
   };
 
+  const blurInput = (input: HTMLInputElement) => {
+    input.dispatchEvent(new Event('focusout', { bubbles: true }));
+  };
+
   const openResolutionSelect = async () => {
     const button = document.querySelector<HTMLButtonElement>('#file-media-resolution');
     await act(async () => {
@@ -49,14 +65,16 @@ describe('FileConfigModal', () => {
     });
   };
 
+  const buildVideoFile = (id: string): UploadedFile => ({
+    id,
+    name: 'demo.mp4',
+    type: 'video/mp4',
+    size: 128,
+    uploadState: 'active',
+  });
+
   it('does not persist empty video metadata for a new video file', async () => {
-    const file: UploadedFile = {
-      id: 'video-1',
-      name: 'demo.mp4',
-      type: 'video/mp4',
-      size: 128,
-      uploadState: 'active',
-    };
+    const file = buildVideoFile('video-1');
 
     const { onSave, onClose } = renderModal(file);
 
@@ -73,11 +91,7 @@ describe('FileConfigModal', () => {
 
   it('clears existing video metadata when all video fields are removed', async () => {
     const file: UploadedFile = {
-      id: 'video-2',
-      name: 'demo.mp4',
-      type: 'video/mp4',
-      size: 128,
-      uploadState: 'active',
+      ...buildVideoFile('video-2'),
       videoMetadata: {
         startOffset: '3s',
         endOffset: '9s',
@@ -106,14 +120,8 @@ describe('FileConfigModal', () => {
     expect(onSave).toHaveBeenCalledWith(file.id, { videoMetadata: undefined });
   });
 
-  it('normalizes video offsets and drops FPS values outside the Gemini range', async () => {
-    const file: UploadedFile = {
-      id: 'video-3',
-      name: 'demo.mp4',
-      type: 'video/mp4',
-      size: 128,
-      uploadState: 'active',
-    };
+  it('normalizes video offsets and keeps an in-range FPS value', async () => {
+    const file = buildVideoFile('video-3');
 
     const { onSave } = renderModal(file);
 
@@ -123,7 +131,7 @@ describe('FileConfigModal', () => {
     await act(async () => {
       setInputValue(inputs[0], '00:10');
       setInputValue(inputs[1], '1:02:03');
-      setInputValue(inputs[2], '48');
+      setInputValue(inputs[2], '2');
     });
 
     const saveButton = getButtonByText('Save');
@@ -137,8 +145,119 @@ describe('FileConfigModal', () => {
       videoMetadata: {
         startOffset: '10s',
         endOffset: '3723s',
+        fps: 2,
       },
     });
+  });
+
+  it('shows an error and blocks save when FPS is outside the Gemini range', async () => {
+    const file = buildVideoFile('video-4');
+
+    const { onSave } = renderModal(file);
+
+    const inputs = Array.from(document.querySelectorAll('input')) as HTMLInputElement[];
+
+    await act(async () => {
+      setInputValue(inputs[2], '48');
+    });
+
+    expect(document.body.textContent).toContain('FPS must be a number between 0 and 24.');
+
+    const saveButton = getButtonByText('Save');
+    expect(saveButton?.disabled).toBe(true);
+
+    await act(async () => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('shows an error and blocks save when an offset cannot be parsed', async () => {
+    const file = buildVideoFile('video-5');
+
+    const { onSave } = renderModal(file);
+
+    const inputs = Array.from(document.querySelectorAll('input')) as HTMLInputElement[];
+
+    await act(async () => {
+      setInputValue(inputs[0], 'abc');
+    });
+
+    expect(document.body.textContent).toContain('Invalid time. Use 10s, 00:10, or 01:00:00.');
+
+    const saveButton = getButtonByText('Save');
+    expect(saveButton?.disabled).toBe(true);
+
+    await act(async () => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('blocks save when the end offset is not after the start offset', async () => {
+    const file = buildVideoFile('video-6');
+
+    const { onSave } = renderModal(file);
+
+    const inputs = Array.from(document.querySelectorAll('input')) as HTMLInputElement[];
+
+    await act(async () => {
+      setInputValue(inputs[0], '60s');
+      setInputValue(inputs[1], '30s');
+    });
+
+    expect(document.body.textContent).toContain('End time must be after start time.');
+
+    const saveButton = getButtonByText('Save');
+    expect(saveButton?.disabled).toBe(true);
+
+    await act(async () => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('echoes the normalized offset back into the field on blur', async () => {
+    const file = buildVideoFile('video-7');
+
+    renderModal(file);
+
+    const inputs = Array.from(document.querySelectorAll('input')) as HTMLInputElement[];
+    const startInput = inputs[0];
+
+    await act(async () => {
+      setInputValue(startInput, '01:15');
+    });
+    await act(async () => {
+      blurInput(startInput);
+    });
+
+    expect(startInput.value).toBe('75s');
+  });
+
+  it('labels the empty option with the current global detail level', async () => {
+    const file: UploadedFile = {
+      id: 'image-1',
+      name: 'diagram.png',
+      type: 'image/png',
+      size: 128,
+      uploadState: 'active',
+    };
+
+    renderModal(file, vi.fn(), vi.fn(), true, MediaResolution.MEDIA_RESOLUTION_HIGH);
+
+    expect(document.body.textContent).toContain('Follow global setting (current: High (Detail))');
+  });
+
+  it('shows the configured file name in the header', () => {
+    const file = buildVideoFile('video-8');
+
+    renderModal(file);
+
+    expect(document.body.textContent).toContain('demo.mp4');
   });
 
   it('avoids per-field mirrored state plus a file-sync effect', () => {
@@ -152,13 +271,7 @@ describe('FileConfigModal', () => {
   });
 
   it('adds visible keyboard focus styles to close and save controls', () => {
-    const file: UploadedFile = {
-      id: 'video-3',
-      name: 'demo.mp4',
-      type: 'video/mp4',
-      size: 128,
-      uploadState: 'active',
-    };
+    const file = buildVideoFile('video-9');
 
     renderModal(file);
 
@@ -179,13 +292,7 @@ describe('FileConfigModal', () => {
       size: 128,
       uploadState: 'active',
     };
-    const videoFile: UploadedFile = {
-      id: 'video-4',
-      name: 'demo.mp4',
-      type: 'video/mp4',
-      size: 128,
-      uploadState: 'active',
-    };
+    const videoFile = buildVideoFile('video-4');
     const pdfFile: UploadedFile = {
       id: 'pdf-1',
       name: 'paper.pdf',

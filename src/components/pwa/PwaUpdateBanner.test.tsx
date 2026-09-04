@@ -33,4 +33,17 @@ describe('PwaUpdateBanner', () => {
     expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
+
+  it('follows theme tokens instead of a hardcoded slate banner', async () => {
+    await act(async () => {
+      renderer.root.render(<PwaUpdateBanner onRefresh={vi.fn()} onDismiss={vi.fn()} />);
+    });
+
+    const html = renderer.container.innerHTML;
+
+    expect(html).not.toContain('bg-slate-950');
+    expect(html).not.toContain('bg-cyan-400');
+    expect(html).toContain('--theme-bg-primary');
+    expect(html).toContain('--theme-text-primary');
+  });
 });

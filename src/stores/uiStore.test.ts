@@ -61,6 +61,7 @@ describe('uiStore history sidebar preferences', () => {
     expect(JSON.parse(localStorage.getItem(UI_PREFERENCES_STORAGE_KEY) || '{}').state).toEqual({
       desktopHistorySidebarOpen: false,
       mobileHistorySidebarOpen: false,
+      historyDisplayMode: 'group',
     });
   });
 
@@ -83,6 +84,7 @@ describe('uiStore history sidebar preferences', () => {
     expect(JSON.parse(localStorage.getItem(UI_PREFERENCES_STORAGE_KEY) || '{}').state).toEqual({
       desktopHistorySidebarOpen: true,
       mobileHistorySidebarOpen: false,
+      historyDisplayMode: 'group',
     });
 
     useUIStore.getState().syncHistorySidebarForViewport();

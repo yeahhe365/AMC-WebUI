@@ -120,6 +120,8 @@ describe('MessageActions', () => {
     expect(continueItem).toBeInTheDocument();
     expect(liveArtifactsItem).not.toBeInTheDocument();
     expect(forkItem).toBeInTheDocument();
+    const forkIcon = forkItem?.querySelector('svg');
+    expect(forkIcon?.getAttribute('viewBox')).toBe('0 0 16 16');
 
     act(() => {
       forkItem?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

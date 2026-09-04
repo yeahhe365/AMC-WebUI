@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { LogEntry } from '@/types/logging';
-import { LOG_LEVEL_COLORS, CATEGORY_COLORS } from './logColorClasses';
+import { LOG_LEVEL_COLORS, CATEGORY_COLORS, LOG_CATEGORY_CHIP_CLASS } from './logColorClasses';
 
 export const LogRow: React.FC<{ log: LogEntry }> = React.memo(({ log }) => {
   const [isDataExpanded, setIsDataExpanded] = useState(false);
@@ -44,7 +44,7 @@ export const LogRow: React.FC<{ log: LogEntry }> = React.memo(({ log }) => {
         <span className={`w-12 font-bold flex-shrink-0 pt-0.5 ${LOG_LEVEL_COLORS[log.level]}`}>{log.level}</span>
 
         <span
-          className={`px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0 self-start uppercase tracking-wider ${CATEGORY_COLORS[log.category] || 'bg-gray-700'}`}
+          className={`px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0 self-start uppercase tracking-wider ${CATEGORY_COLORS[log.category] || LOG_CATEGORY_CHIP_CLASS}`}
         >
           {log.category}
         </span>

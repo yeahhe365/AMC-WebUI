@@ -61,8 +61,15 @@ describe('fileTypeClassification', () => {
     expect(isMarkdownFile({ name: 'README.txt', type: 'text/plain' })).toBe(false);
   });
 
-  it('does not treat extension-like filenames without dots as file extensions', () => {
-    expect(isTextFile({ name: 'sql', type: '' })).toBe(false);
+  it('imports extensionless files as text without treating the whole name as an extension', () => {
+    expect(isTextFile({ name: 'Dockerfile', type: '' })).toBe(true);
+    expect(isTextFile({ name: 'LICENSE', type: 'application/octet-stream' })).toBe(true);
+    expect(isTextFile({ name: 'sql', type: '' })).toBe(true);
     expect(isMarkdownFile({ name: 'markdown', type: '' })).toBe(false);
+    expect(isTextFile({ name: 'photo', type: 'image/png' })).toBe(false);
+    expect(isTextFile({ name: 'Gemini 3.8 Flash 专项核验', type: '' })).toBe(true);
+    expect(isTextFile({ name: 'Gemini 3.8 Flash 专项核验', type: 'application/octet-stream' })).toBe(true);
+    expect(isTextFile({ name: 'notes.md', type: '' })).toBe(true);
+    expect(isTextFile({ name: 'report.pdf', type: '' })).toBe(false);
   });
 });

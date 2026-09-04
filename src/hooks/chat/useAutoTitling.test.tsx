@@ -3,12 +3,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_APP_SETTINGS } from '@/constants/settingsDefaults';
 import type { SavedChatSession } from '@/types';
 import { useAutoTitling } from './useAutoTitling';
-import { createDefaultThirdPartyApiSettings } from '@/utils/thirdPartyApiProviders';
+import { createThirdPartyConnection } from '@/test/data/factories';
 
-const { generateTitleApiMock, getGeminiKeyForRequestMock } = vi.hoisted(() => ({
+const { generateTitleApiMock, getGeminiKeyForRequestMock, mockDbGetSession } = vi.hoisted(() => ({
   generateTitleApiMock: vi.fn(),
   getGeminiKeyForRequestMock: vi.fn(),
+  mockDbGetSession: vi.fn(),
 }));
+
+vi.mock('@/services/db/dbService', async () => {
+  const { createDbServiceMockModule } = await import('@/test/doubles/moduleMocks');
+
+  return createDbServiceMockModule({
+    getSession: mockDbGetSession,
+    getSessionMetadataOnly: mockDbGetSession,
+  });
+});
 
 vi.mock('@/services/api/generation/textApi', () => ({
   generateTitleApi: generateTitleApiMock,
@@ -17,12 +27,6 @@ vi.mock('@/services/api/generation/textApi', () => ({
 vi.mock('@/utils/apiKeySelection', () => ({
   getGeminiKeyForRequest: getGeminiKeyForRequestMock,
 }));
-
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
 
 const createSession = (overrides: Partial<SavedChatSession> = {}): SavedChatSession => ({
   id: 'session-1',
@@ -54,6 +58,9 @@ describe('useAutoTitling', () => {
     vi.clearAllMocks();
     getGeminiKeyForRequestMock.mockReturnValue({ key: 'gemini-key', isNewKey: true });
     generateTitleApiMock.mockResolvedValue('Routing Basics');
+    // The DB re-check in generateTitleForSession will look up the session; return
+    // the default "New Chat" session so the guard passes and the API call proceeds.
+    mockDbGetSession.mockResolvedValue(createSession());
   });
 
   it('uses a Gemini key instead of the OpenAI sticky key while OpenAI-compatible mode is active', async () => {
@@ -66,18 +73,18 @@ describe('useAutoTitling', () => {
       useAutoTitling({
         appSettings: {
           ...DEFAULT_APP_SETTINGS,
-          isThirdPartyApiEnabled: true,
-          apiMode: 'third-party',
           apiKey: 'gemini-key',
           thirdPartyApi: {
-            activeProvider: 'openai',
-            providers: {
-              ...createDefaultThirdPartyApiSettings().providers,
-              openai: { ...createDefaultThirdPartyApiSettings().providers.openai, apiKey: 'openai-key' },
-            },
+            connections: [createThirdPartyConnection({ id: 'openai', apiKey: 'openai-key' })],
           },
         },
-        activeChat: createSession(),
+        activeChat: createSession({
+          settings: {
+            ...DEFAULT_APP_SETTINGS,
+            modelId: 'gpt-5.6-sol',
+            providerId: 'openai',
+          },
+        }),
         updateAndPersistSessions,
         language: 'en',
         generatingTitleSessionIds: new Set(),

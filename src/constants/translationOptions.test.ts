@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  LIVE_TRANSLATE_TARGET_LANGUAGE_CODES,
-  DEFAULT_LIVE_TRANSLATE_TARGET_LANGUAGE_CODE,
-  liveTranslateLanguageLabel,
-} from './translationOptions';
+import { LIVE_TRANSLATE_TARGET_LANGUAGE_CODES, liveTranslateLanguageLabel } from './translationOptions';
 
 describe('LIVE_TRANSLATE_TARGET_LANGUAGE_CODES', () => {
   it('matches the official supported-language count (78 languages)', () => {
@@ -39,10 +35,6 @@ describe('LIVE_TRANSLATE_TARGET_LANGUAGE_CODES', () => {
     expect(LIVE_TRANSLATE_TARGET_LANGUAGE_CODES).toContain('pt-PT');
     // 文档示例用 pl
     expect(LIVE_TRANSLATE_TARGET_LANGUAGE_CODES).toContain('pl');
-  });
-
-  it('defaults to English', () => {
-    expect(DEFAULT_LIVE_TRANSLATE_TARGET_LANGUAGE_CODE).toBe('en');
   });
 });
 

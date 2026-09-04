@@ -1,4 +1,4 @@
-import { type ModelOption } from '@/types';
+import { normalizeModelApiModeTag, type ModelOption } from '@/types';
 import { migrateRemovedModelId } from '@/constants/modelConfiguration';
 
 import { getModelCapabilities, isImageGenerationModel } from './modelCapabilities';
@@ -7,27 +7,39 @@ export const sanitizeModelOptions = (models: ModelOption[]): ModelOption[] => {
   const seenIds = new Set<string>();
 
   return models.reduce<ModelOption[]>((sanitized, model) => {
-    const normalizedId = migrateRemovedModelId(model.id.trim()) ?? model.id.trim();
+    // Removed-model migrations (migrateRemovedModelId) apply ONLY to the
+    // selected-model pointer (resolveSupportedModelId / tab cycle ids), never to
+    // user-defined custom list entries. Rewriting an entry here silently changed
+    // or dropped ids the user typed in the list editor (issue #114).
+    const normalizedId = model.id.trim();
 
     if (!normalizedId || seenIds.has(normalizedId)) {
       return sanitized;
     }
 
     seenIds.add(normalizedId);
-    sanitized.push({
+    const normalized: ModelOption = {
       ...model,
       id: normalizedId,
       name: model.name.trim() || normalizedId,
-    });
+    };
+    // Normalize the persisted provider-family tag so the legacy
+    // 'openai-compatible' tag folds into 'third-party' (and bogus tags are
+    // dropped) instead of being spread through verbatim.
+    const apiModeTag = normalizeModelApiModeTag(model.apiMode);
+    if (apiModeTag) {
+      normalized.apiMode = apiModeTag;
+    } else {
+      delete normalized.apiMode;
+    }
+    sanitized.push(normalized);
 
     return sanitized;
   }, []);
 };
 
-export const resolveSupportedModelId = (modelId: string | null | undefined, fallback: string): string => {
-  const resolved = migrateRemovedModelId(modelId) || fallback;
-  return resolved;
-};
+export const resolveSupportedModelId = (modelId: string | null | undefined, fallback: string): string =>
+  migrateRemovedModelId(modelId) || fallback;
 
 /**
  * De-duplicate a model list by id, preserving the first occurrence of each id.
@@ -48,15 +60,18 @@ export const deduplicateModelsById = (models: ModelOption[]): ModelOption[] => {
 export const sortModels = (models: ModelOption[]): ModelOption[] => {
   const pinnedPriorityOrder: Record<string, number> = {
     'gemini-3.1-pro-preview': 0,
-    'gemini-3.6-flash': 1,
-    'gemini-3.5-flash-lite': 2,
+    'gemini-3.8-flash': 1,
+    'gemini-3.7-flash': 2,
+    'gemini-3.5-flash-lite': 3,
+    'gemini-3.6-flash': 4,
+    'gemini-3-flash-preview': 5,
   };
 
   const getCategoryWeight = (id: string) => {
     const capabilities = getModelCapabilities(id);
     if (capabilities.isTtsModel) return 3;
     if (isImageGenerationModel(id)) return 4;
-    if (capabilities.isNativeAudioModel) return 2;
+    if (capabilities.isNativeAudioModel || capabilities.isTranscribeModel) return 2;
     return 1;
   };
 

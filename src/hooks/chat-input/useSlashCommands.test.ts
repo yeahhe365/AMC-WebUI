@@ -76,7 +76,9 @@ describe('useSlashCommands', () => {
       icon,
     }));
 
-    expect(result.current.allCommandsForHelp).toEqual(executableCommands);
+    // Cherry-style grouping sorts by group priority, so compare as sets (sorted by name) rather than strict order
+    const sortByName = <T extends { name: string }>(arr: T[]) => [...arr].sort((a, b) => a.name.localeCompare(b.name));
+    expect(sortByName(result.current.allCommandsForHelp)).toEqual(sortByName(executableCommands));
     unmount();
   });
 
@@ -145,6 +147,34 @@ describe('useSlashCommands', () => {
       'Gemini 2.5 Pro',
       'Gemini 2.5 Flash',
     ]);
+    unmount();
+  });
+
+  it('hides artifacts command on models that cannot generate suggestions', () => {
+    const props = createProps({ currentModelId: 'gemini-3.1-flash-tts-preview' });
+    const { result, unmount } = renderHook(() => useSlashCommands(props));
+
+    act(() => {
+      result.current.handleInputChange('/');
+    });
+
+    const commandNames = result.current.slashCommandState.filteredCommands.map((c) => c.name);
+    expect(commandNames).not.toContain('artifacts');
+    expect(commandNames).not.toContain('fast');
+    unmount();
+  });
+
+  it('hides fast command on gemini-3-pro-image-preview', () => {
+    const props = createProps({ currentModelId: 'gemini-3-pro-image-preview' });
+    const { result, unmount } = renderHook(() => useSlashCommands(props));
+
+    act(() => {
+      result.current.handleInputChange('/');
+    });
+
+    const commandNames = result.current.slashCommandState.filteredCommands.map((c) => c.name);
+    expect(commandNames).not.toContain('fast');
+    expect(commandNames).not.toContain('artifacts');
     unmount();
   });
 });

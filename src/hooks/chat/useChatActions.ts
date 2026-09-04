@@ -77,19 +77,10 @@ export const useChatActions = ({
     userScrolledUpRef,
   });
 
-  const {
-    handleClearCurrentChat,
-    handleTogglePinCurrentSession,
-    toggleGoogleSearch,
-    toggleCodeExecution,
-    toggleLocalPython,
-    toggleUrlContext,
-    toggleDeepSearch,
-  } = useChatSessionActions({
+  const { handleClearCurrentChat, handleTogglePinCurrentSession } = useChatSessionActions({
     activeSessionId,
     isLoading,
     updateAndPersistSessions,
-    setCurrentChatSettings,
     setSelectedFiles,
     handleStopGenerating,
     startNewChat,
@@ -120,11 +111,6 @@ export const useChatActions = ({
     handleSelectModelInHeader,
     handleClearCurrentChat,
     handleTranscribeAudio,
-    toggleGoogleSearch,
-    toggleCodeExecution,
-    toggleLocalPython,
-    toggleUrlContext,
-    toggleDeepSearch,
     handleTogglePinCurrentSession,
     handleUpdateMessageContent,
     handleUpdateMessageFile,

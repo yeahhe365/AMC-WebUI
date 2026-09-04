@@ -9,8 +9,11 @@ const TOGGLEABLE_CHAT_TOOL_IDS = [
   'codeExecution',
   'localPython',
   'urlContext',
+  'alwaysKeepThinking',
 ] as const;
 
+// Mirrors useChatInputToolStates: every toggleable tool gets an onToggle, so
+// menu/slash availability filtering (not missing handlers) decides visibility.
 export const createChatToolToggleStates = (overrides: ChatToolToggleStates = {}): ChatToolToggleStates => ({
   googleSearch: { isEnabled: false, onToggle: vi.fn() },
   googleMaps: { isEnabled: false, onToggle: vi.fn() },
@@ -18,6 +21,7 @@ export const createChatToolToggleStates = (overrides: ChatToolToggleStates = {})
   codeExecution: { isEnabled: false, onToggle: vi.fn() },
   localPython: { isEnabled: false, onToggle: vi.fn() },
   urlContext: { isEnabled: false, onToggle: vi.fn() },
+  alwaysKeepThinking: { isEnabled: false, onToggle: vi.fn() },
   ...overrides,
 });
 

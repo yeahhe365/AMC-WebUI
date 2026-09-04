@@ -1,18 +1,20 @@
 import type { LogLevel, LogCategory } from '@/types/logging';
 
 export const LOG_LEVEL_COLORS: Record<LogLevel, string> = {
-  INFO: 'text-blue-400',
-  WARN: 'text-yellow-400',
-  ERROR: 'text-red-400',
-  DEBUG: 'text-gray-500',
+  INFO: 'text-[var(--theme-text-info)]',
+  WARN: 'text-[var(--theme-text-warning)]',
+  ERROR: 'text-[var(--theme-text-danger)]',
+  DEBUG: 'text-[var(--theme-text-tertiary)]',
 };
 
+export const LOG_CATEGORY_CHIP_CLASS = 'bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-secondary)]';
+
 export const CATEGORY_COLORS: Record<LogCategory, string> = {
-  SYSTEM: 'bg-gray-700 text-gray-200',
-  NETWORK: 'bg-purple-900/50 text-purple-200',
-  USER: 'bg-green-900/50 text-green-200',
-  MODEL: 'bg-blue-900/50 text-blue-200',
-  DB: 'bg-indigo-900/50 text-indigo-200',
-  AUTH: 'bg-orange-900/50 text-orange-200',
-  FILE: 'bg-teal-900/50 text-teal-200',
+  SYSTEM: LOG_CATEGORY_CHIP_CLASS,
+  NETWORK: LOG_CATEGORY_CHIP_CLASS,
+  USER: LOG_CATEGORY_CHIP_CLASS,
+  MODEL: LOG_CATEGORY_CHIP_CLASS,
+  DB: LOG_CATEGORY_CHIP_CLASS,
+  AUTH: LOG_CATEGORY_CHIP_CLASS,
+  FILE: LOG_CATEGORY_CHIP_CLASS,
 };

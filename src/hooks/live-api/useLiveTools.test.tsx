@@ -6,12 +6,6 @@ import { createUploadedFile } from '@/test/data/factories';
 import { createLiveSessionRef, createLiveSessionStub, createLiveToolCall } from '@/test/live-api/fixtures';
 import { renderHook } from '@/test/render/renderer';
 
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
 describe('useLiveTools', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -1,4 +1,5 @@
 import { act } from 'react';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { setupProviderTestRenderer as setupTestRenderer } from '@/test/render/providerRenderer';
@@ -30,7 +31,7 @@ describe('AboutSection', () => {
     vi.unstubAllGlobals();
   });
 
-  const renderAboutSection = async (language: 'en' | 'zh' = 'zh') => {
+  const renderAboutSection = async (language: SupportedLanguage = 'zh') => {
     await act(async () => {
       useSettingsStore.setState({ language });
       renderer.root.render(<AboutSection />);
@@ -123,5 +124,18 @@ describe('AboutSection', () => {
     const releaseLink = renderer.container.querySelector('a[href="https://github.com/yeahhe365/AMC-WebUI/releases"]');
 
     expect(releaseLink?.getAttribute('title')).toBe(`有新版本：${nextPatchVersion}`);
+  });
+
+  it('uses quiet settings actions instead of lifted marketplace chrome', async () => {
+    await renderAboutSection();
+
+    const html = renderer.container.innerHTML;
+    const github = renderer.container.querySelector('[data-settings-item="about-github"]');
+
+    expect(html).not.toContain('hover:-translate-y');
+    expect(html).not.toContain('#24292F');
+    expect(html).not.toContain('bg-gradient-to-r');
+    expect(html).not.toContain('animate-ping');
+    expect(github?.className).toContain('border-[var(--theme-border-secondary)]');
   });
 });

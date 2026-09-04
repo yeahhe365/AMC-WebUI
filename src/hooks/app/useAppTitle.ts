@@ -1,14 +1,37 @@
 import { useState, useMemo, useEffect } from 'react';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import { type ChatMessage } from '@/types';
 
 interface UseAppTitleProps {
   isLoading: boolean;
   messages: ChatMessage[];
-  language: 'en' | 'zh';
+  language: SupportedLanguage;
   sessionTitle: string;
 }
 
 const GENERATION_TITLE_REFRESH_MS = 1000;
+
+// Browser-tab chrome strings; kept local because they interpolate time and
+// concatenate with session titles (not plain t() lookups).
+const GENERATING_LABELS: Record<SupportedLanguage, string> = {
+  en: 'Generating',
+  zh: '生成中',
+  ja: '生成中',
+  ko: '생성 중',
+  es: 'Generando',
+  fr: 'Génération',
+  de: 'Generierung',
+};
+
+const NEW_CHAT_LABELS: Record<SupportedLanguage, string> = {
+  en: 'New Chat',
+  zh: '新聊天',
+  ja: '新しいチャット',
+  ko: '새 채팅',
+  es: 'Nuevo chat',
+  fr: 'Nouvelle discussion',
+  de: 'Neuer Chat',
+};
 
 export const useAppTitle = ({ isLoading, messages, language, sessionTitle }: UseAppTitleProps) => {
   const [generationTime, setGenerationTime] = useState(0);
@@ -47,11 +70,11 @@ export const useAppTitle = ({ isLoading, messages, language, sessionTitle }: Use
       let statusPrefix = '';
       if (isLoading) {
         const timeDisplay = ` (${currentGenerationStartTime ? generationTime : 0}s)`;
-        statusPrefix = language === 'zh' ? `生成中${timeDisplay}… | ` : `Generating${timeDisplay}... | `;
+        statusPrefix = `${GENERATING_LABELS[language]}${timeDisplay}... | `;
       }
 
       const suffix = sessionTitle === 'AMC WebUI' ? '' : ' • AMC WebUI';
-      const cleanTitle = sessionTitle === 'New Chat' && language === 'zh' ? '新聊天' : sessionTitle || 'New Chat';
+      const cleanTitle = sessionTitle === 'New Chat' ? NEW_CHAT_LABELS[language] : sessionTitle || NEW_CHAT_LABELS.en;
       document.title = `${statusPrefix}${cleanTitle}${suffix}`;
     };
 

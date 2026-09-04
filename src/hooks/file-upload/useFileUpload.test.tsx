@@ -15,18 +15,6 @@ vi.mock('@/utils/file-upload/uploadFileItem', () => ({
   uploadFileItem: mockUploadFileItem,
 }));
 
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
-vi.mock('@/services/db/dbService', async () => {
-  const { createDbServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createDbServiceMockModule();
-});
-
 describe('useFileUpload', () => {
   beforeEach(() => {
     vi.clearAllMocks();

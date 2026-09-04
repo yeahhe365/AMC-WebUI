@@ -1,94 +1,110 @@
 import React, { useRef, useEffect } from 'react';
 
 interface AudioVisualizerProps {
-  stream: MediaStream | null;
+  analyser: AnalyserNode | null;
 }
 
-const AUDIO_CONTEXT_INIT_DELAY_MS = 50;
+const VISUALIZER_BAR_COUNT = 48;
+const BAR_GAP_RATIO = 0.35;
+const HEIGHT_FILL_RATIO = 0.9;
+const MIN_BAR_HEIGHT = 2;
+const FALLBACK_CANVAS_WIDTH = 300;
+const FALLBACK_CANVAS_HEIGHT = 64;
 
-export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ stream }) => {
+/**
+ * The accent colour lives in a CSS variable, which canvas cannot read directly.
+ * Re-reading every frame would thrash style resolution, so it refreshes once a
+ * second at most — enough for theme switches, cheap enough for 60fps drawing.
+ */
+const ACCENT_REFRESH_FRAME_INTERVAL = 60;
+
+const readAccentColor = (): string => {
+  const style = getComputedStyle(document.body);
+  return style.getPropertyValue('--theme-bg-accent').trim() || '#3b82f6';
+};
+
+export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ analyser }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const animationFrameIdRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!stream || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas || !analyser) return;
 
-    const initAudio = () => {
-      const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
-      const audioContext = new AudioContextConstructor();
-      audioContextRef.current = audioContext;
+    const canvasContext = canvas.getContext('2d');
+    if (!canvasContext) return;
 
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 64;
-      analyser.smoothingTimeConstant = 0.6;
-      analyserRef.current = analyser;
+    const sampleBuffer = new Float32Array(analyser.fftSize);
+    const samplesPerBar = Math.max(1, Math.floor(sampleBuffer.length / VISUALIZER_BAR_COUNT));
+    let accentColor = readAccentColor();
+    let frameIndex = 0;
 
-      const source = audioContext.createMediaStreamSource(stream);
-      sourceRef.current = source;
-      source.connect(analyser);
+    const renderFrame = () => {
+      animationFrameIdRef.current = requestAnimationFrame(renderFrame);
+      frameIndex += 1;
 
-      drawVisualizer();
-    };
+      if (frameIndex % ACCENT_REFRESH_FRAME_INTERVAL === 0) {
+        accentColor = readAccentColor();
+      }
 
-    const drawVisualizer = () => {
-      if (!analyserRef.current || !canvasRef.current) return;
+      // Size the backing store to the device pixel ratio so bars stay crisp
+      // instead of being upscaled from a fixed 300x64 bitmap.
+      const devicePixelRatio = window.devicePixelRatio || 1;
+      const cssWidth = canvas.clientWidth || FALLBACK_CANVAS_WIDTH;
+      const cssHeight = canvas.clientHeight || FALLBACK_CANVAS_HEIGHT;
+      const pixelWidth = Math.round(cssWidth * devicePixelRatio);
+      const pixelHeight = Math.round(cssHeight * devicePixelRatio);
 
-      const canvas = canvasRef.current;
-      const canvasContext = canvas.getContext('2d');
-      if (!canvasContext) return;
+      if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+        canvas.width = pixelWidth;
+        canvas.height = pixelHeight;
+      }
 
-      const bufferLength = analyserRef.current.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-      const style = getComputedStyle(document.body);
-      const accentColor = style.getPropertyValue('--theme-bg-accent').trim() || '#3b82f6';
+      canvasContext.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+      canvasContext.clearRect(0, 0, cssWidth, cssHeight);
+      canvasContext.fillStyle = accentColor;
 
-      const draw = () => {
-        if (!analyserRef.current) return;
+      analyser.getFloatTimeDomainData(sampleBuffer);
 
-        animationFrameIdRef.current = requestAnimationFrame(draw);
-        analyserRef.current.getByteFrequencyData(dataArray);
+      const slotWidth = cssWidth / VISUALIZER_BAR_COUNT;
+      const barWidth = Math.max(1, slotWidth * (1 - BAR_GAP_RATIO));
+      let barX = 0;
 
-        const width = canvas.width;
-        const height = canvas.height;
+      for (let barIndex = 0; barIndex < VISUALIZER_BAR_COUNT; barIndex += 1) {
+        const sampleStart = barIndex * samplesPerBar;
+        let peakAmplitude = 0;
 
-        canvasContext.clearRect(0, 0, width, height);
-
-        canvasContext.fillStyle = accentColor;
-
-        const effectiveSlice = Math.floor(bufferLength * 0.7);
-        const barWidth = (width / bufferLength) * 2.5;
-        let barX = (width - effectiveSlice * (barWidth + 1)) / 2;
-
-        for (let i = 0; i < effectiveSlice; i++) {
-          const barHeight = (dataArray[i] / 255) * height * 0.9;
-          if (barHeight > 2) {
-            canvasContext.beginPath();
-            canvasContext.roundRect(barX, (height - barHeight) / 2, barWidth, barHeight, 2);
-            canvasContext.fill();
+        for (let sampleIndex = sampleStart; sampleIndex < sampleStart + samplesPerBar; sampleIndex += 1) {
+          const amplitude = Math.abs(sampleBuffer[sampleIndex] ?? 0);
+          if (amplitude > peakAmplitude) {
+            peakAmplitude = amplitude;
           }
-          barX += barWidth + 1;
         }
-      };
-      draw();
+
+        const barHeight = peakAmplitude * cssHeight * HEIGHT_FILL_RATIO;
+        if (barHeight > MIN_BAR_HEIGHT) {
+          canvasContext.beginPath();
+          canvasContext.roundRect(barX, (cssHeight - barHeight) / 2, barWidth, barHeight, barWidth / 2);
+          canvasContext.fill();
+        }
+
+        barX += slotWidth;
+      }
     };
 
-    const timeoutId = setTimeout(initAudio, AUDIO_CONTEXT_INIT_DELAY_MS);
+    renderFrame();
 
     return () => {
-      clearTimeout(timeoutId);
-      if (animationFrameIdRef.current) cancelAnimationFrame(animationFrameIdRef.current);
-      sourceRef.current?.disconnect();
-      analyserRef.current?.disconnect();
-      audioContextRef.current?.close().catch(() => {});
+      if (animationFrameIdRef.current !== null) {
+        cancelAnimationFrame(animationFrameIdRef.current);
+      }
+      animationFrameIdRef.current = null;
     };
-  }, [stream]);
+  }, [analyser]);
 
   return (
     <div className="w-full h-16 flex items-center justify-center bg-[var(--theme-bg-tertiary)]/20 rounded-xl overflow-hidden">
-      <canvas ref={canvasRef} width={300} height={64} className="w-full h-full object-contain" />
+      <canvas ref={canvasRef} className="w-full h-full block" />
     </div>
   );
 };

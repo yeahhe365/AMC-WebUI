@@ -1,5 +1,5 @@
 import type { OpenAIResponsePayload } from './openaiCompatibleTypes';
-import { appendSseChunk } from './sseBuffer';
+import { readSseStream } from './sseReader';
 
 const parseSseDataLines = (buffer: string): { events: string[]; rest: string } => {
   const events: string[] = [];
@@ -26,59 +26,22 @@ const parseSseDataLines = (buffer: string): { events: string[]; rest: string } =
   return { events, rest: buffer.slice(searchStart) };
 };
 
-export const readOpenAICompatibleStreamEvents = async (
+export const readOpenAICompatibleStreamEvents = (
   response: Response,
   abortSignal: AbortSignal,
   onEvent: (payload: OpenAIResponsePayload) => void,
-): Promise<void> => {
-  if (!response.body) {
-    return;
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done || abortSignal.aborted) {
-        break;
+): Promise<void> =>
+  readSseStream(
+    response,
+    abortSignal,
+    parseSseDataLines,
+    (event) => {
+      // Skip malformed SSE lines instead of aborting the whole stream.
+      try {
+        onEvent(JSON.parse(event) as OpenAIResponsePayload);
+      } catch {
+        // Ignore unparseable event and continue.
       }
-
-      buffer = appendSseChunk(buffer, decoder.decode(value, { stream: true }));
-      const parsed = parseSseDataLines(buffer);
-      buffer = parsed.rest;
-
-      for (const event of parsed.events) {
-        if (event === '[DONE]') {
-          return;
-        }
-        // Skip malformed SSE lines instead of aborting the whole stream.
-        try {
-          onEvent(JSON.parse(event) as OpenAIResponsePayload);
-        } catch {
-          // Ignore unparseable event and continue.
-        }
-      }
-    }
-
-    const tail = decoder.decode();
-    if (tail) {
-      buffer = appendSseChunk(buffer, tail);
-    }
-    const parsed = parseSseDataLines(`${buffer}\n\n`);
-    for (const event of parsed.events) {
-      if (event !== '[DONE]') {
-        try {
-          onEvent(JSON.parse(event) as OpenAIResponsePayload);
-        } catch {
-          // Ignore unparseable event and continue.
-        }
-      }
-    }
-  } finally {
-    // Release the reader so the underlying HTTP/TLS connection is returned to the pool.
-    await reader.cancel().catch(() => undefined);
-  }
-};
+    },
+    (event) => event === '[DONE]',
+  );

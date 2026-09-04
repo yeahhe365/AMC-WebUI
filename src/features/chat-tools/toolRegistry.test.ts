@@ -51,15 +51,47 @@ describe('chat tool registry', () => {
         capabilities: geminiImageCapabilities,
         hasLocalPythonHandler: true,
       }).map((tool) => tool.id),
-    ).toEqual(['googleSearch', 'googleMaps', 'tokenCount']);
+    ).toEqual(['googleSearch', 'tokenCount']);
 
+    // Gemma supports no API tools at all (no grounding, no function calling),
+    // so only the provider-agnostic helpers remain.
     expect(
       getChatToolsForSurface({
         surface: 'tools-menu',
         capabilities: gemmaCapabilities,
         hasLocalPythonHandler: true,
       }).map((tool) => tool.id),
-    ).toEqual(['deepSearch', 'googleSearch', 'googleMaps', 'localPython', 'alwaysKeepThinking', 'tokenCount']);
+    ).toEqual(['alwaysKeepThinking', 'tokenCount']);
+  });
+
+  it('hides Gemini-native tools on third-party provider routes', () => {
+    const geminiCapabilities = getModelCapabilities('gemini-2.5-flash');
+
+    const idsFor = (providerId?: string) =>
+      getChatToolsForSurface({
+        surface: 'tools-menu',
+        capabilities: geminiCapabilities,
+        providerId,
+        hasLocalPythonHandler: true,
+      }).map((tool) => tool.id);
+
+    // Gemini-native route: everything is offered.
+    expect(idsFor(undefined)).toEqual([
+      'deepSearch',
+      'googleSearch',
+      'googleMaps',
+      'codeExecution',
+      'localPython',
+      'urlContext',
+      'alwaysKeepThinking',
+      'tokenCount',
+    ]);
+    expect(idsFor('gemini-native')).toEqual(idsFor(undefined));
+
+    // Third-party route: the Gemini built-in tools and the Gemini token-count
+    // modal are dead there; only the provider-agnostic keep-thinking toggle
+    // remains.
+    expect(idsFor('openai')).toEqual(['alwaysKeepThinking']);
   });
 
   it('hides the keep-thinking tool on Live, TTS, and image-generation models', () => {

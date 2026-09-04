@@ -6,14 +6,17 @@ export interface AnthropicChatConfig {
   systemInstruction?: string;
   temperature?: number;
   topP?: number;
+  topK?: number;
+  maxOutputTokens?: number;
+  stopSequences?: string[];
   thinkingBudget?: number;
   /** Maps to output_config.effort on adaptive Claude models (Fable 5 / Opus 5 / Sonnet 5, …). */
   thinkingLevel?: ThinkingLevel;
+  extraHeaders?: Record<string, string> | null;
 }
 
 export type AnthropicContentBlock =
-  | { type: 'text'; text: string }
-  | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
+  { type: 'text'; text: string } | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
 
 export interface AnthropicMessage {
   role: 'user' | 'assistant';
@@ -41,11 +44,8 @@ export type AnthropicStreamEvent = {
   message?: AnthropicResponsePayload;
   delta?: { type?: string; text?: string; thinking?: string };
   usage?: AnthropicUsage;
-};
-
-export type AnthropicModelsResponsePayload = {
-  data?: Array<{ id?: unknown }>;
-  error?: { message?: string };
+  /** Mid-stream failure (e.g. overloaded_error); Anthropic ends the stream after this event. */
+  error?: { type?: string; message?: string };
 };
 
 export const asAnthropicChatConfig = (config: unknown): AnthropicChatConfig =>

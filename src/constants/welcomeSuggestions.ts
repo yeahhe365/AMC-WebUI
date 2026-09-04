@@ -4,7 +4,7 @@ export const SUGGESTIONS_KEYS = [
     descKey: 'suggestionHtmlDesc',
     shortKey: 'suggestionHtmlShort',
     specialAction: 'organize',
-    icon: 'AppWindow',
+    icon: 'Palette',
   },
   {
     titleKey: 'suggestionTranslateTitle',
@@ -34,7 +34,7 @@ export const SUGGESTIONS_KEYS = [
     titleKey: 'suggestionExplainTitle',
     descKey: 'suggestionExplainDesc',
     shortKey: 'suggestionExplainShort',
-    icon: 'Lightbulb',
+    icon: 'FileQuestion',
   },
   {
     titleKey: 'suggestionSummarizeTitle',

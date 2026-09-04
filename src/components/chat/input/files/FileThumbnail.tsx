@@ -1,7 +1,8 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ElementType, type FC, type ReactNode } from 'react';
+import { lazy, memo, Suspense, useEffect, useRef, useState, type ElementType, type FC, type ReactNode } from 'react';
 import type { UploadedFile } from '@/types';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/constants/fileTypeSupport';
-import { getFileTypeCategory, isTextFile } from '@/utils/file/fileTypeClassification';
+import { getFileTypeCategory } from '@/utils/file/fileTypeClassification';
+import { FileCode } from 'lucide-react';
 
 const LazyPdfFileThumbnail = lazy(() =>
   import('./PdfFileThumbnail').then((module) => ({ default: module.PdfFileThumbnail })),
@@ -14,6 +15,45 @@ interface FileThumbnailProps {
   bgClass: string;
 }
 
+const CODE_EXTENSIONS = new Set([
+  'js',
+  'jsx',
+  'ts',
+  'tsx',
+  'py',
+  'json',
+  'html',
+  'htm',
+  'css',
+  'scss',
+  'less',
+  'java',
+  'c',
+  'cpp',
+  'h',
+  'hpp',
+  'cs',
+  'go',
+  'rs',
+  'php',
+  'sh',
+  'bash',
+  'zsh',
+  'yaml',
+  'yml',
+  'toml',
+  'sql',
+  'xml',
+  'graphql',
+  'vue',
+  'svelte',
+]);
+
+const isCodeExtension = (filename: string): boolean => {
+  const extension = filename.split('.').pop()?.toLowerCase();
+  return extension ? CODE_EXTENSIONS.has(extension) : false;
+};
+
 const getDisplayExtension = (file: UploadedFile) => {
   const extension = file.name.split('.').pop()?.trim();
   if (extension && extension !== file.name) {
@@ -22,28 +62,6 @@ const getDisplayExtension = (file: UploadedFile) => {
 
   const mimeSuffix = file.type.split('/').pop()?.split(/[+;]/)[0];
   return (mimeSuffix || 'FILE').slice(0, 4).toUpperCase();
-};
-
-const buildTextLines = (text: string | null) =>
-  (text || '')
-    .replace(/\r/g, '')
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(0, 5);
-
-const getWaveformBars = (file: UploadedFile) => {
-  const seed = `${file.name}:${file.size}:${file.type}`;
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) % 9973;
-  }
-
-  return Array.from({ length: 18 }, (_, index) => {
-    const wave = Math.sin((hash + index * 29) / 13);
-    const stepped = (hash + index * 37) % 41;
-    return 24 + Math.round(Math.abs(wave) * 42) + stepped;
-  });
 };
 
 const useVisibleThumbnailGate = (enabled: boolean) => {
@@ -78,63 +96,6 @@ const useVisibleThumbnailGate = (enabled: boolean) => {
   return { containerRef, isVisible };
 };
 
-const TextThumbnail = ({ file }: { file: UploadedFile }) => {
-  const [previewText, setPreviewText] = useState(file.textContent ?? null);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    const loadTextPreview = async () => {
-      if (typeof file.textContent === 'string') {
-        setPreviewText(file.textContent);
-        return;
-      }
-
-      try {
-        if (file.rawFile && 'text' in file.rawFile) {
-          const text = await file.rawFile.text();
-          if (!isCancelled) setPreviewText(text);
-          return;
-        }
-
-        if (file.dataUrl) {
-          const response = await fetch(file.dataUrl);
-          const text = await response.text();
-          if (!isCancelled) setPreviewText(text);
-        }
-      } catch {
-        if (!isCancelled) setPreviewText(null);
-      }
-    };
-
-    loadTextPreview();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [file.dataUrl, file.rawFile, file.textContent]);
-
-  const lines = buildTextLines(previewText);
-  const fallbackLines = ['{', '  ...', '}'];
-  const displayLines = lines.length > 0 ? lines : fallbackLines;
-
-  return (
-    <div
-      data-thumbnail-kind="text"
-      className="h-full w-full overflow-hidden bg-[var(--theme-bg-primary)] text-[var(--theme-text-secondary)]"
-    >
-      <div className="flex h-full flex-col gap-1 p-2 text-xs leading-tight">
-        {displayLines.map((line, index) => (
-          <div key={`${index}:${line}`} className="flex items-center gap-1">
-            <span className="w-2 flex-shrink-0 text-[var(--theme-text-tertiary)]">{index + 1}</span>
-            <span className="truncate font-mono">{line}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
-
 const PdfThumbnail = ({ file, fallback }: { file: UploadedFile; fallback: ReactNode }) => {
   const shouldLoadPreview = !!file.dataUrl;
   const { containerRef, isVisible } = useVisibleThumbnailGate(shouldLoadPreview);
@@ -152,98 +113,67 @@ const PdfThumbnail = ({ file, fallback }: { file: UploadedFile; fallback: ReactN
   );
 };
 
-const VideoThumbnail = ({ file, fallback }: { file: UploadedFile; fallback: ReactNode }) => {
-  if (!file.dataUrl) {
+const VideoThumbnail = memo(
+  ({ file, fallback }: { file: UploadedFile; fallback: ReactNode }) => {
+    if (!file.dataUrl) {
+      return (
+        <div data-thumbnail-kind="video" className="h-full w-full">
+          {fallback}
+        </div>
+      );
+    }
+
     return (
-      <div data-thumbnail-kind="video" className="h-full w-full">
-        {fallback}
+      <div data-thumbnail-kind="video" className="relative h-full w-full overflow-hidden bg-black">
+        <video
+          src={`${file.dataUrl}#t=0.1`}
+          className="h-full w-full object-cover pointer-events-none"
+          muted
+          playsInline
+          preload="metadata"
+          aria-label={file.name}
+        />
       </div>
     );
-  }
+  },
+  (prev, next) => prev.file.id === next.file.id && prev.file.dataUrl === next.file.dataUrl,
+);
 
-  return (
-    <div data-thumbnail-kind="video" className="relative h-full w-full overflow-hidden bg-black">
-      <video
-        src={`${file.dataUrl}#t=0.1`}
-        className="h-full w-full object-cover"
-        muted
-        playsInline
-        preload="metadata"
-        aria-label={file.name}
-      />
-      <div className="absolute inset-x-2 bottom-2 h-1 rounded-full bg-white/20">
-        <div className="h-full w-1/3 rounded-full bg-white/70" />
-      </div>
-    </div>
-  );
-};
-
-const AudioThumbnail = ({ file }: { file: UploadedFile }) => {
-  const bars = useMemo(() => getWaveformBars(file), [file]);
-
-  return (
-    <div
-      data-thumbnail-kind="audio"
-      className="flex h-full w-full items-center justify-center overflow-hidden bg-gradient-to-br from-purple-950 via-slate-950 to-cyan-950 px-2"
-    >
-      <div className="flex h-12 w-full items-center justify-center gap-0.5">
-        {bars.map((height, index) => (
-          <span
-            key={index}
-            data-waveform-bar="true"
-            className="w-1 rounded-full bg-cyan-200/80 shadow-[0_0_8px_rgba(103,232,249,0.35)]"
-            style={{ height: `${Math.min(88, height)}%` }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const CoverThumbnail = ({ file, Icon, colorClass, bgClass }: FileThumbnailProps) => {
+const CoverThumbnail = ({
+  file,
+  Icon: defaultIcon,
+  colorClass: defaultColorClass,
+  bgClass: defaultBgClass,
+}: FileThumbnailProps) => {
   const category = getFileTypeCategory(file.type, file.error);
   const extension = getDisplayExtension(file);
 
+  let Icon = defaultIcon;
+  let colorClass = defaultColorClass;
+  let bgClass = defaultBgClass;
+
+  if (category === 'text' && isCodeExtension(file.name)) {
+    Icon = FileCode;
+    colorClass = 'text-cyan-600 dark:text-cyan-400';
+    bgClass = 'bg-[var(--theme-bg-code-block)]';
+  }
+
   return (
-    <div data-thumbnail-kind={category} className={`relative h-full w-full overflow-hidden ${bgClass} p-2`}>
-      <div className="absolute inset-0 opacity-50">
-        {category === 'spreadsheet' ? (
-          <div className="grid h-full w-full grid-cols-4 grid-rows-5 gap-px p-2">
-            {Array.from({ length: 20 }, (_, index) => (
-              <span key={index} className="rounded-[2px] bg-white/25" />
-            ))}
-          </div>
-        ) : category === 'presentation' ? (
-          <div className="flex h-full w-full items-center justify-center p-3">
-            <span className="h-10 w-14 rounded border border-white/35 bg-white/20" />
-          </div>
-        ) : category === 'archive' ? (
-          <div className="flex h-full w-full flex-col gap-1 p-3">
-            {Array.from({ length: 5 }, (_, index) => (
-              <span key={index} className="h-1.5 rounded-full bg-white/25" />
-            ))}
-          </div>
-        ) : (
-          <div className="flex h-full w-full flex-col gap-1.5 p-3">
-            {Array.from({ length: 4 }, (_, index) => (
-              <span key={index} className="h-1.5 rounded-full bg-white/25" />
-            ))}
-          </div>
-        )}
+    <div
+      data-thumbnail-kind={category}
+      className={`relative h-full w-full overflow-hidden ${bgClass} p-2 flex flex-col items-center justify-center gap-1`}
+    >
+      <div className="rounded-lg bg-[var(--theme-bg-primary)]/90 p-1.5 shadow-sm border border-[var(--theme-border-secondary)]/50">
+        <Icon size={19} className={colorClass} strokeWidth={1.6} />
       </div>
-      <div className="relative flex h-full flex-col items-center justify-center gap-1">
-        <div className="rounded-lg bg-[var(--theme-bg-primary)]/80 p-1.5 shadow-sm">
-          <Icon size={19} className={colorClass} strokeWidth={1.6} />
-        </div>
-        <span className="max-w-full rounded bg-[var(--theme-bg-primary)]/80 px-1.5 py-0.5 text-xs font-semibold leading-none text-[var(--theme-text-secondary)]">
-          {extension}
-        </span>
-      </div>
+      <span className="max-w-full truncate rounded bg-[var(--theme-bg-primary)]/90 px-1.5 py-0.5 text-[10px] font-bold leading-none tracking-wide text-[var(--theme-text-secondary)] shadow-xs border border-[var(--theme-border-secondary)]/40">
+        {extension}
+      </span>
     </div>
   );
 };
 
-export const FileThumbnail: FC<FileThumbnailProps> = (props) => {
+const FileThumbnailComponent: FC<FileThumbnailProps> = (props) => {
   const { file } = props;
   const category = getFileTypeCategory(file.type, file.error);
   const fallback = <CoverThumbnail {...props} />;
@@ -267,17 +197,17 @@ export const FileThumbnail: FC<FileThumbnailProps> = (props) => {
     return <VideoThumbnail file={file} fallback={fallback} />;
   }
 
-  if (category === 'audio') {
-    return <AudioThumbnail file={file} />;
-  }
-
-  if (category === 'spreadsheet') {
-    return fallback;
-  }
-
-  if (isTextFile(file)) {
-    return <TextThumbnail file={file} />;
-  }
-
   return fallback;
 };
+
+export const FileThumbnail: FC<FileThumbnailProps> = memo(
+  FileThumbnailComponent,
+  (prev, next) =>
+    prev.file.id === next.file.id &&
+    prev.file.dataUrl === next.file.dataUrl &&
+    prev.file.type === next.file.type &&
+    prev.file.error === next.file.error &&
+    prev.Icon === next.Icon &&
+    prev.colorClass === next.colorClass &&
+    prev.bgClass === next.bgClass,
+);

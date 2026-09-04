@@ -1,5 +1,5 @@
 import React from 'react';
-import { KeyRound, CheckCircle } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 
 import { useI18n } from '@/contexts/I18nContext';
 import { type AppSettings, type ChatSettings } from '@/types';
@@ -16,8 +16,6 @@ interface ApiUsageTabProps {
 
 export const ApiUsageTab: React.FC<ApiUsageTabProps> = ({ apiKeyUsage, appSettings, currentChatSettings }) => {
   const { t } = useI18n();
-  // Usage is recorded against the masked form of each key (see maskApiKeyForStorage);
-  // mask the configured keys the same way so the lookup matches.
   const allApiKeys = parseApiKeys(appSettings.apiKey).map(maskApiKeyForStorage);
   const lockedKeyMasked = currentChatSettings.lockedApiKey
     ? maskApiKeyForStorage(currentChatSettings.lockedApiKey)
@@ -34,51 +32,40 @@ export const ApiUsageTab: React.FC<ApiUsageTabProps> = ({ apiKeyUsage, appSettin
   });
 
   const totalApiUsage = Array.from(displayApiKeyUsage.values()).reduce((sum, count) => sum + count, 0);
+  const usageRows = Array.from(displayApiKeyUsage.entries()).sort(([, a], [, b]) => b - a);
 
   return (
-    <div className="p-4 overflow-y-auto custom-scrollbar h-full">
-      <h4 className="font-semibold text-lg text-[var(--theme-text-primary)] mb-4 flex items-center gap-2">
-        <KeyRound size={20} /> {t('logViewerApiUsageTitle')}
+    <div className="custom-scrollbar h-full overflow-y-auto p-4">
+      <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--theme-text-primary)]">
+        <KeyRound size={16} className="text-[var(--theme-text-tertiary)]" /> {t('logViewerApiUsageTitle')}
       </h4>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {Array.from(displayApiKeyUsage.entries())
-          .sort(([, a], [, b]) => b - a)
-          .map(([key, count], index) => {
-            const percentage = totalApiUsage > 0 ? (count / totalApiUsage) * 100 : 0;
-            const isActive = lockedKeyMasked === key;
-            return (
-              <div
-                key={key}
-                className={`p-4 rounded-xl border transition-all relative overflow-hidden ${isActive ? 'bg-[var(--theme-bg-accent)]/10 border-[var(--theme-border-focus)]' : 'bg-[var(--theme-bg-input)] border-[var(--theme-border-secondary)]'}`}
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <span className="font-mono text-xs text-[var(--theme-text-tertiary)]">#{index + 1}</span>
-                  {isActive && (
-                    <span className="text-xs font-bold uppercase bg-green-900 text-green-300 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <CheckCircle size={10} /> {t('logViewerActive')}
-                    </span>
-                  )}
-                </div>
-                <div className="mb-4">
-                  <ObfuscatedApiKey apiKey={key} />
-                </div>
-                <div className="flex items-end justify-between">
-                  <div className="flex flex-col">
-                    <span className="text-2xl font-bold text-[var(--theme-text-primary)]">{count}</span>
-                    <span className="text-xs text-[var(--theme-text-tertiary)]">{t('logViewerRequests')}</span>
-                  </div>
-                  <div className="text-xl font-bold text-[var(--theme-text-tertiary)] opacity-30">
-                    {percentage.toFixed(0)}%
-                  </div>
-                </div>
-                <div
-                  className="absolute bottom-0 left-0 h-1 bg-[var(--theme-bg-accent)] transition-all duration-500"
-                  style={{ width: `${percentage}%` }}
-                />
+      <ul className="divide-y divide-[var(--theme-border-secondary)]/40 rounded-xl border border-[var(--theme-border-secondary)]/60 bg-[var(--theme-bg-secondary)]/35">
+        {usageRows.map(([key, count], index) => {
+          const percentage = totalApiUsage > 0 ? (count / totalApiUsage) * 100 : 0;
+          const isActive = lockedKeyMasked === key;
+          return (
+            <li key={key} className="flex items-center gap-3 px-3 py-2.5">
+              <span className="w-6 flex-shrink-0 font-mono text-xs text-[var(--theme-text-tertiary)]">
+                #{index + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <ObfuscatedApiKey apiKey={key} />
               </div>
-            );
-          })}
-      </div>
+              {isActive ? (
+                <span className="flex-shrink-0 text-xs font-medium text-[var(--theme-text-primary)]">
+                  {t('logViewerActive')}
+                </span>
+              ) : null}
+              <span className="flex-shrink-0 text-sm font-medium tabular-nums text-[var(--theme-text-primary)]">
+                {count}
+              </span>
+              <span className="w-10 flex-shrink-0 text-right text-xs tabular-nums text-[var(--theme-text-tertiary)]">
+                {percentage.toFixed(0)}%
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 };

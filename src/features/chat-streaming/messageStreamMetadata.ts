@@ -92,6 +92,19 @@ const mergeOptionalCounts = (existing?: number, incoming?: number): number | und
   return (existing ?? 0) + (incoming ?? 0);
 };
 
+const getResponseTokenCount = (usage: UsageMetadata): number | undefined => {
+  // Legacy field name: the v1beta reference documents `candidatesTokenCount`
+  // while newer SDK types (and the live API) use `responseTokenCount`. Some
+  // producers (e.g. the OpenAI-compatible usage mapper) still emit the old name.
+  const legacy = (usage as UsageMetadata & { candidatesTokenCount?: number }).candidatesTokenCount;
+  return usage.responseTokenCount ?? legacy;
+};
+
+const getResponseTokensDetails = (usage: UsageMetadata): ModalityTokenCount[] | undefined => {
+  const legacy = (usage as UsageMetadata & { candidatesTokensDetails?: ModalityTokenCount[] }).candidatesTokensDetails;
+  return usage.responseTokensDetails ?? legacy;
+};
+
 export const mergeUsageMetadata = (
   existing: UsageMetadata | undefined,
   incoming: UsageMetadata | undefined,
@@ -106,7 +119,10 @@ export const mergeUsageMetadata = (
 
   const promptTokensDetails = mergeTokenDetails(existing.promptTokensDetails, incoming.promptTokensDetails);
   const cacheTokensDetails = mergeTokenDetails(existing.cacheTokensDetails, incoming.cacheTokensDetails);
-  const responseTokensDetails = mergeTokenDetails(existing.responseTokensDetails, incoming.responseTokensDetails);
+  const responseTokensDetails = mergeTokenDetails(
+    getResponseTokensDetails(existing),
+    getResponseTokensDetails(incoming),
+  );
   const toolUsePromptTokensDetails = mergeTokenDetails(
     existing.toolUsePromptTokensDetails,
     incoming.toolUsePromptTokensDetails,
@@ -122,8 +138,8 @@ export const mergeUsageMetadata = (
       incoming.cachedContentTokenCount ?? sumTokenDetails(incoming.cacheTokensDetails),
     ),
     responseTokenCount: mergeOptionalCounts(
-      existing.responseTokenCount ?? sumTokenDetails(existing.responseTokensDetails),
-      incoming.responseTokenCount ?? sumTokenDetails(incoming.responseTokensDetails),
+      getResponseTokenCount(existing) ?? sumTokenDetails(getResponseTokensDetails(existing)),
+      getResponseTokenCount(incoming) ?? sumTokenDetails(getResponseTokensDetails(incoming)),
     ),
     toolUsePromptTokenCount: mergeOptionalCounts(
       existing.toolUsePromptTokenCount ?? sumTokenDetails(existing.toolUsePromptTokensDetails),

@@ -1,8 +1,8 @@
-import { act } from 'react';
-import { setupTestRenderer } from '@/test/render/renderer';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { setupStoreStateReset } from '@/test/stores/reset';
 import { useSettingsStore } from '@/stores/settingsStore';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import { I18nProvider, useI18n } from './I18nContext';
 
 const TranslationProbe = () => {
@@ -11,25 +11,30 @@ const TranslationProbe = () => {
 };
 
 describe('I18nContext', () => {
-  const renderer = setupTestRenderer();
   setupStoreStateReset();
 
-  it('updates translated text when the language in the settings store changes', () => {
-    act(() => {
-      useSettingsStore.setState({ language: 'en' });
-      renderer.root.render(
-        <I18nProvider>
-          <TranslationProbe />
-        </I18nProvider>,
-      );
+  it('updates translated text when the language in the settings store changes', async () => {
+    useSettingsStore.setState({ language: 'en' as SupportedLanguage });
+    const view = render(
+      <I18nProvider>
+        <TranslationProbe />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByTestId('translation-probe').textContent).toBe('New Chat');
+
+    await act(async () => {
+      useSettingsStore.setState({ language: 'zh' as SupportedLanguage });
     });
 
-    expect(renderer.container.querySelector('[data-testid="translation-probe"]')?.textContent).toBe('New Chat');
+    await waitFor(() => expect(screen.getByTestId('translation-probe').textContent).toBe('新聊天'));
 
-    act(() => {
-      useSettingsStore.setState({ language: 'zh' });
+    await act(async () => {
+      useSettingsStore.setState({ language: 'ja' as SupportedLanguage });
     });
 
-    expect(renderer.container.querySelector('[data-testid="translation-probe"]')?.textContent).toBe('新聊天');
+    await waitFor(() => expect(screen.getByTestId('translation-probe').textContent).toBe('新しいチャット'));
+
+    view.unmount();
   });
 });

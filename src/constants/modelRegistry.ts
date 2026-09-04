@@ -1,13 +1,8 @@
 import type { ModelOption } from '@/types';
+import { ROBOTICS_MODEL } from './modelConfiguration';
 
 type ModelRegistryGroup =
-  | 'defaultPinned'
-  | 'tts'
-  | 'image'
-  | 'liveArtifacts'
-  | 'connectionTest'
-  | 'transcription'
-  | 'liveTranslate';
+  'defaultPinned' | 'tts' | 'image' | 'liveArtifacts' | 'connectionTest' | 'transcription' | 'liveTranslate';
 
 interface RegisteredModel {
   id: string;
@@ -18,22 +13,41 @@ interface RegisteredModel {
 
 const MODEL_REGISTRY: RegisteredModel[] = [
   {
-    id: 'gemini-3.6-flash',
-    name: 'Gemini 3.6 Flash',
-    groups: ['defaultPinned', 'liveArtifacts', 'connectionTest', 'transcription'],
+    id: 'gemini-3.5-transcribe',
+    name: 'Gemini 3.5 Transcribe',
+    groups: ['defaultPinned', 'transcription'],
     groupLabels: {
-      liveArtifacts: 'Gemini 3.6 Flash',
-      transcription: 'Gemini 3.6 Flash',
+      transcription: 'Gemini 3.5 Transcribe',
+    },
+  },
+  {
+    id: 'gemini-3.5-transcribe-live',
+    name: 'Gemini 3.5 Transcribe Live',
+    groups: ['defaultPinned'],
+  },
+  {
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
+    groups: ['defaultPinned', 'liveArtifacts', 'connectionTest'],
+    groupLabels: {
+      liveArtifacts: 'Gemini 3.8 Flash',
+    },
+  },
+  {
+    id: 'gemini-3.7-flash',
+    name: 'Gemini 3.7 Flash',
+    groups: ['liveArtifacts', 'connectionTest'],
+    groupLabels: {
+      liveArtifacts: 'Gemini 3.7 Flash',
     },
   },
   {
     id: 'gemini-3.5-flash-lite',
     name: 'Gemini 3.5 Flash-Lite',
-    groups: ['defaultPinned', 'liveArtifacts', 'connectionTest', 'transcription'],
+    groups: ['defaultPinned', 'liveArtifacts', 'connectionTest'],
     groupLabels: {
       liveArtifacts: 'Gemini 3.5 Flash-Lite',
       connectionTest: 'Gemini 3.5 Flash-Lite',
-      transcription: 'Gemini 3.5 Flash-Lite',
     },
   },
   {
@@ -49,20 +63,19 @@ const MODEL_REGISTRY: RegisteredModel[] = [
   {
     id: 'gemini-3.1-pro-preview',
     name: 'Gemini 3.1 Pro',
-    groups: ['defaultPinned', 'liveArtifacts', 'transcription', 'connectionTest'],
+    groups: ['defaultPinned', 'liveArtifacts', 'connectionTest'],
     groupLabels: {
       liveArtifacts: 'Gemini 3.1 Pro',
       connectionTest: 'Gemini 3.1 Pro',
-      transcription: 'Gemini 3.1 Pro',
     },
   },
   {
-    id: 'gemini-robotics-er-1.6-preview',
-    name: 'Gemini Robotics-ER 1.6',
+    id: ROBOTICS_MODEL,
+    name: 'Gemini Robotics-ER 2',
     groups: ['defaultPinned', 'liveArtifacts', 'connectionTest'],
     groupLabels: {
-      liveArtifacts: 'Gemini Robotics-ER 1.6',
-      connectionTest: 'Gemini Robotics-ER 1.6',
+      liveArtifacts: 'Gemini Robotics-ER 2',
+      connectionTest: 'Gemini Robotics-ER 2',
     },
   },
   {

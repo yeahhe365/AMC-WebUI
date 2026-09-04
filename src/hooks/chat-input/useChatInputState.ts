@@ -43,6 +43,7 @@ export const useChatInputState = (activeSessionId: string | null, isEditing: boo
   const justInitiatedFileOpRef = useRef(false);
   const prevIsProcessingFileRef = useRef(false);
   const isComposingRef = useRef(false);
+  const compositionEndedAtRef = useRef(0);
 
   const isMobile = useIsMobile();
 
@@ -145,6 +146,7 @@ export const useChatInputState = (activeSessionId: string | null, isEditing: boo
 
   const handleCompositionEnd = useCallback(() => {
     isComposingRef.current = false;
+    compositionEndedAtRef.current = Date.now();
   }, []);
 
   return {
@@ -176,6 +178,7 @@ export const useChatInputState = (activeSessionId: string | null, isEditing: boo
     justInitiatedFileOpRef,
     prevIsProcessingFileRef,
     isComposingRef,
+    compositionEndedAtRef,
     handleCompositionStart,
     handleCompositionEnd,
     clearCurrentDraft,

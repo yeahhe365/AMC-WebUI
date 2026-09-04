@@ -1,0 +1,422 @@
+[
+  {
+    "key": "helpCmdMaps",
+    "current": "Alternar Maps grounding",
+    "suggested": "Alternar la búsqueda en Maps",
+    "reason": "INCONSISTENCY: 'Maps Grounding' is translated 'Búsqueda en Maps' in mapsGroundingLabel/mapsGroundingShort ('Búsqueda profunda' pattern); this key keeps the English term 'Maps grounding'.",
+    "severity": "medium"
+  },
+  {
+    "key": "headerThinkingToggleAria",
+    "current": "Alternar nivel de razonamiento",
+    "suggested": "Alternar nivel de pensamiento",
+    "reason": "INCONSISTENCY: 'thinking level' is 'nivel de pensamiento' elsewhere (messageSenderEmptyReplyWithThoughts; tooltips headerThinkingHighTitle/LowFastTitle/MinimalFastTitle 'Pensamiento: ...'), while 'razonamiento' is reserved for 'reasoning' (headerReasoningToggleAria).",
+    "severity": "medium"
+  },
+  {
+    "key": "suggestionSrtDesc",
+    "current": "Genera un archivo de subtítulos SRT estándar para el vídeo adjunto. Asegura marcas de tiempo precisas (formato: 00:00:00,000 --> 00:00:00,000) y transcribe el diálogo. Muestra ÚNICAMENTE el contenido SRT dentro de un bloque de código:",
+    "suggested": "Genera un archivo de subtítulos SRT estándar para el video adjunto. Asegura marcas de tiempo precisas (formato: 00:00:00,000 --> 00:00:00,000) y transcribe el diálogo. Muestra ÚNICAMENTE el contenido SRT dentro de un bloque de código:",
+    "reason": "INCONSISTENCY: 'vídeo' vs 'video'. Dominant form in the app is 'video' without accent (attachMenuAddByUrl, liveStopVideo, tokenModalVideoEstimate, videoSettingsTipFps, aboutDescription, settingsFilesApiVideo).",
+    "severity": "medium"
+  },
+  {
+    "key": "suggestionSrtShort",
+    "current": "Genera subtítulos SRT a partir de vídeo.",
+    "suggested": "Genera subtítulos SRT a partir de video.",
+    "reason": "INCONSISTENCY: 'vídeo' vs 'video'; unify on 'video' as in the rest of the UI.",
+    "severity": "medium"
+  },
+  {
+    "key": "filePreviewYoutubePlayer",
+    "current": "Reproductor de vídeo de YouTube",
+    "suggested": "Reproductor de video de YouTube",
+    "reason": "INCONSISTENCY: 'vídeo' vs 'video'; unify on 'video'.",
+    "severity": "medium"
+  },
+  {
+    "key": "filePreviewVideoClipped",
+    "current": "Vídeo recortado",
+    "suggested": "Video recortado",
+    "reason": "INCONSISTENCY: 'Vídeo' vs 'Video'; unify on 'video'.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsOpenAICompatibleClearFetchedSelection",
+    "current": "Limpiar",
+    "suggested": "Borrar",
+    "reason": "INCONSISTENCY: action 'Clear' is 'Borrar' everywhere else (tokenModalClear, tokenModalClearAll, queuedSubmissionClearAll, logViewerClearButton, historySearchClearAria, scenariosClearSearch, shortcutsClear); this uses 'Limpiar'.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsEnableLogging",
+    "current": "Habilitar registro",
+    "suggested": "Activar registro",
+    "reason": "INCONSISTENCY: Enable/Disable family is Activar/Desactivar across the app (enable='Activar', thirdPartyConnectionDisabled='Desactivado', 'Actívalo', 'Desactívalo'); this uses 'Habilitar'.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsSystemPromptEnabled",
+    "current": "Habilitado",
+    "suggested": "Activado",
+    "reason": "INCONSISTENCY: toggle state 'Enabled' should match the Activar/Desactivar pair used elsewhere instead of 'Habilitado'.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsGenerateQuadImagesTooltip",
+    "current": "Cuando esta habilitado, las solicitudes de generación de imágenes produciran cuatro variaciones independientes a la vez. Esto consumirá más créditos de API.",
+    "suggested": "Cuando esté activado, las solicitudes de generación de imágenes producirán cuatro variaciones independientes a la vez. Esto consumirá más créditos de API.",
+    "reason": "ORTHOGRAPHY+INCONSISTENCY: missing tildes in 'esta habilitado' (esté) and 'produciran' (producirán); also 'habilitado' breaks the Activar/Desactivar terminology family.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsResetModelListConfirm",
+    "current": "Restablecer la lista de modelos a sus valores por defecto? Esto eliminará tus adiciones personalizadas.",
+    "suggested": "¿Restablecer la lista de modelos a sus valores predeterminados? Esto eliminará tus adiciones personalizadas.",
+    "reason": "PUNCTUATION: question missing opening '¿' — the only such case in the whole file. Also 'por defecto' -> 'predeterminado' for consistency.",
+    "severity": "medium"
+  },
+  {
+    "key": "shortcutsChatInputTitle",
+    "current": "Redactor",
+    "suggested": "Redacción",
+    "reason": "UNNATURAL/MISTRANSLATION: 'Composer' rendered as 'Redactor', which in Spanish means a person (writer/editor), not the message input area.",
+    "severity": "medium"
+  },
+  {
+    "key": "thinkingTookTime",
+    "current": "Pensado durante {duration}",
+    "suggested": "Pensó durante {duration}",
+    "reason": "UNNATURAL: 'Pensado durante {duration}' is a passive participle no native UI uses for 'Thought for {duration}' (cf. ChatGPT/Gemini ES: 'Pensó durante X s').",
+    "severity": "medium"
+  },
+  {
+    "key": "safetyThresholdBlockOnlyHigh",
+    "current": "Bloquear poco",
+    "suggested": "Bloquear pocos",
+    "reason": "UNNATURAL: threshold scale reads 'No bloquear nada / Bloquear poco / Bloquear algo / Bloquear la mayoría'; standard Gemini ES UI uses count nouns: 'Bloquear pocos'.",
+    "severity": "medium"
+  },
+  {
+    "key": "safetyThresholdBlockMediumAndAbove",
+    "current": "Bloquear algo",
+    "suggested": "Bloquear algunos",
+    "reason": "UNNATURAL: see safetyThresholdBlockOnlyHigh; 'Bloquear algo' is not natural for a block-frequency option ('Bloquear algunos').",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsSystemPrompt",
+    "current": "Prompt del sistema por defecto",
+    "suggested": "Prompt del sistema predeterminado",
+    "reason": "INCONSISTENCY: 'default' is 'predeterminado' in the majority of keys (mediaResolutionUnspecified, videoSettingsFpsPlaceholder, appDefaultModelsLoadError, settingsLanguageSystem, settingsScopeDefaults, settingsResetConfirm); this uses 'por defecto'.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsSystemPromptAria",
+    "current": "Editor del prompt del sistema por defecto",
+    "suggested": "Editor del prompt del sistema predeterminado",
+    "reason": "INCONSISTENCY: 'por defecto' vs dominant 'predeterminado'.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsNoModelsInList",
+    "current": "Aún no hay modelos en la lista. Añade uno o restablece los valores por defecto.",
+    "suggested": "Aún no hay modelos en la lista. Añade uno o restablece los valores predeterminados.",
+    "reason": "INCONSISTENCY: 'valores por defecto' vs dominant 'valores predeterminados' (settingsScopeDefaults, settingsResetConfirm).",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsEnableLoggingDescription",
+    "current": "Guarda los registros del sistema en el almacenamiento local para la solución de problemas. Desactivado por defecto.",
+    "suggested": "Guarda los registros del sistema en el almacenamiento local para solucionar problemas. Desactivado de forma predeterminada.",
+    "reason": "INCONSISTENCY: 'por defecto' vs dominant 'predeterminado'; also 'la solución de problemas' is stiffer than 'solucionar problemas'.",
+    "severity": "medium"
+  },
+  {
+    "key": "shortcutsResetDefault",
+    "current": "Restablecer por defecto",
+    "suggested": "Restablecer valores predeterminados",
+    "reason": "INCONSISTENCY: 'Restablecer por defecto' is unidiomatic; use 'predeterminado' as in settingsScopeDefaults/settingsResetConfirm.",
+    "severity": "medium"
+  },
+  {
+    "key": "liveStatusMissingApiKey",
+    "current": "Live API requiere una clave API del navegador.",
+    "suggested": "Live API requiere una clave de API del navegador.",
+    "reason": "INCONSISTENCY: 'clave API' vs dominant 'clave de API' (~20 keys in Settings/API use 'clave(s) de API'); unify.",
+    "severity": "medium"
+  },
+  {
+    "key": "uploadMissingApiKey",
+    "current": "La clave API no estaba disponible para la subida de archivos.",
+    "suggested": "La clave de API no estaba disponible para la subida de archivos.",
+    "reason": "INCONSISTENCY: 'clave API' vs dominant 'clave de API'.",
+    "severity": "medium"
+  },
+  {
+    "key": "messageSenderApiKeyNotConfigured",
+    "current": "La clave API no está configurada en los ajustes.",
+    "suggested": "La clave de API no está configurada en los ajustes.",
+    "reason": "INCONSISTENCY: 'clave API' vs dominant 'clave de API' (apiRuntimeKeyNotConfigured says 'Clave de API no configurada.').",
+    "severity": "medium"
+  },
+  {
+    "key": "messageSenderApiKeyErrorSessionTitle",
+    "current": "Error de clave API",
+    "suggested": "Error de clave de API",
+    "reason": "INCONSISTENCY: 'clave API' vs dominant 'clave de API'.",
+    "severity": "medium"
+  },
+  {
+    "key": "logViewerApiKeysTab",
+    "current": "Claves API",
+    "suggested": "Claves de API",
+    "reason": "INCONSISTENCY: 'Claves API' vs dominant 'Claves de API' (settingsApiKey 'Claves de API de Gemini').",
+    "severity": "medium"
+  },
+  {
+    "key": "logViewerApiUsageTitle",
+    "current": "Estadísticas de uso de claves API",
+    "suggested": "Estadísticas de uso de claves de API",
+    "reason": "INCONSISTENCY: 'claves API' vs dominant 'claves de API'.",
+    "severity": "medium"
+  },
+  {
+    "key": "settingsResetConfirm",
+    "current": "¿Seguro que quieres restablecer todos los ajustes a sus valores predeterminados? Esto no afecta al historial de chats, claves API, proveedores de API de terceros ni servidores MCP. Se perderán los cambios actuales.",
+    "suggested": "¿Seguro que quieres restablecer todos los ajustes a sus valores predeterminados? Esto no afecta al historial de chats, claves de API, proveedores de API de terceros ni servidores MCP. Se perderán los cambios actuales.",
+    "reason": "INCONSISTENCY: 'claves API' vs dominant 'claves de API'.",
+    "severity": "medium"
+  },
+  {
+    "key": "addByIdPlaceholder",
+    "current": "Pega el ID de archivo (ej. files/xyz123)",
+    "suggested": "Pega el ID de archivo (p. ej., files/xyz123)",
+    "reason": "FORMAT/INCONSISTENCY: abbreviation 'ej.' vs 'p. ej.' (chatBehaviorSystemPromptPlaceholder uses the RAE-recommended 'p. ej.'). Unify on 'p. ej.'. Also add comma after the abbreviation.",
+    "severity": "low"
+  },
+  {
+    "key": "videoSettingsFpsPlaceholder",
+    "current": "ej. 1 (Predeterminado)",
+    "suggested": "p. ej., 1 (Predeterminado)",
+    "reason": "FORMAT/INCONSISTENCY: 'ej.' vs 'p. ej.' used in chatBehaviorSystemPromptPlaceholder.",
+    "severity": "low"
+  },
+  {
+    "key": "videoSettingsPlaceholder",
+    "current": "ej. 10s o 00:10",
+    "suggested": "p. ej., 10s o 00:10",
+    "reason": "FORMAT/INCONSISTENCY: 'ej.' vs 'p. ej.'.",
+    "severity": "low"
+  },
+  {
+    "key": "videoSettingsTipTimestamp",
+    "current": "Puedes preguntar sobre momentos específicos usando marcas de tiempo (ej. \"¿Qué pasa en 01:15?\").",
+    "suggested": "Puedes preguntar sobre momentos específicos usando marcas de tiempo (p. ej., \"¿Qué pasa en 01:15?\").",
+    "reason": "FORMAT/INCONSISTENCY: 'ej.' vs 'p. ej.'.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsLocalAppDataLoading",
+    "current": "Calculando el uso del almacenamiento local…",
+    "suggested": "Calculando el uso del almacenamiento local...",
+    "reason": "FORMAT/INCONSISTENCY: typographic ellipsis '…' while the rest of the file uses three dots '...' (loading/cargando strings).",
+    "severity": "low"
+  },
+  {
+    "key": "settingsSearchPlaceholder",
+    "current": "Buscar ajustes…",
+    "suggested": "Buscar ajustes...",
+    "reason": "FORMAT/INCONSISTENCY: '…' vs '...' used everywhere else (historySearchPlaceholder 'Buscar en el historial...').",
+    "severity": "low"
+  },
+  {
+    "key": "usageLoading",
+    "current": "Cargando datos de uso…",
+    "suggested": "Cargando datos de uso...",
+    "reason": "FORMAT/INCONSISTENCY: '…' vs '...' used everywhere else.",
+    "severity": "low"
+  },
+  {
+    "key": "apiConfigTestConnection",
+    "current": "Probar Conexión",
+    "suggested": "Probar conexión",
+    "reason": "FORMAT: mid-title capitalization 'Probar Conexión' — Spanish only capitalizes the first word (cf. 'Guardar y cerrar', 'Probar conexión' style used elsewhere).",
+    "severity": "low"
+  },
+  {
+    "key": "safetyTitle",
+    "current": "Ajustes de Seguridad",
+    "suggested": "Ajustes de seguridad",
+    "reason": "FORMAT: unnecessary capital 'Seguridad'; modelsSafetyToggleAria correctly says 'ajustes de seguridad'.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsAdvancedMode",
+    "current": "Modo Avanzado",
+    "suggested": "Modo avanzado",
+    "reason": "FORMAT: Title Case 'Modo Avanzado' is not Spanish convention; other toggles use sentence case.",
+    "severity": "low"
+  },
+  {
+    "key": "apiConfigKeyPlaceholder",
+    "current": "Introduce tus Claves de API de Gemini",
+    "suggested": "Introduce tus claves de API de Gemini",
+    "reason": "FORMAT/INCONSISTENCY: common noun capitalized mid-sentence ('Claves de API'); part of the systematic mis-capitalization of 'Clave(s) de API' copied from Title Case labels.",
+    "severity": "low"
+  },
+  {
+    "key": "apiConfigOpenaiKeyPlaceholder",
+    "current": "Introduce tus Claves de API compatibles con OpenAI",
+    "suggested": "Introduce tus claves de API compatibles con OpenAI",
+    "reason": "FORMAT: mid-sentence 'Claves de API' should be lowercase.",
+    "severity": "low"
+  },
+  {
+    "key": "apiConfigOverridingEnvKey",
+    "current": "Anulando la Clave de API del entorno.",
+    "suggested": "Anulando la clave de API del entorno.",
+    "reason": "FORMAT: mid-sentence 'Clave de API' should be lowercase.",
+    "severity": "low"
+  },
+  {
+    "key": "apiConfigUsingOwnKeys",
+    "current": "Usando Claves de API almacenadas en este navegador.",
+    "suggested": "Usando claves de API almacenadas en este navegador.",
+    "reason": "FORMAT: mid-sentence 'Claves de API' should be lowercase.",
+    "severity": "low"
+  },
+  {
+    "key": "apiConfigMissingEnvKey",
+    "current": "No se encontró ninguna Clave de API en el entorno. Activa esto para continuar con tu propia clave.",
+    "suggested": "No se encontró ninguna clave de API en el entorno. Activa esto para continuar con tu propia clave.",
+    "reason": "FORMAT: mid-sentence 'Clave de API' should be lowercase.",
+    "severity": "low"
+  },
+  {
+    "key": "apiConfigNoKeyProvided",
+    "current": "No se proporcionó ninguna Clave de API para la prueba.",
+    "suggested": "No se proporcionó ninguna clave de API para la prueba.",
+    "reason": "FORMAT: mid-sentence 'Clave de API' should be lowercase.",
+    "severity": "low"
+  },
+  {
+    "key": "apiConfigNoKeyAvailable",
+    "current": "No hay ninguna Clave de API disponible actualmente.",
+    "suggested": "No hay ninguna clave de API disponible actualmente.",
+    "reason": "FORMAT: mid-sentence 'Clave de API' should be lowercase.",
+    "severity": "low"
+  },
+  {
+    "key": "apiConfigInvalidKeyFormat",
+    "current": "El formato de la Clave de API parece no válido.",
+    "suggested": "El formato de la clave de API parece no válido.",
+    "reason": "FORMAT: mid-sentence 'Clave de API' should be lowercase.",
+    "severity": "low"
+  },
+  {
+    "key": "apiRuntimeNoValidKeysFound",
+    "current": "No se encontraron Claves de API válidas.",
+    "suggested": "No se encontraron claves de API válidas.",
+    "reason": "FORMAT: mid-sentence 'Claves de API' should be lowercase.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsLiveAutomaticHelp",
+    "current": "Live usa directamente la Clave de API de tu navegador para su conexión WebSocket.",
+    "suggested": "Live usa directamente la clave de API de tu navegador para su conexión WebSocket.",
+    "reason": "FORMAT: mid-sentence 'Clave de API' should be lowercase.",
+    "severity": "low"
+  },
+  {
+    "key": "thirdPartyApiKeyHelp",
+    "current": "Almacenada por separado de las Claves de API de Gemini. Introduce la clave para esta conexión.",
+    "suggested": "Almacenada por separado de las claves de API de Gemini. Introduce la clave para esta conexión.",
+    "reason": "FORMAT: mid-sentence 'Claves de API' should be lowercase.",
+    "severity": "low"
+  },
+  {
+    "key": "appSwitchingModel",
+    "current": "Cambiando modelo...",
+    "suggested": "Cambiando de modelo...",
+    "reason": "UNNATURAL: 'Cambiando modelo...' drops the preposition; natural Spanish is 'Cambiando de modelo...'.",
+    "severity": "low"
+  },
+  {
+    "key": "liveStartScreenShare",
+    "current": "Iniciar compartir pantalla",
+    "suggested": "Comenzar a compartir pantalla",
+    "reason": "UNNATURAL: 'Iniciar compartir pantalla' stacks two verbs incorrectly; 'Comenzar a compartir pantalla' (or simply 'Compartir pantalla') is the natural phrasing.",
+    "severity": "low"
+  },
+  {
+    "key": "pipPlaceholderDescription",
+    "current": "El chat se está ejecutando en una ventana separada. Ciérrala para traer la conversación de vuelta aquí.",
+    "suggested": "El chat se está ejecutando en una ventana separada. Ciérrala para recuperar aquí la conversación.",
+    "reason": "UNNATURAL: 'traer la conversación de vuelta aquí' is a calque of 'bring back'; 'recuperar aquí la conversación' is the natural phrasing.",
+    "severity": "low"
+  },
+  {
+    "key": "alwaysKeepThinkingLabel",
+    "current": "Mantener pensamiento en contexto",
+    "suggested": "Mantener el pensamiento en el contexto",
+    "reason": "UNNATURAL: telegraphic 'Mantener pensamiento en contexto' lacks articles; cf. sibling settingsAlwaysKeepThinkingInContextLabel 'Mantener siempre el razonamiento en el contexto'.",
+    "severity": "low"
+  },
+  {
+    "key": "usageDescription",
+    "current": "Controla el consumo de tokens y el número de solicitudes de la actividad reciente del modelo.",
+    "suggested": "Supervisa el consumo de tokens y el número de solicitudes de la actividad reciente del modelo.",
+    "reason": "MISTRANSLATION (mild): 'Track' rendered as 'Controla' (to control/regulate); 'Supervisa' or 'Haz seguimiento de' conveys monitoring, not control.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsVoiceSectionTitle",
+    "current": "Voz y habla",
+    "suggested": "Voz y narración",
+    "reason": "UNNATURAL: 'Speech & Voice' as 'Voz y habla' — 'habla' is the act of speaking, odd as a section name; 'narración' (or just 'Voz') fits TTS settings.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsApiProxyLabel",
+    "current": "Usar endpoint Proxy",
+    "suggested": "Usar servidor proxy",
+    "reason": "UNNATURAL: 'Usar endpoint Proxy' mixes untranslated jargon and random capitalization; 'servidor proxy' is the standard Spanish networking term.",
+    "severity": "low"
+  },
+  {
+    "key": "logViewerLoggingDisabledHint",
+    "current": "El registro está desactivado. Actívalo en Ajustes → Datos y aplicación para registrar nuevos logs.",
+    "suggested": "El registro está desactivado. Actívalo en Ajustes → Datos y aplicación para guardar nuevos registros.",
+    "reason": "INCONSISTENCY: sentence mixes 'registro' and anglicism 'logs' ('registrar nuevos logs'); logs is translated 'registros' throughout the Log Viewer.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsFilesApiTooltip",
+    "current": "Se aplica a los archivos añadidos después de cambiar esta configuración. Activado prefiere Files API. Desactivado envia el contenido en línea cuando es posible; los archivos demasiado grandes aún pueden usar Files API.",
+    "suggested": "Se aplica a los archivos añadidos después de cambiar esta configuración. Activado prefiere Files API. Desactivado envía el contenido en línea cuando es posible; los archivos demasiado grandes aún pueden usar Files API.",
+    "reason": "ORTHOGRAPHY: 'envia' missing tilde → 'envía'.",
+    "severity": "low"
+  },
+  {
+    "key": "settingsThinkingModeTooltip",
+    "current": "Controla cuanto razonamiento interno realiza el modelo. Automático equilibra calidad y velocidad. Desactivado prioriza la velocidad. Presupuesto permite establecer un presupuesto fijo de tokens.",
+    "suggested": "Controla cuánto razonamiento interno realiza el modelo. Automático equilibra calidad y velocidad. Desactivado prioriza la velocidad. Presupuesto permite establecer un presupuesto fijo de tokens.",
+    "reason": "ORTHOGRAPHY: 'cuanto' missing tilde → 'cuánto' (quantity introduced by 'controla').",
+    "severity": "low"
+  },
+  {
+    "key": "usageEstimatedCost",
+    "current": "Coste estimado",
+    "suggested": "Costo estimado",
+    "reason": "INCONSISTENCY (regional): 'Coste' is Peninsular-specific; rest of the UI avoids Peninsular-only lexicon and the target is Latin-American-friendly neutral Spanish → 'Costo'.",
+    "severity": "low"
+  },
+  {
+    "key": "historyCopySuffix",
+    "current": "Copiar",
+    "suggested": "Copia",
+    "reason": "INCONSISTENCY: unused-as-button suffix key translated as verb 'Copiar', but its sibling historyCopyTitle uses the noun '(Copia)' for '{title} (Copy)'.",
+    "severity": "low"
+  }
+]

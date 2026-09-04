@@ -8,6 +8,7 @@ import { QuadImageToggle } from './toolbar/QuadImageToggle';
 import { TtsVoiceSelector } from './toolbar/TtsVoiceSelector';
 import { LanguageDirectionSelector } from './toolbar/LanguageDirectionSelector';
 import { MediaResolutionSelector } from './toolbar/MediaResolutionSelector';
+import { TranscribeCluster } from './toolbar/TranscribeCluster';
 import { Clapperboard } from 'lucide-react';
 import { useChatStore } from '@/stores/chatStore';
 import { useChatInputToolbarContext } from './ChatInputContext';
@@ -37,6 +38,7 @@ const ChatInputToolbarComponent: React.FC = () => {
     isAddingByUrl,
     ttsContext,
     onEditTtsContext,
+    onAttachmentAction,
   } = useChatInputToolbarContext();
   const {
     isImageGenerationModel,
@@ -68,14 +70,19 @@ const ChatInputToolbarComponent: React.FC = () => {
   const showImageCluster = showAspectRatio || showImageSize || showImageOutputMode || showQuadToggle;
 
   // Allow voice selection for TTS and Native Audio (Live) models, except Live Translate
-  // which shows a language-direction selector instead.
-  const canShowTtsVoice = (isTtsModel || isNativeAudioModel) && !isLiveTranslate && Boolean(ttsVoice);
+  // and Live Transcribe (which output translated speech or text only).
+  const canShowTtsVoice =
+    (isTtsModel || isNativeAudioModel) && !isLiveTranslate && !capabilities.isLiveTranscribe && Boolean(ttsVoice);
 
   // Live Translate models show a language-direction selector instead of voice
   const canShowLanguageDirection = isLiveTranslate;
 
-  // Show Media Resolution selector for Native Audio (Live API) to control stream quality
-  const canShowMediaResolution = isNativeAudioModel && Boolean(mediaResolution);
+  // Show Media Resolution selector for Native Audio multimodal (Live API) to control stream quality
+  const canShowMediaResolution =
+    isNativeAudioModel && !isLiveTranslate && !capabilities.isLiveTranscribe && Boolean(mediaResolution);
+
+  // Show Transcribe cluster for Gemini 3.5 Transcribe (batch file transcription)
+  const canShowTranscribeCluster = capabilities.isTranscribeModel && !capabilities.isLiveTranscribe;
 
   const hasVisibleContent =
     showAspectRatio ||
@@ -85,14 +92,33 @@ const ChatInputToolbarComponent: React.FC = () => {
     canShowTtsVoice ||
     canShowLanguageDirection ||
     canShowMediaResolution ||
+    canShowTranscribeCluster ||
     fileError ||
     showAddByIdInput ||
     showAddByUrlInput;
 
   return (
-    <div className={`flex flex-col gap-1.5 ${hasVisibleContent ? 'mb-1.5' : ''}`}>
-      {(showImageCluster || canShowTtsVoice || canShowLanguageDirection || canShowMediaResolution || isTtsModel) && (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+    <div
+      className={`flex flex-col gap-1 transition-all duration-200 ease-out ${
+        hasVisibleContent
+          ? 'mb-1.5 opacity-100 translate-y-0'
+          : 'opacity-0 -translate-y-1 h-0 overflow-hidden pointer-events-none'
+      }`}
+    >
+      {(showImageCluster ||
+        canShowTtsVoice ||
+        canShowLanguageDirection ||
+        canShowMediaResolution ||
+        canShowTranscribeCluster ||
+        isTtsModel) && (
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          {canShowTranscribeCluster && (
+            <TranscribeCluster
+              currentChatSettings={currentChatSettings}
+              setCurrentChatSettings={setCurrentChatSettings}
+              onAttachmentAction={onAttachmentAction}
+            />
+          )}
           {canShowTtsVoice && <TtsVoiceSelector ttsVoice={ttsVoice} setTtsVoice={setTtsVoice} />}
           {canShowLanguageDirection && <LanguageDirectionSelector />}
           {isTtsModel && (
@@ -124,11 +150,7 @@ const ChatInputToolbarComponent: React.FC = () => {
             </button>
           )}
           {canShowMediaResolution && mediaResolution !== undefined && (
-            <MediaResolutionSelector
-              mediaResolution={mediaResolution}
-              setMediaResolution={setMediaResolution}
-              isNativeAudioModel={isNativeAudioModel}
-            />
+            <MediaResolutionSelector mediaResolution={mediaResolution} setMediaResolution={setMediaResolution} />
           )}
           {showImageCluster && (
             <div className={TOOLBAR_IMAGE_CLUSTER_CLASS} data-testid="image-settings-cluster">
@@ -155,7 +177,7 @@ const ChatInputToolbarComponent: React.FC = () => {
         </div>
       )}
       {fileError && (
-        <div className="p-2 text-sm text-[var(--theme-text-danger)] bg-[var(--theme-bg-error-message)] border border-[var(--theme-bg-danger)] rounded-md">
+        <div className="p-2 text-sm text-[var(--theme-text-danger)] bg-[var(--theme-bg-error-message)] border border-[var(--theme-bg-danger)] rounded-md animate-in fade-in duration-150">
           {fileError}
         </div>
       )}

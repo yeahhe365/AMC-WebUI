@@ -111,6 +111,7 @@ export interface ChatInputState {
   justInitiatedFileOpRef: MutableRefObject<boolean>;
   prevIsProcessingFileRef: MutableRefObject<boolean>;
   isComposingRef: MutableRefObject<boolean>;
+  compositionEndedAtRef: MutableRefObject<number>;
   handleCompositionStart: () => void;
   handleCompositionEnd: () => void;
   clearCurrentDraft: () => void;
@@ -190,7 +191,6 @@ export interface ChatInputVoiceState {
   isTranscribing: boolean;
   isMicInitializing: boolean;
   error: string | null;
-  systemAudioWarning: string | null;
   handleVoiceInputClick: () => void;
   handleCancelRecording: () => void;
 }
@@ -242,8 +242,10 @@ export interface ChatInputHandlers {
   ) => void;
   queueCurrentSubmission: () => void;
   cancelPendingUploadSend: () => void;
-  restoreQueuedSubmission: () => void;
-  removeQueuedSubmission: () => void;
+  restoreQueuedSubmission: (id: string) => void;
+  removeQueuedSubmission: (id: string) => void;
+  removeAllQueuedSubmissions: () => void;
+  reorderQueuedSubmissions: (activeId: string, targetIndex: number) => void;
 }
 
 export interface ChatInputContextValue {
@@ -259,7 +261,7 @@ export interface ChatInputContextValue {
   targetDocument: Document;
   canSend: boolean;
   canQueueMessage: boolean;
-  queuedSubmission: QueuedChatInputSubmission | null;
+  queuedSubmissions: QueuedChatInputSubmission[];
   chatInputMode: ChatInputMode;
   isAnyModalOpen: boolean;
   handleSmartSendMessage: (text: string, options?: { isFastMode?: boolean; files?: UploadedFile[] }) => Promise<void>;
@@ -267,12 +269,17 @@ export interface ChatInputContextValue {
   initialTextareaHeight: number;
   handleStartLiveCamera: () => Promise<void>;
   handleStartLiveScreenShare: () => Promise<void>;
-  queuedSubmissionView?: {
+  queuedSubmissionsView?: {
     title: string;
-    previewText: string;
-    fileCount: number;
-    onEdit: () => void;
-    onRemove: () => void;
+    items: Array<{
+      id: string;
+      previewText: string;
+      fileCount: number;
+    }>;
+    onEditItem: (id: string) => void;
+    onRemoveItem: (id: string) => void;
+    onReorderItem: (activeId: string, targetIndex: number) => void;
+    onClearAll: () => void;
   };
 }
 
@@ -297,12 +304,16 @@ export interface ChatInputToolbarContextValue {
   isAddingByUrl: boolean;
   ttsContext?: string;
   onEditTtsContext: () => void;
+  onAttachmentAction?: (action: AttachmentAction) => void;
 }
 
 export interface ChatInputActionsContextValue {
   currentModelId: string;
+  /** Active session routing — Gemini built-in tools are hidden on third-party routes. */
+  providerId?: string;
   toolStates: ChatToolToggleStates;
   onAttachmentAction: (action: AttachmentAction) => void;
+  onNewChat: () => void;
   disabled: boolean;
   onRecordButtonClick: () => void;
   onCancelRecording: () => void;
@@ -325,19 +336,25 @@ export interface ChatInputActionsContextValue {
   onToggleToolAndFocus: (toggleFunc: () => void) => void;
   onCountTokens: () => void;
   isImageGenerationModel: boolean;
+  isTranscribeModel: boolean;
   isNativeAudioModel: boolean;
+  isLiveTranslate: boolean;
+  isLiveTranscribe: boolean;
+  isTtsModel: boolean;
   canAddYouTubeVideo: boolean;
   isLoading: boolean;
   isEditing: boolean;
   showInputTranslationButton: boolean;
   showInputPasteButton: boolean;
   showInputClearButton: boolean;
+  showVoiceInputButton: boolean;
 }
 
 export interface ChatInputComposerStatusContextValue {
   hasTrimmedInput: boolean;
   canSend: boolean;
   canQueueMessage: boolean;
+  queuedCount: number;
   onTranslate: () => void;
   onPasteFromClipboard: () => void;
   onClearInput: () => void;

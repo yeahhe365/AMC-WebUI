@@ -20,6 +20,7 @@ import { isTextFile } from '@/utils/file/fileTypeClassification';
 import { getFileCardMeta } from '@/components/shared/file-preview/fileCardMeta';
 import { useI18n } from '@/contexts/I18nContext';
 import { FileThumbnail } from './FileThumbnail';
+import { interpolate } from '@/i18n/interpolate';
 
 interface SelectedFileDisplayProps {
   file: UploadedFile;
@@ -39,6 +40,14 @@ const MENU_ITEM_CLASS =
   'flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs leading-tight text-[var(--theme-text-secondary)] transition-colors hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)]';
 const FILE_PREVIEW_BOX_CLASS =
   'file-preview-box relative w-full aspect-square rounded-xl border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-tertiary)]/30 flex items-center justify-center transition-colors group-hover:border-[var(--theme-border-focus)]/50';
+
+const formatDisplayFileName = (fileName: string): string => {
+  const recordingMatch = fileName.match(/^recording-\d{4}-\d{2}-\d{2}-(\d{2})(\d{2})(\d{2})(\.[^.]+)$/);
+  if (recordingMatch) {
+    return `rec-${recordingMatch[1]}:${recordingMatch[2]}:${recordingMatch[3]}${recordingMatch[4]}`;
+  }
+  return fileName;
+};
 
 export const SelectedFileDisplay: React.FC<SelectedFileDisplayProps> = ({
   file,
@@ -157,20 +166,28 @@ export const SelectedFileDisplay: React.FC<SelectedFileDisplayProps> = ({
           )}
         </div>
 
-        <div className="mt-1.5 px-0.5 text-left w-full">
+        <div className="mt-1.5 px-0.5 text-left w-full min-h-[3rem] flex flex-col justify-start">
           <p className="text-xs font-medium text-[var(--theme-text-primary)] truncate leading-tight" title={file.name}>
-            {file.name}
+            {formatDisplayFileName(file.name)}
           </p>
           <p
             className={`text-xs truncate leading-tight mt-0.5 flex items-center gap-1 ${isFailed ? 'text-[var(--theme-text-danger)] font-medium' : 'text-[var(--theme-text-tertiary)]'}`}
             title={isFailed ? file.error : undefined}
           >
-            {file.videoMetadata ? <Scissors size={8} className="text-[var(--theme-text-link)]" /> : null}
-            {file.mediaResolution && <SlidersHorizontal size={8} className="text-[var(--theme-text-link)]" />}
+            {file.videoMetadata ? (
+              <span title={t('fileBadgeVideoMetadata')}>
+                <Scissors size={10} className="text-[var(--theme-text-link)]" />
+              </span>
+            ) : null}
+            {file.mediaResolution && (
+              <span title={t('fileBadgeMediaResolution')}>
+                <SlidersHorizontal size={10} className="text-[var(--theme-text-link)]" />
+              </span>
+            )}
             {isFailed
               ? file.error || t('selectedFileErrorFallback')
               : isUploading
-                ? t('selectedFileUploading').replace('{percent}', String(uploadPercent))
+                ? interpolate(t('selectedFileUploading'), { percent: String(uploadPercent) })
                 : isProcessing
                   ? t('selectedFileProcessingGemini')
                   : isCancelled

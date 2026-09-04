@@ -1,6 +1,11 @@
 import { useState, useMemo, useCallback } from 'react';
 import { type UploadedFile, type ChatMessage, type VideoMetadata, type MediaResolution } from '@/types';
 import { useFileModalState } from '@/hooks/ui/useFileModalState';
+import {
+  createHtmlPreviewRequest,
+  type HtmlPreviewOpenOptions,
+  type HtmlPreviewRequest,
+} from '@/utils/html-preview/previewPrivilege';
 
 interface UseMessageListUiProps {
   messages: ChatMessage[];
@@ -13,8 +18,7 @@ interface UseMessageListUiProps {
 
 export const useMessageListUi = ({ messages, onUpdateMessageFile }: UseMessageListUiProps) => {
   const [isHtmlPreviewModalOpen, setIsHtmlPreviewModalOpen] = useState(false);
-  const [htmlToPreview, setHtmlToPreview] = useState<string | null>(null);
-  const [initialTrueFullscreenRequest, setInitialTrueFullscreenRequest] = useState(false);
+  const [htmlPreview, setHtmlPreview] = useState<HtmlPreviewRequest | null>(null);
 
   const allFiles = useMemo(() => messages.flatMap((message) => message.files || []), [messages]);
   const {
@@ -37,16 +41,14 @@ export const useMessageListUi = ({ messages, onUpdateMessageFile }: UseMessageLi
     [openPreview],
   );
 
-  const handleOpenHtmlPreview = useCallback((htmlContent: string, options?: { initialTrueFullscreen?: boolean }) => {
-    setHtmlToPreview(htmlContent);
-    setInitialTrueFullscreenRequest(options?.initialTrueFullscreen ?? false);
+  const handleOpenHtmlPreview = useCallback((htmlContent: string, options?: HtmlPreviewOpenOptions) => {
+    setHtmlPreview(createHtmlPreviewRequest(htmlContent, options));
     setIsHtmlPreviewModalOpen(true);
   }, []);
 
   const handleCloseHtmlPreview = useCallback(() => {
     setIsHtmlPreviewModalOpen(false);
-    setHtmlToPreview(null);
-    setInitialTrueFullscreenRequest(false);
+    setHtmlPreview(null);
   }, []);
 
   const handleConfigureFile = useCallback(
@@ -68,8 +70,7 @@ export const useMessageListUi = ({ messages, onUpdateMessageFile }: UseMessageLi
   return {
     previewFile,
     isHtmlPreviewModalOpen,
-    htmlToPreview,
-    initialTrueFullscreenRequest,
+    htmlPreview,
     configuringFile,
     setConfiguringFile,
     handleFileClick,

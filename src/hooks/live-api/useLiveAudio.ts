@@ -5,6 +5,9 @@ import { logService } from '@/services/logService';
 import { createManagedObjectUrl, releaseManagedObjectUrl } from '@/services/objectUrlManager';
 import { useStateWithRef } from '@/hooks/useStateWithRef';
 
+const HYBRID_VAD_SILENCE_MS = 700;
+const SPEECH_RMS_THRESHOLD = 0.015;
+
 export const useLiveAudio = () => {
   const [volume, setVolume] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -20,6 +23,17 @@ export const useLiveAudio = () => {
   const sourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const outputAudioActiveRef = useRef(false);
   const outputAudioTailTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const hasSpokenInTurnRef = useRef(false);
+  const speechEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onSpeechEndRef = useRef<(() => void) | null>(null);
+
+  const clearSpeechEndTimer = useCallback(() => {
+    if (speechEndTimerRef.current) {
+      clearTimeout(speechEndTimerRef.current);
+      speechEndTimerRef.current = null;
+    }
+  }, []);
 
   const clearOutputAudioTail = useCallback(() => {
     if (outputAudioTailTimeoutRef.current) {
@@ -38,7 +52,8 @@ export const useLiveAudio = () => {
   }, [clearOutputAudioTail]);
 
   const initializeAudio = useCallback(
-    async (onAudioData: (data: Float32Array) => void) => {
+    async (onAudioData: (data: Float32Array) => void, onSpeechEnd?: () => void) => {
+      onSpeechEndRef.current = onSpeechEnd ?? null;
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
 
       const outputAudioContext = new AudioContextClass({ sampleRate: 24000 });
@@ -83,6 +98,8 @@ export const useLiveAudio = () => {
       workletNode.port.onmessage = (event) => {
         if (isMutedRef.current) {
           setVolume(0);
+          clearSpeechEndTimer();
+          hasSpokenInTurnRef.current = false;
           return;
         }
 
@@ -90,6 +107,8 @@ export const useLiveAudio = () => {
 
         if (outputAudioActiveRef.current) {
           setVolume(0);
+          clearSpeechEndTimer();
+          hasSpokenInTurnRef.current = false;
           return;
         }
 
@@ -102,6 +121,18 @@ export const useLiveAudio = () => {
         const rms = Math.sqrt(sum / (sampleCount / step));
         setVolume(rms);
 
+        // Hybrid VAD detection
+        if (rms >= SPEECH_RMS_THRESHOLD) {
+          hasSpokenInTurnRef.current = true;
+          clearSpeechEndTimer();
+        } else if (hasSpokenInTurnRef.current && !speechEndTimerRef.current) {
+          speechEndTimerRef.current = setTimeout(() => {
+            hasSpokenInTurnRef.current = false;
+            speechEndTimerRef.current = null;
+            onSpeechEndRef.current?.();
+          }, HYBRID_VAD_SILENCE_MS);
+        }
+
         onAudioData(inputSamples);
       };
 
@@ -111,7 +142,7 @@ export const useLiveAudio = () => {
 
       return { outputAudioContext, inputAudioContext };
     },
-    [isMutedRef],
+    [clearSpeechEndTimer, isMutedRef],
   );
 
   const toggleMute = useCallback(() => {
@@ -181,6 +212,8 @@ export const useLiveAudio = () => {
   const cleanupAudio = useCallback(() => {
     stopAudioPlayback();
     clearOutputAudioTail();
+    clearSpeechEndTimer();
+    hasSpokenInTurnRef.current = false;
     outputAudioActiveRef.current = false;
 
     if (streamRef.current) {
@@ -217,7 +250,7 @@ export const useLiveAudio = () => {
 
     setVolume(0);
     setIsMuted(false);
-  }, [clearOutputAudioTail, setIsMuted, stopAudioPlayback]);
+  }, [clearOutputAudioTail, clearSpeechEndTimer, setIsMuted, stopAudioPlayback]);
 
   return {
     volume,

@@ -115,5 +115,7 @@ describe('UsageOverviewTab', () => {
     expect(renderer.container.textContent).toContain('gemini-3-flash-preview');
     expect(renderer.container.textContent).toContain('gemini-3.1-flash-image-preview');
     expect(renderer.container.textContent).toContain('Strict official mode');
+    expect(renderer.container.innerHTML).not.toContain('xl:grid-cols-6');
+    expect(renderer.container.innerHTML).not.toContain('rounded-2xl');
   });
 });

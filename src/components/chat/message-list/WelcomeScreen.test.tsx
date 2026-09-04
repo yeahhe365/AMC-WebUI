@@ -43,6 +43,15 @@ describe('WelcomeScreen', () => {
     expect(trigger).toHaveTextContent('How can I help you today?');
   });
 
+  it('does not render a decorative glow above the greeting', async () => {
+    await act(async () => {
+      renderer.root.render(<WelcomeScreen />);
+    });
+
+    expect(renderer.container.querySelector('.blur-2xl')).toBeNull();
+    expect(renderer.container.innerHTML).not.toContain('radial-gradient');
+  });
+
   it('keeps the default cursor so the desktop hover trigger feels hidden', async () => {
     await act(async () => {
       renderer.root.render(<WelcomeScreen />);

@@ -47,34 +47,6 @@
   border: 1px solid var(--theme-border-secondary) !important;
 }
 
-.markdown-body table {
-  display: block;
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  border-collapse: separate;
-  border-spacing: 0;
-  border: 1px solid var(--theme-border-secondary) !important;
-  border-radius: 0.75rem !important;
-  background-color: color-mix(in srgb, var(--theme-bg-tertiary) 18%, transparent);
-  margin: 0.85rem 0 !important;
-}
-
-.markdown-body th,
-.markdown-body td {
-  border-bottom: 1px solid var(--theme-border-secondary) !important;
-  padding: 0.55rem 0.85rem !important;
-}
-
-.markdown-body th {
-  background-color: color-mix(in srgb, var(--theme-bg-tertiary) 45%, transparent);
-  font-weight: 600 !important;
-}
-
-.markdown-body tr:last-child td {
-  border-bottom: none !important;
-}
-
 .markdown-body strong {
   color: var(--theme-text-primary) !important;
   font-weight: 700 !important;
@@ -202,8 +174,13 @@
 }
 
 /* Ensure first element doesn't push down the content, aligning text with avatar */
+/* BaseMarkdownRenderer 在 .markdown-body 与真实 markdown 节点之间多包了一层
+   wrapper div，需覆盖到第二层的第一个真实内容节点。Suspense/Fragment 不产生
+   DOM 节点，两级选择器即可，不要加更深层级或 :has()。 */
 .markdown-body > *:first-child,
-.is-loading > *:first-child {
+.markdown-body > *:first-child > *:first-child,
+.is-loading > *:first-child,
+.is-loading > *:first-child > *:first-child {
   margin-top: 0 !important;
 }
 
@@ -344,86 +321,101 @@ code.hljs {
   line-height: 1.4; /* Slightly tighter for inline code tags */
 }
 
-/* Table Styles - Clean Minimalist Style (No Grid Borders) */
+/* Table Styles — Linear Minimal
+   Frameless: no outer border/background. Structure = one strong uppercase
+   header rule + hairline row separators. Columns are content-sized
+   (table-layout: auto); the TableBlock wrapper handles horizontal scroll.
+   No !important: the LA inline-style protocol says model inline styles must
+   win, and source-order cascade already beats tailwind utility classes. */
 .markdown-body table:not(.rich-html-table) {
   border-collapse: collapse;
-  width: 100%;
   min-width: 100%;
   margin: 0; /* Handled by TableBlock wrapper */
-  background-color: transparent !important;
-  border: none !important;
-  table-layout: fixed;
+  background-color: transparent;
+  table-layout: auto;
 }
 
 .markdown-body table:not(.rich-html-table) caption {
   caption-side: top;
-  color: inherit !important;
-  font-weight: 600;
+  color: var(--theme-text-tertiary);
+  font-weight: 500;
+  font-size: 0.75em;
   text-align: left;
-  padding: 0.875rem 1rem 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 1rem 0.5rem;
 }
 
-.markdown-body table:not(.rich-html-table) thead {
-  background-color: transparent !important;
-  border-bottom: 1px solid var(--theme-border-secondary) !important;
-}
-
-.markdown-body table:not(.rich-html-table) thead tr {
-  background-color: transparent !important;
-  border: none !important;
-}
-
+/* Header: single strong bottom rule; uppercase small caps feel. No fill. */
 .markdown-body table:not(.rich-html-table) thead th {
-  background-color: transparent !important;
-  color: inherit !important;
-  font-weight: 700;
-  padding: 0.875rem 1rem;
+  background-color: transparent;
+  color: var(--theme-text-tertiary);
+  font-weight: 500;
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   text-align: left;
-  border: none !important;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-bottom: 1px solid var(--theme-border-secondary);
+  white-space: nowrap;
   vertical-align: top;
-  font-size: 0.95em;
-  opacity: 0.9;
 }
 
-.markdown-body table:not(.rich-html-table) tbody {
-  background-color: transparent !important;
-}
-
-/* Horizontal lines between rows */
-.markdown-body table:not(.rich-html-table) tbody tr {
-  background-color: transparent !important;
-  border-bottom: 1px solid var(--theme-border-secondary) !important;
-  border-top: none !important;
-  border-left: none !important;
-  border-right: none !important;
-}
-
-/* Remove border from last row to avoid double border with container bottom if present, or just clean look */
-.markdown-body table:not(.rich-html-table) tbody tr:last-child {
-  border-bottom: none !important;
-}
-
-.markdown-body table:not(.rich-html-table) tbody tr:hover {
-  background-color: transparent !important; /* No hover effect for cleaner look, or maybe subtle */
-}
-
+/* Body rows: hairline separators, generous padding, no eager word-break. */
 .markdown-body table:not(.rich-html-table) tbody td {
-  padding: 1rem;
-  border: none !important;
-  color: inherit !important;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--theme-border-secondary) 30%, transparent);
+  color: inherit;
   vertical-align: top;
-  background-color: transparent !important;
+  background-color: transparent;
   line-height: 1.6;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow-wrap: break-word;
+  font-variant-numeric: tabular-nums;
+}
+
+.markdown-body table:not(.rich-html-table) tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Hover: soft lift only, no hard fill. */
+.markdown-body table:not(.rich-html-table) tbody tr:hover {
+  background-color: color-mix(in srgb, var(--theme-bg-tertiary) 25%, transparent);
+}
+
+/* GFM column alignment — :---: / ---: in the delimiter row emits align attrs */
+.markdown-body :where(th, td)[align='center'] {
+  text-align: center;
+}
+
+.markdown-body :where(th, td)[align='right'] {
+  text-align: right;
 }
 
 .markdown-body table.rich-html-table {
   max-width: 100%;
+}
+
+/* Fullscreen tables scroll the whole sheet; keep the header pinned above the fold.
+   NOTE: base header background is transparent, so the sticky fullscreen header
+   needs an opaque background here. This selector is intentionally more specific
+   than the base `.markdown-body table:not(.rich-html-table) thead th` rule. */
+[data-table-fullscreen-overlay='true'] .markdown-body table:not(.rich-html-table) thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--theme-bg-primary);
+  box-shadow: 0 1px 0 var(--theme-border-secondary); /* collapse drops th borders, shadow fills in */
+}
+
+/* Touch devices have no hover, so the table actions would otherwise be unreachable.
+   Keep the bar visible and interactive wherever hover is not supported. */
+@media (hover: none) {
+  .markdown-body [data-table-actions-scope='true'] > div:last-child {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 /* Citation Styles */
@@ -471,13 +463,18 @@ code.hljs {
 }
 
 .tool-result strong {
-  display: block;
-  margin-bottom: 0.5rem;
   color: var(--theme-text-secondary);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   opacity: 0.9;
+}
+
+/* The localized header row replaces the legacy baked <strong> header; keep the
+   strong inline (icon + label share the row with the action buttons). */
+.tool-result > div:first-child strong {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Ensure pre/code blocks inside tool results are readable and handle overflow */
@@ -497,4 +494,34 @@ code.hljs {
 .tool-result .group.relative.rounded-lg {
   border: 1px solid var(--theme-border-secondary);
   background-color: var(--theme-bg-primary); /* Slightly elevate the code block */
+}
+
+/* Server code execution card: the status strip (CodeExecutionBlock) above the
+   code block, plus the tool result attached right below, so the round-trip
+   reads as one unit. */
+.code-exec-block {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+/* CodeBlock owns a default my-3 — collapse it inside the card so the strip,
+   code and (soon) result sit tightly together. */
+.code-exec-block > div {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* The result block directly following the code-exec card is part of the same
+   round-trip: pull it up and drop its own top gap so they read as one card. */
+.code-exec-block + .tool-result {
+  margin-top: 0.375rem;
+}
+
+/* The pre.code-exec-code itself is styled by the inner CodeBlock; neutralize
+   any inherited pre margins/padding so no double spacing appears. */
+pre.code-exec-code {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
 }

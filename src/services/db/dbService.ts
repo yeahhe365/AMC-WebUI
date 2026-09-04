@@ -17,6 +17,7 @@ import {
   getAllSessionMetadata,
   getAllSessions,
   getSession,
+  getSessionMetadataOnly,
   saveSession,
   searchSessions,
   setAllSessions,
@@ -33,6 +34,7 @@ export type { AppDataSizeEstimate } from './appDataSize';
 export const dbService = {
   getAllSessions,
   getSession,
+  getSessionMetadataOnly,
   getAllSessionMetadata,
   searchSessions,
   setAllSessions,

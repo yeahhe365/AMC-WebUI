@@ -1,10 +1,36 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, MousePointer2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import { SUGGESTIONS_KEYS } from '@/constants/welcomeSuggestions';
 import { SUGGESTION_CHIP_ACTIVE_CLASS, SUGGESTION_CHIP_CLASS } from '@/constants/designTokens';
 import { SuggestionIcon } from './SuggestionIcon';
+import { NavChip } from './NavChip';
 import { type translations } from '@/i18n/translations';
+
+/** Scroll-arrow chrome shared by both directions. */
+const SUGGESTION_SCROLL_ARROW_CLASSES =
+  'absolute top-1/2 -translate-y-[calc(50%+4px)] z-10 p-1.5 rounded-full bg-[var(--theme-bg-primary)]/95 border border-[var(--theme-border-secondary)] shadow-md text-[var(--theme-text-primary)] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] focus-visible:border-[var(--theme-border-focus)]';
+
+/** Trailing state dot — separates toggle chips (导航/BBox/Guide) from one-shot actions. */
+const SuggestionToggleDot = () => (
+  <span aria-hidden="true" className="h-1 w-1 flex-shrink-0 rounded-full bg-current opacity-50" />
+);
+
+/** Hidden-by-default state that stays reachable via keyboard focus. */
+const SUGGESTION_SCROLL_ARROW_HIDDEN_CLASSES =
+  'opacity-0 pointer-events-none focus-visible:opacity-100 focus-visible:pointer-events-auto';
+
+/**
+ * Directional edge fade — only the side that actually hides chips fades, so a
+ * clipped chip reads as "scrollable" instead of "broken". Correct at both
+ * scroll extremes, unlike the old static always-both-sides mask.
+ */
+const suggestionFadeClass = (fadeLeft: boolean, fadeRight: boolean): string => {
+  if (fadeLeft && fadeRight) return 'fade-mask-x-both';
+  if (fadeLeft) return 'fade-mask-x-l';
+  if (fadeRight) return 'fade-mask-x-r';
+  return '';
+};
 
 interface ChatSuggestionsProps {
   show: boolean;
@@ -14,10 +40,16 @@ interface ChatSuggestionsProps {
   isBBoxModeActive?: boolean;
   onToggleGuide?: () => void;
   isGuideModeActive?: boolean;
+  onTogglePdfNav?: () => void;
+  isPdfNavEnabled?: boolean;
+  onToggleVideoNav?: () => void;
+  isVideoNavEnabled?: boolean;
+  onToggleAudioNav?: () => void;
+  isAudioNavEnabled?: boolean;
   isFullscreen: boolean;
 }
 
-export const ChatSuggestions: React.FC<ChatSuggestionsProps> = ({
+const ChatSuggestionsComponent: React.FC<ChatSuggestionsProps> = ({
   show,
   onSuggestionClick,
   onOrganizeInfoClick,
@@ -25,6 +57,12 @@ export const ChatSuggestions: React.FC<ChatSuggestionsProps> = ({
   isBBoxModeActive,
   onToggleGuide,
   isGuideModeActive,
+  onTogglePdfNav,
+  isPdfNavEnabled,
+  onToggleVideoNav,
+  isVideoNavEnabled,
+  onToggleAudioNav,
+  isAudioNavEnabled,
   isFullscreen,
 }) => {
   const { t } = useI18n();
@@ -61,14 +99,14 @@ export const ChatSuggestions: React.FC<ChatSuggestionsProps> = ({
 
   return (
     <div
-      className="relative group/suggestions mb-3 sm:mb-4"
+      className="relative group/suggestions mb-1.5 sm:mb-2"
       onMouseEnter={() => setIsSuggestionsHovered(true)}
       onMouseLeave={() => setIsSuggestionsHovered(false)}
     >
       <div
         ref={suggestionsRef}
         onScroll={checkScroll}
-        className="flex gap-2 overflow-x-auto pb-1 px-1 no-scrollbar fade-mask-x scroll-smooth"
+        className={`flex gap-2 overflow-x-auto pb-1 px-1 no-scrollbar scroll-smooth ${suggestionFadeClass(showLeftArrow, showRightArrow)}`}
       >
         {SUGGESTIONS_KEYS.map((suggestion, index) => (
           <React.Fragment key={index}>
@@ -99,8 +137,9 @@ export const ChatSuggestions: React.FC<ChatSuggestionsProps> = ({
                     aria-pressed={!!isBBoxModeActive}
                     title={t('bboxButtonTitle')}
                   >
-                    <SuggestionIcon iconName="Scan" />
+                    <SuggestionIcon iconName="BoxSelect" />
                     <span>{t('bboxButtonShort')}</span>
+                    <SuggestionToggleDot />
                   </button>
                 )}
                 {onToggleGuide && (
@@ -112,9 +151,43 @@ export const ChatSuggestions: React.FC<ChatSuggestionsProps> = ({
                     aria-pressed={!!isGuideModeActive}
                     title={t('guideButtonTitle')}
                   >
-                    <MousePointer2 size={13} />
+                    <SuggestionIcon iconName="MousePointer2" />
                     <span>{t('guideButtonShort')}</span>
+                    <SuggestionToggleDot />
                   </button>
+                )}
+                {onTogglePdfNav && (
+                  <NavChip
+                    iconName="Pdf"
+                    labelKey="pdfNavLabel"
+                    missingHintKey="pdfNavNoPdfHint"
+                    mediaKind="pdf"
+                    isEnabled={!!isPdfNavEnabled}
+                    onToggle={onTogglePdfNav}
+                    testId="pdf-nav-chip"
+                  />
+                )}
+                {onToggleVideoNav && (
+                  <NavChip
+                    iconName="Clapperboard"
+                    labelKey="videoNavChipLabel"
+                    missingHintKey="videoNavNoVideoHint"
+                    mediaKind="video"
+                    isEnabled={!!isVideoNavEnabled}
+                    onToggle={onToggleVideoNav}
+                    testId="video-nav-chip"
+                  />
+                )}
+                {onToggleAudioNav && (
+                  <NavChip
+                    iconName="AudioLines"
+                    labelKey="audioNavChipLabel"
+                    missingHintKey="audioNavNoAudioHint"
+                    mediaKind="audio"
+                    isEnabled={!!isAudioNavEnabled}
+                    onToggle={onToggleAudioNav}
+                    testId="audio-nav-chip"
+                  />
                 )}
               </>
             )}
@@ -126,7 +199,7 @@ export const ChatSuggestions: React.FC<ChatSuggestionsProps> = ({
         <button
           type="button"
           onClick={() => handleScroll('left')}
-          className={`absolute left-0 top-1/2 -translate-y-[calc(50%+4px)] z-10 p-1.5 rounded-full bg-[var(--theme-bg-primary)]/95 border border-[var(--theme-border-secondary)] shadow-md text-[var(--theme-text-primary)] transition-all duration-200 ${isSuggestionsHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          className={`${SUGGESTION_SCROLL_ARROW_CLASSES} left-0 ${isSuggestionsHovered ? 'opacity-100' : SUGGESTION_SCROLL_ARROW_HIDDEN_CLASSES}`}
           aria-label={t('suggestionsScrollLeft')}
         >
           <ChevronLeft size={16} strokeWidth={2} />
@@ -136,7 +209,7 @@ export const ChatSuggestions: React.FC<ChatSuggestionsProps> = ({
         <button
           type="button"
           onClick={() => handleScroll('right')}
-          className={`absolute right-0 top-1/2 -translate-y-[calc(50%+4px)] z-10 p-1.5 rounded-full bg-[var(--theme-bg-primary)]/95 border border-[var(--theme-border-secondary)] shadow-md text-[var(--theme-text-primary)] transition-all duration-200 ${isSuggestionsHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+          className={`${SUGGESTION_SCROLL_ARROW_CLASSES} right-0 ${isSuggestionsHovered ? 'opacity-100' : SUGGESTION_SCROLL_ARROW_HIDDEN_CLASSES}`}
           aria-label={t('suggestionsScrollRight')}
         >
           <ChevronRight size={16} strokeWidth={2} />
@@ -145,3 +218,5 @@ export const ChatSuggestions: React.FC<ChatSuggestionsProps> = ({
     </div>
   );
 };
+
+export const ChatSuggestions = React.memo(ChatSuggestionsComponent);

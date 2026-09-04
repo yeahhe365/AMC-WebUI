@@ -192,11 +192,12 @@ describe('SelectedFileDisplay', () => {
     expect(moveButton).toBeUndefined();
   });
 
-  it('renders a text snippet thumbnail for text files', () => {
+  it('renders a cover thumbnail with type badge for text files', () => {
     act(() => {
       renderer.root.render(
         <SelectedFileDisplay
           file={createFile({
+            name: 'notes.txt',
             textContent: 'first line\nsecond line\nthird line',
           })}
           onRemove={() => {}}
@@ -205,8 +206,10 @@ describe('SelectedFileDisplay', () => {
       );
     });
 
-    expect(renderer.container.querySelector('[data-thumbnail-kind="text"]')).not.toBeNull();
-    expect(renderer.container.textContent).toContain('first line');
+    const thumbnail = renderer.container.querySelector('[data-thumbnail-kind="text"]');
+    expect(thumbnail).not.toBeNull();
+    expect(thumbnail?.textContent).toContain('TXT');
+    expect(renderer.container.textContent).not.toContain('first line');
   });
 
   it('renders a first-page thumbnail for PDF files', async () => {
@@ -268,7 +271,7 @@ describe('SelectedFileDisplay', () => {
     expect(renderer.container.querySelector('video')).not.toBeNull();
   });
 
-  it('renders a waveform thumbnail for audio files', () => {
+  it('renders an audio thumbnail for audio files', () => {
     act(() => {
       renderer.root.render(
         <SelectedFileDisplay
@@ -284,7 +287,6 @@ describe('SelectedFileDisplay', () => {
     });
 
     expect(renderer.container.querySelector('[data-thumbnail-kind="audio"]')).not.toBeNull();
-    expect(renderer.container.querySelectorAll('[data-waveform-bar="true"]').length).toBeGreaterThan(0);
   });
 
   it('renders a cover thumbnail for spreadsheet and other document files', () => {

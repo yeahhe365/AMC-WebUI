@@ -1,4 +1,3 @@
-import { logService } from '@/services/logService';
 import { decodeBase64ToArrayBuffer } from '@/utils/file/fileEncoding';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 
@@ -33,7 +32,9 @@ export const float32ToPCM16Base64 = (data: Float32Array): string => {
   const sampleCount = data.length;
   const int16 = new Int16Array(sampleCount);
   for (let i = 0; i < sampleCount; i++) {
-    int16[i] = Math.max(-1, Math.min(1, data[i])) * 32768;
+    // 0x7fff (not 32768) so a full-scale +1.0 sample stays 32767 instead of
+    // wrapping Int16 to -32768. Matches float32ToPcm16Bytes below.
+    int16[i] = Math.max(-1, Math.min(1, data[i])) * 0x7fff;
   }
   let binary = '';
   const bytes = new Uint8Array(int16.buffer);
@@ -164,87 +165,4 @@ export const createWavBlobFromPCMChunks = (chunks: string[], sampleRate = 24000)
   const wavBuffer = createWavBuffer(merged, sampleRate, 1);
   const blob = new Blob([wavBuffer], { type: 'audio/wav' });
   return createManagedObjectUrl(blob);
-};
-
-/**
- * Combines microphone stream with system audio stream (screen share) if requested.
- * Returns the resulting mixed stream and a cleanup function.
- */
-type ExtendedDisplayMediaStreamOptions = DisplayMediaStreamOptions & {
-  systemAudio?: 'include' | 'exclude';
-  selfBrowserSurface?: 'include' | 'exclude';
-};
-
-type WindowWithWebkitAudioContext = Window &
-  typeof globalThis & {
-    webkitAudioContext?: typeof AudioContext;
-  };
-
-export const SYSTEM_AUDIO_NOT_SHARED_WARNING =
-  'System audio was not shared. Recording continued with microphone audio only.';
-export const SYSTEM_AUDIO_CAPTURE_FAILED_WARNING =
-  'System audio capture was cancelled or failed. Recording continued with microphone audio only.';
-
-interface MixedAudioStreamResult {
-  stream: MediaStream;
-  cleanup: () => void;
-  warning?: string;
-}
-
-export const getMixedAudioStream = async (
-  micStream: MediaStream,
-  includeSystemAudio: boolean = false,
-): Promise<MixedAudioStreamResult> => {
-  if (!includeSystemAudio) {
-    return { stream: micStream, cleanup: () => {} };
-  }
-
-  try {
-    const displayStream = await navigator.mediaDevices.getDisplayMedia({
-      video: {
-        width: 1,
-        height: 1,
-      },
-      audio: {
-        echoCancellation: false,
-        noiseSuppression: false,
-        autoGainControl: false,
-      },
-      systemAudio: 'include',
-      selfBrowserSurface: 'include',
-    } as ExtendedDisplayMediaStreamOptions);
-
-    const didShareSystemAudio = displayStream.getAudioTracks().length > 0;
-    if (!didShareSystemAudio) {
-      logService.warn("System audio not shared (user might have unchecked 'Share Audio').");
-      displayStream.getTracks().forEach((t) => t.stop());
-      return { stream: micStream, cleanup: () => {}, warning: SYSTEM_AUDIO_NOT_SHARED_WARNING };
-    }
-
-    const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
-    const audioContext = new AudioContextClass();
-    const mixedDestination = audioContext.createMediaStreamDestination();
-
-    const microphoneSource = audioContext.createMediaStreamSource(micStream);
-    const systemAudioSource = audioContext.createMediaStreamSource(displayStream);
-
-    microphoneSource.connect(mixedDestination);
-    systemAudioSource.connect(mixedDestination);
-
-    const cleanup = () => {
-      try {
-        microphoneSource.disconnect();
-        systemAudioSource.disconnect();
-        displayStream.getTracks().forEach((t) => t.stop());
-        audioContext.close().catch(() => {});
-      } catch (cleanupError) {
-        logService.error('Error cleaning up mixed stream:', cleanupError);
-      }
-    };
-
-    return { stream: mixedDestination.stream, cleanup };
-  } catch (error) {
-    logService.warn('System audio capture cancelled or failed:', error);
-    return { stream: micStream, cleanup: () => {}, warning: SYSTEM_AUDIO_CAPTURE_FAILED_WARNING };
-  }
 };

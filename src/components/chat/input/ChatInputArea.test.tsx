@@ -106,23 +106,29 @@ describe('ChatInputArea default spacing', () => {
     const source = fs.readFileSync(chatInputAreaPath, 'utf8');
     const layoutSource = fs.readFileSync(chatInputAreaLayoutPath, 'utf8');
 
+    // ponytail: shell className became a template literal (expanded modifier), onClick on its own line
     const queuedStripIndex = source.indexOf('className={queuedSubmissionContainerClass}');
-    const inputShellIndex = source.indexOf('className={inputContainerClass} onClick={handleInputShellClick}');
+    const inputShellIndex = source.indexOf('className={`${inputContainerClass}');
     const inputShellEndIndex = source.indexOf('<ChatTextArea', inputShellIndex);
 
     expect(layoutSource).toContain('const queuedSubmissionContainerClass =');
     expect(queuedStripIndex).toBeGreaterThan(-1);
     expect(inputShellIndex).toBeGreaterThan(-1);
+    expect(source.indexOf('onClick={handleInputShellClick}', inputShellIndex)).toBeGreaterThan(inputShellIndex);
     expect(queuedStripIndex).toBeLessThan(inputShellIndex);
     expect(source.slice(inputShellIndex, inputShellEndIndex)).not.toContain('QueuedSubmissionCard');
   });
 
   it('uses an inset queued strip that visually docks to the wider composer shell', () => {
     const source = fs.readFileSync(chatInputAreaLayoutPath, 'utf8');
+    // ponytail: shell radius extracted to COMPOSER_SHELL_RADIUS_CLASS in constants/designTokens.ts
+    const designTokensSource = fs.readFileSync(path.resolve(__dirname, '../../../constants/designTokens.ts'), 'utf8');
 
     expect(source).toContain('relative z-10 mx-5 mb-[-22px] -translate-y-1.5');
     expect(source).toContain('focus-within:border-[var(--theme-border-focus)]');
     expect(source).toContain('relative z-20');
-    expect(source).toContain('rounded-[1.625rem]');
+    expect(source).toContain('${COMPOSER_SHELL_RADIUS_CLASS}');
+    expect(designTokensSource).toContain("pill: 'rounded-[20px]'");
+    expect(designTokensSource).toContain('COMPOSER_SHELL_RADIUS_CLASS = RADIUS_CLASS.pill');
   });
 });

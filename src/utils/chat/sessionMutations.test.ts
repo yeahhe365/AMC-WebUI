@@ -23,6 +23,57 @@ describe('sessionMutations', () => {
     expect(next[1]).toBe(other);
   });
 
+  it('preserves the array identity when the session updater returns the same reference', () => {
+    const sessions = [makeSession('s1'), makeSession('s2')];
+
+    const unchanged = updateSessionById(sessions, 's1', (session) => session);
+
+    expect(unchanged).toBe(sessions);
+    expect(unchanged[1]).toBe(sessions[1]);
+  });
+
+  it('preserves the session reference when a message patch changes nothing', () => {
+    const session: SavedChatSession = {
+      ...makeSession('session-1'),
+      messages: [
+        {
+          id: 'message-1',
+          role: 'model',
+          content: 'hello',
+          timestamp: new Date('2026-05-04T00:00:00.000Z'),
+        },
+      ],
+    };
+    const sessions = [session];
+
+    const unchanged = updateMessageInSession(sessions, 'session-1', 'message-1', { content: 'hello' });
+
+    expect(unchanged).toBe(sessions);
+    expect(unchanged[0]).toBe(session);
+    expect(unchanged[0].messages).toBe(session.messages);
+  });
+
+  it('builds a new session object when a message field actually changes', () => {
+    const session: SavedChatSession = {
+      ...makeSession('session-1'),
+      messages: [
+        {
+          id: 'message-1',
+          role: 'model',
+          content: 'hello',
+          timestamp: new Date('2026-05-04T00:00:00.000Z'),
+        },
+      ],
+    };
+    const sessions = [session];
+
+    const changed = updateMessageInSession(sessions, 'session-1', 'message-1', { content: 'goodbye' });
+
+    expect(changed).not.toBe(sessions);
+    expect(changed[0]).not.toBe(session);
+    expect(changed[0].messages[0].content).toBe('goodbye');
+  });
+
   it('updates a nested message and file through focused helpers', () => {
     const sessions: SavedChatSession[] = [
       {

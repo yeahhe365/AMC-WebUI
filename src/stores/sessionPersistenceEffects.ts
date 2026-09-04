@@ -1,5 +1,6 @@
 import type { SavedChatSession } from '@/types';
 import type { SyncMessage } from '@/types/sync';
+import { logService } from '@/services/logService';
 import { mergePersistedSessionMessages } from './sessionPersistence';
 
 interface PersistSessionChangesOptions {
@@ -45,7 +46,27 @@ export async function persistSessionChanges({
         return session;
       }
 
-      const persistedSession = await getSession(session.id);
+      // The in-memory messages of an inactive session are stripped to [], so
+      // saving it is only safe once the persisted record has been re-merged. If
+      // the lookup fails or the session vanished from the DB, skip the save:
+      // persisting an empty shell would trip the file-record GC in saveSession
+      // and permanently delete every attachment blob of that session.
+      let persistedSession: SavedChatSession | null | undefined;
+      try {
+        persistedSession = await getSession(session.id);
+      } catch (error) {
+        logService.warn('Skipping session persist: persisted record could not be read.', {
+          sessionId: session.id,
+          error,
+        });
+        return null;
+      }
+      if (!persistedSession) {
+        logService.warn('Skipping session persist: session has no persisted record to merge with.', {
+          sessionId: session.id,
+        });
+        return null;
+      }
       if (version !== undefined && sessionPersistVersions.get(session.id) !== version) {
         return null;
       }

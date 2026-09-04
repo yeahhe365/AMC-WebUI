@@ -1,11 +1,9 @@
 import { type Dispatch, type MutableRefObject, type SetStateAction, useCallback, useEffect, useRef } from 'react';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import { type AppSettings, type SavedChatSession } from '@/types';
-import { logService } from '@/services/logService';
-import { getGeminiKeyForRequest } from '@/utils/apiKeySelection';
-import { generateSessionTitle } from '@/utils/chat/session';
-import { generateTitleApi } from '@/services/api/generation/textApi';
+import { autoTitleSession, isSessionAutoTitleEligible } from '@/features/auto-titling/autoTitleSession';
 import { getVisibleChatMessages } from '@/utils/chat/visibility';
-import { isThirdPartyApiActive } from '@/utils/thirdPartyApiActive';
+import { isThirdPartyApiRoute } from '@/utils/chatApiRoute';
 
 type SessionsUpdater = (updater: (prev: SavedChatSession[]) => SavedChatSession[]) => void;
 
@@ -13,7 +11,7 @@ interface AutoTitlingProps {
   appSettings: AppSettings;
   activeChat?: SavedChatSession;
   updateAndPersistSessions: SessionsUpdater;
-  language: 'en' | 'zh';
+  language: SupportedLanguage;
   generatingTitleSessionIds: Set<string>;
   setGeneratingTitleSessionIds: Dispatch<SetStateAction<Set<string>>>;
   sessionKeyMapRef?: MutableRefObject<Map<string, string>>;
@@ -34,11 +32,17 @@ const hashAttemptValue = (value: string | null | undefined): string => {
 const buildAutoTitleAttemptKey = (
   session: SavedChatSession,
   appSettings: AppSettings,
-  language: 'en' | 'zh',
+  language: SupportedLanguage,
 ): string => {
   const messages = getVisibleChatMessages(session.messages);
   const firstMessage = messages[0];
   const secondMessage = messages[1];
+  // When the first model reply is still streaming, its content keeps growing
+  // every frame. Including that in the attempt key would make the key change
+  // per chunk, re-firing auto-titling for the same in-flight reply. Exclude it
+  // so an early (content≥2000) attempt is recorded exactly once; once the
+  // stream finishes, isLoading flips and a fresh key retries with full content.
+  const secondMessageContentKey = secondMessage?.isLoading ? 'streaming' : hashAttemptValue(secondMessage?.content);
   const messageKey = (message: (typeof messages)[number] | undefined) =>
     message
       ? [
@@ -46,7 +50,7 @@ const buildAutoTitleAttemptKey = (
           message.role,
           message.isLoading ? 'loading' : 'idle',
           message.stoppedByUser ? 'stopped' : 'active',
-          hashAttemptValue(message.content),
+          message === secondMessage ? secondMessageContentKey : hashAttemptValue(message.content),
         ].join(':')
       : 'none';
 
@@ -57,7 +61,7 @@ const buildAutoTitleAttemptKey = (
     messageKey(secondMessage),
     hashAttemptValue(session.settings.lockedApiKey),
     language,
-    appSettings.apiMode,
+    session.settings.providerId ?? 'gemini-native',
     appSettings.useCustomApiConfig ? 'custom-api' : 'env-api',
     appSettings.serverManagedApi ? 'server-managed' : 'browser-managed',
     appSettings.useApiProxy ? 'proxy' : 'direct',
@@ -79,90 +83,32 @@ export const useAutoTitling = ({
 
   const generateTitleForSession = useCallback(
     async (session: SavedChatSession) => {
-      const sessionId = session.id;
-      const messages = getVisibleChatMessages(session.messages);
-      if (messages.length < 2) return;
-
-      setGeneratingTitleSessionIds((prev) => new Set(prev).add(sessionId));
-      logService.info(`Auto-generating title for session ${sessionId}`);
-
-      const stickyKey = isThirdPartyApiActive(appSettings) ? undefined : sessionKeyMapRef?.current?.get(sessionId);
-
-      let keyToUse: string;
-      if (stickyKey) {
-        keyToUse = stickyKey;
-      } else {
-        const keyResult = getGeminiKeyForRequest(appSettings, session.settings, { skipIncrement: true });
-        if ('error' in keyResult) {
-          logService.error(`Could not generate title for session ${sessionId}: ${keyResult.error}`);
-          setGeneratingTitleSessionIds((prev) => {
-            const next = new Set(prev);
-            next.delete(sessionId);
-            return next;
-          });
-          return;
-        }
-        keyToUse = keyResult.key;
-      }
-
+      setGeneratingTitleSessionIds((prev) => new Set(prev).add(session.id));
       try {
-        const userContent = messages[0].content;
-        const modelContent = messages[1].content;
-
-        if (!userContent.trim() && !modelContent.trim()) {
-          logService.info(`Skipping title generation for session ${sessionId} due to empty content.`);
-          return;
-        }
-
-        const newTitle = await generateTitleApi(keyToUse, userContent, modelContent, language);
-
-        if (newTitle && newTitle.trim()) {
-          logService.info(`Generated new title for session ${sessionId}: "${newTitle}"`);
-          updateAndPersistSessions((prev) =>
-            prev.map((session) => (session.id === sessionId ? { ...session, title: newTitle.trim() } : session)),
-          );
-        } else {
-          logService.warn(`Title generation for session ${sessionId} returned an empty string.`);
-        }
-      } catch (error) {
-        logService.error(`Failed to auto-generate title for session ${sessionId}`, { error });
-        const localTitle = generateSessionTitle(messages);
-        if (localTitle && localTitle !== 'New Chat') {
-          updateAndPersistSessions((prev) =>
-            prev.map((session) => (session.id === sessionId ? { ...session, title: localTitle } : session)),
-          );
-        }
+        await autoTitleSession({
+          session,
+          appSettings,
+          language,
+          stickyKey: isThirdPartyApiRoute(appSettings, session.settings)
+            ? undefined
+            : sessionKeyMapRef?.current?.get(session.id),
+          updateAndPersistSessions,
+        });
       } finally {
         setGeneratingTitleSessionIds((prev) => {
           const next = new Set(prev);
-          next.delete(sessionId);
+          next.delete(session.id);
           return next;
         });
       }
     },
-    [appSettings, updateAndPersistSessions, language, setGeneratingTitleSessionIds, sessionKeyMapRef],
+    [appSettings, language, setGeneratingTitleSessionIds, sessionKeyMapRef, updateAndPersistSessions],
   );
 
   useEffect(() => {
     if (!appSettings.isAutoTitleEnabled || !activeChat) return;
-
-    const visibleMessages = getVisibleChatMessages(activeChat.messages);
-
-    const isNewChat = activeChat.title === 'New Chat';
-    const isPlaceholder = activeChat.title === generateSessionTitle(activeChat.messages);
-
-    if (!isNewChat && !isPlaceholder) return;
-
+    if (!isSessionAutoTitleEligible(activeChat)) return;
     if (generatingTitleSessionIds.has(activeChat.id)) return;
-
-    if (visibleMessages.length < 2) return;
-
-    const firstMsg = visibleMessages[0];
-    const secondMsg = visibleMessages[1];
-
-    if (firstMsg.role !== 'user' || secondMsg.role !== 'model') return;
-
-    if (secondMsg.isLoading || secondMsg.stoppedByUser) return;
 
     const attemptKey = buildAutoTitleAttemptKey(activeChat, appSettings, language);
     if (attemptedTitleKeysRef.current.has(attemptKey)) return;

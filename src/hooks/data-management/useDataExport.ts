@@ -1,9 +1,11 @@
 import { useCallback } from 'react';
 import { type AppSettings, type SavedScenario, type ChatGroup } from '@/types';
 import { logService } from '@/services/logService';
+import { toastError } from '@/stores/toastStore';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 import { serializeSessionForPortableExport } from '@/utils/chat/session';
 import { triggerDownload } from '@/utils/export/core';
+import { redactExportedAppSettings } from '@/utils/secretRedaction';
 import { dbService } from '@/services/db/dbService';
 import { buildScenarioExportPayload } from '@/features/scenarios/scenarioLibrary';
 
@@ -26,11 +28,31 @@ const isSensitiveMcpHeader = (name: string): boolean => {
   );
 };
 
+const isSensitiveMcpEnvKey = (key: string): boolean => {
+  const normalized = key.trim().toLowerCase();
+  return (
+    normalized.includes('token') ||
+    normalized.includes('secret') ||
+    normalized.includes('password') ||
+    normalized.includes('credential') ||
+    normalized.includes('api_key') ||
+    normalized.includes('apikey') ||
+    normalized.endsWith('_key') ||
+    normalized.endsWith('key')
+  );
+};
+
 const redactMcpSecretsForExport = (settings: AppSettings): AppSettings => ({
   ...settings,
   mcpServers: (settings.mcpServers ?? []).map((server) => ({
     ...server,
-    ...(server.env ? { env: {} } : {}),
+    // Keep non-secret env vars (paths, flags, log levels) so an exported
+    // settings file remains a working stdio server config after re-import.
+    ...(server.env
+      ? {
+          env: Object.fromEntries(Object.entries(server.env).filter(([key]) => !isSensitiveMcpEnvKey(key))),
+        }
+      : {}),
     ...(server.headers
       ? {
           headers: Object.fromEntries(
@@ -49,7 +71,7 @@ export const useDataExport = ({ appSettings, savedGroups, savedScenarios, t }: U
       const dataToExport = {
         type: 'AllModelChat-Settings',
         version: 1,
-        settings: redactMcpSecretsForExport(appSettings),
+        settings: redactExportedAppSettings(redactMcpSecretsForExport(appSettings)),
       };
       const jsonString = JSON.stringify(dataToExport, null, 2);
       const blob = new Blob([jsonString], { type: 'application/json' });
@@ -57,7 +79,7 @@ export const useDataExport = ({ appSettings, savedGroups, savedScenarios, t }: U
       triggerDownload(createManagedObjectUrl(blob), `amc-webui-settings-${date}.json`);
     } catch (error) {
       logService.error('Failed to export settings', { error });
-      alert(t('exportFailedTitle'));
+      toastError(t('exportFailedTitle'));
     }
   }, [appSettings, t]);
 
@@ -83,7 +105,7 @@ export const useDataExport = ({ appSettings, savedGroups, savedScenarios, t }: U
       triggerDownload(createManagedObjectUrl(blob), `amc-webui-history-${date}.json`);
     } catch (error) {
       logService.error('Failed to export history', { error });
-      alert(t('exportFailedTitle'));
+      toastError(t('exportFailedTitle'));
     }
   }, [savedGroups, t]);
 
@@ -97,7 +119,7 @@ export const useDataExport = ({ appSettings, savedGroups, savedScenarios, t }: U
       triggerDownload(createManagedObjectUrl(blob), `amc-webui-scenarios-${date}.json`);
     } catch (error) {
       logService.error('Failed to export scenarios', { error });
-      alert(t('exportFailedTitle'));
+      toastError(t('exportFailedTitle'));
     }
   }, [savedScenarios, t]);
 

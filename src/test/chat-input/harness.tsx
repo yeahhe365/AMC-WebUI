@@ -30,7 +30,6 @@ const mockChatStoreState = vi.hoisted(() => ({
   aspectRatio: '1:1',
   imageSize: '1K',
   imageOutputMode: 'IMAGE_TEXT',
-  personGeneration: 'ALLOW_ADULT',
   loadingSessionIds: new Set<string>(),
   setSelectedFiles: vi.fn((value: unknown[] | ((previous: unknown[]) => unknown[])) => {
     mockChatStoreState.selectedFiles =
@@ -55,9 +54,6 @@ const mockChatStoreState = vi.hoisted(() => ({
   }),
   setImageOutputMode: vi.fn((value: string) => {
     mockChatStoreState.imageOutputMode = value;
-  }),
-  setPersonGeneration: vi.fn((value: string) => {
-    mockChatStoreState.personGeneration = value;
   }),
   setCurrentChatSettings: vi.fn(),
 }));
@@ -111,6 +107,7 @@ const mockChatInputUiSettings = vi.hoisted(() => ({
   showInputTranslationButton: undefined as boolean | undefined,
   showInputPasteButton: undefined as boolean | undefined,
   showInputClearButton: undefined as boolean | undefined,
+  showVoiceInputButton: undefined as boolean | undefined,
 }));
 
 const mockApiUtils = vi.hoisted(() => ({
@@ -235,7 +232,7 @@ vi.mock('@/components/chat/input/ChatInputArea', async () => {
       localFileState,
       inputDisabled,
       canQueueMessage,
-      queuedSubmissionView,
+      queuedSubmissionsView,
       handleStartLiveCamera,
       handleStartLiveScreenShare,
     } = useChatInputContext();
@@ -248,15 +245,30 @@ vi.mock('@/components/chat/input/ChatInputArea', async () => {
         }}
       >
         <div data-testid="chat-input-value">{inputState.inputText}</div>
-        {queuedSubmissionView ? (
+        {queuedSubmissionsView ? (
           <div data-testid="queued-card">
-            <div data-testid="queued-title">{queuedSubmissionView.title}</div>
-            <div data-testid="queued-preview">{queuedSubmissionView.previewText}</div>
-            <button type="button" data-testid="queued-edit" onClick={queuedSubmissionView.onEdit}>
+            <div data-testid="queued-title">{queuedSubmissionsView.title}</div>
+            {queuedSubmissionsView.items.map((item) => (
+              <div data-testid="queued-preview" key={item.id}>
+                {item.previewText}
+              </div>
+            ))}
+            <button
+              type="button"
+              data-testid="queued-edit"
+              onClick={() => queuedSubmissionsView?.onEditItem(queuedSubmissionsView.items[0]?.id ?? '')}
+            >
               edit
             </button>
-            <button type="button" data-testid="queued-remove" onClick={queuedSubmissionView.onRemove}>
+            <button
+              type="button"
+              data-testid="queued-remove"
+              onClick={() => queuedSubmissionsView?.onRemoveItem(queuedSubmissionsView.items[0]?.id ?? '')}
+            >
               remove
+            </button>
+            <button type="button" data-testid="queued-clear" onClick={queuedSubmissionsView.onClearAll}>
+              clear
             </button>
           </div>
         ) : null}
@@ -330,6 +342,7 @@ const ChatInputTestProvider = ({ value, children }: { value: ChatAreaProviderVal
   mockChatInputUiSettings.showInputTranslationButton = value.input.appSettings.showInputTranslationButton ?? false;
   mockChatInputUiSettings.showInputPasteButton = value.input.appSettings.showInputPasteButton ?? true;
   mockChatInputUiSettings.showInputClearButton = value.input.appSettings.showInputClearButton ?? true;
+  mockChatInputUiSettings.showVoiceInputButton = value.input.appSettings.showVoiceInputButton ?? false;
   mockChatStoreState.setSelectedFiles = value.input.setSelectedFiles as typeof mockChatStoreState.setSelectedFiles;
   mockChatStoreState.setAppFileError = value.input.setAppFileError as typeof mockChatStoreState.setAppFileError;
   mockChatStoreState.setEditingMessageId = value.input

@@ -208,16 +208,14 @@ describe('source readability boundaries', () => {
   });
 
   it('names audio stream composition locals after their runtime role', () => {
-    const audioProcessingSource = readProjectFile('src/features/audio/audioProcessing.ts');
+    const audioAnalyserSource = readProjectFile('src/features/audio/useAudioAnalyser.ts');
 
     for (const vagueLocalName of VAGUE_AUDIO_STREAM_LOCALS) {
-      expect(audioProcessingSource).not.toContain(vagueLocalName);
+      expect(audioAnalyserSource).not.toContain(vagueLocalName);
     }
 
-    expect(audioProcessingSource).toContain('const audioContext =');
-    expect(audioProcessingSource).toContain('const mixedDestination =');
-    expect(audioProcessingSource).toContain('const microphoneSource =');
-    expect(audioProcessingSource).toContain('const systemAudioSource =');
+    expect(audioAnalyserSource).toContain('const audioContext =');
+    expect(audioAnalyserSource).toContain('const sessionAnalyser =');
   });
 
   it('keeps compact UI helpers readable through domain names', () => {
@@ -237,8 +235,6 @@ describe('source readability boundaries', () => {
 
     expect(sendControlsSource).not.toContain('const x = e.clientX');
     expect(sendControlsSource).not.toContain('const y = e.clientY');
-    expect(sendControlsSource).toContain('const rippleX =');
-    expect(sendControlsSource).toContain('const rippleY =');
   });
 
   it('keeps JSX comments from restating obvious component sections', () => {
@@ -298,9 +294,14 @@ describe('source readability boundaries', () => {
       'Wrap toolbar in z-indexed container to ensure dropdowns render above status banner',
       'Use chunkIndex+1 to match the [N] citation markers in the text body.',
       // Layout / design constraints (not section narration)
-      'Decorative gradient orb — neutral only, no accent/blue tint',
       'Mobile-only close row; desktop close lives in the content pane.',
       'Search container aligned with main header baseline',
+      'Search collapses the tab list into a desktop-only match-count status.',
+      'Danger severity escalates by consequence: reset < delete chats < wipe all data.',
+      // Selection ask panel (selection-ask dock / resize hit zones)
+      '常显品牌色条：贴边收起后把手要有足够的视觉存在感，避免找不到面板',
+      '把手仅作视觉指示，命中区在面板外侧热区；内缩 4px 防圆角裁剪',
+      '热区是面板兄弟节点、跨边框（外 6 内 1）：放面板内会盖住右缘滚动条',
     ]);
     const jsxCommentPattern = /\{\/\*\s*([^*]+?)\s*\*\/\}/g;
     const unexpectedComments = listProjectSourceFiles('src')

@@ -5,6 +5,7 @@ import {
   MESSAGE_BLOCK_BUTTON_CLASS,
   MODAL_CLOSE_BUTTON_CLASS,
   MODAL_CLOSE_BUTTON_DANGER_HOVER_CLASS,
+  SETTINGS_DANGER_SOLID_BUTTON_CLASS,
   SMALL_ICON_BUTTON_CLASS,
   SMALL_ICON_BUTTON_ROUND_CLASS,
   SMALL_ICON_DANGER_BUTTON_CLASS,
@@ -16,9 +17,9 @@ describe('CHAT_INPUT_BUTTON_CLASS', () => {
     expect(CHAT_INPUT_BUTTON_CLASS).not.toContain('active:scale');
   });
 
-  it('keeps compact input buttons at least 44px square for touch', () => {
-    expect(CHAT_INPUT_BUTTON_CLASS).toContain('h-11');
-    expect(CHAT_INPUT_BUTTON_CLASS).toContain('w-11');
+  it('keeps compact input buttons neatly sized at 36px square', () => {
+    expect(CHAT_INPUT_BUTTON_CLASS).toContain('h-9');
+    expect(CHAT_INPUT_BUTTON_CLASS).toContain('w-9');
   });
 
   it('uses color-only transitions so composer controls do not feel sluggish', () => {
@@ -32,6 +33,11 @@ describe('MESSAGE_BLOCK_BUTTON_CLASS', () => {
     expect(MESSAGE_BLOCK_BUTTON_CLASS).toContain('min-h-11');
     expect(MESSAGE_BLOCK_BUTTON_CLASS).toContain('min-w-11');
   });
+
+  it('shows a visible focus ring for keyboard users', () => {
+    expect(MESSAGE_BLOCK_BUTTON_CLASS).toContain('focus-visible:ring-2');
+    expect(MESSAGE_BLOCK_BUTTON_CLASS).toContain('focus-visible:ring-[var(--theme-border-focus)]');
+  });
 });
 
 describe('icon button helper classes', () => {
@@ -42,5 +48,13 @@ describe('icon button helper classes', () => {
     expect(SMALL_ICON_BUTTON_CLASS).toContain('rounded-md');
     expect(SMALL_ICON_BUTTON_ROUND_CLASS).toContain('rounded-full');
     expect(SMALL_ICON_DANGER_BUTTON_CLASS).toContain('hover:text-[var(--theme-text-danger)]');
+  });
+});
+
+describe('SETTINGS_DANGER_SOLID_BUTTON_CLASS', () => {
+  it('builds the solid danger action from theme tokens, not hardcoded reds', () => {
+    expect(SETTINGS_DANGER_SOLID_BUTTON_CLASS).toContain('bg-[var(--theme-bg-danger)]');
+    expect(SETTINGS_DANGER_SOLID_BUTTON_CLASS).toContain('hover:bg-[var(--theme-bg-danger-hover)]');
+    expect(SETTINGS_DANGER_SOLID_BUTTON_CLASS).not.toMatch(/(?:^|\s)(?:from|to|bg)-red-\d/);
   });
 });

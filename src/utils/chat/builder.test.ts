@@ -8,12 +8,6 @@ vi.mock('@/utils/file/fileEncoding', () => ({
   fileToString: vi.fn().mockResolvedValue('file text content'),
 }));
 
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
 vi.mock('@/utils/model/modelCapabilities', () => ({
   isGemini3Model: vi.fn((id: string) => id?.includes('gemini-3')),
 }));
@@ -63,6 +57,18 @@ describe('buildContentParts', () => {
     const file = makeFile({ error: 'Upload failed' });
     const { contentParts } = await buildContentParts('Hello', [file]);
     expect(contentParts).toEqual([{ text: 'Hello' }]);
+  });
+
+  it('inserts a protocol omission note for files marked omitted from API history', async () => {
+    const file = makeFile({
+      name: 'deck.pdf',
+      type: 'application/pdf',
+      uploadState: 'failed',
+      error: 'unavailable',
+      omittedFromApiHistory: true,
+    });
+    const { contentParts } = await buildContentParts('look at this', [file]);
+    expect(contentParts).toEqual([{ text: expect.stringContaining('deck.pdf') }, { text: 'look at this' }]);
   });
 
   it('skips files not in active state', async () => {

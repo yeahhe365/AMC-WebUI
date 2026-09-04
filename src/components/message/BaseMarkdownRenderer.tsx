@@ -1,15 +1,17 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useI18n } from '@/contexts/I18nContext';
 import ReactMarkdown from 'react-markdown';
 import type { PluggableList } from 'unified';
 import { CodeBlock } from './blocks/CodeBlock';
 import { TableBlock } from './blocks/TableBlock';
 import { ToolResultBlock } from './blocks/ToolResultBlock';
+import { CodeExecutionBlock } from './blocks/CodeExecutionBlock';
 import { DeferredDiagramBlock } from './blocks/DeferredDiagramBlock';
 import { type UploadedFile, type SideViewContent } from '@/types';
+import type { OpenHtmlPreviewHandler } from '@/utils/html-preview/previewPrivilege';
 import { extractTextFromNode } from '@/utils/reactNodeText';
 import { InlineCode } from './code/InlineCode';
-import { splitMarkdownSegments } from '@/utils/markdownSegments';
+import { transformMarkdownTextSegments } from '@/utils/markdownSegments';
 import { stripGemmaThoughtMarkup, wrapReasoningMarkup } from '@/utils/chat/reasoning';
 import { normalizePreviewableMarkdownContent } from '@/utils/previewableMarkdown';
 import type { LiveArtifactFollowupPayload } from '@/utils/live-artifacts/liveArtifactFollowup';
@@ -23,7 +25,7 @@ export interface MarkdownRendererProps {
   messageId?: string;
   isLoading: boolean;
   onImageClick: (file: UploadedFile) => void;
-  onOpenHtmlPreview: (html: string, options?: { initialTrueFullscreen?: boolean }) => void;
+  onOpenHtmlPreview: OpenHtmlPreviewHandler;
   onLiveArtifactFollowUp?: (payload: LiveArtifactFollowupPayload) => void;
   expandCodeBlocksByDefault: boolean;
   isMermaidRenderingEnabled: boolean;
@@ -38,6 +40,10 @@ export interface MarkdownRendererProps {
   interactiveMode?: 'enabled' | 'disabled';
   contentPreNormalized?: boolean;
   liveArtifactFontSize?: number;
+  liveArtifactsMode?: boolean;
+  unwrapMislabeledHtmlBlocks?: boolean;
+  /** True while the stream has emitted an executableCode part with no result yet. */
+  hasPendingCodeExecution?: boolean;
 }
 
 type MarkdownCodeProps = React.ComponentPropsWithoutRef<'code'> & {
@@ -72,11 +78,6 @@ interface BaseMarkdownRendererProps extends MarkdownRendererProps {
 
 const INLINE_MATH_OPERATOR_REGEX = /(?:^|[^A-Za-z])(?:\d+\s*[=+\-*/<>]\s*\d+|[A-Za-z]\s*[=+\-*/<>]\s*[A-Za-z0-9])/;
 const INLINE_MATH_MARKER_REGEX = /[\\^_{}]/;
-
-const transformMarkdownTextSegments = (value: string, transform: (segment: string) => string): string =>
-  splitMarkdownSegments(value)
-    .map((segment) => (segment.type === 'literal' ? segment.value : transform(segment.value)))
-    .join('');
 
 const SINGLE_LIVE_ARTIFACT_FENCE_REGEX =
   /^```(amc-live-artifact-html|amc-live-artifact-interaction)\n([\s\S]*?)\n?```\s*$/;
@@ -139,11 +140,27 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
     interactiveMode = 'enabled',
     contentPreNormalized = false,
     liveArtifactFontSize,
+    liveArtifactsMode,
+    unwrapMislabeledHtmlBlocks = true,
+    hasPendingCodeExecution = false,
     remarkPlugins,
     rehypePlugins,
   }) => {
     const { t } = useI18n();
     const isInteractive = interactiveMode !== 'disabled';
+
+    // Keep the event callbacks behind a latest-ref so the `components` map for
+    // react-markdown can depend on nothing but content/theme primitives. The
+    // inline component closures defined below are function types; if their
+    // identity changed on every render, React would unmount/remount the whole
+    // subtree they render, resetting local state like CodeBlock's expanded
+    // flag. Background-session store churn must not tear down a completed
+    // session's code blocks, so the closures read the freshest callback from
+    // this ref at event time instead of being rebuilt.
+    const handlersRef = useRef({ onImageClick, onOpenHtmlPreview, onLiveArtifactFollowUp, onOpenSidePanel });
+    useEffect(() => {
+      handlersRef.current = { onImageClick, onOpenHtmlPreview, onLiveArtifactFollowUp, onOpenSidePanel };
+    });
 
     const components = useMemo(
       () => ({
@@ -175,7 +192,7 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
                     dataUrl: src,
                     uploadState: 'active',
                   };
-                  onImageClick(file);
+                  handlersRef.current.onImageClick(file);
                 } else if (src) {
                   const file: UploadedFile = {
                     id: `inline-img-${Date.now()}`,
@@ -185,7 +202,7 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
                     dataUrl: src,
                     uploadState: 'active',
                   };
-                  onImageClick(file);
+                  handlersRef.current.onImageClick(file);
                 }
               }}
               {...rest}
@@ -212,7 +229,12 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
           const { className, children, ...rest } = props;
           if (className?.includes('tool-result')) {
             return (
-              <ToolResultBlock className={className} files={files} onImageClick={onImageClick} {...rest}>
+              <ToolResultBlock
+                className={className}
+                files={files}
+                onImageClick={handlersRef.current.onImageClick}
+                {...rest}
+              >
                 {children}
               </ToolResultBlock>
             );
@@ -244,6 +266,36 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
           const language = langMatch ? langMatch[1] : '';
           const isGraphviz = language === 'graphviz' || language === 'dot';
 
+          const isServerCodeExecution = typeof rest.className === 'string' && rest.className.includes('code-exec-code');
+
+          const codeBlock = (
+            <CodeBlock
+              {...rest}
+              cacheKey={
+                messageId && node?.position?.start?.offset !== undefined
+                  ? `${messageId}:${node.position.start.offset}`
+                  : undefined
+              }
+              className={codeClassName}
+              onOpenHtmlPreview={handlersRef.current.onOpenHtmlPreview}
+              onLiveArtifactFollowUp={handlersRef.current.onLiveArtifactFollowUp}
+              expandCodeBlocksByDefault={expandCodeBlocksByDefault}
+              showPreviewControls={isInteractive}
+              isLoading={isLoading}
+              onOpenSidePanel={handlersRef.current.onOpenSidePanel}
+              liveArtifactFontSize={liveArtifactFontSize}
+              themeId={themeId}
+              liveArtifactsMode={liveArtifactsMode}
+              disableRun={isServerCodeExecution}
+            >
+              {codeElement || children}
+            </CodeBlock>
+          );
+
+          if (isServerCodeExecution) {
+            return <CodeExecutionBlock isRunning={hasPendingCodeExecution}>{codeBlock}</CodeExecutionBlock>;
+          }
+
           if (isMermaidRenderingEnabled && language === 'mermaid' && typeof rawCode === 'string') {
             return (
               <DeferredDiagramBlock
@@ -251,11 +303,11 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
                 load={loadMermaidBlock}
                 componentProps={{
                   code: rawCode,
-                  onImageClick,
+                  onImageClick: handlersRef.current.onImageClick,
                   isLoading,
                   renderDelayMs: diagramRenderDelayMs,
                   themeId,
-                  onOpenSidePanel,
+                  onOpenSidePanel: handlersRef.current.onOpenSidePanel,
                 }}
                 eager={diagramLoadMode === 'eager'}
               />
@@ -269,38 +321,18 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
                 load={loadGraphvizBlock}
                 componentProps={{
                   code: rawCode,
-                  onImageClick,
+                  onImageClick: handlersRef.current.onImageClick,
                   isLoading,
                   renderDelayMs: diagramRenderDelayMs,
                   themeId,
-                  onOpenSidePanel,
+                  onOpenSidePanel: handlersRef.current.onOpenSidePanel,
                 }}
                 eager={diagramLoadMode === 'eager'}
               />
             );
           }
 
-          return (
-            <CodeBlock
-              {...rest}
-              cacheKey={
-                messageId && node?.position?.start?.offset !== undefined
-                  ? `${messageId}:${node.position.start.offset}`
-                  : undefined
-              }
-              className={codeClassName}
-              onOpenHtmlPreview={onOpenHtmlPreview}
-              onLiveArtifactFollowUp={onLiveArtifactFollowUp}
-              expandCodeBlocksByDefault={expandCodeBlocksByDefault}
-              showPreviewControls={isInteractive}
-              isLoading={isLoading}
-              onOpenSidePanel={onOpenSidePanel}
-              liveArtifactFontSize={liveArtifactFontSize}
-              themeId={themeId}
-            >
-              {codeElement || children}
-            </CodeBlock>
-          );
+          return codeBlock;
         },
       }),
       [
@@ -308,18 +340,16 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
         diagramRenderDelayMs,
         expandCodeBlocksByDefault,
         files,
+        hasPendingCodeExecution,
         isGraphvizRenderingEnabled,
         isInteractive,
         isLoading,
         isMermaidRenderingEnabled,
         messageId,
-        onImageClick,
-        onLiveArtifactFollowUp,
-        onOpenHtmlPreview,
-        onOpenSidePanel,
         t,
         themeId,
         liveArtifactFontSize,
+        liveArtifactsMode,
       ],
     );
 
@@ -328,7 +358,10 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
 
       const normalizedContent = contentPreNormalized
         ? content
-        : normalizePreviewableMarkdownContent(content, { isStreaming: isLoading });
+        : normalizePreviewableMarkdownContent(content, {
+            isStreaming: isLoading,
+            unwrapMislabeledHtmlBlocks,
+          });
       const contentWithNormalizedMath = transformMarkdownTextSegments(
         normalizedContent,
         normalizeEscapedMathDelimiters,
@@ -339,7 +372,7 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
       }
 
       return stripGemmaThoughtMarkup(contentWithNormalizedMath);
-    }, [content, contentPreNormalized, hideThinkingInContext, isLoading, t]);
+    }, [content, contentPreNormalized, hideThinkingInContext, isLoading, t, unwrapMislabeledHtmlBlocks]);
     const singleLiveArtifact = useMemo(() => extractSingleLiveArtifactFence(processedContent), [processedContent]);
 
     if (isInteractive && singleLiveArtifact) {
@@ -356,6 +389,7 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
             onOpenSidePanel={onOpenSidePanel}
             liveArtifactFontSize={liveArtifactFontSize}
             themeId={themeId}
+            liveArtifactsMode={liveArtifactsMode}
           >
             <code className={`language-${singleLiveArtifact.language}`}>{singleLiveArtifact.code}</code>
           </CodeBlock>

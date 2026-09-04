@@ -1,209 +1,689 @@
 import React from 'react';
-import { Atom, Braces, FileCode2, FileJson, FileText, Workflow } from 'lucide-react';
-import {
-  IconCLang,
-  IconCpp,
-  IconCSharp,
-  IconDart,
-  IconGo,
-  IconHtml5,
-  IconIni,
-  IconJava,
-  IconKotlin,
-  IconLua,
-  IconPhp,
-  IconPython,
-  IconRuby,
-  IconRust,
-  IconShell,
-  IconSql,
-  IconSwift,
-  IconToml,
-  IconTypeScript,
-  IconYaml,
-} from '@/components/icons';
+import { Braces, FileCode2, Workflow } from 'lucide-react';
+import { MaterialIcon } from './MaterialIcon';
+
+// When a badge has no material icon, which lucide fallback to render.
+// 'braces' (default) for code-ish languages without a material icon;
+// 'workflow' for diagram languages whose material icon reads poorly at 20px.
+type FallbackIcon = 'braces' | 'workflow';
+
+type LanguageBadgeEntry = {
+  aliases: string[];
+  badgeId: string;
+  displayName: string;
+  compactLabel?: string;
+  // material-icon-theme icon name; absent → lucide fallback
+  materialIcon?: string;
+  fallbackIcon?: FallbackIcon;
+};
 
 type LanguageBadgeConfig = {
   badgeId: string;
   iconId: string;
   displayName: string;
   compactLabel?: string;
-  renderIcon: () => React.ReactNode;
-};
-
-type LanguageBadgeEntry = Omit<LanguageBadgeConfig, 'iconId'> & {
-  aliases: string[];
-  iconId?: string;
-};
-
-const TextGlyph: React.FC<{ label: string; className: string }> = ({ label, className }) => {
-  const isCompact = label.length >= 3;
-  return (
-    <span
-      className={`inline-flex h-5 min-w-5 items-center justify-center overflow-hidden rounded-[5px] font-black uppercase ${
-        isCompact ? 'px-1 text-[9px] tracking-[0.04em]' : 'px-1 text-xs tracking-[0.08em]'
-      } ${className}`}
-      aria-hidden="true"
-    >
-      {label}
-    </span>
-  );
+  materialIcon?: string;
+  fallbackIcon?: FallbackIcon;
 };
 
 const normalizeLanguage = (language: string) => language.trim().toLowerCase();
 const LANGUAGE_ICON_SIZE = 20;
 
-const LANGUAGE_BADGE_ENTRIES = [
+const LANGUAGE_BADGE_ENTRIES: LanguageBadgeEntry[] = [
   {
     aliases: ['py', 'py3', 'python'],
     badgeId: 'python',
     displayName: 'Python',
-    renderIcon: () => <IconPython size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'python',
   },
   {
     aliases: ['tsx'],
     badgeId: 'tsx',
     displayName: 'TSX',
-    renderIcon: () => <IconTypeScript size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'react-ts',
   },
   {
     aliases: ['ts', 'typescript'],
     badgeId: 'typescript',
     displayName: 'TypeScript',
-    renderIcon: () => <IconTypeScript size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'typescript',
   },
   {
     aliases: ['js', 'javascript', 'node', 'nodejs'],
     badgeId: 'javascript',
     displayName: 'JavaScript',
-    renderIcon: () => <TextGlyph label="JS" className="bg-[#f7df1e] text-black" />,
+    materialIcon: 'javascript',
   },
   {
     aliases: ['jsx', 'react'],
     badgeId: 'jsx',
-    iconId: 'react',
     displayName: 'React',
-    renderIcon: () => <Atom size={LANGUAGE_ICON_SIZE} strokeWidth={2.1} className="text-[#61dafb]" />,
+    materialIcon: 'react',
   },
   {
     aliases: ['html', 'htm'],
     badgeId: 'html',
     displayName: 'HTML',
-    renderIcon: () => <IconHtml5 size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'html',
   },
   {
-    aliases: ['css', 'scss', 'sass', 'less'],
+    aliases: ['css'],
     badgeId: 'css',
     displayName: 'CSS',
-    renderIcon: () => <TextGlyph label="CSS" className="bg-[#1d4ed8] text-white" />,
+    materialIcon: 'css',
+  },
+  {
+    aliases: ['scss', 'sass'],
+    badgeId: 'sass',
+    displayName: 'Sass',
+    materialIcon: 'sass',
+  },
+  {
+    aliases: ['less'],
+    badgeId: 'less',
+    displayName: 'Less',
+    materialIcon: 'less',
   },
   {
     aliases: ['go', 'golang'],
     badgeId: 'go',
     displayName: 'Go',
-    renderIcon: () => <IconGo size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'go',
   },
   {
     aliases: ['rust', 'rs'],
     badgeId: 'rust',
     displayName: 'Rust',
-    renderIcon: () => <IconRust size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'rust',
   },
   {
     aliases: ['java', 'jvm'],
     badgeId: 'java',
     displayName: 'Java',
-    renderIcon: () => <IconJava size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'java',
   },
   {
     aliases: ['cs', 'csharp', 'c#'],
     badgeId: 'csharp',
     displayName: 'C#',
-    renderIcon: () => <IconCSharp size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'csharp',
   },
   {
     aliases: ['kotlin', 'kt', 'android'],
     badgeId: 'kotlin',
     displayName: 'Kotlin',
-    renderIcon: () => <IconKotlin size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'kotlin',
   },
   {
     aliases: ['rb', 'ruby', 'rails'],
     badgeId: 'ruby',
     displayName: 'Ruby',
-    renderIcon: () => <IconRuby size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'ruby',
   },
   {
     aliases: ['php'],
     badgeId: 'php',
     displayName: 'PHP',
-    renderIcon: () => <IconPhp size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'php',
   },
   {
     aliases: ['swift'],
     badgeId: 'swift',
     displayName: 'Swift',
-    renderIcon: () => <IconSwift size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'swift',
   },
   {
     aliases: ['dart'],
     badgeId: 'dart',
     displayName: 'Dart',
-    renderIcon: () => <IconDart size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'dart',
   },
   {
     aliases: ['lua'],
     badgeId: 'lua',
     displayName: 'Lua',
-    renderIcon: () => <IconLua size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'lua',
   },
   {
     aliases: ['c', 'h'],
     badgeId: 'c',
     displayName: 'C',
-    renderIcon: () => <IconCLang size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'c',
   },
   {
     aliases: ['cpp', 'c++', 'hpp'],
     badgeId: 'cpp',
     displayName: 'C++',
-    renderIcon: () => <IconCpp size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'cpp',
   },
   {
     aliases: ['json', 'json5'],
     badgeId: 'json',
     displayName: 'JSON',
-    renderIcon: () => <FileJson size={LANGUAGE_ICON_SIZE} strokeWidth={2.1} className="text-yellow-500" />,
+    materialIcon: 'json',
   },
   {
     aliases: ['sql', 'mysql', 'postgres', 'postgresql', 'sqlite', 'plsql'],
     badgeId: 'sql',
     displayName: 'SQL',
-    renderIcon: () => <IconSql size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'database',
   },
   {
-    aliases: ['sh', 'bash', 'zsh', 'shell', 'terminal', 'powershell', 'ps1', 'batch', 'cmd'],
+    aliases: ['sh', 'bash', 'zsh', 'shell', 'terminal', 'batch', 'cmd'],
     badgeId: 'shell',
     displayName: 'Shell',
-    renderIcon: () => <IconShell size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'console',
+  },
+  {
+    aliases: ['powershell', 'ps1'],
+    badgeId: 'powershell',
+    displayName: 'PowerShell',
+    materialIcon: 'powershell',
   },
   {
     aliases: ['yaml', 'yml'],
     badgeId: 'yaml',
     displayName: 'YAML',
-    renderIcon: () => <IconYaml size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'yaml',
   },
   {
     aliases: ['toml'],
     badgeId: 'toml',
     displayName: 'TOML',
-    renderIcon: () => <IconToml size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'toml',
   },
   {
     aliases: ['ini', 'config'],
     badgeId: 'ini',
     displayName: 'INI',
-    renderIcon: () => <IconIni size={LANGUAGE_ICON_SIZE} />,
+    materialIcon: 'settings',
+  },
+  {
+    aliases: ['mermaid'],
+    badgeId: 'mermaid',
+    displayName: 'Mermaid',
+    materialIcon: 'mermaid',
+  },
+  {
+    aliases: ['graphviz'],
+    badgeId: 'graphviz',
+    displayName: 'Graphviz',
+    compactLabel: 'DOT',
+    // material dotjs is 4 faint translucent ellipses that read as noise at
+    // 20px; Workflow (nodes + edges) is clearer for graphviz.
+    fallbackIcon: 'workflow',
+  },
+  {
+    aliases: ['dot'],
+    badgeId: 'dot',
+    displayName: 'DOT',
+    fallbackIcon: 'workflow',
+  },
+  {
+    aliases: ['md'],
+    badgeId: 'md',
+    displayName: 'Markdown',
+    materialIcon: 'markdown',
+  },
+  {
+    aliases: ['markdown'],
+    badgeId: 'markdown',
+    displayName: 'Markdown',
+    materialIcon: 'markdown',
+  },
+  {
+    aliases: ['csv'],
+    badgeId: 'csv',
+    displayName: 'CSV',
+    materialIcon: 'document',
+  },
+  {
+    aliases: ['txt'],
+    badgeId: 'txt',
+    displayName: 'TXT',
+    materialIcon: 'document',
+  },
+  {
+    aliases: ['text'],
+    badgeId: 'text',
+    displayName: 'TEXT',
+    materialIcon: 'document',
+  },
+  {
+    aliases: ['log'],
+    badgeId: 'log',
+    displayName: 'LOG',
+    materialIcon: 'log',
+  },
+  {
+    aliases: ['pl', 'perl'],
+    badgeId: 'pl',
+    displayName: 'PL',
+    materialIcon: 'perl',
+  },
+  {
+    aliases: ['r'],
+    badgeId: 'r',
+    displayName: 'R',
+    materialIcon: 'r',
+  },
+  {
+    aliases: ['docker', 'dockerfile'],
+    badgeId: 'docker',
+    displayName: 'DOCKER',
+    materialIcon: 'docker',
+  },
+  {
+    aliases: ['git'],
+    badgeId: 'git',
+    displayName: 'GIT',
+    materialIcon: 'git',
+  },
+  {
+    aliases: ['diff'],
+    badgeId: 'diff',
+    displayName: 'DIFF',
+    materialIcon: 'diff',
+  },
+  {
+    aliases: ['aws'],
+    badgeId: 'aws',
+    displayName: 'AWS',
+  },
+  {
+    aliases: ['jenkins'],
+    badgeId: 'jenkins',
+    displayName: 'JENKINS',
+  },
+  {
+    aliases: ['npm'],
+    badgeId: 'npm',
+    displayName: 'NPM',
+    materialIcon: 'npm',
+  },
+  {
+    aliases: ['yarn'],
+    badgeId: 'yarn',
+    displayName: 'YARN',
+    materialIcon: 'yarn',
+  },
+  {
+    aliases: ['pnpm'],
+    badgeId: 'pnpm',
+    displayName: 'PNPM',
+    materialIcon: 'pnpm',
+  },
+  {
+    aliases: ['xml'],
+    badgeId: 'xml',
+    displayName: 'XML',
+    materialIcon: 'xml',
+  },
+  {
+    aliases: ['svg'],
+    badgeId: 'svg',
+    displayName: 'SVG',
+    materialIcon: 'svg',
+  },
+  {
+    aliases: ['vue'],
+    badgeId: 'vue',
+    displayName: 'VUE',
+    materialIcon: 'vue',
+  },
+  {
+    aliases: ['vuejs'],
+    badgeId: 'vuejs',
+    displayName: 'VUEJS',
+    materialIcon: 'vue',
+  },
+  {
+    aliases: ['angular'],
+    badgeId: 'angular',
+    displayName: 'ANGULAR',
+    materialIcon: 'angular',
+  },
+  {
+    aliases: ['ng'],
+    badgeId: 'ng',
+    displayName: 'NG',
+    materialIcon: 'angular',
+  },
+  {
+    aliases: ['clj', 'cljs', 'clojure'],
+    badgeId: 'clojure',
+    displayName: 'Clojure',
+    materialIcon: 'clojure',
+  },
+  {
+    aliases: ['haskell', 'hs'],
+    badgeId: 'haskell',
+    displayName: 'Haskell',
+    materialIcon: 'haskell',
+  },
+  {
+    aliases: ['elixir', 'ex', 'exs'],
+    badgeId: 'elixir',
+    displayName: 'Elixir',
+    materialIcon: 'elixir',
+  },
+  {
+    aliases: ['erlang', 'erl'],
+    badgeId: 'erlang',
+    displayName: 'Erlang',
+    materialIcon: 'erlang',
+  },
+  {
+    aliases: ['scala', 'sc'],
+    badgeId: 'scala',
+    displayName: 'Scala',
+    materialIcon: 'scala',
+  },
+  {
+    aliases: ['groovy'],
+    badgeId: 'groovy',
+    displayName: 'Groovy',
+    materialIcon: 'groovy',
+  },
+  {
+    aliases: ['gradle'],
+    badgeId: 'gradle',
+    displayName: 'Gradle',
+    materialIcon: 'gradle',
+  },
+  {
+    aliases: ['fsharp', 'fs', 'fsx'],
+    badgeId: 'fsharp',
+    displayName: 'F#',
+    materialIcon: 'fsharp',
+  },
+  {
+    aliases: ['ocaml', 'ml', 'mli'],
+    badgeId: 'ocaml',
+    displayName: 'OCaml',
+    materialIcon: 'ocaml',
+  },
+  {
+    aliases: ['objectivec', 'objective-c', 'm'],
+    badgeId: 'objective-c',
+    displayName: 'Objective-C',
+    materialIcon: 'objective-c',
+  },
+  {
+    aliases: ['objectivecpp', 'objective-c++', 'mm'],
+    badgeId: 'objective-cpp',
+    displayName: 'Objective-C++',
+    materialIcon: 'objective-cpp',
+  },
+  {
+    aliases: ['zig'],
+    badgeId: 'zig',
+    displayName: 'Zig',
+    materialIcon: 'zig',
+  },
+  {
+    aliases: ['asm', 'assembly'],
+    badgeId: 'assembly',
+    displayName: 'Assembly',
+    materialIcon: 'assembly',
+  },
+  {
+    aliases: ['julia', 'jl'],
+    badgeId: 'julia',
+    displayName: 'Julia',
+    materialIcon: 'julia',
+  },
+  {
+    aliases: ['svelte'],
+    badgeId: 'svelte',
+    displayName: 'Svelte',
+    materialIcon: 'svelte',
+  },
+  {
+    aliases: ['astro'],
+    badgeId: 'astro',
+    displayName: 'Astro',
+    materialIcon: 'astro',
+  },
+  {
+    aliases: ['stylus', 'styl'],
+    badgeId: 'stylus',
+    displayName: 'Stylus',
+    materialIcon: 'stylus',
+  },
+  {
+    aliases: ['jupyter', 'ipynb'],
+    badgeId: 'jupyter',
+    displayName: 'Jupyter',
+    materialIcon: 'jupyter',
+  },
+  {
+    aliases: ['makefile', 'make', 'cmake'],
+    badgeId: 'makefile',
+    displayName: 'Makefile',
+    materialIcon: 'makefile',
+  },
+  {
+    aliases: ['graphql', 'gql'],
+    badgeId: 'graphql',
+    displayName: 'GraphQL',
+    materialIcon: 'graphql',
+  },
+  {
+    aliases: ['proto', 'protobuf'],
+    badgeId: 'proto',
+    displayName: 'Protocol Buffer',
+    materialIcon: 'proto',
+  },
+  {
+    aliases: ['prisma'],
+    badgeId: 'prisma',
+    displayName: 'Prisma',
+    materialIcon: 'prisma',
+  },
+  {
+    aliases: ['terraform', 'tf'],
+    badgeId: 'terraform',
+    displayName: 'Terraform',
+    materialIcon: 'terraform',
+  },
+  {
+    aliases: ['hcl'],
+    badgeId: 'hcl',
+    displayName: 'HCL',
+    materialIcon: 'hcl',
+  },
+  {
+    aliases: ['next'],
+    badgeId: 'next',
+    displayName: 'Next.js',
+    materialIcon: 'next',
+  },
+  {
+    aliases: ['nuxt'],
+    badgeId: 'nuxt',
+    displayName: 'Nuxt',
+    materialIcon: 'nuxt',
+  },
+  {
+    aliases: ['vite'],
+    badgeId: 'vite',
+    displayName: 'Vite',
+    materialIcon: 'vite',
+  },
+  {
+    aliases: ['vitest'],
+    badgeId: 'vitest',
+    displayName: 'Vitest',
+    materialIcon: 'vitest',
+  },
+  {
+    aliases: ['webpack'],
+    badgeId: 'webpack',
+    displayName: 'Webpack',
+    materialIcon: 'webpack',
+  },
+  {
+    aliases: ['rollup'],
+    badgeId: 'rollup',
+    displayName: 'Rollup',
+    materialIcon: 'rollup',
+  },
+  {
+    aliases: ['eslint'],
+    badgeId: 'eslint',
+    displayName: 'ESLint',
+    materialIcon: 'eslint',
+  },
+  {
+    aliases: ['prettier'],
+    badgeId: 'prettier',
+    displayName: 'Prettier',
+    materialIcon: 'prettier',
+  },
+  {
+    aliases: ['biome'],
+    badgeId: 'biome',
+    displayName: 'Biome',
+    materialIcon: 'biome',
+  },
+  {
+    aliases: ['postcss'],
+    badgeId: 'postcss',
+    displayName: 'PostCSS',
+    materialIcon: 'postcss',
+  },
+  {
+    aliases: ['tailwind', 'tailwindcss'],
+    badgeId: 'tailwindcss',
+    displayName: 'Tailwind CSS',
+    materialIcon: 'tailwindcss',
+  },
+  {
+    aliases: ['nodejs'],
+    badgeId: 'nodejs',
+    displayName: 'Node.js',
+    materialIcon: 'nodejs',
+  },
+  {
+    aliases: ['deno'],
+    badgeId: 'deno',
+    displayName: 'Deno',
+    materialIcon: 'deno',
+  },
+  {
+    aliases: ['bun'],
+    badgeId: 'bun',
+    displayName: 'Bun',
+    materialIcon: 'bun',
+  },
+  {
+    aliases: ['mdx'],
+    badgeId: 'mdx',
+    displayName: 'MDX',
+    materialIcon: 'mdx',
+  },
+  {
+    aliases: ['pdf'],
+    badgeId: 'pdf',
+    displayName: 'PDF',
+    materialIcon: 'pdf',
+  },
+  {
+    aliases: ['tex', 'latex'],
+    badgeId: 'tex',
+    displayName: 'TeX',
+    materialIcon: 'tex',
+  },
+  {
+    aliases: ['license', 'licence'],
+    badgeId: 'license',
+    displayName: 'License',
+    materialIcon: 'license',
+  },
+  {
+    aliases: ['changelog'],
+    badgeId: 'changelog',
+    displayName: 'Changelog',
+    materialIcon: 'changelog',
+  },
+  {
+    aliases: ['readme'],
+    badgeId: 'readme',
+    displayName: 'README',
+    materialIcon: 'readme',
+  },
+  {
+    aliases: ['lock'],
+    badgeId: 'lock',
+    displayName: 'Lockfile',
+    materialIcon: 'lock',
+  },
+  {
+    aliases: ['zip', 'tar', 'gz', '7z', 'rar'],
+    badgeId: 'zip',
+    displayName: 'Archive',
+    materialIcon: 'zip',
+  },
+  {
+    aliases: ['audio', 'mp3', 'wav', 'ogg'],
+    badgeId: 'audio',
+    displayName: 'Audio',
+    materialIcon: 'audio',
+  },
+  {
+    aliases: ['video', 'mp4', 'mkv'],
+    badgeId: 'video',
+    displayName: 'Video',
+    materialIcon: 'video',
+  },
+  {
+    aliases: ['image', 'png', 'jpg', 'jpeg', 'gif', 'webp'],
+    badgeId: 'image',
+    displayName: 'Image',
+    materialIcon: 'image',
+  },
+  {
+    aliases: ['font', 'ttf', 'otf', 'woff', 'woff2'],
+    badgeId: 'font',
+    displayName: 'Font',
+    materialIcon: 'font',
+  },
+  {
+    aliases: ['env'],
+    badgeId: 'tune',
+    displayName: 'Environment',
+    materialIcon: 'tune',
+  },
+  {
+    aliases: ['jsconfig'],
+    badgeId: 'jsconfig',
+    displayName: 'JSConfig',
+    materialIcon: 'jsconfig',
+  },
+  {
+    aliases: ['tsconfig'],
+    badgeId: 'tsconfig',
+    displayName: 'TSConfig',
+    materialIcon: 'tsconfig',
+  },
+  {
+    aliases: ['typescript-def', 'd.ts'],
+    badgeId: 'typescript-def',
+    displayName: 'TypeScript Def',
+    materialIcon: 'typescript-def',
+  },
+  {
+    aliases: ['gemfile', 'gem'],
+    badgeId: 'gemfile',
+    displayName: 'Gemfile',
+    materialIcon: 'gemfile',
+  },
+  {
+    aliases: ['go-mod', 'gomod'],
+    badgeId: 'go-mod',
+    displayName: 'Go Module',
+    materialIcon: 'go-mod',
   },
 ] satisfies LanguageBadgeEntry[];
 
@@ -213,35 +693,31 @@ const LANGUAGE_BADGE_CONFIGS = new Map<string, LanguageBadgeConfig>(
       alias,
       {
         badgeId: entry.badgeId,
-        iconId: entry.iconId ?? entry.badgeId,
+        iconId: entry.materialIcon ?? entry.fallbackIcon ?? 'braces',
         displayName: entry.displayName,
         compactLabel: entry.compactLabel,
-        renderIcon: entry.renderIcon,
+        materialIcon: entry.materialIcon,
+        fallbackIcon: entry.fallbackIcon,
       },
     ]),
   ),
 );
 
-const BRACES_ICON_LANGUAGES = new Set([
-  'pl',
-  'perl',
-  'r',
-  'docker',
-  'dockerfile',
-  'git',
-  'diff',
-  'aws',
-  'jenkins',
-  'npm',
-  'yarn',
-  'pnpm',
-  'xml',
-  'svg',
-  'vue',
-  'vuejs',
-  'angular',
-  'ng',
-]);
+const renderIcon = (config: LanguageBadgeConfig): React.ReactNode => {
+  if (config.materialIcon) {
+    return <MaterialIcon name={config.materialIcon} size={LANGUAGE_ICON_SIZE} />;
+  }
+
+  if (config.iconId === 'generic') {
+    return <FileCode2 size={LANGUAGE_ICON_SIZE} strokeWidth={2.1} className="text-gray-400" />;
+  }
+
+  if (config.fallbackIcon === 'workflow') {
+    return <Workflow size={LANGUAGE_ICON_SIZE} strokeWidth={2.1} className="text-pink-400" />;
+  }
+
+  return <Braces size={LANGUAGE_ICON_SIZE} strokeWidth={2.1} className="text-violet-400" />;
+};
 
 const getLanguageBadgeConfig = (language: string): LanguageBadgeConfig => {
   const lang = normalizeLanguage(language || 'text');
@@ -250,44 +726,18 @@ const getLanguageBadgeConfig = (language: string): LanguageBadgeConfig => {
     return mappedConfig;
   }
 
-  if (['mermaid', 'graphviz', 'dot'].includes(lang)) {
-    return {
-      badgeId: lang,
-      iconId: lang,
-      // graphviz keeps a meaningful "tool + format" pair; others are a single label
-      displayName: lang === 'dot' ? 'DOT' : lang === 'graphviz' ? 'Graphviz' : 'Mermaid',
-      compactLabel: lang === 'graphviz' ? 'DOT' : undefined,
-      renderIcon: () => <Workflow size={LANGUAGE_ICON_SIZE} strokeWidth={2.1} className="text-pink-400" />,
-    };
-  }
-
-  if (['md', 'markdown', 'csv', 'txt', 'text', 'log'].includes(lang)) {
-    return {
-      badgeId: lang,
-      iconId: 'text',
-      displayName: lang === 'md' || lang === 'markdown' ? 'Markdown' : lang.toUpperCase(),
-      renderIcon: () => (
-        <FileText size={LANGUAGE_ICON_SIZE} strokeWidth={2.1} className="text-[var(--theme-text-secondary)]" />
-      ),
-    };
-  }
-
-  if (BRACES_ICON_LANGUAGES.has(lang)) {
-    return {
-      badgeId: lang,
-      iconId: 'braces',
-      displayName: lang.toUpperCase(),
-      renderIcon: () => <Braces size={LANGUAGE_ICON_SIZE} strokeWidth={2.1} className="text-violet-400" />,
-    };
-  }
-
   return {
     badgeId: lang,
     iconId: 'generic',
     displayName: lang,
-    renderIcon: () => <FileCode2 size={LANGUAGE_ICON_SIZE} strokeWidth={2.1} className="text-gray-400" />,
   };
 };
+
+// The set of material-icon-theme icons referenced by the badge entries. Guarded
+// by materialIconSubset.test.ts against the generated MATERIAL_ICONS module.
+export const MATERIAL_ICON_NAMES = Array.from(
+  new Set(LANGUAGE_BADGE_ENTRIES.map((entry) => entry.materialIcon).filter((name): name is string => Boolean(name))),
+).sort();
 
 export const LanguageIcon: React.FC<{ language: string }> = ({ language }) => {
   const config = getLanguageBadgeConfig(language || 'text');
@@ -303,7 +753,7 @@ export const LanguageIcon: React.FC<{ language: string }> = ({ language }) => {
         className="inline-flex h-5 flex-shrink-0 items-center justify-center"
         aria-hidden="true"
       >
-        {config.renderIcon()}
+        {renderIcon(config)}
       </span>
       <span data-language-meta className="inline-flex min-w-0 items-center gap-1.5">
         <span className="truncate text-xs font-bold uppercase leading-none tracking-wider text-[var(--theme-text-secondary)]">

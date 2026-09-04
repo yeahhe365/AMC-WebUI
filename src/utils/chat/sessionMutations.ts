@@ -7,7 +7,23 @@ export const updateSessionById = (
   sessions: SavedChatSession[],
   sessionId: string,
   updater: (session: SavedChatSession) => SavedChatSession,
-) => sessions.map((session) => (session.id === sessionId ? updater(session) : session));
+) => {
+  let changed = false;
+  const next = sessions.map((session) => {
+    if (session.id !== sessionId) {
+      return session;
+    }
+    const updated = updater(session);
+    if (updated !== session) {
+      changed = true;
+    }
+    return updated;
+  });
+  // Preserve the array identity when no session actually changed so callers —
+  // the streaming hot path updates idempotently on every chunk — can skip the
+  // store write and downstream re-renders entirely.
+  return changed ? next : sessions;
+};
 
 export const updateMessageInSession = (
   sessions: SavedChatSession[],
@@ -15,16 +31,31 @@ export const updateMessageInSession = (
   messageId: string,
   updater: MessagePatchOrUpdater,
 ) =>
-  updateSessionById(sessions, sessionId, (session) => ({
-    ...session,
-    messages: session.messages.map((message) => {
+  updateSessionById(sessions, sessionId, (session) => {
+    let messageChanged = false;
+    const messages = session.messages.map((message) => {
       if (message.id !== messageId) {
         return message;
       }
-
-      return typeof updater === 'function' ? updater(message) : { ...message, ...updater };
-    }),
-  }));
+      const updated =
+        typeof updater === 'function'
+          ? updater(message)
+          : // Object patch: only rebuild when a provided key's value actually
+            // differs, so an idempotent patch (the streaming hot path re-applies
+            // the same thinkingSource/resume stamp every chunk) keeps the
+            // message reference and lets the outer short-circuit skip the write.
+            Object.keys(updater).some((key) => message[key as keyof ChatMessage] !== updater[key as keyof ChatMessage])
+            ? { ...message, ...updater }
+            : message;
+      if (updated !== message) {
+        messageChanged = true;
+      }
+      return updated;
+    });
+    // Preserve the session reference when no message actually changed so the
+    // outer updateSessionById short-circuit can pass the whole array through.
+    return messageChanged ? { ...session, messages } : session;
+  });
 
 export const updateFileInMessage = (
   sessions: SavedChatSession[],

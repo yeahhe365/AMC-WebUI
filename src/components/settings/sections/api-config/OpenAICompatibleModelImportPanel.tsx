@@ -13,6 +13,7 @@ import {
   type EditableOpenAICompatibleModelRow,
   parsePastedOpenAICompatibleModelIds,
 } from './openaiCompatibleModelListState';
+import { interpolate } from '@/i18n/interpolate';
 
 interface OpenAICompatibleModelImportPanelProps {
   rows: EditableOpenAICompatibleModelRow[];
@@ -45,20 +46,45 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedFetchedModelIds, setSelectedFetchedModelIds] = useState<Set<string>>(() => new Set());
   const [managerMessage, setManagerMessage] = useState<string | null>(null);
+  const [activeCategoryTab, setActiveCategoryTab] = useState<'all' | 'new' | 'existing' | 'missing'>('all');
   const handledFetchRequestIdRef = useRef(0);
 
-  const filteredPreviewModels = useMemo(() => {
-    if (!searchFilter.trim()) return fetchedPreviewModels;
-    const query = searchFilter.toLowerCase().trim();
-    return fetchedPreviewModels.filter(
-      (model) => model.id.toLowerCase().includes(query) || model.name.toLowerCase().includes(query),
-    );
-  }, [fetchedPreviewModels, searchFilter]);
+  const fetchedModelIdSet = useMemo(() => new Set(fetchedPreviewModels.map((m) => m.id)), [fetchedPreviewModels]);
 
-  const importableFetchedModelIds = useMemo(
-    () => fetchedPreviewModels.filter((model) => !currentModelIds.has(model.id)).map((model) => model.id),
+  const newModels = useMemo(
+    () => fetchedPreviewModels.filter((model) => !currentModelIds.has(model.id)),
     [currentModelIds, fetchedPreviewModels],
   );
+
+  const existingModels = useMemo(
+    () => fetchedPreviewModels.filter((model) => currentModelIds.has(model.id)),
+    [currentModelIds, fetchedPreviewModels],
+  );
+
+  const missingModels = useMemo(() => {
+    if (fetchedPreviewModels.length === 0) return [];
+    return rows.filter((r) => !fetchedModelIdSet.has(r.id)).map((r) => ({ id: r.id, name: r.name }));
+  }, [fetchedModelIdSet, fetchedPreviewModels.length, rows]);
+
+  const displayedModels = useMemo(() => {
+    let list: Array<{ id: string; name: string; isMissing?: boolean }>;
+    if (activeCategoryTab === 'new') {
+      list = newModels;
+    } else if (activeCategoryTab === 'existing') {
+      list = existingModels;
+    } else if (activeCategoryTab === 'missing') {
+      list = missingModels.map((m) => ({ ...m, isMissing: true }));
+    } else {
+      list = [...fetchedPreviewModels, ...missingModels.map((m) => ({ ...m, isMissing: true }))];
+    }
+
+    if (!searchFilter.trim()) return list;
+    const query = searchFilter.toLowerCase().trim();
+    return list.filter((m) => m.id.toLowerCase().includes(query) || m.name.toLowerCase().includes(query));
+  }, [activeCategoryTab, existingModels, fetchedPreviewModels, missingModels, newModels, searchFilter]);
+
+  const importableFetchedModelIds = useMemo(() => newModels.map((model) => model.id), [newModels]);
+
   const selectedImportableFetchedModelIds = useMemo(
     () => importableFetchedModelIds.filter((modelId) => selectedFetchedModelIds.has(modelId)),
     [importableFetchedModelIds, selectedFetchedModelIds],
@@ -102,7 +128,7 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
 
     onCommitRows([...rows, ...rowsToAdd]);
     setBatchModelText('');
-    setManagerMessage(t('settingsOpenAICompatibleModelPasteAdded').replace('{count}', String(rowsToAdd.length)));
+    setManagerMessage(interpolate(t('settingsOpenAICompatibleModelPasteAdded'), { count: String(rowsToAdd.length) }));
   };
 
   const handleToggleFetchedModel = (modelId: string, checked: boolean) => {
@@ -117,7 +143,7 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
     });
   };
 
-  const handleSelectAllFetchedModels = () => {
+  const handleSelectAllNew = () => {
     setSelectedFetchedModelIds(new Set(importableFetchedModelIds));
   };
 
@@ -141,13 +167,23 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
 
     onCommitRows([...rows, ...rowsToAdd]);
     setSelectedFetchedModelIds(new Set());
-    setManagerMessage(t('settingsOpenAICompatibleModelImportAdded').replace('{count}', String(rowsToAdd.length)));
+    setManagerMessage(interpolate(t('settingsOpenAICompatibleModelImportAdded'), { count: String(rowsToAdd.length) }));
+  };
+
+  const handlePruneMissingModels = () => {
+    if (missingModels.length === 0) return;
+    const missingIdSet = new Set(missingModels.map((m) => m.id));
+    const remainingRows = rows.filter((r) => !missingIdSet.has(r.id));
+    onCommitRows(remainingRows);
+    setManagerMessage(
+      interpolate(t('settingsOpenAICompatiblePruneMissingConfirm'), { count: String(missingModels.length) }),
+    );
   };
 
   return (
     <section className="min-w-0 space-y-4">
       <div className="space-y-2">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)]">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-secondary)]">
           <ClipboardList size={14} />
           {t('settingsOpenAICompatibleBatchPasteTitle')}
         </div>
@@ -168,7 +204,7 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
 
       <div className="space-y-2 rounded-lg border border-[var(--theme-border-secondary)] p-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)]">
+          <div className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-secondary)]">
             {t('settingsOpenAICompatibleFetchedPreviewTitle')}
           </div>
           {onFetchModelsForImportPreview && (
@@ -188,10 +224,62 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
 
         {fetchedPreviewModels.length > 0 ? (
           <>
+            <div className="flex items-center gap-1.5 border-b border-[var(--theme-border-secondary)]/50 pb-2 overflow-x-auto">
+              <button
+                type="button"
+                onClick={() => setActiveCategoryTab('all')}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                  activeCategoryTab === 'all'
+                    ? 'bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-primary)] font-semibold'
+                    : 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]'
+                }`}
+              >
+                {t('settingsOpenAICompatibleTabAll')} ({fetchedPreviewModels.length + missingModels.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveCategoryTab('new')}
+                className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                  activeCategoryTab === 'new'
+                    ? 'bg-emerald-500/20 text-emerald-400 font-semibold'
+                    : 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                {t('settingsOpenAICompatibleTabNew')} ({newModels.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveCategoryTab('existing')}
+                className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                  activeCategoryTab === 'existing'
+                    ? 'bg-sky-500/20 text-sky-400 font-semibold'
+                    : 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                {t('settingsOpenAICompatibleTabExisting')} ({existingModels.length})
+              </button>
+              {missingModels.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveCategoryTab('missing')}
+                  className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                    activeCategoryTab === 'missing'
+                      ? 'bg-amber-500/20 text-amber-400 font-semibold'
+                      : 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]'
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  {t('settingsOpenAICompatibleTabMissing')} ({missingModels.length})
+                </button>
+              )}
+            </div>
+
             <div className="relative">
               <Search
                 size={14}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-tertiary)]"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-secondary)]"
               />
               <input
                 type="text"
@@ -204,7 +292,7 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
                 <button
                   type="button"
                   onClick={() => setSearchFilter('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]"
                 >
                   <X size={12} />
                 </button>
@@ -212,55 +300,67 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs text-[var(--theme-text-tertiary)]">
-                {t('settingsOpenAICompatibleFetchedPreviewCount')
-                  .replace('{count}', String(fetchedPreviewModels.length))
-                  .replace('{selected}', String(selectedImportableFetchedModelIds.length))}
+              <span className="text-xs text-[var(--theme-text-secondary)]">
+                {interpolate(t('settingsOpenAICompatibleFetchedPreviewCount'), {
+                  count: String(displayedModels.length),
+                  selected: String(selectedImportableFetchedModelIds.length),
+                })}
               </span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={handleSelectAllFetchedModels}
+                  onClick={handleSelectAllNew}
                   disabled={importableFetchedModelIds.length === 0}
                   className="text-xs font-medium text-[var(--theme-text-link)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {t('settingsOpenAICompatibleSelectAllFetched')}
+                  {t('settingsOpenAICompatibleSelectAllNew')}
                 </button>
                 <button
                   type="button"
                   onClick={handleClearFetchedSelection}
                   disabled={selectedFetchedModelIds.size === 0}
-                  className="text-xs font-medium text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                  className="text-xs font-medium text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {t('settingsOpenAICompatibleClearFetchedSelection')}
                 </button>
               </div>
             </div>
             <div className="max-h-56 overflow-y-auto rounded-md bg-[var(--theme-bg-input)]/45 p-1 custom-scrollbar">
-              {filteredPreviewModels.map((model) => {
-                const alreadyAdded = currentModelIds.has(model.id);
-                const checked = !alreadyAdded && selectedFetchedModelIds.has(model.id);
+              {displayedModels.map((model) => {
+                const isMissing = model.isMissing === true;
+                const alreadyAdded = !isMissing && currentModelIds.has(model.id);
+                const checked = !isMissing && !alreadyAdded && selectedFetchedModelIds.has(model.id);
 
                 return (
                   <label
                     key={model.id}
-                    className={`flex items-start gap-2 rounded-md px-2 py-2 text-sm transition-colors ${
-                      alreadyAdded ? 'opacity-60' : 'hover:bg-[var(--theme-bg-tertiary)]/35'
+                    className={`flex items-center gap-2 rounded-md px-2 py-2 text-sm transition-colors ${
+                      alreadyAdded || isMissing ? 'opacity-70' : 'hover:bg-[var(--theme-bg-tertiary)]/35'
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={alreadyAdded}
-                      onChange={(event) => handleToggleFetchedModel(model.id, event.target.checked)}
-                      className="mt-0.5"
-                      data-openai-compatible-fetched-model-checkbox="true"
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-mono text-[var(--theme-text-primary)]">{model.id}</span>
-                      {alreadyAdded && (
-                        <span className="mt-0.5 block text-xs text-[var(--theme-text-tertiary)]">
-                          {t('settingsOpenAICompatibleAlreadyAdded')}
+                    {!isMissing && (
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={alreadyAdded}
+                        onChange={(event) => handleToggleFetchedModel(model.id, event.target.checked)}
+                        className="mt-0.5"
+                        data-openai-compatible-fetched-model-checkbox="true"
+                      />
+                    )}
+                    <span className="min-w-0 flex-1 flex items-center justify-between gap-2">
+                      <span className="truncate font-mono text-xs text-[var(--theme-text-primary)]">{model.id}</span>
+                      {isMissing ? (
+                        <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-500/15 text-amber-400 shrink-0">
+                          {t('settingsOpenAICompatibleTabMissing')}
+                        </span>
+                      ) : alreadyAdded ? (
+                        <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-sky-500/15 text-sky-400 shrink-0">
+                          {t('settingsOpenAICompatibleTabExisting')}
+                        </span>
+                      ) : (
+                        <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-emerald-500/15 text-emerald-400 shrink-0">
+                          {t('settingsOpenAICompatibleTabNew')}
                         </span>
                       )}
                     </span>
@@ -268,19 +368,30 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
                 );
               })}
             </div>
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-2 pt-1">
+              {missingModels.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={handlePruneMissingModels}
+                  className="text-xs text-[var(--theme-text-warning)] hover:underline"
+                >
+                  {t('settingsOpenAICompatiblePruneMissing')} ({missingModels.length})
+                </button>
+              ) : (
+                <div />
+              )}
               <button
                 type="button"
                 onClick={handleImportFetchedModels}
                 disabled={selectedImportableFetchedModelIds.length === 0}
                 className={SETTINGS_PRIMARY_ACTION_BUTTON_CLASS}
               >
-                {t('settingsOpenAICompatibleImportSelectedModels')}
+                {t('settingsOpenAICompatibleImportSelectedModels')} ({selectedImportableFetchedModelIds.length})
               </button>
             </div>
           </>
         ) : (
-          <div className="rounded-md bg-[var(--theme-bg-input)]/45 px-3 py-6 text-center text-xs italic text-[var(--theme-text-tertiary)]">
+          <div className="rounded-md bg-[var(--theme-bg-input)]/45 px-3 py-6 text-center text-xs italic text-[var(--theme-text-secondary)]">
             {t('settingsOpenAICompatibleFetchedPreviewEmpty')}
           </div>
         )}

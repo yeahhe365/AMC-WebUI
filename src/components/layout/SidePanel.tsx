@@ -8,7 +8,9 @@ import { FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS } from '@/constants/focusClasse
 import { Z_INDEX_SIDE_PANEL_MOBILE, Z_INDEX_TOPMOST_OVERLAY } from '@/constants/layout';
 import { useI18n } from '@/contexts/I18nContext';
 import { lazyNamedComponent } from '@/utils/lazyNamedComponent';
-import { buildUnrestrictedHtmlPreviewSrcDoc } from '@/utils/html-preview/previewDocument';
+import { buildHtmlPreviewSrcDoc } from '@/utils/html-preview/previewDocument';
+import { HTML_PREVIEW_SANDBOX } from '@/utils/html-preview/previewPrivilege';
+import { useHtmlPreviewGraphvizRelay } from '@/hooks/ui/useHtmlPreviewGraphvizRelay';
 
 interface PanelTabButtonProps {
   activeTab: 'code' | 'preview';
@@ -51,6 +53,12 @@ export const SidePanel: React.FC<SidePanelProps> = ({ content, onClose, themeId 
   const [debouncedCode, setDebouncedCode] = useState(content?.content || '');
   const [activeTab, setActiveTab] = useState<'code' | 'preview'>('preview');
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  useHtmlPreviewGraphvizRelay({
+    iframeRef,
+    privilege: 'unrestricted',
+    themeId,
+    enabled: content?.type === 'html',
+  });
 
   const [width, setWidth] = useState(600);
   const [isResizing, setIsResizing] = useState(false);
@@ -129,9 +137,9 @@ export const SidePanel: React.FC<SidePanelProps> = ({ content, onClose, themeId 
             ref={iframeRef}
             className="w-full h-full border-0 block"
             // Match the code-block preview modal: unrestricted rendering (not Live Artifacts).
-            sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-same-origin allow-popups-to-escape-sandbox allow-presentation allow-pointer-lock allow-top-navigation-by-user-activation"
+            sandbox={HTML_PREVIEW_SANDBOX.unrestricted}
             title={t('sidePanelLivePreview')}
-            srcDoc={buildUnrestrictedHtmlPreviewSrcDoc(debouncedCode)}
+            srcDoc={buildHtmlPreviewSrcDoc(debouncedCode, { privilege: 'unrestricted' })}
           />
         </div>
       );

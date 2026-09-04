@@ -5,7 +5,7 @@ test('Live Artifacts helper toggles on from an edge tap after hover', async ({ p
   await page.waitForLoadState('networkidle');
 
   const liveArtifactsButton = page.getByRole('button', {
-    name: /Load Live Artifacts prompt and save settings|加载 Live Artifacts 提示并保存设置/,
+    name: /Load Live Artifacts prompt|加载 Live Artifacts 提示/,
   });
 
   await expect(liveArtifactsButton).toBeVisible();

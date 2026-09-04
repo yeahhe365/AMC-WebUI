@@ -29,9 +29,44 @@ ${STREAM_SANITIZER_SCRIPT}
     return true;
   };
 
+  const isChartNode = (n) => n && n.nodeType === Node.ELEMENT_NODE && n.hasAttribute('data-amc-chart');
+  const chartAttrEqual = (a, b) => a.getAttribute('data-amc-chart') === b.getAttribute('data-amc-chart');
+
+  // Rendered graphviz is patched in asynchronously through the parent bridge,
+  // so its sig/state attributes and SVG subtree must survive attribute-unchanged
+  // patches. Unlike the chart branch, we do NOT syncAttributes here: the patch
+  // would overwrite the runtime-added data-amc-graphviz-sig/-state attributes
+  // back to nothing and force a pointless re-request.
+  const isGraphvizNode = (n) => n && n.nodeType === Node.ELEMENT_NODE && n.hasAttribute('data-amc-graphviz');
+  const graphvizAttrEqual = (a, b) =>
+    a.getAttribute('data-amc-graphviz') === b.getAttribute('data-amc-graphviz');
+
   const patchNode = (currentNode, nextNode) => {
     if (!canPatchNode(currentNode, nextNode)) {
       currentNode.replaceWith(nextNode);
+      return;
+    }
+
+    // Rendered charts are patched in by the chart renderer, not by the stream:
+    // their SVG subtree must survive attribute-unchanged patches. When the
+    // chart payload changes, fall through so the old SVG is replaced and the
+    // renderer's attribute observer re-renders from the new spec.
+    if (
+      isChartNode(currentNode) &&
+      isChartNode(nextNode) &&
+      chartAttrEqual(currentNode, nextNode)
+    ) {
+      syncAttributes(currentNode, nextNode);
+      return;
+    }
+
+    // Graphviz nodes keep the same dot: leave the node completely untouched so
+    // the in-flight render response (or the already-injected SVG) is preserved.
+    if (
+      isGraphvizNode(currentNode) &&
+      isGraphvizNode(nextNode) &&
+      graphvizAttrEqual(currentNode, nextNode)
+    ) {
       return;
     }
 

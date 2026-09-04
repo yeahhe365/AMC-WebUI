@@ -3,6 +3,7 @@ import { render as testingLibraryRender, type RenderOptions } from '@testing-lib
 import { I18nProvider } from '@/contexts/I18nContext';
 import { WindowProvider } from '@/contexts/WindowContext';
 import { useSettingsStore } from '@/stores/settingsStore';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import {
   createTestRenderer,
   renderHook,
@@ -13,7 +14,7 @@ import {
 } from './renderer';
 
 type TestProviderOptions = {
-  language?: 'en' | 'zh';
+  language?: SupportedLanguage;
   window?: Window;
   document?: Document;
 };

@@ -1,73 +1,48 @@
 import React from 'react';
 import { useI18n } from '@/contexts/I18nContext';
-import { ChevronDown, Save, FilePlus, Loader2 } from 'lucide-react';
-import { CREATE_FILE_EXTENSION_OPTIONS } from './createFileExtensionOptions';
+import { Save, FilePlus, Loader2 } from 'lucide-react';
+import { SETTINGS_KBD_KEY_CLASS } from '@/constants/designTokens';
 
 interface CreateFileFooterProps {
-  filenameBase: string;
-  setFilenameBase: (name: string) => void;
-  extension: string;
-  setExtension: (ext: string) => void;
   onSave: () => void;
   isEditing: boolean;
-  isProcessing: boolean;
-  isLoading: boolean;
   isExportingPdf: boolean;
-  hasContent: boolean;
+  canSave: boolean;
+  shortcutHint: string;
+  pdfError: string | null;
 }
 
 export const CreateFileFooter: React.FC<CreateFileFooterProps> = ({
-  filenameBase,
-  setFilenameBase,
-  extension,
-  setExtension,
   onSave,
   isEditing,
-  isProcessing,
-  isLoading,
   isExportingPdf,
-  hasContent,
+  canSave,
+  shortcutHint,
+  pdfError,
 }) => {
   const { t } = useI18n();
   return (
-    <div className="flex items-center justify-between px-4 py-3 gap-3 bg-[var(--theme-bg-secondary)]/50 flex-shrink-0">
-      <div className="flex items-center gap-2 flex-1 min-w-0 w-full">
-        <div className="flex-grow min-w-0">
-          <input
-            type="text"
-            value={filenameBase}
-            onChange={(e) => setFilenameBase(e.target.value)}
-            placeholder={t('createTextFilenamePlaceholder')}
-            className="w-full h-9 px-3 bg-[var(--theme-bg-input)] border border-[var(--theme-border-secondary)] rounded-lg focus:ring-2 focus:ring-[var(--theme-border-focus)] focus:border-transparent text-[var(--theme-text-primary)] placeholder-[var(--theme-text-tertiary)] outline-none transition-all text-sm font-medium"
-            aria-label={t('createTextFilenamePlaceholder')}
-            autoComplete="off"
-          />
-        </div>
+    <div
+      data-create-file-footer
+      className="flex items-center justify-between gap-3 px-4 py-3 bg-[var(--theme-bg-secondary)]/50 flex-shrink-0"
+    >
+      {pdfError ? (
+        <p role="alert" className="min-w-0 flex-1 truncate text-xs text-[var(--theme-icon-error)]">
+          {pdfError}
+        </p>
+      ) : (
+        <span className="min-w-0 flex-1" />
+      )}
 
-        <div className="relative flex-shrink-0">
-          <select
-            value={extension}
-            onChange={(e) => setExtension(e.target.value)}
-            className="h-9 pl-3 pr-8 bg-[var(--theme-bg-input)] border border-[var(--theme-border-secondary)] rounded-lg focus:ring-2 focus:ring-[var(--theme-border-focus)] focus:border-transparent text-[var(--theme-text-primary)] outline-none transition-all text-sm font-mono cursor-pointer appearance-none max-w-[80px]"
-            aria-label={t('createTextFileExtensionAria')}
-          >
-            {CREATE_FILE_EXTENSION_OPTIONS.map((ext) => (
-              <option key={ext} value={ext}>
-                {ext}
-              </option>
-            ))}
-            {!CREATE_FILE_EXTENSION_OPTIONS.includes(extension) && <option value={extension}>{extension}</option>}
-          </select>
-          <ChevronDown
-            size={14}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--theme-text-tertiary)] pointer-events-none"
-          />
-        </div>
+      <div className="flex items-center gap-3 flex-shrink-0">
+        <kbd aria-hidden="true" className={`hidden lg:inline-block ${SETTINGS_KBD_KEY_CLASS}`}>
+          {shortcutHint}
+        </kbd>
 
         <button
           type="button"
           onClick={onSave}
-          disabled={(!hasContent && !filenameBase.trim()) || isProcessing || isLoading || isExportingPdf}
+          disabled={!canSave || isExportingPdf}
           className="h-9 px-3 sm:px-4 text-sm font-medium bg-[var(--theme-bg-accent)] hover:bg-[var(--theme-bg-accent-hover)] text-[var(--theme-text-accent)] rounded-lg shadow-sm hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 whitespace-nowrap flex-shrink-0"
           title={isEditing ? t('save') : t('createTextCreateButton')}
         >
@@ -78,8 +53,7 @@ export const CreateFileFooter: React.FC<CreateFileFooterProps> = ({
           ) : (
             <FilePlus size={16} strokeWidth={2} />
           )}
-          <span className="hidden sm:inline">{isEditing ? t('save') : t('createTextCreateButton')}</span>
-          <span className="sm:hidden">{isEditing ? t('save') : t('add')}</span>
+          <span>{isEditing ? t('save') : t('createTextCreateButton')}</span>
         </button>
       </div>
     </div>

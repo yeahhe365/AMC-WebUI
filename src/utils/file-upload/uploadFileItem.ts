@@ -1,12 +1,16 @@
 import type { MutableRefObject } from 'react';
-import { getErrorMessage } from '@/utils/errorMessage';
-import { type AppSettings, type UploadedFile, type MediaResolution } from '@/types';
+import { type AppSettings, type ChatProviderId, type UploadedFile, type MediaResolution } from '@/types';
 import { SUPPORTED_UPLOAD_MIME_TYPES } from '@/constants/fileTypeSupport';
 import { logService } from '@/services/logService';
 import { releaseManagedObjectUrl } from '@/services/objectUrlManager';
 import { generateUniqueId } from '@/utils/chat/ids';
 import { fileToBlobUrl } from '@/utils/file/filePreviewUrls';
 import { uploadFileApi } from '@/services/api/fileApi';
+import {
+  formatGeminiFileApiProcessingError,
+  getApiKeyFingerprint,
+  toFileApiExpirationTime,
+} from '@/utils/chat/geminiFilesApi';
 import {
   createProcessingPlaceholderFile,
   formatSpeed,
@@ -15,6 +19,7 @@ import {
   shouldUseFileApi,
 } from './fileUploadPolicy';
 import { getTranslator } from '@/i18n/translations';
+import { interpolate, formatI18nErrorMessage } from '@/i18n/interpolate';
 
 type Translator = ReturnType<typeof getTranslator>;
 
@@ -27,9 +32,12 @@ interface UploadFileItemParams {
   forceFileApi?: boolean;
   defaultResolution: MediaResolution | undefined;
   appSettings: AppSettings;
+  /** Session provider — when third-party the Gemini Files API is never used. */
+  providerId?: ChatProviderId;
   setSelectedFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
   uploadStatsRef: MutableRefObject<Map<string, { lastLoaded: number; lastTime: number }>>;
   t?: Translator;
+  onFileUpdate?: (fileId: string, patch: Partial<UploadedFile>) => void;
 }
 
 export const uploadFileItem = async ({
@@ -38,9 +46,11 @@ export const uploadFileItem = async ({
   forceFileApi = false,
   defaultResolution,
   appSettings,
+  providerId,
   setSelectedFiles,
   uploadStatsRef,
   t = getTranslator('en'),
+  onFileUpdate,
 }: UploadFileItemParams) => {
   const fileId = generateUniqueId();
   const effectiveMimeType = getEffectiveMimeType(file);
@@ -59,14 +69,14 @@ export const uploadFileItem = async ({
         size: file.size,
         isProcessing: false,
         progress: 0,
-        error: t('uploadUnsupportedType').replace('{filename}', file.name),
+        error: interpolate(t('uploadUnsupportedType'), { filename: file.name }),
         uploadState: 'failed',
       },
     ]);
     return;
   }
 
-  const shouldUploadFile = forceFileApi || shouldUseFileApi(file, appSettings);
+  const shouldUploadFile = forceFileApi || shouldUseFileApi(file, appSettings, providerId);
 
   const dataUrl = fileToBlobUrl(file);
 
@@ -91,6 +101,7 @@ export const uploadFileItem = async ({
       return;
     }
     const controller = new AbortController();
+    const apiKeyFingerprint = getApiKeyFingerprint(keyToUse);
 
     const initialFileState: UploadedFile = createProcessingPlaceholderFile({
       id: fileId,
@@ -111,6 +122,7 @@ export const uploadFileItem = async ({
 
     setSelectedFiles((previousFiles) => [...previousFiles, initialFileState]);
 
+    let lastReportedPercent = -1;
     const handleProgress = (loaded: number, total: number) => {
       const now = Date.now();
       const stats = uploadStatsRef.current.get(fileId);
@@ -128,6 +140,19 @@ export const uploadFileItem = async ({
       }
 
       const progressPercent = Math.round((loaded / total) * PERCENT_MULTIPLIER);
+
+      if (progressPercent === lastReportedPercent && !speedStr && progressPercent < 100) {
+        return;
+      }
+      lastReportedPercent = progressPercent;
+
+      const patch: Partial<UploadedFile> = {
+        progress: progressPercent,
+      };
+      if (speedStr) {
+        patch.uploadSpeed = speedStr;
+      }
+      onFileUpdate?.(fileId, patch);
 
       setSelectedFiles((previousFiles) =>
         previousFiles.map((selectedFile) => {
@@ -157,6 +182,28 @@ export const uploadFileItem = async ({
 
       const { uploadState, isProcessing } = getUploadLifecycleForGeminiState(uploadedFileInfo.state);
 
+      onFileUpdate?.(fileId, {
+        isProcessing,
+        progress: 100,
+        fileUri: uploadedFileInfo.uri,
+        fileApiName: uploadedFileInfo.name,
+        fileApiExpirationTime: toFileApiExpirationTime(uploadedFileInfo.expirationTime),
+        fileApiKeyFingerprint: apiKeyFingerprint,
+        rawFile: file,
+        transferStrategy: 'files-api',
+        uploadState,
+        error:
+          uploadState === 'failed'
+            ? formatGeminiFileApiProcessingError(
+                uploadedFileInfo,
+                t('uploadApiProcessingFailed'),
+                t('uploadApiProcessingFailedWithMessage'),
+              )
+            : undefined,
+        abortController: undefined,
+        uploadSpeed: undefined,
+      });
+
       setSelectedFiles((previousFiles) =>
         previousFiles.map((selectedFile) =>
           selectedFile.id === fileId
@@ -166,10 +213,19 @@ export const uploadFileItem = async ({
                 progress: 100,
                 fileUri: uploadedFileInfo.uri,
                 fileApiName: uploadedFileInfo.name,
+                fileApiExpirationTime: toFileApiExpirationTime(uploadedFileInfo.expirationTime),
+                fileApiKeyFingerprint: apiKeyFingerprint,
                 rawFile: file,
                 transferStrategy: 'files-api',
                 uploadState,
-                error: uploadState === 'failed' ? t('uploadApiProcessingFailed') : selectedFile.error || undefined,
+                error:
+                  uploadState === 'failed'
+                    ? formatGeminiFileApiProcessingError(
+                        uploadedFileInfo,
+                        t('uploadApiProcessingFailed'),
+                        t('uploadApiProcessingFailedWithMessage'),
+                      )
+                    : selectedFile.error || undefined,
                 abortController: undefined,
                 uploadSpeed: undefined,
               }
@@ -177,7 +233,7 @@ export const uploadFileItem = async ({
         ),
       );
     } catch (uploadError) {
-      let errorMsg = t('uploadFailedWithMessage').replace('{message}', getErrorMessage(uploadError));
+      let errorMsg = formatI18nErrorMessage(t, 'uploadFailedWithMessage', uploadError);
       let uploadStateUpdate: UploadedFile['uploadState'] = 'failed';
 
       if (uploadError instanceof Error && uploadError.name === 'AbortError') {
@@ -189,6 +245,16 @@ export const uploadFileItem = async ({
       }
 
       releaseManagedObjectUrl(dataUrl);
+
+      onFileUpdate?.(fileId, {
+        isProcessing: false,
+        error: errorMsg,
+        uploadState: uploadStateUpdate,
+        abortController: undefined,
+        uploadSpeed: undefined,
+        dataUrl: undefined,
+        rawFile: undefined,
+      });
 
       setSelectedFiles((previousFiles) =>
         previousFiles.map((selectedFile) =>
@@ -222,6 +288,8 @@ export const uploadFileItem = async ({
       mediaResolution: defaultResolution,
     });
     setSelectedFiles((previousFiles) => [...previousFiles, initialFileState]);
+
+    onFileUpdate?.(fileId, { isProcessing: false, progress: 100, uploadState: 'active' });
 
     setSelectedFiles((previousFiles) =>
       previousFiles.map((selectedFile) =>

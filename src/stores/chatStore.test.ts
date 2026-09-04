@@ -26,18 +26,6 @@ Object.defineProperty(window, 'location', {
   value: { pathname: '/' } as Location,
 });
 
-vi.mock('@/services/db/dbService', async () => {
-  const { createDbServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createDbServiceMockModule();
-});
-
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
 vi.mock('@/utils/chat/session', () => ({
   rehydrateSessionFiles: vi.fn((session: any) => session),
 }));
@@ -58,6 +46,8 @@ import { useChatStore } from './chatStore';
 import { dbService } from '@/services/db/dbService';
 import { type SavedChatSession, type ChatGroup } from '@/types';
 import { createChatSettings, createSavedChatSessionMetadata, createUploadedFile } from '@/test/data/factories';
+import { updateMessageInSession as updateMessageInSessionUtil } from '@/utils/chat/sessionMutations';
+import { startActiveGenerationJob } from '@/features/message-sender/activeGenerationJobs';
 
 const makeSession = (overrides: Partial<SavedChatSession> = {}): SavedChatSession =>
   createSavedChatSessionMetadata({
@@ -94,8 +84,8 @@ describe('chatStore', () => {
       aspectRatio: '1:1',
       imageSize: '1K',
       imageOutputMode: 'IMAGE_TEXT',
-      personGeneration: 'ALLOW_ADULT',
       isSwitchingModel: false,
+      pendingLockedApiKey: null,
     });
   });
 
@@ -167,6 +157,74 @@ describe('chatStore', () => {
     });
   });
 
+  // ── Idempotent streaming patches preserve references (regression guard) ──
+  // The streaming hot path re-applies the same message patch on every SSE chunk
+  // (thinkingSource / thinking resume). When the patch changes nothing, the
+  // whole update must be a no-op: savedSessions keeps its identity so no
+  // subscriber re-renders. This is what makes the per-chunk store rewrite a
+  // short-circuit instead of a cascade.
+
+  describe('idempotent updates preserve store references', () => {
+    const sessionWithMessage = (): SavedChatSession =>
+      makeSession({
+        id: 'active',
+        messages: [{ id: 'gen-1', role: 'model' as const, content: 'hi', timestamp: new Date() }],
+      });
+
+    it('keeps savedSessions identity when a function updater changes nothing', () => {
+      const session = sessionWithMessage();
+      useChatStore.getState().setSavedSessions([session]);
+      useChatStore.getState().setActiveSessionId('active');
+
+      const before = useChatStore.getState().savedSessions;
+      useChatStore.getState().updateAndPersistSessions(
+        (prev) =>
+          updateMessageInSessionUtil(prev, 'active', 'gen-1', (message) => {
+            void message;
+            return message;
+          }),
+        { persist: false },
+      );
+
+      expect(useChatStore.getState().savedSessions).toBe(before);
+      expect(useChatStore.getState().savedSessions[0]).toBe(session);
+      expect(useChatStore.getState().activeMessages).toBe(useChatStore.getState().activeMessages);
+    });
+
+    it('keeps savedSessions identity when a patch already matches the message', () => {
+      const session = sessionWithMessage();
+      useChatStore.getState().setSavedSessions([session]);
+      useChatStore.getState().setActiveSessionId('active');
+
+      const before = useChatStore.getState().savedSessions;
+      useChatStore
+        .getState()
+        .updateAndPersistSessions((prev) => updateMessageInSessionUtil(prev, 'active', 'gen-1', { content: 'hi' }));
+
+      expect(useChatStore.getState().savedSessions).toBe(before);
+    });
+
+    it('still updates savedSessions and activeMessages when the patch changes a field', () => {
+      const session = sessionWithMessage();
+      useChatStore.getState().setSavedSessions([session]);
+      useChatStore.getState().setActiveSessionId('active');
+      // In the real streaming path activeMessages mirrors the session's runtime
+      // messages; keep them in sync so the patch actually finds its target.
+      useChatStore.getState().setActiveMessages([...session.messages]);
+
+      useChatStore
+        .getState()
+        .updateAndPersistSessions((prev) =>
+          updateMessageInSessionUtil(prev, 'active', 'gen-1', { thinkingSource: 'gemini' }),
+        );
+
+      const saved = useChatStore.getState().savedSessions[0];
+      expect(saved).not.toBe(session);
+      expect(saved.messages[0].thinkingSource).toBe('gemini');
+      expect(useChatStore.getState().activeMessages[0].thinkingSource).toBe('gemini');
+    });
+  });
+
   // ── Auxiliary setters ──
 
   describe('auxiliary setters', () => {
@@ -203,11 +261,6 @@ describe('chatStore', () => {
     it('setImageOutputMode', () => {
       useChatStore.getState().setImageOutputMode('IMAGE_ONLY');
       expect(useChatStore.getState().imageOutputMode).toBe('IMAGE_ONLY');
-    });
-
-    it('setPersonGeneration', () => {
-      useChatStore.getState().setPersonGeneration('DONT_ALLOW');
-      expect(useChatStore.getState().personGeneration).toBe('DONT_ALLOW');
     });
 
     it('setIsSwitchingModel', () => {
@@ -476,6 +529,69 @@ describe('chatStore', () => {
     });
   });
 
+  describe('updateUploadedFile', () => {
+    it('updates file in selectedFiles', () => {
+      const file = createUploadedFile({ id: 'f1', uploadState: 'uploading', progress: 10 });
+      useChatStore.setState({ selectedFiles: [file] });
+
+      useChatStore.getState().updateUploadedFile('f1', { progress: 80, uploadState: 'active' });
+
+      expect(useChatStore.getState().selectedFiles[0].progress).toBe(80);
+      expect(useChatStore.getState().selectedFiles[0].uploadState).toBe('active');
+    });
+
+    it('updates file in activeMessages directly without requiring savedSessions to contain messages', () => {
+      const file = createUploadedFile({ id: 'f2', uploadState: 'uploading' });
+      const msg = {
+        id: 'm1',
+        role: 'user' as const,
+        content: 'hello',
+        timestamp: new Date(),
+        files: [file],
+      };
+      useChatStore.setState({
+        activeSessionId: 's1',
+        activeMessages: [msg],
+        savedSessions: [makeSession({ id: 's1', messages: [] })], // stripped in savedSessions
+      });
+
+      useChatStore.getState().updateUploadedFile('f2', { uploadState: 'active', isProcessing: false });
+
+      expect(useChatStore.getState().activeMessages[0].files?.[0].uploadState).toBe('active');
+      expect(useChatStore.getState().activeMessages[0].files?.[0].isProcessing).toBe(false);
+    });
+
+    it('does not wipe out activeMessages when updating file in another session', () => {
+      const file = createUploadedFile({ id: 'f3', uploadState: 'uploading' });
+      const session1Msg = {
+        id: 's1-m1',
+        role: 'user' as const,
+        content: 'session 1',
+        timestamp: new Date(),
+        files: [file],
+      };
+      const activeMsg = {
+        id: 's2-m1',
+        role: 'model' as const,
+        content: 'session 2 streaming answer',
+        timestamp: new Date(),
+      };
+
+      useChatStore.setState({
+        activeSessionId: 's2',
+        activeMessages: [activeMsg],
+        savedSessions: [makeSession({ id: 's1', messages: [session1Msg] }), makeSession({ id: 's2', messages: [] })],
+      });
+
+      useChatStore.getState().updateUploadedFile('f3', { uploadState: 'active' });
+
+      // Active messages in session 2 must remain completely intact
+      expect(useChatStore.getState().activeMessages).toEqual([activeMsg]);
+      // Session 1 messages updated
+      expect(useChatStore.getState().savedSessions[0].messages[0].files?.[0].uploadState).toBe('active');
+    });
+  });
+
   describe('atomic session and message actions', () => {
     it('updates a message in the active session without repeating session/message traversal at call sites', () => {
       const message = { id: 'm1', role: 'model' as const, content: 'draft', timestamp: new Date(), isLoading: true };
@@ -551,13 +667,119 @@ describe('chatStore', () => {
       expect(sessions[0].settings.modelId).toBe('new-model');
     });
 
-    it('does nothing when no active session', () => {
+    it('clears a pending locked API key when a session becomes active', () => {
+      useChatStore.setState({ pendingLockedApiKey: 'pending-key' });
+      useChatStore.getState().setActiveSessionId('s1');
+      expect(useChatStore.getState().pendingLockedApiKey).toBeNull();
+    });
+
+    it('stashes a pending locked API key when there is no active session', () => {
+      useChatStore.getState().setSavedSessions([makeSession({ id: 's1' })]);
+      useChatStore.getState().setCurrentChatSettings((prev) => ({
+        ...prev,
+        lockedApiKey: 'pending-key',
+      }));
+      expect(dbService.saveSession).not.toHaveBeenCalled();
+      expect(useChatStore.getState().pendingLockedApiKey).toBe('pending-key');
+    });
+
+    it('does not persist settings when no active session', () => {
       useChatStore.getState().setSavedSessions([makeSession({ id: 's1' })]);
       useChatStore.getState().setCurrentChatSettings((prev) => ({
         ...prev,
         modelId: 'new-model',
       }));
       expect(dbService.saveSession).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── stopGenerating ──
+
+  describe('stopGenerating', () => {
+    const seedLoadingSession = (messages: SavedChatSession['messages']) => {
+      useChatStore.getState().setSavedSessions([makeSession({ id: 's1', messages })]);
+      useChatStore.getState().setActiveSessionId('s1');
+      useChatStore.getState().setActiveMessages(messages);
+      useChatStore.getState().setSessionLoading('s1', true);
+    };
+
+    const loadingModelMessage = () => ({
+      id: 'gen-1',
+      role: 'model' as const,
+      content: '',
+      isLoading: true,
+      timestamp: new Date(),
+    });
+
+    beforeEach(() => {
+      useChatStore.getState()._activeJobs.current.clear();
+    });
+
+    it('returns not_loading when the session is not marked as loading', () => {
+      useChatStore.getState().setActiveSessionId('s1');
+
+      expect(useChatStore.getState().stopGenerating()).toBe('not_loading');
+    });
+
+    it('aborts the local job, flags the message as stopped by the user, and clears loading', () => {
+      const controller = new AbortController();
+      seedLoadingSession([loadingModelMessage()]);
+      startActiveGenerationJob(useChatStore.getState()._activeJobs, 's1', 'gen-1', controller);
+
+      const result = useChatStore.getState().stopGenerating();
+
+      expect(result).toBe('stopped');
+      expect(controller.signal.aborted).toBe(true);
+      expect(useChatStore.getState().activeMessages[0]).toEqual(
+        expect.objectContaining({ isLoading: false, stoppedByUser: true }),
+      );
+      expect(useChatStore.getState().loadingSessionIds.has('s1')).toBe(false);
+      expect(useChatStore.getState()._activeJobs.current.has('gen-1')).toBe(false);
+    });
+
+    it('requests a cross-tab abort without local cleanup when the loading message has no local job', () => {
+      seedLoadingSession([loadingModelMessage()]);
+
+      const result = useChatStore.getState().stopGenerating();
+
+      expect(result).toBe('no_local_job');
+      // Loading stays flagged so the owner tab performs its own cleanup.
+      expect(useChatStore.getState().loadingSessionIds.has('s1')).toBe(true);
+    });
+
+    it('reports stopped without aborting or clearing loading when only a session-scoped job remains', () => {
+      const controller = new AbortController();
+      seedLoadingSession([]);
+      // Job belongs to THIS session but no message is streaming anymore
+      // (e.g. remote-owned stream): report stopped and leave everything as-is.
+      startActiveGenerationJob(useChatStore.getState()._activeJobs, 's1', 'orphan-gen', controller);
+
+      const result = useChatStore.getState().stopGenerating();
+
+      expect(result).toBe('stopped');
+      expect(controller.signal.aborted).toBe(false);
+      expect(useChatStore.getState().loadingSessionIds.has('s1')).toBe(true);
+      expect(useChatStore.getState()._activeJobs.current.has('orphan-gen')).toBe(true);
+    });
+  });
+
+  // ── cancelEdit ──
+
+  describe('cancelEdit', () => {
+    it('clears the editing state, selected files, and errors back to defaults', () => {
+      useChatStore.getState().setEditingMessageId('m1');
+      useChatStore.getState().setEditMode('update');
+      useChatStore.getState().setSelectedFiles([createUploadedFile({ id: 'f1' })]);
+      useChatStore.getState().setAppFileError('boom');
+
+      useChatStore.getState().cancelEdit();
+
+      const state = useChatStore.getState();
+      expect(state.editingMessageId).toBeNull();
+      expect(state.editMode).toBe('resend');
+      expect(state.selectedFiles).toEqual([]);
+      expect(state.appFileError).toBeNull();
+      expect(state.commandedInput).toEqual({ text: '', id: expect.any(Number) });
     });
   });
 });

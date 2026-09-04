@@ -1,4 +1,5 @@
 import { logService } from '@/services/logService';
+import { toastError } from '@/stores/toastStore';
 import { getErrorMessage } from './errorMessage';
 /**
  * Captures the current screen content as an image Blob.
@@ -29,7 +30,7 @@ const getScreenImageCaptureConstructor = (): ScreenImageCaptureConstructor | und
 export const captureScreenImage = async (messages: ScreenCaptureMessages): Promise<Blob | null> => {
   const mediaDevices = navigator.mediaDevices;
   if (!mediaDevices?.getDisplayMedia) {
-    alert(messages.unsupported);
+    toastError(messages.unsupported);
     return null;
   }
 
@@ -44,7 +45,7 @@ export const captureScreenImage = async (messages: ScreenCaptureMessages): Promi
     const errorMessage = getErrorMessage(error);
     logService.error('Error starting screen capture:', error);
     if (errorName !== 'NotAllowedError') {
-      alert(messages.startFailed(errorMessage));
+      toastError(messages.startFailed(errorMessage));
     }
     return null;
   }

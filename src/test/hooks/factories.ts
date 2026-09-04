@@ -10,7 +10,6 @@ import {
   type SavedChatSession,
   type UploadedFile,
   type ImageOutputMode,
-  type ImagePersonGeneration,
 } from '@/types';
 import { createAppSettings, createChatSettings } from '@/test/data/factories';
 
@@ -31,12 +30,11 @@ const createStreamHandlers = (): StreamHandlerFunctions => ({
 
 export type MessageSenderPropsOverrides = Omit<
   Partial<MessageSenderProps>,
-  'appSettings' | 'currentChatSettings' | 'imageOutputMode' | 'personGeneration'
+  'appSettings' | 'currentChatSettings' | 'imageOutputMode'
 > & {
   appSettings?: Partial<MessageSenderProps['appSettings']>;
   currentChatSettings?: Partial<MessageSenderProps['currentChatSettings']>;
   imageOutputMode?: ImageOutputMode;
-  personGeneration?: ImagePersonGeneration;
 };
 
 export const createMessageSenderProps = (overrides: MessageSenderPropsOverrides = {}): MessageSenderProps => {
@@ -54,7 +52,6 @@ export const createMessageSenderProps = (overrides: MessageSenderPropsOverrides 
     aspectRatio: '1:1',
     imageSize: '1K',
     imageOutputMode: 'IMAGE_TEXT',
-    personGeneration: 'ALLOW_ADULT',
     userScrolledUpRef: createMutableRef(false),
     activeSessionId: null,
     sessionKeyMapRef: createMutableRef(new Map<string, string>()),
@@ -65,12 +62,11 @@ export const createMessageSenderProps = (overrides: MessageSenderPropsOverrides 
 
 export type StandardChatPropsOverrides = Omit<
   Partial<StandardChatProps>,
-  'appSettings' | 'currentChatSettings' | 'imageOutputMode' | 'personGeneration'
+  'appSettings' | 'currentChatSettings' | 'imageOutputMode'
 > & {
   appSettings?: Partial<StandardChatProps['appSettings']>;
   currentChatSettings?: Partial<StandardChatProps['currentChatSettings']>;
   imageOutputMode?: ImageOutputMode;
-  personGeneration?: ImagePersonGeneration;
 };
 
 export const createStandardChatProps = (overrides: StandardChatPropsOverrides = {}): StandardChatProps => {
@@ -84,7 +80,6 @@ export const createStandardChatProps = (overrides: StandardChatPropsOverrides = 
     aspectRatio: '1:1',
     imageSize: '1K',
     imageOutputMode: 'IMAGE_TEXT',
-    personGeneration: 'ALLOW_ADULT',
     userScrolledUpRef: createMutableRef(false),
     activeSessionId: 'session-1',
     setActiveSessionId: vi.fn(),

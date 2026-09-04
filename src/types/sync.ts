@@ -12,4 +12,6 @@ export type SyncMessage =
       ts?: number;
     }
   | { type: 'ABORT_GENERATION'; sessionId: string; originId: string }
-  | { type: 'PERSISTED_STATE_UPDATED'; storageKey: string; originId: string };
+  | { type: 'PERSISTED_STATE_UPDATED'; storageKey: string; originId: string }
+  | { type: 'SESSION_COMPLETED'; sessionId: string; outcome: 'success' | 'error' }
+  | { type: 'SESSION_VIEWED'; sessionId: string };

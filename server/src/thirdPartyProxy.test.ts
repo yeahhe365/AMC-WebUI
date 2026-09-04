@@ -275,4 +275,35 @@ describe('third-party proxy routing + BYOK 兜底', () => {
     expect(headers.get('accept-encoding')).toBeNull();
     expect(headers.get('x-client-header')).toBe('present');
   });
+
+  it('applies allowlisted extra headers from JSON and does not forward the envelope header', async () => {
+    const { fetchImpl, calls } = fetchRecorder();
+    const app = createServer(buildConfig({ thirdPartyRoutes: {} }), { fetchImpl });
+    const started = serverCleanup.track(await startHttpServer(app));
+
+    const response = await fetch(`${started.baseUrl}/api/openai/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-third-party-provider': 'openai',
+        authorization: 'Bearer browser-byok-key',
+        'x-third-party-base-url': 'https://openrouter.ai/api/v1',
+        'x-third-party-extra-headers': JSON.stringify({
+          'HTTP-Referer': 'https://example.com',
+          'X-Title': 'AMC',
+          Cookie: 'secret',
+          'x-api-key': 'should-not-override',
+        }),
+      },
+      body: JSON.stringify({}),
+    });
+
+    expect(response.status).toBe(200);
+    const headers = new Headers(calls[0].init.headers as HeadersInit);
+    expect(headers.get('http-referer')).toBe('https://example.com');
+    expect(headers.get('x-title')).toBe('AMC');
+    expect(headers.get('cookie')).toBeNull();
+    expect(headers.get('x-third-party-extra-headers')).toBeNull();
+    expect(headers.get('x-api-key')).toBe('browser-byok-key');
+  });
 });

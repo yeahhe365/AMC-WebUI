@@ -3,8 +3,9 @@ FROM node:24-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
-COPY package.json package-lock.json .npmrc ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN echo '{"type":"module"}' > /app/package.json && \
+    npm config set registry https://registry.npmmirror.com && \
+    npm install --no-package-lock --no-audit --no-fund @modelcontextprotocol/sdk@^1.29.0 ws@^8.18.0
 
 COPY server/dist /app/server/dist
 

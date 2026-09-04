@@ -122,4 +122,29 @@ describe('FileDisplay', () => {
 
     expect(onFileClick).toHaveBeenCalledTimes(1);
   });
+
+  it('renders upload progress and speed for an uploading file card in message', () => {
+    act(() => {
+      renderer.root.render(
+        <FileDisplay
+          file={createUploadedFile({
+            id: 'uploading-doc',
+            name: 'dataset.csv',
+            type: 'text/csv',
+            size: 1048576,
+            uploadState: 'uploading',
+            progress: 45,
+            uploadSpeed: '1.5 MB/s',
+            isProcessing: true,
+          })}
+          onFileClick={() => {}}
+          isFromMessageList
+        />,
+      );
+    });
+
+    expect(renderer.container.textContent).toContain('45%');
+    expect(renderer.container.textContent).toContain('1.5 MB/s');
+    expect(renderer.container.querySelector('.animate-spin')).not.toBeNull();
+  });
 });

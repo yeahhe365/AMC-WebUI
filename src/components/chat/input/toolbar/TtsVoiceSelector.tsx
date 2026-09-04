@@ -25,12 +25,12 @@ export const TtsVoiceSelector: React.FC<TtsVoiceSelectorProps> = ({ ttsVoice, se
     >
       {AVAILABLE_TTS_VOICES.map((voice) => (
         <option key={voice.id} value={voice.id}>
-          <div className="flex items-center gap-2">
+          <span className="flex items-center gap-2">
             <AudioLines size={14} className="text-purple-500 flex-shrink-0" />
             <span className="whitespace-nowrap">
               {voice.name} ({t(voice.styleKey)})
             </span>
-          </div>
+          </span>
         </option>
       ))}
     </Select>

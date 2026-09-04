@@ -6,12 +6,6 @@ const { mockGetLiveApiClient, mockFloat32ToPCM16Base64 } = vi.hoisted(() => ({
   mockFloat32ToPCM16Base64: vi.fn(() => 'pcm-base64'),
 }));
 
-vi.mock('@/services/logService', async () => {
-  const { createLogServiceMockModule } = await import('@/test/doubles/moduleMocks');
-
-  return createLogServiceMockModule();
-});
-
 vi.mock('@/services/api/liveApiAuth', () => ({
   LiveApiAuthConfigurationError: class LiveApiAuthConfigurationError extends Error {
     constructor(message: string) {
@@ -932,4 +926,69 @@ describe('useLiveConnection', () => {
 
     unmount();
   });
+
+  // The Live Translate model runs continuous-stream translation and Google kills
+  // the session with "Request contains an invalid argument" when audio resumes
+  // after an audioStreamEnd signal, so the client-side hybrid VAD must stay
+  // silent for it while remaining active for conversational live models.
+  it.each([
+    { modelId: 'gemini-3.1-flash-live-preview', shouldSignalStreamEnd: true },
+    { modelId: 'gemini-3.5-live-translate-preview', shouldSignalStreamEnd: false },
+  ])(
+    'client speech end signals audioStreamEnd=$shouldSignalStreamEnd for $modelId',
+    async ({ modelId, shouldSignalStreamEnd }) => {
+      const sendRealtimeInput = vi.fn();
+      const sessionRef = createLiveSessionRef();
+      let onSpeechEnd: (() => void) | undefined;
+
+      mockGetLiveApiClient.mockResolvedValue({
+        live: {
+          connect: vi.fn(({ callbacks }) => {
+            callbacks.onopen?.();
+            callbacks.onmessage?.({ setupComplete: {} });
+            return Promise.resolve({ sendRealtimeInput, close: vi.fn() });
+          }),
+        },
+      });
+      const initializeAudio = vi.fn(async (_onAudioData: unknown, speechEnd?: () => void) => {
+        onSpeechEnd = speechEnd;
+      });
+
+      const { result, unmount } = renderHook(() =>
+        useLiveConnection({
+          appSettings: createAppSettings(),
+          modelId,
+          liveConfig: {},
+          tools: [],
+          initializeAudio,
+          cleanupAudio: vi.fn(),
+          stopVideo: vi.fn(),
+          handleMessage: vi.fn(),
+          setSessionHandle: vi.fn(),
+          sessionHandleRef: { current: null },
+          sessionRef,
+        }),
+      );
+
+      let didConnect: boolean | undefined;
+      await act(async () => {
+        didConnect = await result.current.connect();
+      });
+      expect(didConnect).toBe(true);
+      expect(onSpeechEnd).toBeDefined();
+
+      await act(async () => {
+        onSpeechEnd?.();
+        await flushAsyncConnect();
+      });
+
+      if (shouldSignalStreamEnd) {
+        expect(sendRealtimeInput).toHaveBeenCalledWith({ audioStreamEnd: true });
+      } else {
+        expect(sendRealtimeInput).not.toHaveBeenCalled();
+      }
+
+      unmount();
+    },
+  );
 });

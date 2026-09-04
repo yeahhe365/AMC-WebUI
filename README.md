@@ -51,6 +51,10 @@
 - **Docker 部署模式**：`web + api` 双服务部署，普通 Gemini 请求走 `/api/gemini/*`，第三方兼容接口走 `/api/openai/*`，Live API 走 `/api/live` 的 WebSocket 全代理
 - **静态前端 + 独立 API 模式**：前端部署到 Pages/CDN，后端单独托管 Node API 服务
 
+> 📢 **Gemini Robotics-ER 模型迁移公告（2026-08-01）**
+> 项目已停止支持 `gemini-robotics-er-1.6-preview`（该模型已于 **2026-08-31** 停服），内置模型已迁移至 **`gemini-robotics-er-2-preview`**，全项目统一由常量 `ROBOTICS_MODEL`（`src/constants/modelConfiguration.ts`）定义。
+> 使用 Robotics 模型前：1) 请确保 `GEMINI_API_KEY` 已在 [AI Studio](https://aistudio.google.com/api-keys) 添加 API 限制，无限制 Key 会返回 `403 Forbidden`；2) 建议 `thinking_level` 默认 `medium`（延迟与性能平衡），仅高精度空间任务使用 `high`；3) 高精度场景可对同一输入多次查询取平均以降低方差。
+
 ## API 模式说明
 
 ### Gemini 原生模式
@@ -76,7 +80,7 @@
 
 ### 深度推理 (Thinking)
 
-- 支持 Gemini 3.0 / 3.1 / 2.5 系列模型的思维链可视化
+- 支持 Gemini 3.x 系列模型的思维链可视化
 - 可设置 **Token 预算** 或 **推理等级** (Minimal / Low / Medium / High)
 - 实时查看 AI 的逻辑演算过程
 
@@ -111,7 +115,7 @@
   - 支持文件挂载与生成文件下载
   - matplotlib 图表自动捕获输出
 - **TTS 语音合成**：30 种语音可选
-- **语音转录**：支持多种 Gemini 模型进行语音转文字
+- **语音转录**：通过 Gemini 3.5 Transcribe 模型进行语音转文字
 - **Gemini 原生图片生成（Nano Banana）**：支持宽高比、尺寸与四图生成
 
 ### 企业级 API 管理
@@ -123,7 +127,7 @@
 
 ### 多语言界面
 
-- 支持中文 / 英文 / 跟随系统三种语言设置
+- 支持英文 / 中文 / 日文 / 韩文 / 西班牙文 / 法文 / 德文共七种界面语言，并可跟随系统自动切换
 - 覆盖所有 UI 组件（聊天、设置、侧边栏、快捷键等）
 
 ### PWA 支持
@@ -152,12 +156,13 @@
 
 ### 安全设置
 
-- 5 个安全过滤类别：骚扰、仇恨言论、色情内容、危险内容、公民诚信
+- 4 个安全过滤类别：骚扰、仇恨言论、色情内容、危险内容
 - 每个类别可独立配置过滤级别（关闭 / 不拦截 / 拦截少量 / 拦截部分 / 拦截大部分）
+- 默认全部为「关闭」，与 Gemini 2.5 / 3 系列模型的官方默认值一致
 
 ### 主题系统
 
-- 内置 Onyx（暗色）、Pearl（亮色）主题
+- 内置 Onyx（暗色）、Graphite（灰色）、Pearl（亮色）主题
 - 支持跟随系统主题自动切换
 
 ### 数据管理
@@ -173,7 +178,7 @@
 
 ### 方式一：标准开发模式
 
-本地开发推荐使用 Node.js 26（仓库提供 `.nvmrc`，CI 主流程与 Docker 镜像也使用同一主版本），最低支持 Node.js 24。仓库启用了 `engine-strict`，如果你使用 Node 27+ 或 23 及以下版本，`npm install` 会直接失败；建议先执行 `nvm use` 使用推荐版本。
+本地开发推荐使用 Node.js 26（仓库提供 `.nvmrc`，CI 主流程使用同一主版本），最低支持 Node.js 24。Docker 镜像基于 `node:24-slim` 构建。仓库启用了 `engine-strict`，如果你使用 Node 27+ 或 23 及以下版本，`npm install` 会直接失败；建议先执行 `nvm use` 使用推荐版本。
 
 ```bash
 # 克隆仓库
@@ -221,7 +226,7 @@ VITE_OPENAI_API_KEY=your_openai_compatible_key_here
 
 项目包含双容器部署：
 
-- `web`：Nginx 托管前端静态资源，并反向代理 `/api/*` 到 `api` 服务
+- `web`：Node 轻量服务托管前端静态资源，并反向代理 `/api/*` 到 `api` 服务
 - `api`：Node 服务，提供 `/api/gemini/*` 代理
 
 运行方式：
@@ -246,6 +251,8 @@ docker compose up -d --build
 > 若要对公网开放，请额外引入鉴权、配额/限流、滥用防护、审计与租户隔离等能力。
 
 ### 运行时配置与环境变量
+
+> 📌 **Gemini Robotics-ER 模型的 API Key 前置条件**（`gemini-robotics-er-2-preview` 等 Robotics 端点）：Google 要求该模型的 API Key **必须已在 [AI Studio](https://aistudio.google.com/api-keys) 添加 API 限制**（restriction），无限制的 Key 会被拒绝并返回 `403 Forbidden`。使用 Robotics 模型前请在 AI Studio 为对应 Key 配置限制（如限定项目/域名），并在部署文档与 CI secrets 说明中同步该要求。
 
 部署时请区分两类配置：
 
@@ -273,7 +280,7 @@ docker compose up -d --build
 
 - 上述 `RUNTIME_*` 会在容器启动时写入 `runtime-config.js`，可被浏览器读取，因此只能放“可公开”信息。
 - public/runtime-config.js 模板用于纯静态构建，默认不启用自定义 API 配置或代理；Docker 部署会由 `docker/web-server.js` 在容器启动时按上表默认值覆盖该文件。
-- Pyodide 产物会在生产构建时复制到 `dist/pyodide/`，运行时默认从同源 `/pyodide/` 加载；如需改用 CDN 或独立静态域，可将 `RUNTIME_PYODIDE_BASE_URL` 设置为完整目录 URL，例如 `https://cdn.jsdelivr.net/pyodide/v0.25.1/full/`。
+- Pyodide 产物会在生产构建时复制到 `dist/pyodide/`，运行时默认从同源 `/pyodide/` 加载；如需改用 CDN 或独立静态域，可将 `RUNTIME_PYODIDE_BASE_URL` 设置为完整目录 URL，例如 `https://cdn.jsdelivr.net/pyodide/v0.27.7/full/`。
 - PWA 预缓存默认排除 `pyodide/` 大体积产物，首次执行本地 Python 时仍会按上述地址按需加载。
 - 默认 BYOK 模式只需要在设置界面填写 API Key：普通 Gemini 代理会使用浏览器请求携带的 key；Live API 走 `/api/live` 的 WebSocket 全代理，由 `api` 容器桥接到官方 `wss://generativelanguage…/BidiGenerateContent`，浏览器 Key 存在时优先透传（BYOK 兜底），否则回落服务端 `GEMINI_API_KEY`。
 - 如需服务端统一托管普通 Gemini 请求的 key，可配置 `GEMINI_API_KEY` 并将 `RUNTIME_SERVER_MANAGED_API=true`；Live API 与第三方接口同样遵循「浏览器 Key 优先·服务端兜底」（除非显式设 `SERVER_KEY_PRIORITY=true`）。
@@ -369,7 +376,7 @@ GEMINI_API_KEY=your_key_here npm run verify:code-execution:api
 
 可选环境变量：
 
-- `CODE_EXECUTION_MODEL`：覆盖默认模型（默认 `gemini-2.5-flash`）
+- `CODE_EXECUTION_MODEL`：覆盖默认模型（默认 `gemini-3.8-flash`）
 
 这个脚本会：
 
@@ -399,7 +406,7 @@ GEMINI_API_KEY=your_key_here npm run verify:code-execution:api
 
 - `/api/gemini/*`
 
-Live API 默认由浏览器使用本地 API Key 直连官方 Live 服务。
+Live API 在静态部署下由浏览器使用本地 API Key 直连官方 Live 服务；Docker 部署默认走 `/api/live` 的 WebSocket 全代理。
 
 ---
 
@@ -436,7 +443,7 @@ AMC-WebUI/
 │   ├── services/               # API、IndexedDB、日志、对象 URL 等基础设施
 │   ├── stores/                 # Zustand 状态（chat / settings / ui）
 │   ├── utils/                  # 领域子目录工具（model / file / live-artifacts / export / chat 等）
-│   ├── i18n/                   # 翻译聚合、覆盖率测试与中英文文案
+│   ├── i18n/                   # 翻译聚合、覆盖率测试与多语言文案
 │   ├── pwa/                    # Service Worker、PWA 注册与安装状态
 │   ├── runtime/                # 运行时配置读取与公开配置映射
 │   ├── schemas/                # Zod 配置 schema
@@ -472,13 +479,13 @@ AMC-WebUI/
 
 OpenAI 兼容模式使用独立模型列表，可在设置中手动维护或从兼容端点拉取；下表列出应用内置的 Gemini 原生默认模型。
 
-| 类型           | 模型                                                                                                            |
-| :------------- | :-------------------------------------------------------------------------------------------------------------- |
-| **Gemini 3.x** | gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3.1-flash-live-preview, gemini-3.1-pro-preview                  |
-| **Robotics**   | gemini-robotics-er-1.6-preview                                                                                  |
-| **Gemma 4**    | gemma-4-31b-it, gemma-4-26b-a4b-it                                                                              |
-| **图片生成**   | gemini-2.5-flash-image, gemini-3-pro-image-preview, gemini-3.1-flash-image-preview, gemini-3.1-flash-lite-image |
-| **TTS**        | gemini-3.1-flash-tts-preview (30 种语音)                                                                        |
+| 类型           | 模型                                                                                                                              |
+| :------------- | :-------------------------------------------------------------------------------------------------------------------------------- |
+| **Gemini 3.x** | gemini-3.8-flash, gemini-3.5-flash-lite, gemini-3.1-flash-live-preview, gemini-3.5-live-translate-preview, gemini-3.1-pro-preview |
+| **Robotics**   | gemini-robotics-er-2-preview                                                                                                      |
+| **Gemma 4**    | gemma-4-31b-it, gemma-4-26b-a4b-it                                                                                                |
+| **图片生成**   | gemini-3-pro-image-preview, gemini-3.1-flash-image-preview, gemini-3.1-flash-lite-image                                           |
+| **TTS**        | gemini-3.1-flash-tts-preview (30 种语音)                                                                                          |
 
 ---
 

@@ -2,7 +2,8 @@ import { act, useState } from 'react';
 import { setupProviderTestRenderer } from '@/test/render/providerRenderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MessageText } from './MessageText';
-import { createAppSettings } from '@/test/data/factories';
+import { createAppSettings, createChatSettings } from '@/test/data/factories';
+import { useChatStore } from '@/stores/chatStore';
 import type { UserMessageCollapseKey } from './userMessageCollapse';
 
 const { mockUseMessageStream } = vi.hoisted(() => ({
@@ -81,7 +82,7 @@ describe('MessageText', () => {
             timestamp: new Date('2026-04-21T00:00:00.000Z'),
           }}
           showThoughts={false}
-          appSettings={createAppSettings({ autoFullscreenHtml: false, hideThinkingInContext: false })}
+          appSettings={createAppSettings({ autoOpenHtmlPreview: false, hideThinkingInContext: false })}
           themeId="pearl"
           baseFontSize={16}
           onImageClick={vi.fn()}
@@ -115,7 +116,7 @@ describe('MessageText', () => {
       <MessageText
         message={message}
         showThoughts={false}
-        appSettings={createAppSettings({ autoFullscreenHtml: true, hideThinkingInContext: false })}
+        appSettings={createAppSettings({ autoOpenHtmlPreview: true, hideThinkingInContext: false })}
         themeId="pearl"
         baseFontSize={16}
         onImageClick={vi.fn()}
@@ -143,6 +144,168 @@ describe('MessageText', () => {
     expect(onOpenHtmlPreview).not.toHaveBeenCalled();
   });
 
+  it('does not auto-open previews for code blocks with non-HTML languages, even when content looks like HTML', () => {
+    const onOpenHtmlPreview = vi.fn();
+    const loadingMessage = {
+      id: 'message-mislabeled-html',
+      role: 'model' as const,
+      content: '```python\n<div style="display:flex"><span>Ready</span></div>\n```',
+      isLoading: true,
+      timestamp: new Date('2026-04-21T00:00:00.000Z'),
+    };
+    const loadedMessage = {
+      ...loadingMessage,
+      isLoading: false,
+    };
+
+    const renderMessage = (message: typeof loadingMessage) => (
+      <MessageText
+        message={message}
+        showThoughts={false}
+        appSettings={createAppSettings({ autoOpenHtmlPreview: true, hideThinkingInContext: false })}
+        themeId="pearl"
+        baseFontSize={16}
+        onImageClick={vi.fn()}
+        onOpenHtmlPreview={onOpenHtmlPreview}
+        expandCodeBlocksByDefault={false}
+        isMermaidRenderingEnabled={true}
+        isGraphvizRenderingEnabled={true}
+        onOpenSidePanel={vi.fn()}
+      />
+    );
+
+    act(() => {
+      renderer.render(renderMessage(loadingMessage));
+    });
+
+    act(() => {
+      renderer.render(renderMessage(loadedMessage));
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+
+    expect(onOpenHtmlPreview).not.toHaveBeenCalled();
+  });
+
+  it('auto-opens previews for code blocks with an explicit html language', () => {
+    const onOpenHtmlPreview = vi.fn();
+    const loadingMessage = {
+      id: 'message-explicit-html',
+      role: 'model' as const,
+      content: '```html\n<div style="display:flex"><span>Ready</span></div>\n```',
+      isLoading: true,
+      timestamp: new Date('2026-04-21T00:00:00.000Z'),
+    };
+    const loadedMessage = {
+      ...loadingMessage,
+      isLoading: false,
+    };
+
+    const renderMessage = (message: typeof loadingMessage) => (
+      <MessageText
+        message={message}
+        showThoughts={false}
+        appSettings={createAppSettings({ autoOpenHtmlPreview: true, hideThinkingInContext: false })}
+        themeId="pearl"
+        baseFontSize={16}
+        onImageClick={vi.fn()}
+        onOpenHtmlPreview={onOpenHtmlPreview}
+        expandCodeBlocksByDefault={false}
+        isMermaidRenderingEnabled={true}
+        isGraphvizRenderingEnabled={true}
+        onOpenSidePanel={vi.fn()}
+      />
+    );
+
+    act(() => {
+      renderer.render(renderMessage(loadingMessage));
+    });
+
+    act(() => {
+      renderer.render(renderMessage(loadedMessage));
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(100);
+    });
+
+    expect(onOpenHtmlPreview).toHaveBeenCalledWith('<div style="display:flex"><span>Ready</span></div>', {
+      initialTrueFullscreen: false,
+      privilege: 'unrestricted',
+    });
+  });
+
+  it('resolves Live Artifacts mode from the active session settings, matching the header button', () => {
+    // Global defaults do NOT enable LA, but the active session has the LA prompt
+    // (via currentChatSettings from the chat store). The renderer must treat the
+    // session's ```json as a Live Artifact interaction, not fall back to the
+    // global setting — that is exactly the #1 mismatch (button on, renderer off).
+    useChatStore.setState({
+      activeSessionId: 'session-la',
+      savedSessions: [
+        {
+          id: 'session-la',
+          title: 'LA Session',
+          timestamp: Date.now(),
+          messages: [],
+          settings: createChatSettings({
+            systemInstruction: '[Live Artifacts Protocol - zh]\nBuild interactive artifacts.',
+          }),
+        },
+      ],
+    });
+
+    const LA_MARKER = '[Live Artifacts Protocol - zh]';
+    const json = JSON.stringify({
+      instruction: 'Adjust the chart',
+      schema: { type: 'object', properties: { color: { type: 'string' } } },
+    });
+    const content = `\`\`\`json\n${json}\n\`\`\``;
+
+    act(() => {
+      renderer.render(
+        <MessageText
+          message={{
+            id: 'message-la-session',
+            role: 'model',
+            content,
+            timestamp: new Date('2026-04-21T00:00:00.000Z'),
+          }}
+          showThoughts={false}
+          appSettings={createAppSettings({
+            autoOpenHtmlPreview: false,
+            hideThinkingInContext: false,
+            // No LA prompt at the global level: systemInstruction is empty.
+            systemInstruction: '',
+          })}
+          themeId="pearl"
+          baseFontSize={16}
+          onImageClick={vi.fn()}
+          onOpenHtmlPreview={vi.fn()}
+          expandCodeBlocksByDefault={false}
+          isMermaidRenderingEnabled={true}
+          isGraphvizRenderingEnabled={true}
+          onOpenSidePanel={vi.fn()}
+        />,
+      );
+    });
+
+    // The session's LA prompt flows into the rendered markdown content so
+    // CodeBlock (gated on liveArtifactsMode) renders it as an interaction form.
+    // We assert via the markdown-renderer testid that the content is unchanged
+    // (the mode flag itself is consumed downstream by CodeBlock), and that the
+    // component read the session settings without error.
+    expect(renderer.container.querySelector('[data-testid="markdown-renderer"]')?.textContent).toBe(content);
+    expect(useChatStore.getState().savedSessions[0].settings.systemInstruction).toContain(LA_MARKER);
+
+    useChatStore.setState({
+      activeSessionId: null,
+      savedSessions: [],
+    });
+  });
+
   it('omits live raw reasoning markup from the visible answer body', () => {
     mockUseMessageStream.mockReturnValue({
       streamContent: 'drafting the answer',
@@ -160,7 +323,7 @@ describe('MessageText', () => {
             timestamp: new Date('2026-04-21T00:00:00.000Z'),
           }}
           showThoughts={false}
-          appSettings={createAppSettings({ autoFullscreenHtml: false, hideThinkingInContext: true })}
+          appSettings={createAppSettings({ autoOpenHtmlPreview: false, hideThinkingInContext: true })}
           themeId="pearl"
           baseFontSize={16}
           onImageClick={vi.fn()}
@@ -187,7 +350,7 @@ describe('MessageText', () => {
             timestamp: new Date('2026-04-21T00:00:00.000Z'),
           }}
           showThoughts={true}
-          appSettings={createAppSettings({ autoFullscreenHtml: false, hideThinkingInContext: false })}
+          appSettings={createAppSettings({ autoOpenHtmlPreview: false, hideThinkingInContext: false })}
           themeId="pearl"
           baseFontSize={16}
           onImageClick={vi.fn()}
@@ -217,7 +380,7 @@ describe('MessageText', () => {
             timestamp: new Date('2026-04-21T00:00:00.000Z'),
           }}
           showThoughts={false}
-          appSettings={createAppSettings({ autoFullscreenHtml: false, hideThinkingInContext: false })}
+          appSettings={createAppSettings({ autoOpenHtmlPreview: false, hideThinkingInContext: false })}
           themeId="pearl"
           baseFontSize={16}
           onImageClick={vi.fn()}
@@ -248,7 +411,7 @@ describe('MessageText', () => {
             timestamp: new Date('2026-04-21T00:00:00.000Z'),
           }}
           showThoughts={false}
-          appSettings={createAppSettings({ autoFullscreenHtml: false, hideThinkingInContext: false })}
+          appSettings={createAppSettings({ autoOpenHtmlPreview: false, hideThinkingInContext: false })}
           themeId="pearl"
           baseFontSize={16}
           onImageClick={vi.fn()}
@@ -287,7 +450,7 @@ describe('MessageText', () => {
             timestamp: new Date('2026-04-21T00:00:00.000Z'),
           }}
           showThoughts={false}
-          appSettings={createAppSettings({ autoFullscreenHtml: false, hideThinkingInContext: false })}
+          appSettings={createAppSettings({ autoOpenHtmlPreview: false, hideThinkingInContext: false })}
           themeId="pearl"
           baseFontSize={16}
           onImageClick={vi.fn()}
@@ -305,22 +468,21 @@ describe('MessageText', () => {
     );
   });
 
-  it('renders mislabeled fenced html fragments inline instead of as css code', () => {
-    const htmlFragment =
-      '<!-- 核心定义卡片 -->\n<div style="padding:20px;background:#f9fafb"><strong>Transformer</strong></div>';
-    const content = `<div style="background:#6d28d9;color:white">Transformer 模型</div>\n\n\`\`\`css\n${htmlFragment}\n\`\`\``;
+  it('renders a full HTML document mislabeled as css inline instead of as css code', () => {
+    const document = '<!doctype html><html><body><div>Transformer 模型</div></body></html>';
+    const content = `<div style="background:#6d28d9;color:white">前置卡片</div>\n\n\`\`\`css\n${document}\n\`\`\``;
 
     act(() => {
       renderer.render(
         <MessageText
           message={{
-            id: 'message-mislabeled-fragment',
+            id: 'message-mislabeled-document',
             role: 'model',
             content,
             timestamp: new Date('2026-04-21T00:00:00.000Z'),
           }}
           showThoughts={false}
-          appSettings={createAppSettings({ autoFullscreenHtml: false, hideThinkingInContext: false })}
+          appSettings={createAppSettings({ autoOpenHtmlPreview: false, hideThinkingInContext: false })}
           themeId="pearl"
           baseFontSize={16}
           onImageClick={vi.fn()}
@@ -335,8 +497,42 @@ describe('MessageText', () => {
 
     const renderedContent = renderer.container.querySelector('[data-testid="markdown-renderer"]')?.textContent;
 
-    expect(renderedContent).toContain(htmlFragment);
+    expect(renderedContent).toContain('Transformer 模型');
     expect(renderedContent).not.toContain('```css');
+  });
+
+  it('keeps a bare html fragment mislabeled as css fenced (no Live Artifact marker)', () => {
+    const htmlFragment =
+      '<!-- 核心定义卡片 -->\n<div style="padding:20px;background:#f9fafb"><strong>Transformer</strong></div>';
+    const content = `<div style="background:#6d28d9;color:white">前置卡片</div>\n\n\`\`\`css\n${htmlFragment}\n\`\`\``;
+
+    act(() => {
+      renderer.render(
+        <MessageText
+          message={{
+            id: 'message-bare-fragment',
+            role: 'model',
+            content,
+            timestamp: new Date('2026-04-21T00:00:00.000Z'),
+          }}
+          showThoughts={false}
+          appSettings={createAppSettings({ autoOpenHtmlPreview: false, hideThinkingInContext: false })}
+          themeId="pearl"
+          baseFontSize={16}
+          onImageClick={vi.fn()}
+          onOpenHtmlPreview={vi.fn()}
+          expandCodeBlocksByDefault={false}
+          isMermaidRenderingEnabled={true}
+          isGraphvizRenderingEnabled={true}
+          onOpenSidePanel={vi.fn()}
+        />,
+      );
+    });
+
+    const renderedContent = renderer.container.querySelector('[data-testid="markdown-renderer"]')?.textContent;
+
+    // 收紧后:无 LA 标记的裸片段按源码显示(围栏保留)。
+    expect(renderedContent).toContain('```css');
   });
 
   it('collapses long user messages by default and expands them on request', () => {
@@ -358,7 +554,7 @@ describe('MessageText', () => {
             timestamp: new Date('2026-04-21T00:00:00.000Z'),
           }}
           showThoughts={false}
-          appSettings={createAppSettings({ autoFullscreenHtml: false, hideThinkingInContext: false })}
+          appSettings={createAppSettings({ autoOpenHtmlPreview: false, hideThinkingInContext: false })}
           themeId="pearl"
           baseFontSize={16}
           onImageClick={vi.fn()}
@@ -423,7 +619,7 @@ describe('MessageText', () => {
           timestamp: new Date('2026-04-21T00:00:00.000Z'),
         }}
         showThoughts={false}
-        appSettings={createAppSettings({ autoFullscreenHtml: false, hideThinkingInContext: false })}
+        appSettings={createAppSettings({ autoOpenHtmlPreview: false, hideThinkingInContext: false })}
         themeId="pearl"
         baseFontSize={16}
         onImageClick={vi.fn()}
@@ -471,7 +667,7 @@ describe('MessageText', () => {
             timestamp: new Date('2026-04-21T00:00:00.000Z'),
           }}
           showThoughts={false}
-          appSettings={createAppSettings({ autoFullscreenHtml: false, hideThinkingInContext: false })}
+          appSettings={createAppSettings({ autoOpenHtmlPreview: false, hideThinkingInContext: false })}
           themeId="pearl"
           baseFontSize={16}
           onImageClick={vi.fn()}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Search, X } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
+import { SETTINGS_KBD_KEY_CLASS } from '@/constants/designTokens';
 
 interface SettingsSearchBarProps {
   value: string;
@@ -8,13 +9,25 @@ interface SettingsSearchBarProps {
   inputRef?: React.Ref<HTMLInputElement>;
   /** Slightly denser control for the settings sidebar. */
   compact?: boolean;
+  /** Combobox wiring for the results listbox (aria-expanded/controls/activedescendant). */
+  ariaExpanded?: boolean;
+  ariaControlsId?: string;
+  ariaActiveDescendantId?: string | null;
 }
 
 /**
- * Lightweight sidebar filter — same visual language as nav rows
- * (no card surface, no shadow, rounded-lg).
+ * Global settings search input (matches every tab's catalog). Same visual
+ * language as nav rows: no card surface, no shadow, rounded-lg.
  */
-export const SettingsSearchBar: React.FC<SettingsSearchBarProps> = ({ value, onChange, inputRef, compact = false }) => {
+export const SettingsSearchBar: React.FC<SettingsSearchBarProps> = ({
+  value,
+  onChange,
+  inputRef,
+  compact = false,
+  ariaExpanded,
+  ariaControlsId,
+  ariaActiveDescendantId,
+}) => {
   const { t } = useI18n();
   const hasValue = value.length > 0;
   const sizeClass = compact ? 'h-9 text-sm' : 'h-10 text-sm';
@@ -26,7 +39,7 @@ export const SettingsSearchBar: React.FC<SettingsSearchBarProps> = ({ value, onC
       <Search
         size={iconSize}
         strokeWidth={1.5}
-        className={`pointer-events-none absolute ${iconLeftClass} top-1/2 z-[1] -translate-y-1/2 text-[var(--theme-text-tertiary)] transition-colors group-hover:text-[var(--theme-text-secondary)] group-focus-within:text-[var(--theme-text-primary)]`}
+        className={`pointer-events-none absolute ${iconLeftClass} top-1/2 z-[1] -translate-y-1/2 text-[var(--theme-text-secondary)] transition-colors group-hover:text-[var(--theme-text-secondary)] group-focus-within:text-[var(--theme-text-primary)]`}
         aria-hidden
       />
       <input
@@ -43,6 +56,11 @@ export const SettingsSearchBar: React.FC<SettingsSearchBarProps> = ({ value, onC
         }}
         placeholder={t('settingsSearchPlaceholder')}
         aria-label={t('settingsSearchAria')}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={ariaExpanded}
+        aria-controls={ariaExpanded ? ariaControlsId : undefined}
+        aria-activedescendant={ariaExpanded && ariaActiveDescendantId ? ariaActiveDescendantId : undefined}
         autoComplete="off"
         spellCheck={false}
         enterKeyHint="search"
@@ -55,15 +73,23 @@ export const SettingsSearchBar: React.FC<SettingsSearchBarProps> = ({ value, onC
           'focus:ring-2 focus:ring-inset focus:ring-[var(--theme-border-focus)]/35',
           'transition-colors',
           sizeClass,
-          // Extra right padding when clear is visible; kbd is focus-only and does not reserve space.
-          hasValue ? (compact ? 'pl-8 pr-8' : 'pl-9 pr-9') : compact ? 'pl-8 pr-3' : 'pl-9 pr-3',
+          // Right padding always reserves room for the clear button / kbd hint.
+          compact ? 'pl-8 pr-8' : 'pl-9 pr-9',
         ].join(' ')}
       />
+      {!hasValue && (
+        <kbd
+          aria-hidden
+          className={`absolute right-2.5 top-1/2 -translate-y-1/2 hidden group-hover:block group-focus-within:block ${SETTINGS_KBD_KEY_CLASS}`}
+        >
+          /
+        </kbd>
+      )}
       {hasValue && (
         <button
           type="button"
           onClick={() => onChange('')}
-          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-1 text-[var(--theme-text-tertiary)] transition-colors hover:bg-[var(--theme-bg-primary)]/60 hover:text-[var(--theme-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-border-focus)]"
+          className="absolute right-1 top-1/2 -translate-y-1/2 rounded-md p-1 text-[var(--theme-text-secondary)] transition-colors hover:bg-[var(--theme-bg-primary)]/60 hover:text-[var(--theme-text-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-border-focus)]"
           aria-label={t('settingsSearchClearAria')}
         >
           <X size={14} strokeWidth={2} />

@@ -178,17 +178,28 @@ export const compressAudioToMp3 = async (file: File | Blob, signal?: AbortSignal
  * Ensures browser-recorded audio (often audio/webm;codecs=opus) is converted to a
  * Gemini transcription-supported MIME type. Independent of the "audio compression" setting.
  */
-export const prepareAudioForGeminiTranscription = async (file: File | Blob): Promise<File> => {
+export const prepareAudioForGeminiTranscription = async (file: File | Blob, signal?: AbortSignal): Promise<File> => {
+  if (signal?.aborted) {
+    throw new DOMException('Aborted', 'AbortError');
+  }
+
   if (isGeminiSupportedAudioMimeType(file)) {
     return toNamedFile(file, `voice-input-${Date.now()}.wav`);
   }
 
   try {
-    const compressed = await compressAudioToMp3(file);
+    const compressed = await compressAudioToMp3(file, signal);
     if (isGeminiSupportedAudioMimeType(compressed)) {
       return compressed;
     }
-  } catch {
+  } catch (error) {
+    // Propagate cancellation instead of falling back to a WAV conversion nobody wants.
+    if (
+      (error instanceof DOMException && error.name === 'AbortError') ||
+      (error instanceof Error && error.name === 'AbortError')
+    ) {
+      throw error;
+    }
     // Fall through to WAV conversion.
   }
 

@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { type UploadedFile } from '@/types';
-import { SUPPORTED_IMAGE_MIME_TYPES } from '@/constants/fileTypeSupport';
+import { isImageMimeType } from '@/utils/file/fileTypeClassification';
 
 export const useImageNavigation = (
   sourceFiles: UploadedFile[],
@@ -10,9 +10,7 @@ export const useImageNavigation = (
   // Centralized logic to filter navigable images
   const images = useMemo(() => {
     if (!sourceFiles) return [];
-    return sourceFiles.filter(
-      (f) => (SUPPORTED_IMAGE_MIME_TYPES.includes(f.type) || f.type === 'image/svg+xml') && !f.error,
-    );
+    return sourceFiles.filter((f) => isImageMimeType(f.type) && !f.error);
   }, [sourceFiles]);
 
   const currentIndex = useMemo(() => {

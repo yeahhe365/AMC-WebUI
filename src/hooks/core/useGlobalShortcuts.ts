@@ -1,11 +1,12 @@
 import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import { CHAT_INPUT_TEXTAREA_SELECTOR, FOCUS_HISTORY_SEARCH_EVENT } from '@/constants/layout';
 import { useFullscreen } from '@/hooks/ui/useFullscreen';
-import type { AppSettings, ChatSettings, ModelOption } from '@/types';
+import type { AppSettings, ChatSettings, ModelOption, ChatProviderId } from '@/types';
 import { isShortcutPressed } from '@/utils/keyboardShortcuts';
 import { getTabCycleModelIds } from '@/utils/model/modelCatalog';
-import { isThirdPartyApiActive } from '@/utils/thirdPartyApiActive';
-import { buildProviderAwareModelList, getThirdPartyProviderConfig } from '@/utils/thirdPartyApiProviders';
+import { resolveChatApiRoute } from '@/utils/chatApiRoute';
+import { buildProviderAwareModelList } from '@/utils/thirdPartyApiProviders';
+import { isEditableElement } from '@/utils/chat-input/focus';
 
 interface UseGlobalShortcutsProps {
   appSettings: AppSettings;
@@ -13,7 +14,7 @@ interface UseGlobalShortcutsProps {
   startNewChat: () => void;
   currentChatSettings: ChatSettings;
   availableModels: ModelOption[];
-  handleSelectModelInHeader: (modelId: string) => void;
+  handleSelectModelInHeader: (modelId: string, providerId?: ChatProviderId) => void;
   setIsLogViewerOpen: (isOpen: boolean | ((prev: boolean) => boolean)) => void;
   onTogglePip: () => void;
   isPipSupported: boolean;
@@ -48,12 +49,7 @@ export const useGlobalShortcuts = ({
       const targetDocument = event.view?.document || document;
       const activeElement = targetDocument.activeElement as HTMLElement;
 
-      const isGenerallyInputFocused =
-        activeElement &&
-        (activeElement.tagName.toLowerCase() === 'input' ||
-          activeElement.tagName.toLowerCase() === 'textarea' ||
-          activeElement.tagName.toLowerCase() === 'select' ||
-          activeElement.isContentEditable);
+      const isGenerallyInputFocused = activeElement instanceof HTMLElement && isEditableElement(activeElement);
 
       if (isShortcutPressed(event, 'global.stopCancel', appSettings)) {
         if (isLoading) {
@@ -100,11 +96,10 @@ export const useGlobalShortcuts = ({
           activeElement instanceof Element && activeElement.matches(CHAT_INPUT_TEXTAREA_SELECTOR);
         if (isChatTextareaFocused || !isGenerallyInputFocused) {
           event.preventDefault();
-          const isThirdPartyMode = isThirdPartyApiActive(appSettings);
-          const activeThirdPartyProvider = isThirdPartyMode ? getThirdPartyProviderConfig(appSettings) : null;
-          const currentModelId = isThirdPartyMode
-            ? (activeThirdPartyProvider?.modelId ?? currentChatSettings.modelId)
-            : currentChatSettings.modelId;
+          // Follow the active session's routing decision — the modelId we cycle
+          // is whatever the session is currently routed to, not a global mode.
+          const currentRoute = resolveChatApiRoute(appSettings, currentChatSettings);
+          const currentModelId = currentRoute.modelId || currentChatSettings.modelId;
           const tabCycleModels = buildTabCycleAvailableModels(appSettings, availableModels);
           const cycleModels = getTabCycleModelIds(tabCycleModels, appSettings.tabModelCycleIds);
           if (cycleModels.length === 0) {
@@ -135,7 +130,7 @@ export const useGlobalShortcuts = ({
     appSettings,
     setAppSettings,
     startNewChat,
-    currentChatSettings.modelId,
+    currentChatSettings,
     availableModels,
     handleSelectModelInHeader,
     setIsLogViewerOpen,

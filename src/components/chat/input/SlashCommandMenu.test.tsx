@@ -31,4 +31,22 @@ describe('SlashCommandMenu', () => {
     expect(scrollContainer?.className.toString()).toContain('overflow-y-auto');
     expect(scrollContainer?.className.toString()).not.toContain('overflow-hidden');
   });
+
+  it('selects with a quiet row instead of an accent bar and icon tile', () => {
+    act(() => {
+      renderer.root.render(
+        <SlashCommandMenu isOpen={true} commands={createCommands()} onSelect={() => {}} selectedIndex={0} />,
+      );
+    });
+
+    const html = renderer.container.innerHTML;
+    const frame = renderer.container.querySelector('[data-slash-command-frame="true"]');
+
+    // Group headers use tracking-wide (architecture forbids widest), but quiet row invariants remain
+    expect(html).toContain('tracking-wide');
+    expect(html).not.toContain('tracking-widest');
+    expect(html).not.toContain('w-1 h-6');
+    expect(html).not.toContain('w-8 h-8');
+    expect(frame?.className.toString()).not.toContain('shadow-2xl');
+  });
 });

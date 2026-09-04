@@ -13,6 +13,8 @@ interface UseLiveConfigProps {
     targetLanguageCode: string;
     echoTargetLanguage: boolean;
   };
+  isPushToTalk?: boolean;
+  allowBargeIn?: boolean;
 }
 
 export interface LiveConfig {
@@ -38,6 +40,12 @@ export interface LiveConfig {
     thinkingLevel?: ThinkingLevel;
     thinkingBudget?: number;
   };
+  realtimeInputConfig?: {
+    automaticActivityDetection?: {
+      disabled?: boolean;
+    };
+    activityHandling?: 'START_OF_ACTIVITY_INTERRUPTS' | 'NO_INTERRUPTION';
+  };
 }
 
 export const useLiveConfig = ({
@@ -45,6 +53,8 @@ export const useLiveConfig = ({
   sessionHandle,
   clientFunctions,
   liveTranslateConfig,
+  isPushToTalk,
+  allowBargeIn,
 }: UseLiveConfigProps) => {
   return useMemo(() => {
     const capabilities = getCachedModelCapabilities(chatSettings.modelId);
@@ -58,6 +68,18 @@ export const useLiveConfig = ({
       };
       return {
         liveConfig: buildLiveTranslateConfig({ targetLanguageCode, echoTargetLanguage }),
+        tools: [] as Tool[],
+      };
+    }
+
+    // Live Transcribe models are streaming speech-to-text only (TEXT response modality);
+    // voiceConfig / tools / systemInstruction / thinking do not apply.
+    if (capabilities.isLiveTranscribe) {
+      return {
+        liveConfig: {
+          responseModalities: ['TEXT'],
+          inputAudioTranscription: {},
+        },
         tools: [] as Tool[],
       };
     }
@@ -120,6 +142,13 @@ export const useLiveConfig = ({
       liveConfig.thinkingConfig = thinkingConfig;
     }
 
+    if (isPushToTalk || allowBargeIn === false) {
+      liveConfig.realtimeInputConfig = {
+        automaticActivityDetection: isPushToTalk ? { disabled: true } : undefined,
+        activityHandling: allowBargeIn === false ? 'NO_INTERRUPTION' : 'START_OF_ACTIVITY_INTERRUPTS',
+      };
+    }
+
     return { liveConfig, tools };
-  }, [chatSettings, sessionHandle, clientFunctions, liveTranslateConfig]);
+  }, [chatSettings, sessionHandle, clientFunctions, liveTranslateConfig, isPushToTalk, allowBargeIn]);
 };

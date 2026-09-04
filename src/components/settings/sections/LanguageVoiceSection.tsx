@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useI18n } from '@/contexts/I18nContext';
 import { Languages } from 'lucide-react';
 import {
@@ -6,10 +6,12 @@ import {
   TRANSLATION_TARGET_LANGUAGE_OPTIONS,
 } from '@/constants/translationOptions';
 import { DEFAULT_THOUGHT_TRANSLATION_MODEL_ID } from '@/constants/modelConfiguration';
+import { SETTINGS_SECTION_CARD_CLASS, SETTINGS_SECTION_LABEL_CLASS } from '@/constants/designTokens';
 import { type AppSettings, type ModelOption, type TranslationTargetLanguage } from '@/types';
 import { Select } from '@/components/shared/Select';
 import { VoiceControl } from '@/components/settings/controls/VoiceControl';
 import type { SettingsUpdateHandler } from '@/components/settings/settingsTypes';
+import { getCachedModelCapabilities } from '@/stores/modelCapabilitiesStore';
 
 interface LanguageVoiceSectionProps {
   availableModels: ModelOption[];
@@ -35,27 +37,45 @@ export const LanguageVoiceSection: React.FC<LanguageVoiceSectionProps> = (props)
   const thoughtTranslationTargetLanguage =
     currentSettings.thoughtTranslationTargetLanguage || DEFAULT_THOUGHT_TRANSLATION_TARGET_LANGUAGE;
   const thoughtTranslationModelId = currentSettings.thoughtTranslationModelId || DEFAULT_THOUGHT_TRANSLATION_MODEL_ID;
-  const inputTranslationModelOptions = ensureSelectedModelOption(availableModels, inputTranslationModelId);
-  const thoughtTranslationModelOptions = ensureSelectedModelOption(availableModels, thoughtTranslationModelId);
+
+  const eligibleModels = useMemo(
+    () =>
+      availableModels.filter((model) => {
+        const caps = getCachedModelCapabilities(model.id);
+        return (
+          !caps.isTtsModel &&
+          !caps.isTranscribeModel &&
+          !caps.isLiveTranscribe &&
+          !caps.isLiveTranslate &&
+          !caps.isImageGenerationModel
+        );
+      }),
+    [availableModels],
+  );
+
+  const inputTranslationModelOptions = ensureSelectedModelOption(eligibleModels, inputTranslationModelId);
+  const thoughtTranslationModelOptions = ensureSelectedModelOption(eligibleModels, thoughtTranslationModelId);
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
-      <VoiceControl
-        transcriptionModelId={currentSettings.transcriptionModelId}
-        setTranscriptionModelId={(value) => onUpdateSetting('transcriptionModelId', value)}
-        titleKey="settingsTranscriptionSectionTitle"
-      />
+    <div className="space-y-5">
+      <div className={SETTINGS_SECTION_CARD_CLASS} data-settings-item="models-tts-voice">
+        <VoiceControl
+          transcriptionModelId={currentSettings.transcriptionModelId}
+          setTranscriptionModelId={(value) => onUpdateSetting('transcriptionModelId', value)}
+          ttsVoice={currentSettings.ttsVoice}
+          setTtsVoice={(value) => onUpdateSetting('ttsVoice', value)}
+          titleKey="settingsVoiceSectionTitle"
+        />
+      </div>
 
-      <div className="pt-6 border-t border-[var(--theme-border-secondary)] space-y-4">
-        <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)] flex items-center gap-2">
+      <div className={`${SETTINGS_SECTION_CARD_CLASS} space-y-4`}>
+        <h4 className={`${SETTINGS_SECTION_LABEL_CLASS} flex items-center gap-2`}>
           <Languages size={14} strokeWidth={1.5} />
           {t('settingsTranslationSectionTitle')}
         </h4>
         <div className="space-y-4">
           <div className="space-y-1">
-            <h5 className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)]">
-              {t('settingsInputTranslationSectionTitle')}
-            </h5>
+            <h5 className={SETTINGS_SECTION_LABEL_CLASS}>{t('settingsInputTranslationSectionTitle')}</h5>
             <Select
               id="translation-target-language-select"
               label=""
@@ -99,9 +119,7 @@ export const LanguageVoiceSection: React.FC<LanguageVoiceSectionProps> = (props)
           </div>
 
           <div className="space-y-1 border-t border-[var(--theme-border-secondary)] pt-4">
-            <h5 className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)]">
-              {t('settingsThoughtTranslationSectionTitle')}
-            </h5>
+            <h5 className={SETTINGS_SECTION_LABEL_CLASS}>{t('settingsThoughtTranslationSectionTitle')}</h5>
             <Select
               id="thought-translation-target-language-select"
               label=""

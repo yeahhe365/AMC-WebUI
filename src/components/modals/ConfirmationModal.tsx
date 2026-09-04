@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal } from '@/components/shared/Modal';
 import { AlertTriangle, Info } from 'lucide-react';
+import { useI18n } from '@/contexts/I18nContext';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -19,10 +20,11 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   onConfirm,
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   isDanger = false,
 }) => {
+  const { t } = useI18n();
   const handleConfirm = () => {
     onConfirm();
     onClose();
@@ -51,19 +53,19 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         <div className="flex justify-end gap-3 mt-2">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-[var(--theme-text-primary)] bg-[var(--theme-bg-input)] border border-[var(--theme-border-secondary)] hover:bg-[var(--theme-bg-tertiary)] rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-[var(--theme-text-primary)] bg-[var(--theme-bg-input)] border border-[var(--theme-border-secondary)] hover:bg-[var(--theme-bg-tertiary)] rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)]"
           >
-            {cancelLabel}
+            {cancelLabel ?? t('cancel')}
           </button>
           <button
             onClick={handleConfirm}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-lg shadow-sm transition-colors flex items-center gap-2 ${
+            className={`px-4 py-2 text-sm font-medium text-white rounded-lg shadow-sm transition-colors flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] ${
               isDanger
                 ? 'bg-[var(--theme-bg-danger)] hover:bg-[var(--theme-bg-danger-hover)]'
                 : 'bg-[var(--theme-bg-accent)] hover:bg-[var(--theme-bg-accent-hover)]'
             }`}
           >
-            {confirmLabel}
+            {confirmLabel ?? t('confirm')}
           </button>
         </div>
       </div>

@@ -29,6 +29,7 @@ const runVitest = () => {
   const result = spawnSync(process.execPath, args, {
     env: {
       ...process.env,
+      NODE_ENV: 'test',
       NODE_OPTIONS: buildVitestNodeOptions(process.allowedNodeEnvironmentFlags, process.env.NODE_OPTIONS),
     },
     stdio: 'inherit',

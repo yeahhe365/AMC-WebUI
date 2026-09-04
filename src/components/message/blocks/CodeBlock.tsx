@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, X, Terminal, AlertTriangle, FileOutput, RotateCcw } from 'lucide-react';
 import { type SideViewContent } from '@/types';
+import { type OpenHtmlPreviewHandler } from '@/utils/html-preview/previewPrivilege';
 import { useCodeBlock } from '@/hooks/ui/useCodeBlock';
 import { usePyodide } from '@/features/local-python/usePyodide';
 import { CodeHeader } from './parts/CodeHeader';
@@ -10,20 +11,25 @@ import { isImageMimeType } from '@/utils/file/fileTypeClassification';
 import { createManagedObjectUrl, releaseManagedObjectUrl } from '@/services/objectUrlManager';
 import { FileDisplay } from '@/components/message/FileDisplay';
 import { useI18n } from '@/contexts/I18nContext';
+import { logService } from '@/services/logService';
 import {
   isLikelyStreamingLiveArtifactInteractionJson,
   isLiveArtifactInteractionLanguage,
   isLiveArtifactLanguage,
 } from '@/utils/previewableMarkdown';
 import type { LiveArtifactFollowupPayload } from '@/utils/live-artifacts/liveArtifactFollowup';
-import { parseLiveArtifactInteractionSpec } from '@/utils/live-artifacts/liveArtifactInteraction';
+import {
+  diagnoseLiveArtifactInteraction,
+  hasLiveArtifactInteractionShape,
+} from '@/utils/live-artifacts/liveArtifactInteraction';
 import { LiveArtifactInteractionFrame } from './LiveArtifactInteractionFrame';
+import { LiveArtifactInteractionDiagnostic } from './LiveArtifactInteractionDiagnostic';
 
 interface CodeBlockProps {
   children: React.ReactNode;
   cacheKey?: string;
   className?: string;
-  onOpenHtmlPreview: (html: string, options?: { initialTrueFullscreen?: boolean }) => void;
+  onOpenHtmlPreview: OpenHtmlPreviewHandler;
   expandCodeBlocksByDefault: boolean;
   onOpenSidePanel: (content: SideViewContent) => void;
   showPreviewControls?: boolean;
@@ -31,6 +37,9 @@ interface CodeBlockProps {
   liveArtifactFontSize?: number;
   themeId?: string;
   onLiveArtifactFollowUp?: (payload: LiveArtifactFollowupPayload) => void;
+  liveArtifactsMode?: boolean;
+  /** Hides the local Pyodide run button — used for server-executed code blocks. */
+  disableRun?: boolean;
 }
 
 type GeneratedFileEntry = {
@@ -77,7 +86,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
     handleToggleExpand,
     handleCopy,
     handleOpenSide,
-    handleFullscreenPreview,
+    handleOpenPreview,
     handleDownload,
     codeElement,
     resolvedCodeText,
@@ -121,7 +130,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
         uploadState: 'active' as const,
       };
     });
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- object URL lifecycle must stay in effects
+
     setGeneratedFiles(nextEntries);
     return () => {
       for (const entry of nextEntries) {
@@ -132,7 +141,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
 
   useEffect(() => {
     const url = image ? createManagedObjectUrl(new Blob([image], { type: 'image/png' })) : null;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- object URL lifecycle must stay in effects
+
     setImageUrl(url);
     return () => {
       if (url) {
@@ -144,15 +153,34 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
   const displayInlineImage = imageUrl && !generatedFiles.some((file) => isImageMimeType(file.type)) ? imageUrl : null;
   const isInteractive = props.showPreviewControls ?? true;
   const showPreviewControls = isInteractive && showPreview;
-  const interactionSpec = useMemo(
-    () =>
-      isLiveArtifactInteractionLanguage(sourceLanguage) ? parseLiveArtifactInteractionSpec(resolvedCodeText) : null,
-    [resolvedCodeText, sourceLanguage],
-  );
+  const isInteractionFence = isLiveArtifactInteractionLanguage(sourceLanguage);
+  const isLikelyJsonShape = isInteractionFence || hasLiveArtifactInteractionShape(resolvedCodeText);
+  // The diagnostic/repair pass is only consumed for interaction fences or
+  // ```json blocks while Live Artifacts mode is on. Skip it otherwise so a
+  // session with LA disabled does not pay a full spec parse on every ```json
+  // code block (the bare-JSON wrapping already gated this the same way).
+  const shouldDiagnoseInteraction = isLikelyJsonShape && (isInteractionFence || props.liveArtifactsMode);
+
+  const diagnosis = useMemo(() => {
+    if (!shouldDiagnoseInteraction || !resolvedCodeText) return null;
+    return diagnoseLiveArtifactInteraction(resolvedCodeText);
+  }, [resolvedCodeText, shouldDiagnoseInteraction]);
+
+  const interactionSpec = diagnosis?.spec ?? null;
+
+  // Log rejected specs for observability
+  useEffect(() => {
+    if (diagnosis && diagnosis.errors.length > 0 && props.cacheKey) {
+      logService.warn('Live Artifact interaction spec rejected', {
+        cacheKey: props.cacheKey,
+        codes: diagnosis.errors.map((e) => e.code),
+        fenceLanguage: isInteractionFence ? 'amc-live-artifact-interaction' : 'json',
+      });
+    }
+  }, [diagnosis, props.cacheKey, isInteractionFence]);
+
   const isStreamingInteractionCandidate =
-    isLiveArtifactInteractionLanguage(sourceLanguage) &&
-    Boolean(props.isLoading) &&
-    isLikelyStreamingLiveArtifactInteractionJson(resolvedCodeText);
+    isInteractionFence && Boolean(props.isLoading) && isLikelyStreamingLiveArtifactInteractionJson(resolvedCodeText);
   // Fenced Live Artifacts (amc-live-artifact-html) always go through ArtifactFrame.
   // Do not gate on isLikelyHtml: that helper rejects common fragments that include
   // <style> tags or are only partially closed while streaming, which used to leave
@@ -163,7 +191,28 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
     previewMarkupType === 'html' &&
     (resolvedCodeText.trim().length > 0 || Boolean(props.isLoading));
 
-  if (isInteractive && interactionSpec) {
+  // Streaming pending frame: partial JSON during streaming takes priority over diagnostic
+  // (incomplete JSON will fail parse and produce errors, but we want the skeleton, not a diagnosis).
+  if (isInteractive && isStreamingInteractionCandidate) {
+    return <LiveArtifactInteractionPendingFrame label={t('thinkingText')} baseFontSize={props.liveArtifactFontSize} />;
+  }
+
+  // Render diagnostic card when the spec failed validation (amc-live-artifact-interaction fence
+  // OR ```json with liveArtifactsMode enabled).
+  if (isInteractive && diagnosis && diagnosis.errors.length > 0 && (isInteractionFence || props.liveArtifactsMode)) {
+    return (
+      <LiveArtifactInteractionDiagnostic
+        diagnosis={diagnosis}
+        rawJson={resolvedCodeText}
+        baseFontSize={props.liveArtifactFontSize}
+        onFollowUp={props.onLiveArtifactFollowUp}
+      />
+    );
+  }
+
+  // Render the form when the spec parsed successfully (amc-live-artifact-interaction fence
+  // OR ```json with liveArtifactsMode enabled).
+  if (isInteractive && interactionSpec && (isInteractionFence || props.liveArtifactsMode)) {
     return (
       <LiveArtifactInteractionFrame
         spec={interactionSpec}
@@ -171,10 +220,6 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
         onFollowUp={props.onLiveArtifactFollowUp}
       />
     );
-  }
-
-  if (isInteractive && isStreamingInteractionCandidate) {
-    return <LiveArtifactInteractionPendingFrame label={t('thinkingText')} baseFontSize={props.liveArtifactFontSize} />;
   }
 
   if (showInlineHtmlPreview) {
@@ -186,6 +231,13 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
         baseFontSize={props.liveArtifactFontSize}
         themeId={props.themeId}
         onFollowUp={props.onLiveArtifactFollowUp}
+        onOpenPreview={() =>
+          props.onOpenHtmlPreview(resolvedCodeText, {
+            privilege: 'sanitized',
+            themeId: props.themeId,
+            baseFontSize: props.liveArtifactFontSize,
+          })
+        }
       />
     );
   }
@@ -202,8 +254,8 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
         onCopy={handleCopy}
         onDownload={handleDownload}
         onOpenSide={handleOpenSide}
-        onFullscreen={handleFullscreenPreview}
-        canRun={isPython}
+        onOpenPreview={handleOpenPreview}
+        canRun={isPython && !props.disableRun}
         isRunning={isRunning}
         onRun={handleRun}
       />

@@ -1,5 +1,5 @@
 import { logService } from '@/services/logService';
-import { type DragEvent, useState, useCallback } from 'react';
+import { type DragEvent, useCallback, useEffect, useState } from 'react';
 import { type UploadedFile } from '@/types';
 import { generateUniqueId } from '@/utils/chat/ids';
 import { useI18n } from '@/contexts/I18nContext';
@@ -16,6 +16,23 @@ export const useFileDragDrop = ({ onFilesDropped, onAddTempFile, onRemoveTempFil
   const { t } = useI18n();
   const [isAppDraggingOver, setIsAppDraggingOver] = useState<boolean>(false);
   const [isProcessingDrop, setIsProcessingDrop] = useState<boolean>(false);
+
+  // App 根容器统一处理 drop，window 监听仅作为兜底防止浏览器导航。
+  // 内部拖拽（文本选区等）不带 'Files' 类型，不受影响。
+  useEffect(() => {
+    const cancelFileDropNavigation = (event: globalThis.DragEvent) => {
+      if (event.dataTransfer?.types.includes('Files')) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener('dragover', cancelFileDropNavigation);
+    window.addEventListener('drop', cancelFileDropNavigation);
+    return () => {
+      window.removeEventListener('dragover', cancelFileDropNavigation);
+      window.removeEventListener('drop', cancelFileDropNavigation);
+    };
+  }, []);
 
   const handleAppDragEnter = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();

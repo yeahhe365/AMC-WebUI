@@ -1,16 +1,13 @@
-import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
 import type { ModelOption, ThirdPartyProviderId } from '@/types';
-import { getModelIcon } from './ModelIcon';
+import { getModelIcon, THIRD_PARTY_PROVIDER_LOGO } from './ModelIcon';
 
-const getIconClassName = (model: ModelOption): string => {
-  const icon = getModelIcon(model) as ReactElement<{ className?: string }>;
-  return icon.props.className ?? '';
-};
+const renderIconHtml = (model: ModelOption): string => renderToStaticMarkup(getModelIcon(model));
 
 describe('getModelIcon', () => {
-  it('colors third-party models by provider instead of falling back to the Gemini sparkle', () => {
-    const className = getIconClassName({
+  it('renders the provider brand logo <img> for third-party models instead of the colored box', () => {
+    const html = renderIconHtml({
       id: 'claude-fable-5',
       name: 'Claude Fable 5',
       isPinned: true,
@@ -18,38 +15,39 @@ describe('getModelIcon', () => {
       providerId: 'anthropic',
     });
 
-    expect(className).toContain('text-orange');
-    expect(className).not.toContain('text-sky');
+    expect(html).toContain('data-model-provider-logo="anthropic"');
+    // Real <img> with the logo src, not the colored Box fallback.
+    expect(html).toContain('<img');
+    expect(html).not.toContain('text-orange');
   });
 
   it('keeps pinned non-provider models on the sparkle icon', () => {
-    const className = getIconClassName({
+    const html = renderIconHtml({
       id: 'some-pinned-model',
       name: 'Some Pinned Model',
       isPinned: true,
     });
 
-    expect(className).toContain('text-sky');
+    expect(html).toContain('text-sky');
+    expect(html).not.toContain('data-model-provider-logo');
   });
 
-  it.each([
-    ['openai', 'text-emerald'],
-    ['anthropic', 'text-orange'],
-    ['qwen', 'text-violet'],
-    ['deepseek', 'text-blue'],
-    ['kimi', 'text-cyan'],
-    ['glm', 'text-rose'],
-    ['openrouter', 'text-fuchsia'],
-    ['custom', 'text-slate'],
-  ] as const)('assigns a distinct color to provider %s', (providerId: ThirdPartyProviderId, expectedColor: string) => {
-    const className = getIconClassName({
-      id: `${providerId}-model`,
-      name: `${providerId} model`,
-      isPinned: true,
-      apiMode: 'third-party',
-      providerId,
-    });
+  it.each(['openai', 'anthropic', 'qwen', 'deepseek', 'kimi', 'glm', 'openrouter', 'custom'] as const)(
+    'renders the brand logo <img> for provider %s',
+    (providerId: ThirdPartyProviderId) => {
+      const html = renderIconHtml({
+        id: `${providerId}-model`,
+        name: `${providerId} model`,
+        isPinned: true,
+        apiMode: 'third-party',
+        providerId,
+        templateId: providerId === 'custom' ? 'custom-openai' : providerId,
+      });
 
-    expect(className).toContain(expectedColor);
-  });
+      expect(html).toContain(`data-model-provider-logo="${providerId}"`);
+      expect(html).toContain('<img');
+      // Every built-in provider has a logo asset wired up.
+      expect(THIRD_PARTY_PROVIDER_LOGO[providerId]).toBeTruthy();
+    },
+  );
 });

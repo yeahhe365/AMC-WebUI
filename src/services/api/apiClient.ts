@@ -5,8 +5,12 @@ import {
   getGeminiApiBaseUrlForSettings,
   getGeminiProxyBaseUrlForSettings,
   resolveConfiguredGeminiBaseUrl,
+  shouldAttachGeminiUpstreamHeader,
+  getNormalizedUpstreamBaseUrl,
+  toAbsoluteHttpUrl,
 } from './geminiApiBaseUrl';
-import type { GeminiClientHttpOptions } from './geminiApiVersion';
+import { normalizeGeminiApiBaseUrl } from '@/utils/apiProxyUrl';
+import { type GeminiClientHttpOptions, withHttpOptionHeaders } from './geminiApiVersion';
 import type { InternalGeminiApiClient } from './geminiResumableUpload';
 
 type ClientConfig = {
@@ -58,13 +62,17 @@ export const getClient = async (
     const mergedHttpOptions = httpOptions ? { ...httpOptions } : undefined;
 
     if (baseUrl && baseUrl.trim().length > 0) {
-      const sanitizedBaseUrl = getGeminiApiBaseUrlForSettings({
-        useCustomApiConfig: true,
-        useApiProxy: true,
-        apiProxyUrl: baseUrl,
-      });
+      const sanitizedBaseUrl = baseUrl.includes('/api/live')
+        ? normalizeGeminiApiBaseUrl(toAbsoluteHttpUrl(baseUrl))
+        : getGeminiApiBaseUrlForSettings({
+            useCustomApiConfig: true,
+            useApiProxy: true,
+            apiProxyUrl: baseUrl,
+          });
       if (mergedHttpOptions) {
-        mergedHttpOptions.baseUrl = sanitizedBaseUrl;
+        if (!mergedHttpOptions.baseUrl) {
+          mergedHttpOptions.baseUrl = sanitizedBaseUrl;
+        }
       } else {
         config.httpOptions = { baseUrl: sanitizedBaseUrl };
       }
@@ -98,9 +106,26 @@ const loadConfiguredApiRouting = async (): Promise<ConfiguredApiRouting> => {
 export const getConfiguredApiClient = async (
   apiKey: string,
   httpOptions?: GeminiClientHttpOptions,
+  routingOverrides?: { directGoogleApi?: boolean },
 ): Promise<GoogleGenAI> => {
-  const { apiProxyUrl } = await loadConfiguredApiRouting();
-  return getClient(apiKey, apiProxyUrl, httpOptions);
+  const { settings, apiProxyUrl } = await loadConfiguredApiRouting();
+
+  const effectiveApiProxyUrl = routingOverrides?.directGoogleApi ? null : apiProxyUrl;
+
+  // Docker mode: when the user configured an absolute upstream proxy URL, the
+  // frontend sends all Gemini requests to the api container's relative path
+  // and needs to tell the backend where to forward via a request header.
+  const upstreamHeader =
+    settings && !routingOverrides?.directGoogleApi
+      ? (() => {
+          if (!shouldAttachGeminiUpstreamHeader(settings)) return undefined;
+          const upstreamUrl = getNormalizedUpstreamBaseUrl(settings);
+          return upstreamUrl ? { 'x-gemini-upstream-base-url': upstreamUrl } : undefined;
+        })()
+      : undefined;
+
+  const mergedHttpOptions = upstreamHeader ? withHttpOptionHeaders(httpOptions, upstreamHeader) : httpOptions;
+  return getClient(apiKey, effectiveApiProxyUrl, mergedHttpOptions);
 };
 
 export const getConfiguredApiClientContext = async (

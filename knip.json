@@ -1,12 +1,22 @@
 {
-  "entry": ["server/src/index.ts", "src/pwa/sw.ts"],
+  "entry": ["server/src/index.ts"],
   "ignore": [
     "docker/web-server.js",
     "public/runtime-config.js",
     "src/utils/export/dom.ts",
     "src/utils/export/files.ts",
     "src/utils/export/image.ts",
-    "src/utils/export/templates.ts"
+    "src/utils/export/templates.ts",
+    "e2e/fixtures/mcp-test-server.mjs"
   ],
-  "ignoreDependencies": ["pdfjs-dist", "pyodide", "lamejs"]
+  "ignoreDependencies": ["pdfjs-dist", "pyodide", "lamejs", "hono", "@iconify-json/material-icon-theme"],
+  "ignoreExportsUsedInFile": {
+    "interface": true,
+    "type": true
+  },
+  "ignoreIssues": {
+    "src/components/icons/groups/GeneralIcons.tsx": ["exports"],
+    "src/stores/persistentStorage.ts": ["exports"],
+    "src/stores/syncedPersist.ts": ["exports", "types"]
+  }
 }

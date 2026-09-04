@@ -1,7 +1,7 @@
 import path from 'path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { getManualChunk, HEAVY_PRELOAD_PATTERNS } from './vite/chunks';
@@ -10,7 +10,6 @@ import { createLocalApiPlugin } from './vite/localApiPlugin';
 import { LAMEJS_WORKER_COPY_SOURCE, PDF_WORKER_COPY_SOURCE } from './vite/staticAssets';
 
 export default defineConfig(async ({ mode }) => {
-  const env = loadEnv(mode, '.', '');
   const analyzerPlugin =
     mode === 'analyze'
       ? [
@@ -85,9 +84,6 @@ export default defineConfig(async ({ mode }) => {
       }),
       ...analyzerPlugin,
     ],
-    define: {
-      'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
-    },
     resolve: {
       alias: {
         '@': path.resolve('./src'),

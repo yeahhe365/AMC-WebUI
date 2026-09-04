@@ -15,6 +15,20 @@ const isSettingsModalHistoryState = (state: unknown) =>
 
 const getCurrentRelativeUrl = () => `${window.location.pathname}${window.location.search}${window.location.hash}`;
 
+const isInteractiveFormElement = (target: EventTarget | null) =>
+  target instanceof Element &&
+  (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || (target as HTMLElement).isContentEditable);
+
+const triggerHapticFeedback = () => {
+  if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+    try {
+      navigator.vibrate(10);
+    } catch {
+      // Ignore non-supporting environments
+    }
+  }
+};
+
 export const useAppUi = () => {
   const isSettingsModalOpen = useUIStore((state) => state.isSettingsModalOpen);
   const isPreloadedMessagesModalOpen = useUIStore((state) => state.isPreloadedMessagesModalOpen);
@@ -27,7 +41,13 @@ export const useAppUi = () => {
   const syncHistorySidebarForViewport = useUIStore((state) => state.syncHistorySidebarForViewport);
   const setIsLogViewerOpen = useUIStore((state) => state.setIsLogViewerOpen);
 
-  const touchStartRef = useRef({ x: 0, y: 0, startedInSidebar: false });
+  const touchStartRef = useRef<{
+    x: number;
+    y: number;
+    time: number;
+    startedInSidebar: boolean;
+    isIgnoredElement: boolean;
+  }>({ x: 0, y: 0, time: 0, startedInSidebar: false, isIgnoredElement: false });
   const wasDesktopRef = useRef(window.innerWidth >= DESKTOP_BREAKPOINT_PX);
   const settingsHistoryPushedRef = useRef(false);
   const wasSettingsModalOpenRef = useRef(isSettingsModalOpen);
@@ -148,7 +168,9 @@ export const useAppUi = () => {
       touchStartRef.current = {
         x: firstTouch.clientX,
         y: firstTouch.clientY,
+        time: Date.now(),
         startedInSidebar: isSidebarElement(e.target),
+        isIgnoredElement: isInteractiveFormElement(e.target),
       };
     }
   }, []);
@@ -160,21 +182,29 @@ export const useAppUi = () => {
       }
 
       const lastTouch = e.changedTouches[0];
-      if (!lastTouch) return;
+      if (!lastTouch || touchStartRef.current.isIgnoredElement) return;
 
       const deltaX = lastTouch.clientX - touchStartRef.current.x;
       const deltaY = lastTouch.clientY - touchStartRef.current.y;
-      const swipeThreshold = 50;
-      const edgeThreshold = 40;
+      const timeElapsed = Math.max(1, Date.now() - touchStartRef.current.time);
+      const velocityX = Math.abs(deltaX) / timeElapsed;
 
-      if (Math.abs(deltaX) < Math.abs(deltaY)) {
+      // Minimum swipe distance or high velocity flick
+      const isFlick = velocityX > 0.45 && Math.abs(deltaX) > 25;
+      const swipeThreshold = isFlick ? 25 : 45;
+      const edgeThreshold = 48;
+
+      // Ensure primarily horizontal intent (horizontal delta dominates vertical delta)
+      if (Math.abs(deltaX) <= Math.abs(deltaY) * 1.15) {
         return;
       }
 
       if (deltaX > swipeThreshold && !isHistorySidebarOpen && touchStartRef.current.x < edgeThreshold) {
         setIsHistorySidebarOpen(true);
+        triggerHapticFeedback();
       } else if (deltaX < -swipeThreshold && isHistorySidebarOpen && touchStartRef.current.startedInSidebar) {
         setIsHistorySidebarOpen(false);
+        triggerHapticFeedback();
       }
     },
     [isHistorySidebarOpen, setIsHistorySidebarOpen],

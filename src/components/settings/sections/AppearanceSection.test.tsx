@@ -1,4 +1,5 @@
 import { act } from 'react';
+import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import { fireEvent } from '@testing-library/react';
 import { setupProviderTestRenderer as setupTestRenderer } from '@/test/render/providerRenderer';
 import { describe, expect, it, vi } from 'vitest';
@@ -22,7 +23,7 @@ describe('AppearanceSection', () => {
     settings,
     onUpdate = vi.fn(),
   }: {
-    language: 'en' | 'zh';
+    language: SupportedLanguage;
     settings?: Partial<AppSettings>;
     onUpdate?: (key: keyof AppSettings, value: AppSettings[keyof AppSettings]) => void;
   }) => {

@@ -156,4 +156,50 @@ describe('buildAnthropicRequestBody', () => {
     expect(body.thinking).toBeUndefined();
     expect(body.output_config).toBeUndefined();
   });
+
+  it('omits temperature/top_p while legacy extended thinking is enabled (Anthropic constraint)', () => {
+    const body = buildAnthropicRequestBody(
+      'claude-haiku-4-5',
+      [],
+      [{ text: 'hi' }],
+      { thinkingBudget: 5000, temperature: 0.7, topP: 0.9 },
+      'user',
+      false,
+    ) as { thinking: { budget_tokens: number }; temperature?: unknown; top_p?: unknown };
+    expect(body.thinking).toEqual({ type: 'enabled', budget_tokens: 5000 });
+    expect(body.temperature).toBeUndefined();
+    expect(body.top_p).toBeUndefined();
+  });
+
+  it('keeps temperature/top_p on adaptive effort models, which have no such restriction', () => {
+    const body = buildAnthropicRequestBody(
+      'claude-sonnet-5',
+      [],
+      [{ text: 'hi' }],
+      { thinkingLevel: 'HIGH', temperature: 0.7, topP: 0.9 },
+      'user',
+      false,
+    ) as { output_config?: { effort?: string }; temperature?: unknown; top_p?: unknown; thinking?: unknown };
+    expect(body.output_config?.effort).toBe('high');
+    expect(body.thinking).toBeUndefined();
+    expect(body.temperature).toBe(0.7);
+    expect(body.top_p).toBe(0.9);
+  });
+
+  it('supports custom maxOutputTokens and stopSequences', () => {
+    const body = buildAnthropicRequestBody(
+      'claude-sonnet-5',
+      [],
+      [{ text: 'hi' }],
+      {
+        maxOutputTokens: 2048,
+        stopSequences: ['Human:', 'Assistant:'],
+      },
+      'user',
+      false,
+    );
+
+    expect(body.max_tokens).toBe(2048);
+    expect(body.stop_sequences).toEqual(['Human:', 'Assistant:']);
+  });
 });

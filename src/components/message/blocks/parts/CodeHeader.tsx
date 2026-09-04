@@ -1,8 +1,9 @@
 import React from 'react';
 import { useI18n } from '@/contexts/I18nContext';
-import { Check, Copy, Maximize2, ChevronDown, ChevronUp, Download, Expand, Sidebar, Play, Loader2 } from 'lucide-react';
+import { Check, Copy, Maximize2, ChevronDown, ChevronUp, Download, Sidebar, Play, Loader2 } from 'lucide-react';
 import { MESSAGE_BLOCK_BUTTON_CLASS } from '@/constants/buttonClasses';
 import { LanguageIcon } from '@/components/message/code/LanguageIcon';
+import { interpolate } from '@/i18n/interpolate';
 
 interface CodeHeaderProps {
   language: string;
@@ -14,7 +15,7 @@ interface CodeHeaderProps {
   onCopy: () => void;
   onDownload: () => void;
   onOpenSide: () => void;
-  onFullscreen: (trueFullscreen: boolean) => void;
+  onOpenPreview: () => void;
   canRun?: boolean;
   isRunning?: boolean;
   onRun?: () => void;
@@ -30,14 +31,14 @@ export const CodeHeader: React.FC<CodeHeaderProps> = ({
   onCopy,
   onDownload,
   onOpenSide,
-  onFullscreen,
+  onOpenPreview,
   canRun,
   isRunning,
   onRun,
 }) => {
   const { t } = useI18n();
   const headerButtonClass = `${MESSAGE_BLOCK_BUTTON_CLASS} !min-h-10 !min-w-10 !rounded-md !p-0 !opacity-90 hover:!opacity-100 hover:bg-[var(--theme-bg-tertiary)]/40`;
-  const runButtonClass = `${headerButtonClass} ${isRunning ? 'text-[var(--theme-text-link)]' : 'text-emerald-500 hover:text-emerald-400'} !bg-transparent`;
+  const runButtonClass = `${headerButtonClass} ${isRunning ? 'text-[var(--theme-text-link)]' : ''} !bg-transparent`;
 
   return (
     <div className="sticky top-0 z-10 flex select-none items-center justify-between gap-2 rounded-t-lg border-b border-[var(--theme-border-secondary)] bg-[var(--theme-bg-code-block-header)] px-3 py-0 transition-all">
@@ -61,17 +62,14 @@ export const CodeHeader: React.FC<CodeHeaderProps> = ({
             <button className={headerButtonClass} title={t('diagramOpenSidePanel')} onClick={onOpenSide}>
               <Sidebar size={16} strokeWidth={2} />
             </button>
-            <button className={headerButtonClass} title={t('codeFullscreenMonitor')} onClick={() => onFullscreen(true)}>
-              <Expand size={16} strokeWidth={2} />
-            </button>
-            <button className={headerButtonClass} title={t('codeFullscreenModal')} onClick={() => onFullscreen(false)}>
+            <button className={headerButtonClass} title={t('codeFullscreenModal')} onClick={onOpenPreview}>
               <Maximize2 size={16} strokeWidth={2} />
             </button>
           </>
         )}
         <button
           className={headerButtonClass}
-          title={t('codeDownloadLanguage').replace('{language}', language.toUpperCase())}
+          title={interpolate(t('codeDownloadLanguage'), { language: language.toUpperCase() })}
           onClick={onDownload}
         >
           <Download size={16} strokeWidth={2} />

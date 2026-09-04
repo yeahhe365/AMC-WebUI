@@ -168,4 +168,40 @@ describe('useLiveConfig', () => {
     });
     unmount();
   });
+
+  it('configures push-to-talk and disable barge-in in realtimeInputConfig', () => {
+    const { result, unmount } = renderHook(() =>
+      useLiveConfig({
+        chatSettings: baseChatSettings,
+        sessionHandle: null,
+        isPushToTalk: true,
+        allowBargeIn: false,
+      }),
+    );
+
+    expect((result.current.liveConfig as LiveConfig).realtimeInputConfig).toEqual({
+      automaticActivityDetection: { disabled: true },
+      activityHandling: 'NO_INTERRUPTION',
+    });
+    unmount();
+  });
+
+  it('builds text-only config with empty tools for live-transcribe models', () => {
+    const { result, unmount } = renderHook(() =>
+      useLiveConfig({
+        chatSettings: createChatSettings({
+          ...baseChatSettings,
+          modelId: 'gemini-3.5-transcribe-live',
+        }),
+        sessionHandle: null,
+      }),
+    );
+
+    expect(result.current.liveConfig).toEqual({
+      responseModalities: ['TEXT'],
+      inputAudioTranscription: {},
+    });
+    expect(result.current.tools).toEqual([]);
+    unmount();
+  });
 });

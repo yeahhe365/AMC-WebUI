@@ -49,4 +49,13 @@ describe('PerformanceMetrics', () => {
     expect(renderer.container.textContent).not.toContain('Σ: 219');
     expect(renderer.container.querySelectorAll('.w-px.h-3').length).toBe(4);
   });
+
+  it('does not show TTFT in the footer', () => {
+    act(() => {
+      renderer.root.render(<PerformanceMetrics message={createMessage({ firstTokenTimeMs: 320 })} />);
+    });
+
+    expect(renderer.container.textContent).not.toContain('TTFT');
+    expect(renderer.container.textContent).not.toContain('0.32s');
+  });
 });

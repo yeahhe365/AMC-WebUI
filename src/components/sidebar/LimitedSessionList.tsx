@@ -3,7 +3,8 @@ import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { type SavedChatSession } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
 import { SessionItem } from './SessionItem';
-import { type SessionItemPassedProps } from './GroupItem';
+import { type SessionItemPassedProps } from './sidebarTypes';
+import { interpolate } from '@/i18n/interpolate';
 
 const INITIAL_VISIBLE_SESSION_COUNT = 80;
 const SESSION_LIST_INCREMENT = 80;
@@ -12,13 +13,18 @@ interface LimitedSessionListProps {
   sessions: SavedChatSession[];
   sessionItemProps: SessionItemPassedProps;
   className?: string;
+  isDragging?: boolean;
 }
 
-const formatShowMoreLabel = (template: string, count: number) => template.replace('{count}', String(count));
-
-export const LimitedSessionList: React.FC<LimitedSessionListProps> = ({ sessions, sessionItemProps, className }) => {
+export const LimitedSessionList: React.FC<LimitedSessionListProps> = ({
+  sessions,
+  sessionItemProps,
+  className,
+  isDragging,
+}) => {
   const { t } = useI18n();
   const [animatedParent] = useAutoAnimate<HTMLUListElement>({ duration: 200 });
+  void isDragging;
   const [limitState, setLimitState] = useState({
     listSignature: '',
     visibleCount: INITIAL_VISIBLE_SESSION_COUNT,
@@ -63,7 +69,7 @@ export const LimitedSessionList: React.FC<LimitedSessionListProps> = ({ sessions
 
   return (
     <>
-      <ul ref={isLargeList ? undefined : animatedParent} className={className}>
+      <ul ref={isDragging || isLargeList ? undefined : animatedParent} className={className}>
         {visibleSessions.map((session) => (
           <SessionItem key={session.id} session={session} {...sessionItemProps} />
         ))}
@@ -77,10 +83,10 @@ export const LimitedSessionList: React.FC<LimitedSessionListProps> = ({ sessions
               visibleCount: Math.min(sessions.length, visibleCount + SESSION_LIST_INCREMENT),
             })
           }
-          className="mx-1 my-1 w-[calc(100%-0.5rem)] rounded-lg px-3 py-2 text-left text-xs font-medium text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)]"
-          aria-label={formatShowMoreLabel(t('historyShowMoreChats'), remainingCount)}
+          className="mx-1 my-1 w-[calc(100%-0.5rem)] rounded-lg px-3 py-2 text-left text-xs font-medium text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)]"
+          aria-label={interpolate(t('historyShowMoreChats'), { count: remainingCount })}
         >
-          {formatShowMoreLabel(t('historyShowMoreChats'), remainingCount)}
+          {interpolate(t('historyShowMoreChats'), { count: remainingCount })}
         </button>
       )}
     </>

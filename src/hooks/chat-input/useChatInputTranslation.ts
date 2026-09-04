@@ -5,6 +5,7 @@ import type { AppSettings, ChatSettings } from '@/types';
 import { translateTextApi } from '@/services/api/generation/textApi';
 import { formatApiKeyErrorMessage, getGeminiKeyForRequest } from '@/utils/apiKeySelection';
 import { useI18n } from '@/contexts/I18nContext';
+import { formatI18nErrorMessage } from '@/i18n/interpolate';
 
 interface UseChatInputTranslationParams {
   appSettings: AppSettings;
@@ -52,7 +53,7 @@ export const useChatInputTranslation = ({
     } catch (error) {
       logService.error('Input translation failed:', error);
       const message = getErrorMessage(error);
-      setAppFileError(t('translateFailedWithMessage').replace('{message}', message));
+      setAppFileError(formatI18nErrorMessage(t, 'translateFailedWithMessage', message));
     } finally {
       setTranslating(false);
     }

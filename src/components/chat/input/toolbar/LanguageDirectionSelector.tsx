@@ -83,7 +83,7 @@ export const LanguageDirectionSelector: React.FC = () => {
                   }}
                   className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between gap-2 transition-colors duration-100 ${
                     o.code === targetLanguageCode
-                      ? 'bg-[var(--theme-accent-bg)] text-[var(--theme-accent-text)]'
+                      ? 'bg-[var(--theme-bg-accent)] text-[var(--theme-text-accent)]'
                       : 'text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-secondary)]'
                   }`}
                 >

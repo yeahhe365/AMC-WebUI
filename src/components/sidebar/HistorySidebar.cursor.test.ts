@@ -11,7 +11,7 @@ describe('HistorySidebar cursor affordances', () => {
     const stylesSource = fs.readFileSync(sidebarStylesPath, 'utf8');
 
     expect(source).toContain('custom-scrollbar p-2 cursor-ew-resize');
-    expect(source).toContain('text-center text-[var(--theme-text-tertiary)] cursor-auto');
+    expect(source).toContain('text-center font-medium text-[var(--theme-text-primary)] cursor-auto');
     expect(source).toContain('transition-colors min-h-[50px] cursor-auto');
     expect(source).toContain('w-full min-w-[52.2px] cursor-ew-resize');
     expect(source).not.toContain('w-full min-w-[52.2px] cursor-pointer');
