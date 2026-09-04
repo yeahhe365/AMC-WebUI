@@ -15,6 +15,7 @@ const TEMPLATE_LABEL_KEYS: Record<ThirdPartyTemplateId, string> = {
   nvidia: 'thirdPartyTemplateNvidia',
   minimax: 'thirdPartyTemplateMinimax',
   grok: 'thirdPartyTemplateGrok',
+  atlascloud: 'thirdPartyTemplateAtlascloud',
   'custom-openai': 'thirdPartyTemplateCustomOpenai',
   'custom-anthropic': 'thirdPartyTemplateCustomAnthropic',
 };

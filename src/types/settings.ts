@@ -100,6 +100,7 @@ export const THIRD_PARTY_TEMPLATE_IDS = [
   'nvidia',
   'minimax',
   'grok',
+  'atlascloud',
   'custom-openai',
   'custom-anthropic',
 ] as const;

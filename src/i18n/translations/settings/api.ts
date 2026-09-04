@@ -799,6 +799,15 @@ const apiSettings = {
     de: 'MiniMax',
   },
   thirdPartyTemplateGrok: { en: 'Grok', zh: 'Grok', ja: 'Grok', ko: 'Grok', es: 'Grok', fr: 'Grok', de: 'Grok' },
+  thirdPartyTemplateAtlascloud: {
+    en: 'Atlas Cloud',
+    zh: 'Atlas Cloud',
+    ja: 'Atlas Cloud',
+    ko: 'Atlas Cloud',
+    es: 'Atlas Cloud',
+    fr: 'Atlas Cloud',
+    de: 'Atlas Cloud',
+  },
   thirdPartyTemplateCustomOpenai: {
     en: 'Custom (OpenAI compatible)',
     zh: '自定义（OpenAI 兼容）',
