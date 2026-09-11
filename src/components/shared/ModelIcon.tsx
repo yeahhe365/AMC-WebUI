@@ -178,6 +178,7 @@ const THIRD_PARTY_TEMPLATE_LOGO: Record<ThirdPartyTemplateId, string> = {
   perplexity: perplexityCherryUrl,
   cerebras: cerebrasCherryUrl,
   fireworks: fireworksCherryUrl,
+  atlascloud: customLogoUrl,
   'custom-openai': customLogoUrl,
   'custom-anthropic': customLogoUrl,
 };

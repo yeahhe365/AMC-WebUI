@@ -48,6 +48,7 @@ export const THIRD_PARTY_TEMPLATE_LABELS: Record<ThirdPartyTemplateId, string> =
   perplexity: 'Perplexity',
   cerebras: 'Cerebras',
   fireworks: 'Fireworks AI',
+  atlascloud: 'Atlas Cloud',
   'custom-openai': 'Custom (OpenAI compatible)',
   'custom-anthropic': 'Custom (Anthropic)',
 };
@@ -333,6 +334,15 @@ const TEMPLATE_DEFAULTS: Record<ThirdPartyTemplateId, ThirdPartyTemplateDefaults
     protocol: 'openai-compatible',
     apiKeyUrl: 'https://fireworks.ai/api-keys',
     docUrl: 'https://docs.fireworks.ai/',
+  },
+  atlascloud: {
+    name: 'Atlas Cloud',
+    baseUrl: 'https://api.atlascloud.ai/v1',
+    modelId: 'deepseek-ai/deepseek-v4-pro',
+    models: [{ id: 'deepseek-ai/deepseek-v4-pro', name: 'DeepSeek V4 Pro', isPinned: true }],
+    protocol: 'openai-compatible',
+    apiKeyUrl: 'https://atlascloud.ai/console/api-keys',
+    docUrl: 'https://docs.atlascloud.ai',
   },
   'custom-openai': {
     name: 'Custom',

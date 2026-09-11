@@ -18,6 +18,7 @@ const TEMPLATE_LABEL_KEYS: Partial<Record<ThirdPartyTemplateId, string>> = {
   nvidia: 'thirdPartyTemplateNvidia',
   minimax: 'thirdPartyTemplateMinimax',
   grok: 'thirdPartyTemplateGrok',
+  atlascloud: 'thirdPartyTemplateAtlascloud',
   'custom-openai': 'thirdPartyTemplateCustomOpenai',
   'custom-anthropic': 'thirdPartyTemplateCustomAnthropic',
 };

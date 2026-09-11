@@ -952,6 +952,15 @@ const apiSettings = {
     fr: 'Together AI',
     de: 'Together AI',
   },
+  thirdPartyTemplateAtlascloud: {
+    en: 'Atlas Cloud',
+    zh: 'Atlas Cloud',
+    ja: 'Atlas Cloud',
+    ko: 'Atlas Cloud',
+    es: 'Atlas Cloud',
+    fr: 'Atlas Cloud',
+    de: 'Atlas Cloud',
+  },
   thirdPartyTemplateCustomOpenai: {
     en: 'Custom (OpenAI compatible)',
     zh: '自定义（OpenAI 兼容）',

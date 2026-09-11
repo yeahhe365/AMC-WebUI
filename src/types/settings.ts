@@ -139,6 +139,7 @@ export const THIRD_PARTY_TEMPLATE_IDS = [
   'perplexity',
   'cerebras',
   'fireworks',
+  'atlascloud',
   'custom-openai',
   'custom-anthropic',
 ] as const;
