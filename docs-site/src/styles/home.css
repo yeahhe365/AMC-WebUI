@@ -247,10 +247,12 @@ html[data-has-hero] .theme-shot-dots {
   flex: none;
 }
 
+html[data-has-hero] .theme-shot-dots span,
 html[data-has-hero] .theme-shot-dots i {
   display: block;
   width: 0.5625rem;
   height: 0.5625rem;
+  margin: 0;
   border-radius: 50%;
   background: color-mix(in oklab, var(--sl-color-gray-4) 55%, transparent);
 }
@@ -260,6 +262,10 @@ html[data-has-hero] .theme-shot-label {
   line-height: 1.4;
   color: var(--sl-color-gray-3);
   letter-spacing: 0.01em;
+}
+
+html[data-has-hero] .theme-shot-stage {
+  margin: 0;
 }
 
 html[data-has-hero] .theme-shot-img {
