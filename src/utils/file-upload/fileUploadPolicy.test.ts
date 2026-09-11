@@ -219,7 +219,7 @@ describe('buildFileUploadPreflight', () => {
     expect(result.notice).toContain('Unsupported file types: voice.webm');
   });
 
-  it('keeps generated-only archive and presentation MIME types out of the upload support set', () => {
+  it('supports archive and presentation MIME types and flags genuinely unsupported files', () => {
     const settings = makeSettings();
     const archive = createFile('output.zip', 'application/zip', 4096);
     const presentation = createFile(
@@ -227,9 +227,13 @@ describe('buildFileUploadPreflight', () => {
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       4096,
     );
+    const unsupportedExe = createFile('app.exe', 'application/x-msdownload', 4096);
 
-    const result = buildFileUploadPreflight([archive, presentation], settings, []);
+    const result = buildFileUploadPreflight([archive, presentation, unsupportedExe], settings, []);
 
-    expect(result.notice).toContain('Unsupported file types: output.zip, slides.pptx');
+    expect(result.filesToUpload).toEqual([archive, presentation, unsupportedExe]);
+    expect(result.notice).toContain('Unsupported file types: app.exe');
+    expect(result.notice).not.toContain('output.zip');
+    expect(result.notice).not.toContain('slides.pptx');
   });
 });

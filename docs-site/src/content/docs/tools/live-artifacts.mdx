@@ -1,0 +1,32 @@
+---
+title: Live Artifacts 交互构件
+description: 自动识别可执行代码块、全屏 HTML/SVG 沙箱交互、Apache ECharts、Mermaid 与 Graphviz 多图表引擎。
+---
+
+# Live Artifacts 交互构件
+
+AMC WebUI 提供了强大的 **Live Artifacts** 渲染系统，能够将模型生成的静态代码片段实时转化为安全、可交互、可调试的动态构件。
+
+---
+
+## 核心能力与渲染引擎
+
+### 1. 交互式 HTML / SVG 沙箱
+- 当模型生成完整的 HTML 页面、SVG 矢量动画或交互表单时，系统会自动呈现「全屏运行预览」按钮。
+- **安全沙箱隔离**：渲染在严格的 `iframe` 沙箱中执行（配备 CSP 限制），避免外部恶意脚本污染主应用上下文。
+- **Follow-up 交互回传**：沙箱内部的表单控件或按钮点击事件，支持向 AI 会话发送反馈追问。
+
+### 2. 多专业图表引擎支持
+Live Artifacts 深度内置了 3 款行业标杆级的图表引擎：
+- **Apache ECharts**：支持高精度双 Y 轴折线图、柱状图、饼图、仪表盘，自动适配 Onyx 暗黑主题并支持数据项悬停提示 (Tooltip)。
+- **Mermaid.js**：文本化输出流程图 (Flowchart)、时序图 (Sequence)、类图与状态转移图。
+- **Graphviz (viz.js)**：专注于有向图、网络拓扑与复杂关系链路图的自动化节点布局。
+
+---
+
+## 自动触发与自定义 Prompt 配置
+
+进入 **设置 -> Live Artifacts**：
+- **触发模型设置**：可指定专门负责生成 Artifacts 的高智力模型（默认 `gemini-3.8-flash`）。
+- **提示词版本管理**：内置经过严密测试的标准提示词版本，同时支持用户注入**自定义系统提示词 (Custom Prompt)**，强制模型输出特定风格的 UI 组件库（如 Tailwind、Bootstrap 等）。
+- **快捷开关**：在输入框输入 `/artifacts` 可快速切换当前会话是否向模型注入生成提示词。

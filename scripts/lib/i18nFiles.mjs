@@ -12,6 +12,7 @@ const BASE_TRANSLATION_FILES = [
   'src/i18n/translations/common.ts',
   'src/i18n/translations/header.ts',
   'src/i18n/translations/history.ts',
+  'src/i18n/translations/library.ts',
   'src/i18n/translations/logViewer.ts',
   'src/i18n/translations/messages.ts',
   'src/i18n/translations/scenarios.ts',

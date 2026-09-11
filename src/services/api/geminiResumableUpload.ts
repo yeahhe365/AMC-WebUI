@@ -75,7 +75,7 @@ const parseRawHeaders = (rawHeaders: string): Record<string, string> => {
   return headers;
 };
 
-const parseJsonPayload = (value: string): unknown => (value ? safeJsonParse(value, null) : null);
+const parseJsonPayload = (value: string): unknown => safeJsonParse(value, null);
 
 const createUploadHttpError = (status: number, responseText: string) => {
   const message = responseText

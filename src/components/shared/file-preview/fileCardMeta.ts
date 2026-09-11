@@ -1,7 +1,7 @@
 import type { ElementType } from 'react';
 import { Edit3, Scissors, Settings2, SlidersHorizontal } from 'lucide-react';
 import type { UploadedFile } from '@/types';
-import { getFileTypeCategory } from '@/utils/file/fileTypeClassification';
+import { resolveFileCategory } from '@/utils/file/fileTypeClassification';
 
 interface FileCardMetaOptions {
   isGemini3?: boolean;
@@ -11,7 +11,7 @@ interface FileCardMetaOptions {
 }
 
 interface FileCardMeta {
-  category: ReturnType<typeof getFileTypeCategory>;
+  category: ReturnType<typeof resolveFileCategory>;
   isActive: boolean;
   isVideo: boolean;
   isImage: boolean;
@@ -30,12 +30,12 @@ export const getFileCardMeta = (
     canConfigure,
   }: FileCardMetaOptions,
 ): FileCardMeta => {
-  const category = getFileTypeCategory(file.type, file.error);
+  const category = resolveFileCategory(file);
   const isActive = file.uploadState === 'active';
   const isVideo = category === 'video' || category === 'youtube';
   const isImage = category === 'image';
   const isPdf = category === 'pdf';
-  const isText = category === 'text';
+  const isText = category === 'text' || category === 'code';
 
   const supportsConfiguration = isVideo || (isGemini3 && (isImage || isPdf)) || (includeTextEditing && isText);
 

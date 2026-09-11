@@ -3,8 +3,9 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { readPersistentStorageItem } from './persistentStorage';
 import { createSyncedPersist } from './syncedPersist';
 
-export type SettingsTab = 'models' | 'interface' | 'api' | 'mcp' | 'data' | 'shortcuts' | 'about';
-export type SettingsTabDescriptor = { id: SettingsTab; labelKey: string };
+import { SETTINGS_TABS, type SettingsTab, type SettingsTabDescriptor } from '@/constants/settingsTabs';
+export type { SettingsTab, SettingsTabDescriptor };
+export { SETTINGS_TABS };
 
 const SETTINGS_UI_STORE_STORAGE_KEY = 'all_model_chat_settings_ui_v1';
 const { storage: settingsUiSyncedStorage } = createSyncedPersist(SETTINGS_UI_STORE_STORAGE_KEY, {
@@ -13,7 +14,6 @@ const { storage: settingsUiSyncedStorage } = createSyncedPersist(SETTINGS_UI_STO
 });
 
 const LEGACY_SETTINGS_TAB_STORAGE_KEY = 'chatSettingsLastTab';
-export const SETTINGS_TABS: SettingsTab[] = ['models', 'interface', 'api', 'mcp', 'data', 'shortcuts', 'about'];
 
 interface SettingsUiState {
   activeTab: SettingsTab;
@@ -40,6 +40,10 @@ const normalizeSettingsTab = (savedTab: string | null): SettingsTab | null => {
     case 'canvas':
     case 'safety':
       return 'models';
+    case 'providers':
+    case 'provider':
+    case 'thirdParty':
+      return 'providers';
     case 'interface':
       return 'interface';
     case 'shortcuts':

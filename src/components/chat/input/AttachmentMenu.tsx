@@ -1,22 +1,26 @@
 import React from 'react';
-import { createPortal } from 'react-dom';
-import { Paperclip, FolderOpen } from 'lucide-react';
+import { Paperclip, FolderOpen, Library, FileArchive } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
-import type { AttachmentAction } from '@/types';
+import { type AttachmentAction, GEMINI_PROVIDER_ID } from '@/types';
 import {
   IconUpload,
   IconGallery,
   IconCamera,
   IconScreenshot,
   IconMicrophone,
-  IconLink,
+  IconCloud,
   IconFileEdit,
-  IconZip,
   IconYoutube,
 } from '@/components/icons';
 import { CHAT_INPUT_BUTTON_CLASS } from '@/constants/buttonClasses';
 import { MENU_ITEM_BUTTON_CLASS, MENU_ITEM_DEFAULT_STATE_CLASS } from '@/constants/menuClasses';
-import { usePortaledMenu } from '@/hooks/ui/usePortaledMenu';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/shared/DropdownMenu';
+import { useIsMobile } from '@/hooks/useDevice';
 import { useChatInputActionsContext } from './ChatInputContext';
 import { isGemmaModel } from '@/utils/model/modelCapabilities';
 
@@ -31,15 +35,18 @@ export const AttachmentMenu: React.FC = () => {
     isTranscribeModel,
     canAddYouTubeVideo,
     currentModelId,
+    providerId,
   } = useChatInputActionsContext();
   const { t } = useI18n();
-  const { isOpen, menuPosition, containerRef, buttonRef, menuRef, targetWindow, closeMenu, toggleMenu } =
-    usePortaledMenu({ constrainHeight: true });
+  const isMobile = useIsMobile();
   const isAttachmentDisabled = disabled;
   const isGemma = isGemmaModel(currentModelId);
+  const isGeminiNative = providerId === undefined || providerId === GEMINI_PROVIDER_ID;
+
+  const isItemActionTriggeredRef = React.useRef(false);
 
   const handleAction = (action: AttachmentAction) => {
-    closeMenu();
+    isItemActionTriggeredRef.current = true;
     onAttachmentAction(action);
   };
 
@@ -47,25 +54,39 @@ export const AttachmentMenu: React.FC = () => {
   // frequently used items go at the bottom, closest to the input area.
   const menuItems = [
     { labelKey: 'attachMenuCreateText', icon: <IconFileEdit size={menuIconSize} />, action: 'text' },
-    ...(canAddYouTubeVideo
+    ...(isGeminiNative && canAddYouTubeVideo
       ? [{ labelKey: 'attachMenuAddByUrl', icon: <IconYoutube size={menuIconSize} />, action: 'url' } as const]
       : []),
-    { labelKey: 'attachMenuAddById', icon: <IconLink size={menuIconSize} />, action: 'id' },
-    { labelKey: 'attachMenuImportFolder', icon: <FolderOpen size={menuIconSize} />, action: 'folder' },
-    { labelKey: 'attachMenuImportZip', icon: <IconZip size={menuIconSize} />, action: 'zip' },
+    ...(isGeminiNative
+      ? [{ labelKey: 'attachMenuAddById', icon: <IconCloud size={menuIconSize} />, action: 'id' } as const]
+      : []),
+    ...(!isMobile
+      ? ([
+          { labelKey: 'attachMenuImportFolder', icon: <FolderOpen size={menuIconSize} />, action: 'folder' },
+          { labelKey: 'attachMenuScreenshot', icon: <IconScreenshot size={menuIconSize} />, action: 'screenshot' },
+        ] as const)
+      : ([{ labelKey: 'attachMenuImportZip', icon: <FileArchive size={menuIconSize} />, action: 'zip' }] as const)),
     { labelKey: 'attachMenuRecordAudio', icon: <IconMicrophone size={menuIconSize} />, action: 'recorder' },
-    { labelKey: 'attachMenuScreenshot', icon: <IconScreenshot size={menuIconSize} />, action: 'screenshot' },
-    { labelKey: 'attachMenuTakePhoto', icon: <IconCamera size={menuIconSize} />, action: 'camera' },
-    { labelKey: 'attachMenuGallery', icon: <IconGallery size={menuIconSize} />, action: 'gallery' },
+    ...(isMobile
+      ? ([
+          { labelKey: 'attachMenuTakePhoto', icon: <IconCamera size={menuIconSize} />, action: 'camera' },
+          { labelKey: 'attachMenuGallery', icon: <IconGallery size={menuIconSize} />, action: 'gallery' },
+        ] as const)
+      : []),
+    { labelKey: 'attachMenuLibrary', icon: <Library size={menuIconSize} />, action: 'library' },
     { labelKey: 'attachMenuUpload', icon: <IconUpload size={menuIconSize} />, action: 'upload' },
   ] as const;
 
   const filteredMenuItems = isTranscribeModel
-    ? menuItems.filter((item) => item.action === 'upload' || item.action === 'recorder' || item.action === 'id')
+    ? menuItems.filter(
+        (item) =>
+          item.action === 'upload' || item.action === 'library' || item.action === 'recorder' || item.action === 'id',
+      )
     : isImageGenerationModel
       ? menuItems.filter(
           (item) =>
             item.action === 'upload' ||
+            item.action === 'library' ||
             item.action === 'gallery' ||
             item.action === 'camera' ||
             item.action === 'screenshot' ||
@@ -76,44 +97,51 @@ export const AttachmentMenu: React.FC = () => {
         : menuItems;
 
   return (
-    <div className="relative" ref={containerRef}>
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={toggleMenu}
-        disabled={isAttachmentDisabled}
-        className={`${CHAT_INPUT_BUTTON_CLASS} text-[var(--theme-icon-attach)] bg-transparent hover:bg-[var(--theme-bg-tertiary)]`}
-        aria-label={t('attachMenuAria')}
-        title={t('attachMenuTitle')}
-        aria-haspopup="true"
-        aria-expanded={isOpen}
-      >
-        <Paperclip size={attachIconSize} strokeWidth={2} />
-      </button>
-
-      {isOpen &&
-        targetWindow &&
-        createPortal(
-          <div
-            ref={menuRef}
-            className="w-60 bg-[var(--theme-bg-primary)] border border-[var(--theme-border-secondary)] rounded-xl py-1.5 custom-scrollbar"
-            style={menuPosition}
-            role="menu"
+    <div className="relative">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            disabled={isAttachmentDisabled}
+            className={`${CHAT_INPUT_BUTTON_CLASS} text-[var(--theme-icon-attach)] bg-transparent hover:bg-[var(--theme-bg-tertiary)] data-[state=open]:bg-[var(--theme-bg-tertiary)] data-[state=open]:text-[var(--theme-text-primary)]`}
+            aria-label={t('attachMenuAria')}
+            title={t('attachMenuTitle')}
+            aria-haspopup="true"
           >
-            {filteredMenuItems.map((item) => (
+            <Paperclip size={attachIconSize} strokeWidth={2} />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          side="top"
+          align="start"
+          sideOffset={8}
+          className="w-60 max-h-[75vh] overflow-y-auto custom-scrollbar py-1.5 shadow-premium"
+          onCloseAutoFocus={(e) => {
+            if (isItemActionTriggeredRef.current) {
+              e.preventDefault();
+              isItemActionTriggeredRef.current = false;
+            }
+          }}
+        >
+          {filteredMenuItems.map((item) => (
+            <DropdownMenuItem
+              key={item.action}
+              asChild
+              onClick={() => handleAction(item.action)}
+              className="cursor-pointer"
+            >
               <button
-                key={item.action}
-                onClick={() => handleAction(item.action)}
-                className={`${MENU_ITEM_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS} px-4 py-2.5 gap-3.5`}
+                type="button"
                 role="menuitem"
+                className={`${MENU_ITEM_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS} w-full px-4 py-2.5 gap-3.5`}
               >
                 <span className="text-[var(--theme-text-secondary)]">{item.icon}</span>
                 <span className="font-medium">{t(item.labelKey)}</span>
               </button>
-            ))}
-          </div>,
-          targetWindow.document.body,
-        )}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 };

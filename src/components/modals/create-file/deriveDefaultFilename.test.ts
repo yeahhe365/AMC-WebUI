@@ -1,34 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { deriveDefaultFilename } from './deriveDefaultFilename';
+import { formatTimestampFilename, deriveDefaultFilename } from './deriveDefaultFilename';
+
+describe('formatTimestampFilename', () => {
+  it('formats a date into YYYY-MM-DD_HH-mm-ss format', () => {
+    const testDate = new Date(2026, 8, 10, 20, 15, 30); // Month is 0-indexed: 8 is September
+    expect(formatTimestampFilename(testDate)).toBe('2026-09-10_20-15-30');
+  });
+
+  it('pads single-digit month, day, hours, minutes, and seconds with zero', () => {
+    const testDate = new Date(2026, 0, 5, 4, 3, 2); // 2026-01-05 04:03:02
+    expect(formatTimestampFilename(testDate)).toBe('2026-01-05_04-03-02');
+  });
+
+  it('generates a valid timestamp string when called without arguments', () => {
+    const result = formatTimestampFilename();
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/);
+  });
+
+  it('gracefully handles invalid Date instances by falling back to a valid timestamp', () => {
+    const invalidDate = new Date('invalid');
+    const result = formatTimestampFilename(invalidDate);
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/);
+  });
+});
 
 describe('deriveDefaultFilename', () => {
-  it('prefers the first markdown heading', () => {
-    expect(deriveDefaultFilename('intro line\n\n# 季度报告\n\nbody')).toBe('季度报告');
+  it('returns timestamp format and does not extract titles from content', () => {
+    const result = deriveDefaultFilename('# 季度报告\n\n正文内容');
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/);
+    expect(result).not.toContain('季度报告');
   });
 
-  it('falls back to the first non-empty line when no heading exists', () => {
-    expect(deriveDefaultFilename('\n\n  hello world  \nsecond line')).toBe('hello world');
-  });
-
-  it('strips markdown links so a heading link does not become the filename', () => {
-    expect(deriveDefaultFilename('# [Anthropic 自曝安全漏洞](https://linux.do/t/topic/2763210)\n\nbody')).toBe(
-      'Anthropic 自曝安全漏洞',
-    );
-  });
-
-  it('strips markdown emphasis and unsafe filename characters', () => {
-    expect(deriveDefaultFilename('# **Bold** `code` title')).toBe('Bold code title');
-    expect(deriveDefaultFilename('a/b:c?d*e')).toBe('abcde');
-  });
-
-  it('collapses repeated whitespace and caps the derived length', () => {
-    expect(deriveDefaultFilename('# a   b\t\tc')).toBe('a b c');
-    expect(deriveDefaultFilename('# ' + 'a'.repeat(80))).toHaveLength(60);
-  });
-
-  it('returns null for empty or blank-only content', () => {
-    expect(deriveDefaultFilename('')).toBeNull();
-    expect(deriveDefaultFilename(' \n\t \n')).toBeNull();
-    expect(deriveDefaultFilename('# **`<>`**')).toBeNull();
+  it('formats a provided Date object', () => {
+    const testDate = new Date(2026, 8, 10, 12, 0, 0);
+    expect(deriveDefaultFilename(testDate)).toBe('2026-09-10_12-00-00');
   });
 });

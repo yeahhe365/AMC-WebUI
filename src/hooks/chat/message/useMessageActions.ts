@@ -1,18 +1,19 @@
-import { type Dispatch, type MutableRefObject, type SetStateAction, useCallback } from 'react';
-import { type ChatMessage, type UploadedFile, type SavedChatSession, type InputCommand } from '@/types';
+import { type MutableRefObject, useCallback } from 'react';
+import { type ChatMessage, type UploadedFile, type SessionsUpdater, type CommandedInputSetter } from '@/types';
 import { logService } from '@/services/logService';
 import { CHAT_INPUT_TEXTAREA_SELECTOR } from '@/constants/layout';
 import { cleanupFilePreviewUrls } from '@/utils/file/filePreviewUrls';
 import { getVisibleChatMessages } from '@/utils/chat/visibility';
 import { cloneMessagesWithFreshIds, createNewSession } from '@/utils/chat/session';
 import { updateSessionById } from '@/utils/chat/sessionMutations';
+import { INVALID_FILE_API_KEY_FINGERPRINT } from '@/utils/chat/geminiFilesApi';
+import { resolveUploadableFile } from '@/features/message-sender/fileApiReference';
 import { releaseSessionLoadingForGenerationHandoff } from '@/features/message-sender/activeGenerationJobs';
 import { isGenerationLeaseHeldByOther } from '@/features/message-sender/generationLease';
 import { useChatStore } from '@/stores/chatStore';
+import { toastError } from '@/stores/toastStore';
 import { useI18n } from '@/contexts/I18nContext';
 
-type CommandedInputSetter = Dispatch<SetStateAction<InputCommand | null>>;
-type SessionsUpdater = (updater: (prev: SavedChatSession[]) => SavedChatSession[]) => void;
 type ActiveSessionSetter = (id: string | null, options?: { history?: 'push' | 'replace' | 'none' | 'auto' }) => void;
 type SendMessageFunc = (overrideOptions?: {
   text?: string;
@@ -148,14 +149,31 @@ export const useMessageActions = ({
 
       const visibleMessages = getVisibleChatMessages(messages);
       const modelMessageIndex = visibleMessages.findIndex((message) => message.id === modelMessageIdToRetry);
-      if (modelMessageIndex < 1) return;
+      if (modelMessageIndex === -1) {
+        logService.warn('Retry blocked: message not found', { modelMessageId: modelMessageIdToRetry });
+        return;
+      }
 
       // Cleanup artifacts (images/audio) from the model message being discarded to prevent memory leaks
       const modelMessage = visibleMessages[modelMessageIndex];
       if (modelMessage.files) cleanupFilePreviewUrls(modelMessage.files);
 
-      const userMessageToResend = visibleMessages[modelMessageIndex - 1];
-      if (userMessageToResend.role !== 'user') return;
+      let userMessageToResend: ChatMessage | undefined;
+      for (let i = modelMessageIndex - 1; i >= 0; i--) {
+        if (visibleMessages[i].role === 'user') {
+          userMessageToResend = visibleMessages[i];
+          break;
+        }
+      }
+
+      if (!userMessageToResend) {
+        logService.warn('Retry blocked: no preceding user message found', {
+          modelMessageId: modelMessageIdToRetry,
+          modelMessageIndex,
+        });
+        toastError(t('messageSenderUnknownError'));
+        return;
+      }
 
       if (isLoading) {
         // Stop current generation but keep the session marked as "loading" in UI state
@@ -166,19 +184,43 @@ export const useMessageActions = ({
             sessionId: activeSessionId,
             stopResult,
           });
-          setAppFileError(t('chatGeneratingInOtherTab'));
+          const errorMsg = t('chatGeneratingInOtherTab');
+          setAppFileError(errorMsg);
+          toastError(errorMsg);
           return;
         }
       } else if (isGenerationLeaseHeldByOther(activeSessionId)) {
         logService.warn('Retry blocked: generation lease held by another tab', { sessionId: activeSessionId });
-        setAppFileError('This chat is generating in another tab. Stop it there first, or wait for it to finish.');
+        const errorMsg = t('chatGeneratingInOtherTab');
+        setAppFileError(errorMsg);
+        toastError(errorMsg);
         return;
       }
 
       try {
+        const rehydratedFiles = userMessageToResend.files
+          ? await Promise.all(
+              userMessageToResend.files.map(async (f) => {
+                const uploadable = await resolveUploadableFile(f);
+                const isFailedOrInvalid =
+                  f.fileApiKeyFingerprint === INVALID_FILE_API_KEY_FINGERPRINT ||
+                  f.uploadState === 'failed' ||
+                  Boolean(f.error);
+
+                return {
+                  ...f,
+                  rawFile: uploadable ?? f.rawFile,
+                  error: undefined,
+                  uploadState: 'active' as const,
+                  ...(isFailedOrInvalid ? { fileApiKeyFingerprint: INVALID_FILE_API_KEY_FINGERPRINT } : {}),
+                };
+              }),
+            )
+          : undefined;
+
         await handleSendMessage({
           text: userMessageToResend.content,
-          files: userMessageToResend.files,
+          files: rehydratedFiles,
           editingId: userMessageToResend.id,
         });
       } finally {
@@ -255,7 +297,7 @@ export const useMessageActions = ({
           return;
         }
       } else if (isGenerationLeaseHeldByOther(activeSessionId)) {
-        setAppFileError('This chat is generating in another tab. Stop it there first, or wait for it to finish.');
+        setAppFileError(t('chatGeneratingInOtherTab'));
         return;
       }
 

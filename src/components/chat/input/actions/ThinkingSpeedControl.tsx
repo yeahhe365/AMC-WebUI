@@ -1,24 +1,30 @@
 import React, { useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { ChevronDown, Gauge, Zap } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import { useChatInputContext } from '@/components/chat/input/ChatInputContext';
-import { usePortaledMenu } from '@/hooks/ui/usePortaledMenu';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/shared/Popover';
 import { getCachedModelCapabilities } from '@/stores/modelCapabilitiesStore';
+import { getDefaultThinkingLevelForModel, isReasoningModel } from '@/utils/model/modelCapabilities';
 import type { ThinkingLevel } from '@/types';
 
 const LEVEL_LABEL_KEYS: Record<ThinkingLevel, string> = {
+  NONE: 'thinkingLevelNone',
   MINIMAL: 'thinkingLevelMinimal',
   LOW: 'thinkingLevelLow',
   MEDIUM: 'thinkingLevelMedium',
   HIGH: 'thinkingLevelHigh',
+  XHIGH: 'thinkingLevelXHigh',
+  MAX: 'thinkingLevelMax',
 };
 
 const LEVEL_FALLBACK: Record<ThinkingLevel, string> = {
-  MINIMAL: '最小',
+  NONE: '关闭',
+  MINIMAL: '极简',
   LOW: '低',
   MEDIUM: '中',
   HIGH: '高',
+  XHIGH: '极高',
+  MAX: '最大',
 };
 
 const WHEEL_STEP_THRESHOLD = 40;
@@ -96,7 +102,8 @@ export const ThinkingSpeedControl: React.FC = () => {
 
   const caps = getCachedModelCapabilities(modelId);
   const isGemma = caps.isGemmaModel;
-  const supportsThinkingLevel = caps.supportsThinkingLevel || isGemma;
+  const isReasoning = isReasoningModel(modelId);
+  const supportsThinkingLevel = caps.supportsThinkingLevel || isGemma || isReasoning;
   const activeCapabilities = caps;
 
   if (!supportsThinkingLevel || activeCapabilities.isTtsModel) return null;
@@ -108,6 +115,8 @@ export const ThinkingSpeedControl: React.FC = () => {
   let supportedLevels: ThinkingLevel[];
   if (isImageThinkingLevelOnly) {
     supportedLevels = ['MINIMAL', 'HIGH'];
+  } else if (isReasoning) {
+    supportedLevels = ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH', 'XHIGH', 'MAX'];
   } else if (supportsThinkingLevel) {
     // gemini-3.7-flash / gemini-3.8-flash rejects MINIMAL with an API error — only offer it where supported.
     supportedLevels =
@@ -143,11 +152,13 @@ export const ThinkingSpeedControl: React.FC = () => {
     if (next) setCurrentChatSettings((prev) => ({ ...prev, thinkingLevel: next }));
   };
 
+  const defaultLevel = getDefaultThinkingLevelForModel(modelId);
+
   const handleResetDefault = () => {
-    setCurrentChatSettings((prev) => ({ ...prev, thinkingLevel: 'HIGH' as ThinkingLevel }));
+    setCurrentChatSettings((prev) => ({ ...prev, thinkingLevel: defaultLevel }));
   };
 
-  const isDefault = displayLevel === 'HIGH';
+  const isDefault = displayLevel === defaultLevel;
 
   const intensityLabel = t('thinkingIntensity');
   const intensityText = intensityLabel !== 'thinkingIntensity' ? intensityLabel : '强度';
@@ -163,9 +174,10 @@ export const ThinkingSpeedControl: React.FC = () => {
   const supportsFast = (isFlash3 || isRobotics) && activeCapabilities.supportsMinimalThinkingLevel;
   const isFastActive = supportsFast && displayLevel === 'MINIMAL';
   const handleToggleFast = () => {
+    const targetNonFast = defaultLevel === 'MINIMAL' ? 'HIGH' : defaultLevel;
     setCurrentChatSettings((prev) => ({
       ...prev,
-      thinkingLevel: isFastActive ? ('HIGH' as ThinkingLevel) : ('MINIMAL' as ThinkingLevel),
+      thinkingLevel: isFastActive ? (targetNonFast as ThinkingLevel) : ('MINIMAL' as ThinkingLevel),
     }));
   };
 
@@ -231,133 +243,120 @@ const ThinkingSpeedControlUI: React.FC<{
   onToggleFast,
   fastAriaLabel,
 }) => {
-  const { isOpen, menuPosition, containerRef, buttonRef, menuRef, targetWindow, toggleMenu, closeMenu } =
-    usePortaledMenu({ menuWidth: 224, gap: 8 });
-
   const showSlider = supportedLevels.length > 2;
 
   return (
-    <div ref={containerRef} className="relative">
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={toggleMenu}
-        className="h-8 gap-1 rounded-md px-2.5 text-xs text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] bg-transparent hover:bg-[var(--theme-bg-tertiary)] inline-flex items-center transition-colors"
-        aria-label={settingsThinkingModeLabel}
-        aria-haspopup="dialog"
-        aria-expanded={isOpen}
-      >
-        <Gauge size={14} className="shrink-0" />
-        <span>{triggerLabel}</span>
-        <ChevronDown size={13} className="shrink-0 text-[var(--theme-text-secondary)]" />
-      </button>
-
-      {isOpen &&
-        targetWindow &&
-        createPortal(
-          <div
-            ref={menuRef}
-            style={menuPosition}
-            className="fixed w-56 overflow-hidden rounded-md border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] p-1.5 text-xs shadow-xl z-[9999] animate-in fade-in slide-in-from-bottom-1 duration-150"
-            role="dialog"
+    <div className="relative">
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="h-8 gap-1 rounded-md px-2.5 text-xs text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] bg-transparent hover:bg-[var(--theme-bg-tertiary)] data-[state=open]:bg-[var(--theme-bg-tertiary)] data-[state=open]:text-[var(--theme-text-primary)] inline-flex items-center transition-colors"
             aria-label={settingsThinkingModeLabel}
           >
-            <div className="flex h-10 items-center px-2">
-              <div className="flex min-w-0 items-baseline gap-1 text-xs">
-                <span className="shrink-0 text-[var(--theme-text-secondary)]">{intensityText}:</span>
-                <span
-                  className="truncate font-medium text-[var(--theme-text-primary)]"
-                  data-testid="composer-effort-slider-label"
-                  aria-live="polite"
-                >
-                  {headerLabel}
-                </span>
-              </div>
-              <div className="ml-auto flex shrink-0 items-center gap-0.5">
-                {showSlider ? (
-                  <button
-                    type="button"
-                    onClick={onResetDefault}
-                    className={`h-7 rounded-md px-2 text-xs transition-colors ${isDefault ? 'text-[var(--theme-bg-accent)] hover:text-[var(--theme-bg-accent)]' : 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)]'}`}
-                    aria-pressed={isDefault}
-                  >
-                    {defaultText}
-                  </button>
-                ) : null}
-                {supportsFast ? (
-                  <button
-                    type="button"
-                    onClick={onToggleFast}
-                    className={`h-7 w-7 flex items-center justify-center rounded-full transition-colors ${isFastActive ? 'text-[var(--theme-bg-accent)] hover:text-[var(--theme-bg-accent)]' : 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)]'}`}
-                    aria-label={fastAriaLabel}
-                    aria-pressed={isFastActive}
-                  >
-                    <Zap size={14} fill={isFastActive ? 'currentColor' : 'none'} />
-                  </button>
-                ) : null}
-              </div>
+            <Gauge size={14} className="shrink-0" />
+            <span>{triggerLabel}</span>
+            <ChevronDown size={13} className="shrink-0 text-[var(--theme-text-secondary)]" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          side="top"
+          align="start"
+          sideOffset={8}
+          className="w-56 overflow-hidden rounded-md border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] p-1.5 text-xs shadow-xl"
+          aria-label={settingsThinkingModeLabel}
+        >
+          <div className="flex h-10 items-center px-2">
+            <div className="flex min-w-0 items-baseline gap-1 text-xs">
+              <span className="shrink-0 text-[var(--theme-text-secondary)]">{intensityText}:</span>
+              <span
+                className="truncate font-medium text-[var(--theme-text-primary)]"
+                data-testid="composer-effort-slider-label"
+                aria-live="polite"
+              >
+                {headerLabel}
+              </span>
             </div>
+            <div className="ml-auto flex shrink-0 items-center gap-0.5">
+              {showSlider ? (
+                <button
+                  type="button"
+                  onClick={onResetDefault}
+                  className={`h-7 rounded-md px-2 text-xs transition-colors ${isDefault ? 'text-[var(--theme-bg-accent)] hover:text-[var(--theme-bg-accent)]' : 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)]'}`}
+                  aria-pressed={isDefault}
+                >
+                  {defaultText}
+                </button>
+              ) : null}
+              {supportsFast ? (
+                <button
+                  type="button"
+                  onClick={onToggleFast}
+                  className={`h-7 w-7 flex items-center justify-center rounded-full transition-colors ${isFastActive ? 'text-[var(--theme-bg-accent)] hover:text-[var(--theme-bg-accent)]' : 'text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)]'}`}
+                  aria-label={fastAriaLabel}
+                  aria-pressed={isFastActive}
+                >
+                  <Zap size={14} fill={isFastActive ? 'currentColor' : 'none'} />
+                </button>
+              ) : null}
+            </div>
+          </div>
 
-            {showSlider ? (
-              <div className="mx-2.5 mt-1 mb-2">
-                <div className="flex items-center justify-between text-[11px] font-medium" aria-hidden="true">
-                  <span className="text-[var(--theme-text-secondary)]">{fasterText}</span>
-                  <span className="text-[var(--theme-bg-accent)]">{smarterText}</span>
-                </div>
-                <WheelStepControl
-                  value={displayIndex}
+          {showSlider ? (
+            <div className="mx-2.5 mt-1 mb-2">
+              <div className="flex items-center justify-between text-[11px] font-medium" aria-hidden="true">
+                <span className="text-[var(--theme-text-secondary)]">{fasterText}</span>
+                <span className="text-[var(--theme-bg-accent)]">{smarterText}</span>
+              </div>
+              <WheelStepControl
+                value={displayIndex}
+                min={0}
+                max={supportedLevels.length - 1}
+                className="relative mt-1.5 h-8"
+                onValueChange={onLevelChange}
+              >
+                <input
+                  type="range"
                   min={0}
                   max={supportedLevels.length - 1}
-                  className="relative mt-1.5 h-8"
-                  onValueChange={onLevelChange}
+                  step={1}
+                  value={displayIndex}
+                  onChange={(e) => onLevelChange(parseInt(e.target.value, 10))}
+                  className="w-full h-8 accent-[var(--theme-bg-accent)] cursor-pointer [&::-webkit-slider-runnable-track]:h-2.5 [&::-webkit-slider-runnable-track]:bg-[var(--theme-bg-tertiary)] [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:shadow-inner [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-[var(--theme-border-secondary)] [&::-webkit-slider-thumb]:bg-[var(--theme-bg-primary)] [&::-webkit-slider-thumb]:shadow-sm appearance-none bg-transparent"
+                  aria-label={intensityText}
+                />
+                <div className="pointer-events-none absolute inset-x-3 top-1/2 z-10 h-0">
+                  {supportedLevels.map((lvl, idx) =>
+                    idx === displayIndex ? null : (
+                      <span
+                        key={lvl}
+                        data-slot="composer-effort-step"
+                        className="absolute size-1 rounded-full bg-[var(--theme-bg-primary)] -translate-x-1/2 -translate-y-1/2"
+                        style={{
+                          left: `${(idx / (supportedLevels.length - 1)) * 100}%`,
+                        }}
+                      />
+                    ),
+                  )}
+                </div>
+              </WheelStepControl>
+            </div>
+          ) : (
+            <div className="px-2 py-1.5 flex gap-1">
+              {supportedLevels.map((lvl) => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => onLevelChange(supportedLevels.indexOf(lvl))}
+                  className={`flex-1 h-8 rounded-lg text-xs font-medium transition-colors ${displayIndex === supportedLevels.indexOf(lvl) ? 'bg-[var(--theme-bg-accent)] text-[var(--theme-text-accent)]' : 'bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]'}`}
                 >
-                  <input
-                    type="range"
-                    min={0}
-                    max={supportedLevels.length - 1}
-                    step={1}
-                    value={displayIndex}
-                    onChange={(e) => onLevelChange(parseInt(e.target.value, 10))}
-                    className="w-full h-8 accent-[var(--theme-bg-accent)] cursor-pointer [&::-webkit-slider-runnable-track]:h-2.5 [&::-webkit-slider-runnable-track]:bg-[var(--theme-bg-tertiary)] [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:shadow-inner [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border [&::-webkit-slider-thumb]:border-[var(--theme-border-secondary)] [&::-webkit-slider-thumb]:bg-[var(--theme-bg-primary)] [&::-webkit-slider-thumb]:shadow-sm appearance-none bg-transparent"
-                    aria-label={intensityText}
-                  />
-                  <div className="pointer-events-none absolute inset-x-3 top-1/2 z-10 h-0">
-                    {supportedLevels.map((lvl, idx) =>
-                      idx === displayIndex ? null : (
-                        <span
-                          key={lvl}
-                          data-slot="composer-effort-step"
-                          className="absolute size-1 rounded-full bg-[var(--theme-bg-primary)] -translate-x-1/2 -translate-y-1/2"
-                          style={{
-                            left: `${(idx / (supportedLevels.length - 1)) * 100}%`,
-                          }}
-                        />
-                      ),
-                    )}
-                  </div>
-                </WheelStepControl>
-              </div>
-            ) : (
-              <div className="px-2 py-1.5 flex gap-1">
-                {supportedLevels.map((lvl) => (
-                  <button
-                    key={lvl}
-                    type="button"
-                    onClick={() => onLevelChange(supportedLevels.indexOf(lvl))}
-                    className={`flex-1 h-8 rounded-lg text-xs font-medium transition-colors ${displayIndex === supportedLevels.indexOf(lvl) ? 'bg-[var(--theme-bg-accent)] text-[var(--theme-text-accent)]' : 'bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]'}`}
-                  >
-                    {levelLabel(lvl)}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <button type="button" onClick={closeMenu} className="sr-only" tabIndex={-1} aria-hidden="true">
-              close
-            </button>
-          </div>,
-          targetWindow.document.body,
-        )}
+                  {levelLabel(lvl)}
+                </button>
+              ))}
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 };

@@ -1,0 +1,42 @@
+---
+title: 服务商与 API 配置 (API Configuration)
+description: 详细了解 Gemini 原生路径、OpenAI 兼容端点配置、多 Key 轮询与自定义代理。
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+# 服务商与 API 配置
+
+AMC WebUI 采用严格的**双 API 隔离架构**。在进行配置时，请先明确你希望配置的是 **Gemini 原生路径** 还是 **OpenAI 兼容路径**。
+
+---
+
+## 1. Gemini 原生配置 (BYOK 模式)
+
+Gemini 原生路径是体验 AMC WebUI 专属高阶能力的通道（包括 Thinking 思考过程、Live API 实时音视频、Google Grounding 搜索与地图、本地 Python 沙箱等）。
+
+<Steps>
+1. 前往 [Google AI Studio](https://aistudio.google.com/api-keys) 创建你的 `GEMINI_API_KEY`。
+2. 打开 AMC WebUI，进入 **设置 -> 服务商与 API (Providers & API)**。
+3. 在 **Gemini 原生配置** 区域填入你的 API Key。
+4. **多 Key 轮询**：如果你拥有多个免费或付费配额的 Gemini Key，可以直接点击「添加 Key」填入多行，应用会在请求时自动执行负载轮询，降低频率触发 429 的概率。
+</Steps>
+
+### 自定义 Gemini API 代理 (Custom Proxy)
+如果你的网络无法直连 Google 服务器，可配置自定义反向代理：
+- 在设置中开启 **自定义 API 配置 / API 代理** 开关。
+- 填写代理 Base URL（例如第三方转发服务或 Cloudflare Worker 代理）。
+- 支持接入 [AIStudioToAPI](https://github.com/iBUHub/AIStudioToAPI) 等将 Web 端转为 Native `/v1beta/*` 格式的代理服务。
+
+---
+
+## 2. OpenAI 兼容端点配置 (第三方服务商)
+
+针对非 Gemini 体系的模型（如 DeepSeek-R1、Claude 3.5 Sonnet、GPT-4o、Qwen 等），请进入 **OpenAI 兼容** 面板：
+
+- **Base URL 规范**：填写到接口根路径（例如 `https://api.openai.com/v1` 或 `https://api.deepseek.com/v1`），客户端发起聊天请求时会自动补齐 `/chat/completions`。
+- **独立 API Key**：第三方兼容 Key 会保存在独立的 IndexedDB 字段中，**绝对不会** 与你的 Gemini Key 产生任何混淆或互相覆盖。
+- **模型列表维护**：支持点击「测试连通性并拉取模型」自动从第三方 `/models` 接口同步模型，也可手动增删自定义模型 ID。
+
+> ⚠️ **注意**
+> OpenAI 兼容模式当前不走 Gemini 原生的 Google 搜索/地图/Artifacts 生成提示词工具链，专注于提供纯粹标准的高性能聊天响应。

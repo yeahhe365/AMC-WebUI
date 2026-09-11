@@ -4,6 +4,8 @@ node_modules/
 # Build output
 dist/
 build/
+docs-site/.astro/
+docs-site/dist/
 
 # Environment variables
 .env

@@ -1,7 +1,7 @@
-export const LARGE_FILE_PREVIEW_LENGTH_THRESHOLD = 50000;
+export const LARGE_FILE_PREVIEW_LENGTH_THRESHOLD = 120000;
 
-const LARGE_MARKDOWN_LINE_THRESHOLD = 1200;
-const LARGE_MARKDOWN_FENCE_THRESHOLD = 12;
+const LARGE_MARKDOWN_LINE_THRESHOLD = 2500;
+const LARGE_MARKDOWN_FENCE_THRESHOLD = 300;
 
 export const shouldDeferMarkdownPreview = (content: string): boolean => {
   if (!content) return false;

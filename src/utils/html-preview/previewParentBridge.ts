@@ -5,6 +5,7 @@ import {
 import {
   HTML_PREVIEW_COPY_EVENT,
   HTML_PREVIEW_DIAGNOSTIC_EVENT,
+  HTML_PREVIEW_DIAGRAM_CLICK_EVENT,
   HTML_PREVIEW_GRAPHVIZ_RENDER_REQUEST_EVENT,
   HTML_PREVIEW_GRAPHVIZ_RENDER_RESPONSE_EVENT,
   HTML_PREVIEW_MESSAGE_CHANNEL,
@@ -27,7 +28,8 @@ type HtmlPreviewBridgeResolution =
   | { kind: 'selection'; payload: unknown }
   | { kind: 'copy'; text: string }
   | { kind: 'diagnostic'; payload: unknown }
-  | { kind: 'graphviz-request'; id: string; dot: string };
+  | { kind: 'graphviz-request'; id: string; dot: string }
+  | { kind: 'diagram-click'; svg: string; title?: string };
 
 export const resolveHtmlPreviewBridgeEvent = ({
   event,
@@ -97,6 +99,21 @@ export const resolveHtmlPreviewBridgeEvent = ({
       }
       const { id, dot } = payload as { id: string; dot: string };
       return { kind: 'graphviz-request', id, dot };
+    }
+    case HTML_PREVIEW_DIAGRAM_CLICK_EVENT: {
+      const payload = data.payload;
+      if (!payload || typeof payload !== 'object' || typeof (payload as { svg?: unknown }).svg !== 'string') {
+        return null;
+      }
+      const svg = (payload as { svg: string }).svg.trim();
+      if (!svg) {
+        return null;
+      }
+      const title =
+        typeof (payload as { title?: unknown }).title === 'string'
+          ? (payload as { title: string }).title.trim()
+          : undefined;
+      return { kind: 'diagram-click', svg, title: title || undefined };
     }
     default:
       return null;

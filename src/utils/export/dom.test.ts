@@ -64,9 +64,9 @@ describe('prepareElementForExport', () => {
     return frame;
   };
 
-  it('preserves iframe srcdoc when forPng=false (HTML export path)', async () => {
+  it('replaces iframe srcdoc with static snapshot when forPng=false (HTML export path)', async () => {
     const container = document.createElement('div');
-    container.appendChild(buildArtifactFrame('<div>Hello</div>'));
+    container.appendChild(buildArtifactFrame('<div>Hello HTML Export</div>'));
 
     const clone = await prepareElementForExport(container, {
       expandDetails: false,
@@ -74,9 +74,11 @@ describe('prepareElementForExport', () => {
     });
 
     const iframe = clone.querySelector('iframe');
-    expect(iframe).not.toBeNull();
-    expect(iframe?.getAttribute('sandbox')).toBe('allow-scripts allow-forms allow-popups allow-modals allow-downloads');
-    expect(iframe?.getAttribute('srcdoc')).toContain('<div>Artifact</div>');
+    expect(iframe).toBeNull();
+
+    const snapshotContainer = clone.querySelector('.is-exporting-png');
+    expect(snapshotContainer).not.toBeNull();
+    expect(snapshotContainer?.textContent).toContain('Hello HTML Export');
   });
 
   it('replaces iframe srcdoc with static snapshot when forPng=true (PNG export path)', async () => {
@@ -110,5 +112,27 @@ describe('prepareElementForExport', () => {
     const iframe = clone.querySelector('iframe');
     expect(iframe).not.toBeNull();
     expect(iframe?.getAttribute('srcdoc')).toContain('Artifact');
+  });
+
+  it('hydrates chart and graphviz declarations in the static snapshot container for HTML export', async () => {
+    const artifactSource = `
+      <div data-amc-chart='{"xAxis":{"type":"category","data":["A","B"]},"yAxis":{"type":"value"},"series":[{"type":"bar","data":[1,2]}]}' style="height:250px;"></div>
+      <div data-amc-graphviz='digraph { a -> b; }'></div>
+    `;
+    const container = document.createElement('div');
+    container.appendChild(buildArtifactFrame(artifactSource));
+
+    const clone = await prepareElementForExport(container, {
+      expandDetails: false,
+      forPng: false,
+    });
+
+    expect(clone.querySelector('iframe')).toBeNull();
+    const snapshotContainer = clone.querySelector('.is-exporting-png') as HTMLElement;
+    expect(snapshotContainer).not.toBeNull();
+    expect(snapshotContainer?.querySelectorAll('svg').length).toBeGreaterThanOrEqual(1);
+    expect(snapshotContainer?.style.background).toBe('transparent');
+    expect(snapshotContainer?.style.height).toBe('auto');
+    expect(snapshotContainer?.style.overflow).toBe('visible');
   });
 });

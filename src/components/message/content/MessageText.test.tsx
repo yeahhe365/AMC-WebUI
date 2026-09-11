@@ -535,6 +535,39 @@ describe('MessageText', () => {
     expect(renderedContent).toContain('```css');
   });
 
+  it('transforms image-locate markers into #image-seek links when images are present in session', () => {
+    const content =
+      '请查看这个图表：<image-locate image="chart.png" box_2d="[100,200,300,400]">关键图表</image-locate>';
+
+    act(() => {
+      renderer.render(
+        <MessageText
+          message={{
+            id: 'message-image-locate',
+            role: 'model',
+            content,
+            timestamp: new Date('2026-04-21T00:00:00.000Z'),
+          }}
+          showThoughts={false}
+          appSettings={createAppSettings({ autoOpenHtmlPreview: false, hideThinkingInContext: false })}
+          themeId="pearl"
+          baseFontSize={16}
+          onImageClick={vi.fn()}
+          onOpenHtmlPreview={vi.fn()}
+          expandCodeBlocksByDefault={false}
+          isMermaidRenderingEnabled={true}
+          isGraphvizRenderingEnabled={true}
+          onOpenSidePanel={vi.fn()}
+        />,
+      );
+    });
+
+    const renderedContent = renderer.container.querySelector('[data-testid="markdown-renderer"]')?.textContent;
+    expect(renderedContent).toContain('[关键图表](#image-seek?');
+    expect(renderedContent).toContain('file=chart.png');
+    expect(renderedContent).toContain('box=100%2C200%2C300%2C400');
+  });
+
   it('collapses long user messages by default and expands them on request', () => {
     const content = Array.from(
       { length: 10 },
@@ -682,5 +715,34 @@ describe('MessageText', () => {
 
     expect(renderer.container.querySelector('[data-user-message-collapsed]')).not.toBeInTheDocument();
     expect(renderer.container.querySelector('[aria-label="Expand"]')).not.toBeInTheDocument();
+  });
+
+  it('renders thinking indicator text without a spinner when loading with no content', () => {
+    act(() => {
+      renderer.render(
+        <MessageText
+          message={{
+            id: 'loading-model',
+            role: 'model',
+            content: '',
+            isLoading: true,
+            timestamp: new Date('2026-04-21T00:00:00.000Z'),
+          }}
+          showThoughts={false}
+          appSettings={createAppSettings({ autoOpenHtmlPreview: false, hideThinkingInContext: false })}
+          themeId="pearl"
+          baseFontSize={16}
+          onImageClick={vi.fn()}
+          onOpenHtmlPreview={vi.fn()}
+          expandCodeBlocksByDefault={false}
+          isMermaidRenderingEnabled={true}
+          isGraphvizRenderingEnabled={true}
+          onOpenSidePanel={vi.fn()}
+        />,
+      );
+    });
+
+    expect(renderer.container.textContent).toContain('Thinking...');
+    expect(renderer.container.querySelector('[data-testid="google-spinner"]')).toBeNull();
   });
 });

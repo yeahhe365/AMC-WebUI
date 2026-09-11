@@ -3,7 +3,7 @@ import { PartMediaResolutionLevel } from '@google/genai';
 import { getHttpOptionsForContents } from './geminiApiVersion';
 
 describe('geminiApiVersion', () => {
-  it('selects v1alpha when any content part carries per-part media resolution', () => {
+  it('leaves default SDK API version unchanged even when content carries per-part media resolution', () => {
     expect(
       getHttpOptionsForContents([
         { parts: [{ text: 'hello' }] },
@@ -16,7 +16,7 @@ describe('geminiApiVersion', () => {
           ],
         },
       ]),
-    ).toEqual({ apiVersion: 'v1alpha' });
+    ).toBeUndefined();
   });
 
   it('leaves default SDK API version unchanged when no per-part media resolution is present', () => {

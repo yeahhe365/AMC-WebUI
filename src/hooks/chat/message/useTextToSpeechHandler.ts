@@ -4,6 +4,7 @@ import { logService } from '@/services/logService';
 import { getGeminiKeyForRequest } from '@/utils/apiKeySelection';
 import { pcmBase64ToWavUrl } from '@/features/audio/audioProcessing';
 import { generateSpeechApi } from '@/services/api/generation/audioApi';
+import { getErrorMessage } from '@/utils/errorMessage';
 import { DEFAULT_TTS_MODEL_ID } from '@/constants/modelConfiguration';
 
 interface TextToSpeechHandlerProps {
@@ -34,9 +35,10 @@ export const useTextToSpeechHandler = ({ appSettings, currentChatSettings }: Tex
         const base64Pcm = await generateSpeechApi(key, modelId, text, voice, abortController.signal);
         return { url: pcmBase64ToWavUrl(base64Pcm) };
       } catch (error) {
-        const timedOut = error instanceof Error && error.message.includes('timed out');
+        const message = getErrorMessage(error, 'TTS generation failed.');
+        const timedOut = message.includes('timed out');
         logService.error(timedOut ? 'Quick TTS timed out:' : 'Quick TTS generation failed:', { error });
-        return { error: error instanceof Error ? error.message : 'TTS generation failed.' };
+        return { error: message };
       }
     },
     [appSettings, currentChatSettings],

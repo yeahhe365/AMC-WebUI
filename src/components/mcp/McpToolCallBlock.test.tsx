@@ -307,4 +307,33 @@ describe('McpToolCallBlock', () => {
 
     finishMcpToolRun(runId, 'success');
   });
+
+  it('displays error summary in header and error details when expanded', () => {
+    const responsePart = {
+      functionResponse: {
+        id: 'call-1',
+        name: 'run_local_python',
+        response: {
+          error: 'Package download failed: Connection timeout',
+        },
+      },
+    };
+
+    render(
+      <McpToolCallBlock
+        call={{ name: 'run_local_python', args: { code: 'import matplotlib' } } as any}
+        responsePart={responsePart as any}
+        status="error"
+      />,
+    );
+
+    const errorSummary = screen.getByTestId('mcp-tool-error-summary');
+    expect(errorSummary).toHaveTextContent('Package download failed: Connection timeout');
+
+    // Click to expand
+    fireEvent.click(screen.getByText('run_local_python'));
+
+    const errorDetails = screen.getByTestId('mcp-tool-error-details');
+    expect(errorDetails).toHaveTextContent('Package download failed: Connection timeout');
+  });
 });

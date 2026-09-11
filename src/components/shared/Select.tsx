@@ -1,10 +1,24 @@
-import React, { useMemo, useId, useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
+import * as SelectPrimitive from '@radix-ui/react-select';
 import { ChevronDown, Check } from 'lucide-react';
-import { useClickOutside } from '@/hooks/useClickOutside';
 import { useI18n } from '@/contexts/I18nContext';
 import { useListboxNavigation } from '@/hooks/ui/useListboxNavigation';
 
-interface SelectProps {
+export const SelectRoot = SelectPrimitive.Root;
+export const SelectTrigger = SelectPrimitive.Trigger;
+export const SelectValue = SelectPrimitive.Value;
+export const SelectIcon = SelectPrimitive.Icon;
+export const SelectPortal = SelectPrimitive.Portal;
+export const SelectContent = SelectPrimitive.Content;
+export const SelectViewport = SelectPrimitive.Viewport;
+export const SelectItem = SelectPrimitive.Item;
+export const SelectItemText = SelectPrimitive.ItemText;
+export const SelectItemIndicator = SelectPrimitive.ItemIndicator;
+export const SelectGroup = SelectPrimitive.Group;
+export const SelectLabel = SelectPrimitive.Label;
+export const SelectSeparator = SelectPrimitive.Separator;
+
+export interface SelectProps {
   id?: string;
   label: string;
   children: React.ReactNode;
@@ -48,7 +62,6 @@ export const Select: React.FC<SelectProps> = ({
   triggerClassName,
 }) => {
   const { t } = useI18n();
-  const listboxId = useId();
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const options = useMemo<SelectOption[]>(() => {
@@ -114,24 +127,6 @@ export const Select: React.FC<SelectProps> = ({
 
   const { isOpen, activeIndex } = navigation;
 
-  useClickOutside(wrapperRef, () => navigation.close(), isOpen);
-
-  const handleToggle = () => {
-    if (disabled) return;
-    if (navigation.isOpenRef.current) {
-      navigation.close();
-      return;
-    }
-
-    navigation.open();
-  };
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (disabled) return;
-
-    navigation.handleKeyDown(event);
-  };
-
   const containerClasses =
     layout === 'horizontal' ? `flex items-center justify-between py-1 ${className || ''}` : className;
 
@@ -142,9 +137,6 @@ export const Select: React.FC<SelectProps> = ({
   const defaultWrapperClasses = layout === 'horizontal' ? 'relative w-full sm:w-64' : 'relative';
 
   const finalWrapperClasses = wrapperClassName || defaultWrapperClasses;
-
-  const dropdownPositionClass = direction === 'up' ? 'bottom-full mb-1' : 'top-full mt-1';
-  const optionId = (optionIndex: number) => `${listboxId}-option-${optionIndex}`;
 
   return (
     <div className={containerClasses}>
@@ -159,56 +151,69 @@ export const Select: React.FC<SelectProps> = ({
         </label>
       )}
       <div className={finalWrapperClasses} ref={wrapperRef}>
-        <button
-          type="button"
-          id={id}
-          onClick={handleToggle}
-          onKeyDown={handleKeyDown}
+        <SelectPrimitive.Root
+          value={value !== undefined ? String(value) : undefined}
+          onValueChange={handleSelect}
+          open={isOpen}
+          onOpenChange={(nextOpen) => {
+            if (nextOpen) {
+              navigation.open();
+            } else {
+              navigation.close();
+            }
+          }}
           disabled={disabled}
-          className={
-            size === 'compact'
-              ? `w-full h-9 px-2.5 py-0 text-left border rounded-lg flex items-center justify-between transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)] ${disabled ? 'opacity-60 cursor-not-allowed bg-[var(--theme-bg-secondary)]' : 'cursor-pointer bg-[var(--theme-bg-input)] hover:border-[var(--theme-border-focus)]'} border-[var(--theme-border-secondary)] text-[var(--theme-text-primary)] text-xs font-medium ${triggerClassName || ''}`
-              : `w-full p-2.5 text-left border rounded-lg flex items-center justify-between transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)] ${disabled ? 'opacity-60 cursor-not-allowed bg-[var(--theme-bg-secondary)]' : 'cursor-pointer bg-[var(--theme-bg-input)] hover:border-[var(--theme-border-focus)]'} border-[var(--theme-border-secondary)] text-[var(--theme-text-primary)] text-sm ${triggerClassName || ''}`
-          }
-          aria-haspopup="listbox"
-          aria-expanded={isOpen}
-          aria-controls={isOpen ? listboxId : undefined}
-          aria-activedescendant={isOpen && activeIndex >= 0 ? optionId(activeIndex) : undefined}
         >
-          <div className="truncate mr-2 flex-grow text-left">
-            {selectedOption ? (
-              selectedOption.label
-            ) : (
-              <span className="text-[var(--theme-text-tertiary)]">{t('selectPlaceholder')}</span>
-            )}
-          </div>
-          <ChevronDown
-            size={16}
-            className={`text-[var(--theme-text-tertiary)] transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
-            strokeWidth={1.5}
-          />
-        </button>
-
-        {isOpen && (
-          <div
-            className={`absolute ${dropdownPositionClass} left-0 z-50 w-full bg-[var(--theme-bg-secondary)] border border-[var(--theme-border-primary)] rounded-xl shadow-premium overflow-hidden flex flex-col ${dropdownClassName || 'max-h-[300px]'}`}
+          <SelectPrimitive.Trigger
+            id={id}
+            aria-label={label}
+            aria-haspopup="listbox"
+            disabled={disabled}
+            onKeyDown={(event) => {
+              if (disabled) return;
+              navigation.handleKeyDown(event);
+            }}
+            className={
+              size === 'compact'
+                ? `w-full h-9 px-2.5 py-0 text-left border rounded-lg flex items-center justify-between transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)] ${disabled ? 'opacity-60 cursor-not-allowed bg-[var(--theme-bg-secondary)]' : 'cursor-pointer bg-[var(--theme-bg-input)] hover:border-[var(--theme-border-focus)]'} border-[var(--theme-border-secondary)] text-[var(--theme-text-primary)] text-xs font-medium ${triggerClassName || ''}`
+                : `w-full p-2.5 text-left border rounded-lg flex items-center justify-between transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)] ${disabled ? 'opacity-60 cursor-not-allowed bg-[var(--theme-bg-secondary)]' : 'cursor-pointer bg-[var(--theme-bg-input)] hover:border-[var(--theme-border-focus)]'} border-[var(--theme-border-secondary)] text-[var(--theme-text-primary)] text-sm ${triggerClassName || ''}`
+            }
           >
-            <div id={listboxId} role="listbox" className="overflow-y-auto custom-scrollbar p-1">
+            <div className="truncate mr-2 flex-grow text-left">
+              {selectedOption ? (
+                selectedOption.label
+              ) : (
+                <span className="text-[var(--theme-text-tertiary)]">{t('selectPlaceholder')}</span>
+              )}
+            </div>
+            <SelectPrimitive.Icon asChild>
+              <ChevronDown
+                size={16}
+                className={`text-[var(--theme-text-tertiary)] transition-transform duration-200 flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+                strokeWidth={1.5}
+              />
+            </SelectPrimitive.Icon>
+          </SelectPrimitive.Trigger>
+
+          <SelectPrimitive.Content
+            position="popper"
+            side={direction === 'up' ? 'top' : 'bottom'}
+            sideOffset={4}
+            className={`z-50 w-[var(--radix-select-trigger-width)] bg-[var(--theme-bg-secondary)] border border-[var(--theme-border-primary)] rounded-xl shadow-premium overflow-hidden flex flex-col ${dropdownClassName || 'max-h-[300px]'}`}
+          >
+            <SelectPrimitive.Viewport className="overflow-y-auto custom-scrollbar p-1">
               {options.map((option, optionIndex) => {
                 const isSelected = String(option.value) === String(value);
                 const isActive = activeIndex === optionIndex;
 
                 return (
-                  <button
+                  <SelectPrimitive.Item
                     key={`${option.value}-${optionIndex}`}
-                    id={optionId(optionIndex)}
-                    type="button"
-                    role="option"
-                    aria-selected={isSelected}
-                    aria-disabled={option.disabled}
-                    onClick={() => handleSelect(option.value)}
+                    value={option.value}
                     disabled={option.disabled}
-                    className={`w-full text-left px-3 py-2 text-sm rounded-lg flex items-center justify-between transition-colors ${
+                    aria-selected={isSelected}
+                    data-highlighted={isActive ? '' : undefined}
+                    className={`w-full text-left px-3 py-2 text-sm rounded-lg flex items-center justify-between transition-colors outline-none select-none ${
                       isSelected
                         ? 'bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-primary)] font-medium'
                         : 'text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-tertiary)]/50 hover:text-[var(--theme-text-primary)]'
@@ -216,16 +221,18 @@ export const Select: React.FC<SelectProps> = ({
                       option.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
                     }`}
                   >
-                    <span className="truncate w-full block">{option.label}</span>
-                    {isSelected && (
+                    <SelectPrimitive.ItemText asChild>
+                      <span className="truncate w-full block">{option.label}</span>
+                    </SelectPrimitive.ItemText>
+                    <SelectPrimitive.ItemIndicator>
                       <Check size={14} className="text-[var(--theme-text-link)] flex-shrink-0 ml-2" strokeWidth={1.5} />
-                    )}
-                  </button>
+                    </SelectPrimitive.ItemIndicator>
+                  </SelectPrimitive.Item>
                 );
               })}
-            </div>
-          </div>
-        )}
+            </SelectPrimitive.Viewport>
+          </SelectPrimitive.Content>
+        </SelectPrimitive.Root>
       </div>
     </div>
   );

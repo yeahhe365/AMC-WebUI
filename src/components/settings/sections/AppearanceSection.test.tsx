@@ -8,6 +8,15 @@ import { setupStoreStateReset } from '@/test/stores/reset';
 import type { AppSettings } from '@/types';
 import { AppearanceSection } from './AppearanceSection';
 
+vi.mock('@/components/shared/Tooltip', () => ({
+  Tooltip: ({ children, text }: { children: React.ReactNode; text?: string }) => (
+    <>
+      {children}
+      {text && <span className="sr-only">{text}</span>}
+    </>
+  ),
+}));
+
 const settingsFixture: AppSettings = {
   ...useSettingsStore.getState().appSettings,
   themeId: 'system',
@@ -37,7 +46,7 @@ describe('AppearanceSection', () => {
     await renderAppearanceSection({ language: 'en' });
 
     expect(renderer.container.textContent).toContain('Theme');
-    expect(renderer.container.textContent).toContain('Gray');
+    expect(renderer.container.textContent).toContain('System');
     expect(renderer.container.textContent).toContain('Reading Size');
     expect(renderer.container.textContent).toContain('Live Artifacts Base Size');
     expect(renderer.container.textContent).toContain('default font size for inline Live Artifacts in chat');
@@ -59,7 +68,7 @@ describe('AppearanceSection', () => {
     });
 
     expect(renderer.container.textContent).toContain('主题');
-    expect(renderer.container.textContent).toContain('灰色');
+    expect(renderer.container.textContent).toContain('系统');
     expect(renderer.container.textContent).toContain('阅读字号');
     expect(renderer.container.textContent).toContain('Live Artifacts 基础字号');
     expect(renderer.container.textContent).toContain('聊天内嵌 Live Artifacts 的默认字号');

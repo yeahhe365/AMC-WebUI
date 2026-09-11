@@ -18,10 +18,8 @@ import {
   getUploadLifecycleForGeminiState,
   shouldUseFileApi,
 } from './fileUploadPolicy';
-import { getTranslator } from '@/i18n/translations';
+import { getTranslator, type Translator } from '@/i18n/translations';
 import { interpolate, formatI18nErrorMessage } from '@/i18n/interpolate';
-
-type Translator = ReturnType<typeof getTranslator>;
 
 const UPLOAD_SPEED_UPDATE_INTERVAL_MS = 500;
 const PERCENT_MULTIPLIER = 100;
@@ -130,7 +128,8 @@ export const uploadFileItem = async ({
       let speedStr = '';
       if (stats) {
         const timeDiff = now - stats.lastTime;
-        if (timeDiff > UPLOAD_SPEED_UPDATE_INTERVAL_MS) {
+        const isInitialSample = stats.lastLoaded === 0 && timeDiff >= 100 && loaded > 0;
+        if (timeDiff > UPLOAD_SPEED_UPDATE_INTERVAL_MS || isInitialSample) {
           const bytesDiff = loaded - stats.lastLoaded;
           const bytesPerSecond = bytesDiff / (timeDiff / 1000);
           speedStr = formatSpeed(bytesPerSecond);
@@ -139,9 +138,11 @@ export const uploadFileItem = async ({
         }
       }
 
-      const progressPercent = Math.round((loaded / total) * PERCENT_MULTIPLIER);
+      // Cap at 99% during active network transfer; finalized to 100% upon server response
+      const rawPercent = Math.round((loaded / total) * PERCENT_MULTIPLIER);
+      const progressPercent = Math.min(99, Math.max(0, rawPercent));
 
-      if (progressPercent === lastReportedPercent && !speedStr && progressPercent < 100) {
+      if (progressPercent === lastReportedPercent && !speedStr && progressPercent < 99) {
         return;
       }
       lastReportedPercent = progressPercent;

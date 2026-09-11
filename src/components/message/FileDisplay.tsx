@@ -1,14 +1,17 @@
-import { logService } from '@/services/logService';
+import { copyTextToClipboard } from '@/utils/clipboard';
 import React, { useState } from 'react';
 import { type UploadedFile } from '@/types';
 import { Check, Copy, Download, SlidersHorizontal, Scissors, Loader2, X } from 'lucide-react';
 import { triggerDownload } from '@/utils/export/core';
+import { getExtensionFromMimeType } from '@/utils/file/fileMime';
 import { CATEGORY_STYLES, getResolutionColor } from '@/utils/file/fileDisplayStyles';
 import { formatFileSize } from '@/utils/file/fileSize';
+import { formatDisplayFileName } from '@/utils/file/fileName';
 import { getFileCardMeta } from '@/components/shared/file-preview/fileCardMeta';
 import { useI18n } from '@/contexts/I18nContext';
 import { FileThumbnail } from '@/components/chat/input/files/FileThumbnail';
 import { interpolate } from '@/i18n/interpolate';
+import { isYoutubeUrl } from '@/utils/file/youtubeUrl';
 
 interface FileDisplayProps {
   file: UploadedFile;
@@ -25,14 +28,6 @@ const MIN_DISPLAY_EXTENSION_LENGTH = 2;
 const MAX_DISPLAY_EXTENSION_LENGTH = 4;
 const MAX_MIME_SUBTYPE_DISPLAY_LENGTH = 8;
 
-const formatDisplayFileName = (fileName: string): string => {
-  const recordingMatch = fileName.match(/^recording-\d{4}-\d{2}-\d{2}-(\d{2})(\d{2})(\d{2})(\.[^.]+)$/);
-  if (recordingMatch) {
-    return `rec-${recordingMatch[1]}:${recordingMatch[2]}:${recordingMatch[3]}${recordingMatch[4]}`;
-  }
-  return fileName;
-};
-
 const getFileExtensionLabel = (name: string): string | undefined => {
   if (!name.includes('.')) return undefined;
 
@@ -47,6 +42,7 @@ const getDisplayType = (mimeType: string, name: string) => {
   const extensionLabel = getFileExtensionLabel(name);
   if (extensionLabel) return extensionLabel;
 
+  if (mimeType === 'video/youtube-link' || mimeType.includes('youtube')) return 'YOUTUBE';
   if (mimeType.includes('pdf')) return 'PDF';
   if (mimeType.includes('word') || mimeType.includes('document')) return 'DOC';
   if (mimeType.includes('sheet') || mimeType.includes('excel')) return 'XLS';
@@ -58,9 +54,9 @@ const getDisplayType = (mimeType: string, name: string) => {
   if (mimeType.includes('javascript')) return 'JS';
   if (mimeType.includes('python')) return 'PY';
 
-  const subtype = mimeType.split('/').pop()?.toUpperCase() || 'FILE';
+  const subtype = (mimeType.split('/').pop()?.toUpperCase() || 'FILE').replace(/[-_]+$/, '');
   return subtype.length > MAX_MIME_SUBTYPE_DISPLAY_LENGTH
-    ? subtype.substring(0, MAX_MIME_SUBTYPE_DISPLAY_LENGTH)
+    ? subtype.substring(0, MAX_MIME_SUBTYPE_DISPLAY_LENGTH).replace(/[-_]+$/, '')
     : subtype;
 };
 
@@ -87,8 +83,6 @@ export const FileDisplay: React.FC<FileDisplayProps> = ({
     }
   };
 
-  const hasPreviewSource = !!file.dataUrl || file.rawFile instanceof Blob;
-  const isClickable = file.uploadState === 'active' && !file.error && !!onFileClick && hasPreviewSource;
   const { category, canConfigure, ConfigIcon } = getFileCardMeta(file, {
     isGemini3,
     includeTextEditing: false,
@@ -96,23 +90,39 @@ export const FileDisplay: React.FC<FileDisplayProps> = ({
     canConfigure: !!onConfigure,
   });
 
-  const handleCopyId = (event: React.MouseEvent) => {
+  const hasPreviewSource =
+    !!file.dataUrl ||
+    file.rawFile instanceof Blob ||
+    (category === 'youtube' && Boolean(file.fileUri || isYoutubeUrl(file.name)));
+  const isClickable =
+    (!file.uploadState || file.uploadState === 'active') &&
+    !file.error &&
+    !isUploading &&
+    !isProcessing &&
+    !!onFileClick &&
+    hasPreviewSource;
+
+  const handleCopyId = async (event: React.MouseEvent) => {
     event.stopPropagation();
     if (!file.fileApiName) return;
-    navigator.clipboard
-      .writeText(file.fileApiName)
-      .then(() => {
-        setIdCopied(true);
-        setTimeout(() => setIdCopied(false), COPIED_STATE_DURATION_MS);
-      })
-      .catch((error) => logService.error('Failed to copy file ID:', error));
+    const ok = await copyTextToClipboard(file.fileApiName);
+    if (ok) {
+      setIdCopied(true);
+      setTimeout(() => setIdCopied(false), COPIED_STATE_DURATION_MS);
+    }
   };
 
   const handleDownloadFile = (event: React.MouseEvent) => {
     event.stopPropagation();
     if (!file.dataUrl) return;
 
-    const filename = file.name || 'download';
+    let filename = file.name || 'download';
+    if (!filename.includes('.') && file.type) {
+      const ext = getExtensionFromMimeType(file.type);
+      if (ext && ext !== '.file') {
+        filename = `${filename}${ext}`;
+      }
+    }
     triggerDownload(file.dataUrl, filename, false);
   };
 
@@ -146,12 +156,16 @@ export const FileDisplay: React.FC<FileDisplayProps> = ({
             {isUploading && file.uploadSpeed && (
               <span className="text-[10px] text-white/80 mt-0.5">{file.uploadSpeed}</span>
             )}
-            {isUploading && (
+            {(isUploading || file.uploadState === 'processing_api') && (
               <div className="w-3/4 h-1.5 bg-black/30 rounded-full mt-2 overflow-hidden">
-                <div
-                  className="h-full bg-[var(--theme-text-link)] transition-all duration-300 rounded-full"
-                  style={{ width: `${uploadPercent}%` }}
-                />
+                {file.uploadState === 'processing_api' ? (
+                  <div className="h-full w-full bg-[var(--theme-text-link)]/80 animate-pulse rounded-full" />
+                ) : (
+                  <div
+                    className="h-full bg-[var(--theme-text-link)] transition-all duration-300 rounded-full"
+                    style={{ width: `${uploadPercent}%` }}
+                  />
+                )}
               </div>
             )}
             {isProcessing && (
@@ -285,12 +299,16 @@ export const FileDisplay: React.FC<FileDisplayProps> = ({
             </span>
           )}
         </div>
-        {isUploading && (
+        {(isUploading || file.uploadState === 'processing_api') && (
           <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-[var(--theme-border-secondary)]">
-            <div
-              className="h-full rounded-full bg-[var(--theme-text-link)] transition-[width] duration-200"
-              style={{ width: `${uploadPercent}%` }}
-            />
+            {file.uploadState === 'processing_api' ? (
+              <div className="h-full w-full rounded-full bg-[var(--theme-text-link)]/75 animate-pulse" />
+            ) : (
+              <div
+                className="h-full rounded-full bg-[var(--theme-text-link)] transition-[width] duration-200"
+                style={{ width: `${uploadPercent}%` }}
+              />
+            )}
           </div>
         )}
       </div>

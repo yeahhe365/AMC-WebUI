@@ -12,7 +12,7 @@ vi.mock('./apiClient', () => ({
   getConfiguredApiClientContext: getConfiguredApiClientContextMock,
 }));
 
-import { uploadFileApi } from './fileApi';
+import { uploadFileApi, getFileMetadataApi, listFilesApi, deleteFileApi, registerGcsFilesApi } from './fileApi';
 
 const uploadXhr = createFakeResumableUploadXhr({
   defaultProgressFractions: [0.5, 1],
@@ -198,5 +198,91 @@ describe('uploadFileApi', () => {
     expect(uploadXhr.requests[0].headers['X-Goog-Upload-Offset']).toBe('0');
     expect(uploadXhr.requests[1].headers['X-Goog-Upload-Offset']).toBe('0');
     expect(uploadedFile.name).toBe('files/test-file');
+  });
+});
+
+describe('getFileMetadataApi', () => {
+  it('fetches metadata for a valid fileApiName', async () => {
+    const mockFile = { name: 'files/test-id', uri: 'https://example.com/file' };
+    const mockGet = vi.fn().mockResolvedValue(mockFile);
+    getConfiguredApiClientMock.mockResolvedValue({
+      files: { get: mockGet },
+    });
+
+    const result = await getFileMetadataApi('api-key', 'files/test-id');
+    expect(mockGet).toHaveBeenCalledWith({ name: 'files/test-id' });
+    expect(result).toEqual(mockFile);
+  });
+
+  it('returns null if file is not found (404)', async () => {
+    const mockGet = vi.fn().mockRejectedValue(new Error('NOT_FOUND: 404'));
+    getConfiguredApiClientMock.mockResolvedValue({
+      files: { get: mockGet },
+    });
+
+    const result = await getFileMetadataApi('api-key', 'files/missing');
+    expect(result).toBeNull();
+  });
+
+  it('throws error for invalid format', async () => {
+    await expect(getFileMetadataApi('api-key', 'invalid-id')).rejects.toThrow('Invalid file ID format');
+  });
+});
+
+describe('listFilesApi', () => {
+  it('lists files and returns items and pagination token', async () => {
+    const mockFiles = [
+      { name: 'files/1', displayName: 'file1.txt' },
+      { name: 'files/2', displayName: 'file2.png' },
+    ];
+    const mockList = vi.fn().mockResolvedValue({
+      page: mockFiles,
+      params: { pageToken: 'next-page-token' },
+    });
+    getConfiguredApiClientMock.mockResolvedValue({
+      files: { list: mockList },
+    });
+
+    const result = await listFilesApi('api-key', 50, 'token-1');
+    expect(mockList).toHaveBeenCalledWith({
+      config: { pageSize: 50, pageToken: 'token-1' },
+    });
+    expect(result.files).toEqual(mockFiles);
+    expect(result.nextPageToken).toBe('next-page-token');
+  });
+});
+
+describe('deleteFileApi', () => {
+  it('deletes a file with valid files/ prefix', async () => {
+    const mockDelete = vi.fn().mockResolvedValue({});
+    getConfiguredApiClientMock.mockResolvedValue({
+      files: { delete: mockDelete },
+    });
+
+    await deleteFileApi('api-key', 'files/delete-me');
+    expect(mockDelete).toHaveBeenCalledWith({ name: 'files/delete-me' });
+  });
+
+  it('throws error for invalid format', async () => {
+    await expect(deleteFileApi('api-key', 'bad-name')).rejects.toThrow('Invalid file ID format');
+  });
+});
+
+describe('registerGcsFilesApi', () => {
+  it('returns empty array when uris is empty', async () => {
+    const result = await registerGcsFilesApi('api-key', []);
+    expect(result).toEqual([]);
+  });
+
+  it('registers files via SDK when available', async () => {
+    const mockFiles = [{ name: 'files/gcs-1', uri: 'gs://b/1' }];
+    const mockRegister = vi.fn().mockResolvedValue({ files: mockFiles });
+    getConfiguredApiClientMock.mockResolvedValue({
+      files: { registerFiles: mockRegister },
+    });
+
+    const result = await registerGcsFilesApi('api-key', ['gs://b/1']);
+    expect(mockRegister).toHaveBeenCalledWith({ uris: ['gs://b/1'] });
+    expect(result).toEqual(mockFiles);
   });
 });

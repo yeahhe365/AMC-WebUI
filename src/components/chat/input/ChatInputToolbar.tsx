@@ -14,6 +14,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { useChatInputToolbarContext } from './ChatInputContext';
 import { useI18n } from '@/contexts/I18nContext';
 import { TOOLBAR_IMAGE_CLUSTER_CLASS } from '@/constants/designTokens';
+import { GEMINI_PROVIDER_ID } from '@/types';
 
 const ChatInputToolbarComponent: React.FC = () => {
   const { t } = useI18n();
@@ -56,33 +57,48 @@ const ChatInputToolbarComponent: React.FC = () => {
   const imageOutputMode = useChatStore((state) => state.imageOutputMode);
   const setImageOutputMode = useChatStore((state) => state.setImageOutputMode);
   const fileError = useChatStore((state) => state.appFileError);
-  const ttsVoice = currentChatSettings.ttsVoice;
-  const mediaResolution = currentChatSettings.mediaResolution;
+  const providerId = currentChatSettings?.providerId;
+  const isGeminiNative = providerId === undefined || providerId === GEMINI_PROVIDER_ID;
+
+  const ttsVoice = currentChatSettings?.ttsVoice;
+  const mediaResolution = currentChatSettings?.mediaResolution;
   const generateQuadImages = appSettings.generateQuadImages ?? false;
   const setTtsVoice = (voice: string) => setCurrentChatSettings((prev) => ({ ...prev, ttsVoice: voice }));
   const setMediaResolution = (resolution: typeof mediaResolution) =>
     setCurrentChatSettings((prev) => ({ ...prev, mediaResolution: resolution }));
-  const showAspectRatio = (isImageGenerationModel || isGemini3ImageModel) && !!aspectRatio;
+  const showAspectRatio = isGeminiNative && (isImageGenerationModel || isGemini3ImageModel) && !!aspectRatio;
   // Only show size control when the user has a real choice.
-  const showImageSize = !!supportedImageSizes && supportedImageSizes.length > 1 && !!imageSize;
-  const showImageOutputMode = isImageGenerationModel && !!imageOutputMode;
-  const showQuadToggle = (isImageGenerationModel || isGemini3ImageModel) && generateQuadImages !== undefined;
+  const showImageSize = isGeminiNative && !!supportedImageSizes && supportedImageSizes.length > 1 && !!imageSize;
+  const showImageOutputMode = isGeminiNative && isImageGenerationModel && !!imageOutputMode;
+  const showQuadToggle =
+    isGeminiNative && (isImageGenerationModel || isGemini3ImageModel) && generateQuadImages !== undefined;
   const showImageCluster = showAspectRatio || showImageSize || showImageOutputMode || showQuadToggle;
 
   // Allow voice selection for TTS and Native Audio (Live) models, except Live Translate
   // and Live Transcribe (which output translated speech or text only).
   const canShowTtsVoice =
-    (isTtsModel || isNativeAudioModel) && !isLiveTranslate && !capabilities.isLiveTranscribe && Boolean(ttsVoice);
+    isGeminiNative &&
+    (isTtsModel || isNativeAudioModel) &&
+    !isLiveTranslate &&
+    !capabilities.isLiveTranscribe &&
+    Boolean(ttsVoice);
 
   // Live Translate models show a language-direction selector instead of voice
-  const canShowLanguageDirection = isLiveTranslate;
+  const canShowLanguageDirection = isGeminiNative && isLiveTranslate;
 
   // Show Media Resolution selector for Native Audio multimodal (Live API) to control stream quality
   const canShowMediaResolution =
-    isNativeAudioModel && !isLiveTranslate && !capabilities.isLiveTranscribe && Boolean(mediaResolution);
+    isGeminiNative &&
+    isNativeAudioModel &&
+    !isLiveTranslate &&
+    !capabilities.isLiveTranscribe &&
+    Boolean(mediaResolution);
 
   // Show Transcribe cluster for Gemini 3.5 Transcribe (batch file transcription)
-  const canShowTranscribeCluster = capabilities.isTranscribeModel && !capabilities.isLiveTranscribe;
+  const canShowTranscribeCluster = isGeminiNative && capabilities.isTranscribeModel && !capabilities.isLiveTranscribe;
+  const canShowTtsDirectorNotes = isGeminiNative && isTtsModel;
+  const canShowAddByIdInput = isGeminiNative && showAddByIdInput;
+  const canShowAddByUrlInput = isGeminiNative && showAddByUrlInput;
 
   const hasVisibleContent =
     showAspectRatio ||
@@ -93,9 +109,10 @@ const ChatInputToolbarComponent: React.FC = () => {
     canShowLanguageDirection ||
     canShowMediaResolution ||
     canShowTranscribeCluster ||
+    canShowTtsDirectorNotes ||
     fileError ||
-    showAddByIdInput ||
-    showAddByUrlInput;
+    canShowAddByIdInput ||
+    canShowAddByUrlInput;
 
   return (
     <div
@@ -110,7 +127,7 @@ const ChatInputToolbarComponent: React.FC = () => {
         canShowLanguageDirection ||
         canShowMediaResolution ||
         canShowTranscribeCluster ||
-        isTtsModel) && (
+        canShowTtsDirectorNotes) && (
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           {canShowTranscribeCluster && (
             <TranscribeCluster
@@ -121,7 +138,7 @@ const ChatInputToolbarComponent: React.FC = () => {
           )}
           {canShowTtsVoice && <TtsVoiceSelector ttsVoice={ttsVoice} setTtsVoice={setTtsVoice} />}
           {canShowLanguageDirection && <LanguageDirectionSelector />}
-          {isTtsModel && (
+          {canShowTtsDirectorNotes && (
             <button
               type="button"
               onClick={onEditTtsContext}
@@ -181,7 +198,7 @@ const ChatInputToolbarComponent: React.FC = () => {
           {fileError}
         </div>
       )}
-      {showAddByIdInput && (
+      {canShowAddByIdInput && (
         <AddFileByIdInput
           fileIdInput={fileIdInput}
           setFileIdInput={setFileIdInput}
@@ -191,7 +208,7 @@ const ChatInputToolbarComponent: React.FC = () => {
           isLoading={isLoading}
         />
       )}
-      {showAddByUrlInput && (
+      {canShowAddByUrlInput && (
         <AddUrlInput
           urlInput={urlInput}
           setUrlInput={setUrlInput}

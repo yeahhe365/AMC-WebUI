@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Copy, MessageSquarePlus } from 'lucide-react';
 import { fetchMcpPrompt, type McpPromptDefinition } from '@/services/api/mcpApi';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { getErrorMessage } from '@/utils/errorMessage';
 import { useChatStore } from '@/stores/chatStore';
 import { useChatDraftStore } from '@/stores/chatDraftStore';
 import type { McpServerConfig } from '@/types';
@@ -27,7 +29,7 @@ export const McpPromptsTab: React.FC<McpPromptsTabProps> = ({ server, prompts, t
   const [errorFor, setErrorFor] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [renderedText, setRenderedText] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const { isCopied: copied, copyToClipboard } = useCopyToClipboard(2000);
 
   if (!prompts.length) {
     return <div className="p-4 text-sm text-[var(--theme-text-secondary)]">{t('settingsMcpEmptyPrompts')}</div>;
@@ -48,7 +50,7 @@ export const McpPromptsTab: React.FC<McpPromptsTabProps> = ({ server, prompts, t
       setRenderedText(promptResultToText(body));
     } catch (promptFetchError) {
       setErrorFor(prompt.name);
-      setErrorMessage(promptFetchError instanceof Error ? promptFetchError.message : String(promptFetchError));
+      setErrorMessage(getErrorMessage(promptFetchError));
     } finally {
       setLoadingName(null);
     }
@@ -58,16 +60,12 @@ export const McpPromptsTab: React.FC<McpPromptsTabProps> = ({ server, prompts, t
     if (!renderedText) return;
     const sessionId = useChatStore.getState().activeSessionId;
     if (!sessionId) {
-      await navigator.clipboard.writeText(renderedText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      void copyToClipboard(renderedText);
       return;
     }
     useChatDraftStore
       .getState()
       .setDraftText(sessionId, (prev) => (prev ? `${prev}\n\n${renderedText}` : renderedText));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -151,10 +149,8 @@ export const McpPromptsTab: React.FC<McpPromptsTabProps> = ({ server, prompts, t
                       </button>
                       <button
                         type="button"
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(renderedText);
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 2000);
+                        onClick={() => {
+                          if (renderedText) void copyToClipboard(renderedText);
                         }}
                         className="flex items-center gap-1 text-[11px]"
                       >

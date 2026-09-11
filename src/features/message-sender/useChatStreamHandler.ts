@@ -1,11 +1,6 @@
 import { type MutableRefObject, useCallback } from 'react';
 import { deferToNextTick } from '@/utils/deferToNextTick';
-import {
-  type AppSettings,
-  type SavedChatSession,
-  type ChatSettings as IndividualChatSettings,
-  type UploadedFile,
-} from '@/types';
+import { type AppSettings, type ChatSettings as IndividualChatSettings, type UploadedFile } from '@/types';
 import type { Part, UsageMetadata } from '@google/genai';
 import { useApiErrorHandler } from './useApiErrorHandler';
 import { logService } from '@/services/logService';
@@ -27,12 +22,7 @@ import { buildCompletionNotificationBody, emitCompletionFeedback } from './compl
 import { getTranslator } from '@/i18n/translations';
 import { resolveAppLanguage } from '@/i18n/languageRegistry';
 import { useChatStore } from '@/stores/chatStore';
-import type { StreamHandlerOptions } from './messageSenderTypes';
-
-type SessionsUpdater = (
-  updater: (prev: SavedChatSession[]) => SavedChatSession[],
-  options?: { persist?: boolean },
-) => void;
+import type { SessionsUpdater, StreamHandlerOptions } from './messageSenderTypes';
 
 interface ChatStreamHandlerProps {
   appSettings: AppSettings;

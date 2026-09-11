@@ -49,6 +49,28 @@ export const TranscribeSettingsModal: React.FC<TranscribeSettingsModalProps> = (
     }
   }, [isOpen, systemInstruction, customVocabulary, wordTimestamps, speakerLabels, smartMode]);
 
+  const handleSmartModeChange = (enabled: boolean) => {
+    setDraftSmartMode(enabled);
+    if (enabled) {
+      setDraftWordTimestamps(false);
+      setDraftSpeakerLabels(false);
+    }
+  };
+
+  const handleWordTimestampsChange = (enabled: boolean) => {
+    setDraftWordTimestamps(enabled);
+    if (enabled) {
+      setDraftSmartMode(false);
+    }
+  };
+
+  const handleSpeakerLabelsChange = (enabled: boolean) => {
+    setDraftSpeakerLabels(enabled);
+    if (enabled) {
+      setDraftSmartMode(false);
+    }
+  };
+
   const handleSave = () => {
     onSave({
       systemInstruction: draftInstruction.trim(),
@@ -87,24 +109,27 @@ export const TranscribeSettingsModal: React.FC<TranscribeSettingsModalProps> = (
             <ToggleItem
               label={t('transcribeWordTimestamps')}
               checked={draftWordTimestamps}
-              onChange={setDraftWordTimestamps}
+              onChange={handleWordTimestampsChange}
               tooltip={t('transcribeWordTimestampsHelp')}
               small
             />
             <ToggleItem
               label={t('transcribeSpeakerLabels')}
               checked={draftSpeakerLabels}
-              onChange={setDraftSpeakerLabels}
+              onChange={handleSpeakerLabelsChange}
               tooltip={t('transcribeSpeakerLabelsHelp')}
               small
             />
             <ToggleItem
               label={t('transcribeSmartMode')}
               checked={draftSmartMode}
-              onChange={setDraftSmartMode}
+              onChange={handleSmartModeChange}
               tooltip={t('transcribeSmartModeHelp')}
               small
             />
+            <p className="text-[11px] leading-relaxed text-[var(--theme-text-tertiary)] px-1 pt-1.5 border-t border-[var(--theme-border-secondary)]/40">
+              {t('transcribeMutualExclusionNote')}
+            </p>
           </div>
 
           <div className="space-y-1.5">

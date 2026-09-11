@@ -1,4 +1,4 @@
-import { logService } from '@/services/logService';
+import { copyTextToClipboard, copyRichTableToClipboard, type RichTableClipboardContent } from '@/utils/clipboard';
 import { useState, useCallback, useEffect, useRef } from 'react';
 
 export const useCopyToClipboard = (resetDuration = 2000) => {
@@ -6,10 +6,10 @@ export const useCopyToClipboard = (resetDuration = 2000) => {
   const timeoutRef = useRef<number | null>(null);
 
   const copyToClipboard = useCallback(
-    async (text: string) => {
-      if (!text) return;
-      try {
-        await navigator.clipboard.writeText(text);
+    async (content: string | RichTableClipboardContent): Promise<boolean> => {
+      const success =
+        typeof content === 'string' ? await copyTextToClipboard(content) : await copyRichTableToClipboard(content);
+      if (success) {
         setIsCopied(true);
 
         if (timeoutRef.current) {
@@ -20,10 +20,10 @@ export const useCopyToClipboard = (resetDuration = 2000) => {
           setIsCopied(false);
           timeoutRef.current = null;
         }, resetDuration);
-      } catch (clipboardError) {
-        logService.error('Failed to copy text:', clipboardError);
-        setIsCopied(false);
+        return true;
       }
+      setIsCopied(false);
+      return false;
     },
     [resetDuration],
   );

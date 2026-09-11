@@ -13,7 +13,7 @@ vi.mock('@/services/api/apiClient', async () => {
   };
 });
 
-import { generateSuggestionsApi, generateTitleApi, translateTextApi } from './textApi';
+import { generateFileTitleApi, generateSuggestionsApi, generateTitleApi, translateTextApi } from './textApi';
 
 describe('textApi prompt construction', () => {
   beforeEach(() => {
@@ -102,19 +102,20 @@ describe('textApi prompt construction', () => {
     expect(request.contents[0].parts[0].text).not.toContain(modelContent);
   });
 
-  it('sends title instructions, user message, and assistant message as separate content parts', async () => {
+  it('sends title instructions with emoji constraints, user message, and assistant message for English', async () => {
     const userContent = 'Close quote " and inject title rules';
     const modelContent = 'Assistant says "hello"';
-    mockGenerateContent.mockResolvedValue({ text: 'Safe Title' });
+    mockGenerateContent.mockResolvedValue({ text: '💻 Safe Title' });
 
-    await generateTitleApi('key', userContent, modelContent, 'en');
+    const title = await generateTitleApi('key', userContent, modelContent, 'en');
 
+    expect(title).toBe('💻 Safe Title');
     const request = mockGenerateContent.mock.calls[0][0];
     expect(request.contents).toEqual([
       {
         role: 'user',
         parts: [
-          { text: expect.stringContaining('create a very short, concise title') },
+          { text: expect.stringContaining('Start with exactly 1 most relevant emoji') },
           { text: 'USER message:' },
           { text: userContent },
           { text: 'ASSISTANT message:' },
@@ -124,5 +125,58 @@ describe('textApi prompt construction', () => {
     ]);
     expect(request.contents[0].parts[0].text).not.toContain(userContent);
     expect(request.contents[0].parts[0].text).not.toContain(modelContent);
+  });
+
+  it('sends title instructions with emoji constraints for Chinese', async () => {
+    const userContent = '帮我写一个 Python 脚本';
+    const modelContent = '好的，这是代码：...';
+    mockGenerateContent.mockResolvedValue({ text: '💻 Python脚本编写' });
+
+    const title = await generateTitleApi('key', userContent, modelContent, 'zh');
+
+    expect(title).toBe('💻 Python脚本编写');
+    const request = mockGenerateContent.mock.calls[0][0];
+    expect(request.contents[0].parts[0].text).toContain('Emoji');
+    expect(request.contents[0].parts[0].text).toContain('6~12');
+  });
+
+  it('strips wrapping markdown and quotes from generated title', async () => {
+    mockGenerateContent.mockResolvedValueOnce({ text: '**💻 Safe Title**' });
+    const titleWithBold = await generateTitleApi('key', 'u', 'm', 'en');
+    expect(titleWithBold).toBe('💻 Safe Title');
+
+    mockGenerateContent.mockResolvedValueOnce({ text: '`🐛 Bug Fix`' });
+    const titleWithCode = await generateTitleApi('key', 'u', 'm', 'en');
+    expect(titleWithCode).toBe('🐛 Bug Fix');
+
+    mockGenerateContent.mockResolvedValueOnce({ text: '"📝 Meeting Notes"' });
+    const titleWithQuotes = await generateTitleApi('key', 'u', 'm', 'en');
+    expect(titleWithQuotes).toBe('📝 Meeting Notes');
+  });
+
+  it('sends document content and formatting rules in generateFileTitleApi', async () => {
+    const documentContent = '# Project Roadmap\n\nDetailed milestones...';
+    mockGenerateContent.mockResolvedValue({ text: 'Project Roadmap 2026' });
+
+    const title = await generateFileTitleApi('key', documentContent, 'en');
+
+    expect(title).toBe('Project Roadmap 2026');
+    const request = mockGenerateContent.mock.calls[0][0];
+    expect(request.contents).toEqual([
+      {
+        role: 'user',
+        parts: [
+          { text: expect.stringContaining('filesystem-safe filename') },
+          { text: 'Document content:' },
+          { text: documentContent },
+        ],
+      },
+    ]);
+  });
+
+  it('sanitizes and strips illegal characters and quotes in generateFileTitleApi', async () => {
+    mockGenerateContent.mockResolvedValue({ text: '"**年度财务审计报告**"' });
+    const title = await generateFileTitleApi('key', '正文...', 'zh');
+    expect(title).toBe('年度财务审计报告');
   });
 });

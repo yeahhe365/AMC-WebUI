@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateApiUsageRecordPriceUsd } from './usagePricing';
+import { calculateApiUsageRecordPriceUsd, estimateMessageCostUsd, formatCostUsd } from './usagePricing';
 import type { ApiUsageRecord } from '@/services/db/dbService';
 
 describe('calculateApiUsageRecordPriceUsd', () => {
@@ -209,5 +209,23 @@ describe('calculateApiUsageRecordPriceUsd', () => {
 
     // 1.0 * 0.3 + 0.1 * 2.5 = 0.3 + 0.25 = 0.55
     expect(calculateApiUsageRecordPriceUsd(record)).toBeCloseTo(0.55, 6);
+  });
+});
+
+describe('estimateMessageCostUsd and formatCostUsd', () => {
+  it('estimates message cost correctly for flash models', () => {
+    const cost = estimateMessageCostUsd('gemini-3.6-flash', {
+      promptTokens: 1000,
+      completionTokens: 500,
+    });
+    // 1000/1M * 1.5 + 500/1M * 7.5 = 0.0015 + 0.00375 = 0.00525
+    expect(cost).toBeCloseTo(0.00525, 5);
+  });
+
+  it('formats small costs below floor as <$0.0001', () => {
+    expect(formatCostUsd(0.00005)).toBe('<$0.0001');
+    expect(formatCostUsd(0.0012)).toBe('$0.0012');
+    expect(formatCostUsd(1.5)).toBe('$1.50');
+    expect(formatCostUsd(null)).toBe('—');
   });
 });

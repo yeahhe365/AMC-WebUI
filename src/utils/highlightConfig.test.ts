@@ -36,6 +36,14 @@ describe('highlightConfig', () => {
       'less',
       'ini',
       'makefile',
+      'make',
+      'html',
+      'jsonc',
+      'postgres',
+      'mysql',
+      'sqlite',
+      'mjs',
+      'docker-compose',
     ];
 
     expect(supportedLanguages.filter((language) => !hljs.getLanguage(language))).toEqual([]);

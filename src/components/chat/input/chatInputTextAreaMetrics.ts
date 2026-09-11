@@ -1,2 +1,1 @@
 export const INITIAL_TEXTAREA_HEIGHT_PX = 24;
-export const MAX_TEXTAREA_HEIGHT_PX = 150;

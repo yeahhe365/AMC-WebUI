@@ -104,11 +104,6 @@ export const createFilePreviewModalMock = (options: { testId?: string; onModuleL
   };
 };
 
-export const createMarkdownPreviewModalMock = (testId = 'markdown-preview-modal') => ({
-  MarkdownPreviewModal: ({ file }: { file: UploadedFile | null }) =>
-    file ? <div data-testid={testId}>{file.name}</div> : null,
-});
-
 export const createMessageListScrollMock = (overrides: Partial<MessageListScrollMockResult> = {}) => ({
   useMessageListScroll: (): MessageListScrollMockResult => ({
     virtuosoRef: { current: null },

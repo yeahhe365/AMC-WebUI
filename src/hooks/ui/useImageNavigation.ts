@@ -7,10 +7,13 @@ export const useImageNavigation = (
   currentFile: UploadedFile | null,
   setPreviewFile: (file: UploadedFile | null) => void,
 ) => {
-  // Centralized logic to filter navigable images
+  // Centralized logic to filter navigable files.
+  // If non-image files are present, allows cycling across all valid (non-error) files.
   const images = useMemo(() => {
     if (!sourceFiles) return [];
-    return sourceFiles.filter((f) => isImageMimeType(f.type) && !f.error);
+    const validFiles = sourceFiles.filter((f) => !f.error);
+    const imageFiles = validFiles.filter((f) => isImageMimeType(f.type));
+    return validFiles.length > imageFiles.length ? validFiles : imageFiles;
   }, [sourceFiles]);
 
   const currentIndex = useMemo(() => {

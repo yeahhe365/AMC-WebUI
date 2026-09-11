@@ -122,7 +122,7 @@ export const useMessageUpdates = ({
   }, [activeSessionId]);
 
   const handleUpdateMessageContent = useCallback(
-    (messageId: string, newContent: string) => {
+    (messageId: string, newContent: string, newFiles?: UploadedFile[]) => {
       if (!activeSessionId) return;
       logService.info('Tampering message content', { messageId });
       const updateActiveMessage =
@@ -130,7 +130,12 @@ export const useMessageUpdates = ({
         ((id: string, updater: Partial<ChatMessage> | ((message: ChatMessage) => ChatMessage)) =>
           updateAndPersistSessions((prev) => updateMessageInSession(prev, activeSessionId, id, updater)));
 
-      updateActiveMessage(messageId, (message) => ({ ...message, content: newContent, apiParts: undefined }));
+      updateActiveMessage(messageId, (message) => ({
+        ...message,
+        content: newContent,
+        ...(newFiles !== undefined ? { files: newFiles.length > 0 ? newFiles : undefined } : {}),
+        apiParts: undefined,
+      }));
     },
     [activeSessionId, updateAndPersistSessions, updateMessageInActiveSession],
   );

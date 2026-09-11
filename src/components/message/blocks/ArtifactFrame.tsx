@@ -4,6 +4,7 @@ import { Maximize2 } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import { useWindowContext } from '@/contexts/WindowContext';
 import { SMALL_ICON_BUTTON_CLASS } from '@/constants/buttonClasses';
+import { hashString } from '@/utils/stringHash';
 import {
   buildStreamingHtmlPreviewRenderPayload,
   buildHtmlPreviewSrcDoc,
@@ -18,6 +19,8 @@ import { useHtmlPreviewBridge } from '@/hooks/ui/useHtmlPreviewBridge';
 import { useHtmlPreviewGraphvizRelay } from '@/hooks/ui/useHtmlPreviewGraphvizRelay';
 import { type LiveArtifactFollowupPayload } from '@/utils/live-artifacts/liveArtifactFollowup';
 import { LIVE_ARTIFACT_CLEAR_SELECTION_EVENT } from '@/utils/text-selection/liveArtifactSelection';
+import { type UploadedFile } from '@/types';
+import { svgToUploadedFile } from '@/utils/export/svgToUploadedFile';
 
 interface ArtifactFrameProps {
   html: string;
@@ -27,6 +30,7 @@ interface ArtifactFrameProps {
   themeId?: string;
   onFollowUp?: (payload: LiveArtifactFollowupPayload) => void;
   onOpenPreview?: () => void;
+  onImageClick?: (file: UploadedFile) => void;
 }
 
 const MIN_FRAME_HEIGHT = 120;
@@ -36,16 +40,6 @@ const STREAMING_SRC_DOC_THROTTLE_MS = 120;
 const frameHeightCache = new Map<string, number>();
 
 const normalizeFrameHeight = (height: number) => Math.max(MIN_FRAME_HEIGHT, Math.ceil(height));
-
-const hashString = (value: string): string => {
-  let hash = 0;
-
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) | 0;
-  }
-
-  return (hash >>> 0).toString(36);
-};
 
 const getContentFrameHeightCacheKey = (html: string, cacheKey?: string): string => {
   const contentHash = `${html.length}:${hashString(html)}`;
@@ -87,6 +81,7 @@ export const ArtifactFrame: React.FC<ArtifactFrameProps> = ({
   themeId,
   onFollowUp,
   onOpenPreview,
+  onImageClick,
 }) => {
   const { t } = useI18n();
   const { window: targetWindow } = useWindowContext();
@@ -297,6 +292,19 @@ export const ArtifactFrame: React.FC<ArtifactFrameProps> = ({
     [contentHeightCacheKey, heightCacheKey, isLoading, streamingHeightCacheKey],
   );
 
+  const handleDiagramClick = useCallback(
+    ({ svg, title }: { svg: string; title?: string }) => {
+      if (!onImageClick || !svg) return;
+      const diagramId = `artifact-diagram-${Math.random().toString(36).substring(2, 9)}`;
+      const file = svgToUploadedFile(svg, {
+        id: diagramId,
+        name: title ? `${title}.svg` : 'diagram.svg',
+      });
+      onImageClick(file);
+    },
+    [onImageClick],
+  );
+
   useHtmlPreviewBridge({
     iframeRef,
     targetWindow,
@@ -306,6 +314,7 @@ export const ArtifactFrame: React.FC<ArtifactFrameProps> = ({
       onResize: handleBridgeResize,
       onCopy: copyToParentClipboard,
       onFollowUp,
+      onDiagramClick: handleDiagramClick,
     },
   });
 

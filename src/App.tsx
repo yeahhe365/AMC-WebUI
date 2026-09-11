@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { useApp } from './hooks/app/useApp';
 import { WindowProvider } from './contexts/WindowContext';
@@ -8,8 +8,20 @@ import { PiPPlaceholder } from './components/layout/PiPPlaceholder';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 import { PwaUpdateBanner } from './components/pwa/PwaUpdateBanner';
 import { ToastViewport } from './components/shared/toast/ToastViewport';
-import { McpToolApprovalDialog } from './components/mcp/McpToolApprovalDialog';
-import { McpShareInstallGate } from './components/mcp/McpShareInstallGate';
+import { lazyNamedComponent } from './utils/lazyNamedComponent';
+
+const LazyMcpToolApprovalDialog = lazyNamedComponent(
+  () => import('./components/mcp/McpToolApprovalDialog'),
+  'McpToolApprovalDialog',
+);
+const LazyMcpShareInstallGate = lazyNamedComponent(
+  () => import('./components/mcp/McpShareInstallGate'),
+  'McpShareInstallGate',
+);
+const LazyGlobalCommandPalette = lazyNamedComponent(
+  () => import('./components/command/GlobalCommandPalette'),
+  'GlobalCommandPalette',
+);
 
 const App: React.FC = () => {
   return (
@@ -28,7 +40,14 @@ const AppContent: React.FC = () => {
 
   // 把文件拖放提升到 App 根：侧边栏/侧面板等区域也能接收文件拖入。
   // 仅处理 Files 类型，避免影响侧边栏的会话拖拽排序和文本选区拖拽。
-  const isFileDrag = (event: React.DragEvent<HTMLElement>) => event.dataTransfer.types.includes('Files');
+  const isFileDrag = (event: React.DragEvent<HTMLElement>) => {
+    const types = event.dataTransfer?.types;
+    if (!types) return false;
+    for (let i = 0; i < types.length; i++) {
+      if (types[i] === 'Files' || types[i].toLowerCase() === 'files') return true;
+    }
+    return false;
+  };
   const isModalEvent = (event: React.DragEvent<HTMLElement>) =>
     event.target instanceof Element && !!event.target.closest('[data-modal-backdrop="true"]');
 
@@ -86,8 +105,19 @@ const AppContent: React.FC = () => {
         />
       ) : null}
       <ToastViewport />
-      <McpToolApprovalDialog />
-      <McpShareInstallGate />
+      <Suspense fallback={null}>
+        <LazyMcpToolApprovalDialog />
+      </Suspense>
+      <Suspense fallback={null}>
+        <LazyMcpShareInstallGate />
+      </Suspense>
+      <Suspense fallback={null}>
+        <LazyGlobalCommandPalette
+          onNewChat={chatState.startNewChat}
+          onOpenExportModal={() => app.setIsExportModalOpen(true)}
+          onClearCurrentChat={chatState.handleClearCurrentChat}
+        />
+      </Suspense>
     </div>
   );
 };

@@ -58,7 +58,13 @@ export const validateMessageBeforeSend = ({
     return { ok: false };
   }
 
-  if (files.some((file) => file.uploadState === 'failed' || file.uploadState === 'cancelled' || !!file.error)) {
+  if (
+    files.some(
+      (file) =>
+        !file.omittedFromApiHistory &&
+        (file.uploadState === 'failed' || file.uploadState === 'cancelled' || Boolean(file.error)),
+    )
+  ) {
     logService.warn('Send message blocked: failed or cancelled attachments are still selected.');
     return { ok: false, fileError: t('messageSenderFileUploadFailedBeforeSend') };
   }

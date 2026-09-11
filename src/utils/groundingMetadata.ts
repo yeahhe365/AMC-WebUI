@@ -18,6 +18,13 @@ export interface GroundingChunkLike {
     title?: string;
     uri?: string;
     text?: string;
+    placeAnswerSources?: {
+      reviewSnippets?: Array<{
+        reviewId?: string;
+        googleMapsUri?: string;
+        title?: string;
+      }>;
+    };
   };
 }
 
@@ -135,9 +142,18 @@ export const mergeGroundingMetadata = (
   return Object.keys(merged).length > 0 ? merged : undefined;
 };
 
+export interface MapsPlaceReview {
+  reviewId?: string;
+  googleMapsUri?: string;
+  title?: string;
+}
+
 export interface MapsPlace {
   uri: string;
   title: string;
+  placeId?: string;
+  text?: string;
+  reviewSnippets?: MapsPlaceReview[];
   /** Original index in groundingChunks array — used to align with citation [N] markers. */
   chunkIndex: number;
 }
@@ -163,7 +179,28 @@ export const extractMapsPlaces = (metadata: unknown): MapsPlace[] => {
     const maps = chunk.maps as GroundingChunkLike['maps'];
     if (!maps?.uri || seen.has(maps.uri)) return;
     seen.add(maps.uri);
-    places.push({ uri: maps.uri, title: maps.title || maps.uri, chunkIndex: index });
+
+    const reviewSnippets: MapsPlaceReview[] = [];
+    if (isRecord(maps.placeAnswerSources) && Array.isArray(maps.placeAnswerSources.reviewSnippets)) {
+      maps.placeAnswerSources.reviewSnippets.forEach((snippet) => {
+        if (isRecord(snippet)) {
+          reviewSnippets.push({
+            reviewId: typeof snippet.reviewId === 'string' ? snippet.reviewId : undefined,
+            googleMapsUri: typeof snippet.googleMapsUri === 'string' ? snippet.googleMapsUri : undefined,
+            title: typeof snippet.title === 'string' ? snippet.title : undefined,
+          });
+        }
+      });
+    }
+
+    places.push({
+      uri: maps.uri,
+      title: maps.title || maps.uri,
+      placeId: typeof maps.placeId === 'string' ? maps.placeId : undefined,
+      text: typeof maps.text === 'string' ? maps.text : undefined,
+      reviewSnippets: reviewSnippets.length > 0 ? reviewSnippets : undefined,
+      chunkIndex: index,
+    });
   });
 
   return places;

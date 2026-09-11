@@ -9,7 +9,8 @@ import { SUPPORTED_UPLOAD_MIME_TYPES } from '@/constants/fileTypeSupport';
 import { logService } from '@/services/logService';
 import { formatApiKeyErrorMessage, getGeminiKeyForRequest } from '@/utils/apiKeySelection';
 import { generateUniqueId } from '@/utils/chat/ids';
-import { getFileMetadataApi } from '@/services/api/fileApi';
+import { getFileMetadataApi, registerGcsFilesApi } from '@/services/api/fileApi';
+import type { File as GeminiFile } from '@google/genai';
 import {
   formatGeminiFileApiProcessingError,
   getApiKeyFingerprint,
@@ -49,7 +50,8 @@ export const useFileIdAdder = ({
     async (fileApiId: string) => {
       logService.info(`Attempting to add file by ID: ${fileApiId}`);
       setAppFileError(null);
-      if (!fileApiId || !fileApiId.startsWith('files/')) {
+      const isGcs = fileApiId.startsWith('gs://');
+      if (!fileApiId || (!fileApiId.startsWith('files/') && !isGcs)) {
         logService.error('Invalid File ID format.', { fileApiId });
         setAppFileError(t('fileIdAdderInvalidFileId'));
         return;
@@ -96,7 +98,13 @@ export const useFileIdAdder = ({
       ]);
 
       try {
-        const fileMetadata = await getFileMetadataApi(keyToUse, fileApiId);
+        let fileMetadata: GeminiFile | null = null;
+        if (isGcs) {
+          const registered = await registerGcsFilesApi(keyToUse, [fileApiId]);
+          fileMetadata = registered[0] ?? null;
+        } else {
+          fileMetadata = await getFileMetadataApi(keyToUse, fileApiId);
+        }
         if (fileMetadata) {
           logService.info(`Successfully fetched metadata for file ID ${fileApiId}`, { metadata: fileMetadata });
           const mimeType = fileMetadata.mimeType ?? 'application/octet-stream';
@@ -215,5 +223,52 @@ export const useFileIdAdder = ({
     ],
   );
 
-  return { addFileById };
+  const addFilesFromCloud = useCallback(
+    (cloudFiles: GeminiFile[]) => {
+      if (!cloudFiles.length) return;
+      const keyResult = getGeminiKeyForRequest(appSettings, currentChatSettings, { skipIncrement: true });
+      const keyToUse = 'error' in keyResult ? '' : keyResult.key;
+      const defaultResolution =
+        currentChatSettings.mediaResolution !== MediaResolution.MEDIA_RESOLUTION_UNSPECIFIED
+          ? currentChatSettings.mediaResolution
+          : undefined;
+
+      const newFiles: UploadedFile[] = cloudFiles
+        .filter((file) => file.name && !selectedFiles.some((sf) => sf.fileApiName === file.name))
+        .map((file) => {
+          const mimeType = file.mimeType ?? 'application/octet-stream';
+          const { uploadState, isProcessing } = getUploadLifecycleForGeminiState(file.state);
+          return {
+            id: generateUniqueId(),
+            name: file.displayName || file.name || 'cloud-file',
+            type: mimeType,
+            size: Number(file.sizeBytes) || 0,
+            fileUri: file.uri,
+            fileApiName: file.name,
+            fileApiExpirationTime: toFileApiExpirationTime(file.expirationTime),
+            fileApiKeyFingerprint: keyToUse ? getApiKeyFingerprint(keyToUse) : undefined,
+            transferStrategy: 'remote-file-id',
+            isProcessing,
+            progress: 100,
+            uploadState,
+            error:
+              uploadState === 'failed'
+                ? formatGeminiFileApiProcessingError(
+                    file,
+                    t('fileIdAdderProcessingFailed'),
+                    t('fileIdAdderProcessingFailedWithMessage'),
+                  )
+                : undefined,
+            mediaResolution: defaultResolution,
+          };
+        });
+
+      if (newFiles.length > 0) {
+        setSelectedFiles((prev) => [...prev, ...newFiles]);
+      }
+    },
+    [appSettings, currentChatSettings, selectedFiles, setSelectedFiles, t],
+  );
+
+  return { addFileById, addFilesFromCloud };
 };

@@ -1,4 +1,4 @@
-import { decodeBase64ToArrayBuffer } from '@/utils/file/fileEncoding';
+import { arrayBufferToBase64, decodeBase64ToArrayBuffer } from '@/utils/file/fileEncoding';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 
 export { decodeBase64ToArrayBuffer };
@@ -36,13 +36,7 @@ export const float32ToPCM16Base64 = (data: Float32Array): string => {
     // wrapping Int16 to -32768. Matches float32ToPcm16Bytes below.
     int16[i] = Math.max(-1, Math.min(1, data[i])) * 0x7fff;
   }
-  let binary = '';
-  const bytes = new Uint8Array(int16.buffer);
-  const byteLength = bytes.byteLength;
-  for (let i = 0; i < byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
+  return arrayBufferToBase64(int16);
 };
 
 const createWavBuffer = (pcmData: Uint8Array, sampleRate: number, numChannels: number): ArrayBuffer => {
@@ -165,4 +159,13 @@ export const createWavBlobFromPCMChunks = (chunks: string[], sampleRate = 24000)
   const wavBuffer = createWavBuffer(merged, sampleRate, 1);
   const blob = new Blob([wavBuffer], { type: 'audio/wav' });
   return createManagedObjectUrl(blob);
+};
+
+/**
+ * Extracts the audio subtype/format from a MIME type (e.g. 'audio/wav' -> 'wav', 'audio/mp3' -> 'mp3').
+ * Defaults to 'wav' if no valid subtype is found.
+ */
+export const getInlineAudioFormat = (mimeType: string): string => {
+  const subtype = mimeType.split('/')[1]?.split(';')[0]?.trim();
+  return subtype || 'wav';
 };

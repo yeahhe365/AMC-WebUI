@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   sendStatelessMessageStreamApi: vi.fn(),
   sendOpenAICompatibleMessageNonStream: vi.fn(),
   sendOpenAICompatibleMessageStream: vi.fn(),
+  sendOpenAIResponsesNonStream: vi.fn(),
+  sendOpenAIResponsesStream: vi.fn(),
   sendAnthropicMessageNonStream: vi.fn(),
   sendAnthropicMessageStream: vi.fn(),
   createMcpClientFunctions: vi.fn(),
@@ -43,7 +45,10 @@ vi.mock('@/utils/chatApiRoute', () => ({
   isUnavailableThirdPartyRoute: (route: { unavailable?: string }) => route.unavailable !== undefined,
 }));
 vi.mock('@/services/api/geminiApiBaseUrl', () => ({ isGeminiProxyRelativePath: mocks.isGeminiProxyRelativePath }));
-vi.mock('@/utils/chat/builder', () => ({ createChatHistoryForApi: mocks.createChatHistoryForApi }));
+vi.mock('@/utils/chat/builder', () => ({
+  createChatHistoryForApi: mocks.createChatHistoryForApi,
+  appendTurnToHistory: (history: unknown[], role: string, parts: unknown[]) => [...(history || []), { role, parts }],
+}));
 vi.mock('@/services/api/generationConfig', () => ({
   buildGenerationConfig: mocks.buildGenerationConfig,
   appendFunctionDeclarationsToTools: mocks.appendFunctionDeclarationsToTools,
@@ -56,6 +61,10 @@ vi.mock('@/services/api/chatApi', () => ({
 vi.mock('@/services/api/openaiCompatibleApi', () => ({
   sendOpenAICompatibleMessageNonStream: mocks.sendOpenAICompatibleMessageNonStream,
   sendOpenAICompatibleMessageStream: mocks.sendOpenAICompatibleMessageStream,
+}));
+vi.mock('@/services/api/openaiResponsesApi', () => ({
+  sendOpenAIResponsesNonStream: mocks.sendOpenAIResponsesNonStream,
+  sendOpenAIResponsesStream: mocks.sendOpenAIResponsesStream,
 }));
 vi.mock('@/services/api/anthropicApi', () => ({
   sendAnthropicMessageNonStream: mocks.sendAnthropicMessageNonStream,
@@ -202,6 +211,45 @@ describe('performStandardChatApiCall', () => {
     expect((handlers.streamOnError.mock.calls[0][0] as Error).message).toBe('upstream down');
   });
 
+  it('routes an openai-responses turn to sendOpenAIResponsesStream when streaming', async () => {
+    mocks.resolveChatApiRoute.mockReturnValue({
+      provider: {
+        protocol: 'openai-responses',
+        baseUrl: 'https://api.openai.com',
+        templateId: 'openai',
+        extraHeaders: {},
+      },
+      providerId: 'openai',
+      modelId: 'gpt-4o',
+    });
+
+    await performStandardChatApiCall(baseParams() as never);
+
+    expect(mocks.sendOpenAIResponsesStream).toHaveBeenCalledTimes(1);
+    expect(mocks.sendOpenAICompatibleMessageStream).not.toHaveBeenCalled();
+    expect(mocks.sendAnthropicMessageStream).not.toHaveBeenCalled();
+  });
+
+  it('routes an openai-responses turn to sendOpenAIResponsesNonStream when non-streaming', async () => {
+    mocks.resolveChatApiRoute.mockReturnValue({
+      provider: {
+        protocol: 'openai-responses',
+        baseUrl: 'https://api.openai.com',
+        templateId: 'openai',
+        extraHeaders: {},
+      },
+      providerId: 'openai',
+      modelId: 'gpt-4o',
+    });
+
+    const params = baseParams({ appSettings: { ...DEFAULT_APP_SETTINGS, isStreamingEnabled: false } });
+    await performStandardChatApiCall(params as never);
+
+    expect(mocks.sendOpenAIResponsesNonStream).toHaveBeenCalledTimes(1);
+    expect(mocks.sendOpenAICompatibleMessageNonStream).not.toHaveBeenCalled();
+    expect(mocks.sendAnthropicMessageNonStream).not.toHaveBeenCalled();
+  });
+
   it('runs the tool loop, injects internal tool messages, and replays the final turn', async () => {
     mocks.createMcpClientFunctions.mockResolvedValue({
       mcpTool: { declaration: { name: 'mcpTool' }, handler: vi.fn() },
@@ -343,5 +391,116 @@ describe('performStandardChatApiCall', () => {
     expect(mocks.ensureHistoryFilesApiReferences).toHaveBeenCalledTimes(1);
     expect(handlers.streamOnError).not.toHaveBeenCalled();
     expect(handlers.streamOnComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('injects image visual grounding protocol directive when isImageNavEnabled is true and images are present', async () => {
+    mocks.sendStatelessMessageStreamApi.mockImplementation(
+      async (_key, _model, _history, _parts, _config, _signal, _part, _thought, _error, onComplete) => {
+        onComplete();
+      },
+    );
+
+    const imageFile = {
+      id: 'img-1',
+      name: 'screenshot.png',
+      type: 'image/png',
+      size: 100,
+    };
+
+    const params = baseParams({
+      sessionToUpdate: {
+        ...DEFAULT_CHAT_SETTINGS,
+        isImageNavEnabled: true,
+      },
+      enrichedFiles: [imageFile],
+    });
+
+    await performStandardChatApiCall(params as never);
+
+    expect(mocks.buildGenerationConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        systemInstruction: expect.stringContaining('Image Visual Grounding Protocol'),
+      }),
+    );
+  });
+
+  it('excludes Live Artifacts protocol from effectiveSystemInstruction when navigation locate directives are active', async () => {
+    mocks.sendStatelessMessageStreamApi.mockImplementation(
+      async (_key, _model, _history, _parts, _config, _signal, _part, _thought, _error, onComplete) => {
+        onComplete();
+      },
+    );
+
+    const pdfFile = {
+      id: 'pdf-1',
+      name: 'doc.pdf',
+      type: 'application/pdf',
+      size: 100,
+    };
+
+    const params = baseParams({
+      sessionToUpdate: {
+        ...DEFAULT_CHAT_SETTINGS,
+        isPdfNavEnabled: true,
+        systemInstruction: '[Live Artifacts Protocol - zh]\nLive Artifacts prompt',
+      },
+      enrichedFiles: [pdfFile],
+    });
+
+    await performStandardChatApiCall(params as never);
+
+    expect(mocks.buildGenerationConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        systemInstruction: expect.not.stringContaining('Live Artifacts Protocol'),
+      }),
+    );
+    expect(mocks.buildGenerationConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        systemInstruction: expect.stringContaining('PDF Locate Protocol'),
+      }),
+    );
+  });
+
+  it('preserves user custom instruction while excluding Live Artifacts when locate directives are active', async () => {
+    mocks.sendStatelessMessageStreamApi.mockImplementation(
+      async (_key, _model, _history, _parts, _config, _signal, _part, _thought, _error, onComplete) => {
+        onComplete();
+      },
+    );
+
+    const pdfFile = {
+      id: 'pdf-1',
+      name: 'doc.pdf',
+      type: 'application/pdf',
+      size: 100,
+    };
+
+    const params = baseParams({
+      sessionToUpdate: {
+        ...DEFAULT_CHAT_SETTINGS,
+        isPdfNavEnabled: true,
+        isLiveArtifactsEnabled: true,
+        systemInstruction: 'Stay concise and helpful.',
+      },
+      enrichedFiles: [pdfFile],
+    });
+
+    await performStandardChatApiCall(params as never);
+
+    expect(mocks.buildGenerationConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        systemInstruction: expect.stringContaining('Stay concise and helpful.'),
+      }),
+    );
+    expect(mocks.buildGenerationConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        systemInstruction: expect.stringContaining('PDF Locate Protocol'),
+      }),
+    );
+    expect(mocks.buildGenerationConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        systemInstruction: expect.not.stringContaining('Live Artifacts Protocol'),
+      }),
+    );
   });
 });

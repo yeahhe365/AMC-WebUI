@@ -1,0 +1,28 @@
+---
+title: 精确计费与开发者日志 (Pricing & Logs)
+description: AMC WebUI 严谨的官方定价计算模型、Token 消耗监控面板与 API 调用日志。
+---
+
+# 精确计费与开发者日志 (Pricing & Logs)
+
+为了帮助开发者和企业精确核算 API 账单成本，AMC WebUI 实现了**严格精确 (Strict Precision)** 的价格与用量追踪系统。
+
+---
+
+## 1. 价格计算核心准则
+
+- **拒绝估算，力求精准**：
+  许多套壳软件简单使用每千 Token 固定费率估算费用，导致多模态、大上下文场景下价格偏差极大。
+- AMC WebUI 仅在数据库存储的响应元数据**足以 100% 还原官方实际计费模型**时才显示具体美元金额：
+  - 区分输入 Token（Prompt Tokens）、缓存命中 Token（Cached Tokens）与思考输出 Token（Completion Tokens）。
+  - 区分模态计费（纯文本 vs 音频 vs 图片输入）。
+  - 对于旧历史记录或缺少精确凭证的请求，系统明确展示 `—` 占位，杜绝误导用户。
+
+---
+
+## 2. 开发者日志面板 (Dev Logs Panel)
+
+点击左下角或使用快捷键打开 **日志与监控面板**：
+- **实时 API 监控**：捕获每次网络请求的 HTTP 状态码、请求耗时 (Latency)、首 Token 响应时间 (TTFT)。
+- **Token 消耗瀑布流**：展示每轮对话的输入、输出及总 Token 开销。
+- **排错追踪**：网络报错或 4xx/5xx 异常时，可直接在日志面板中一键查看完整的错误堆栈与 Google/OpenAI 原生返回的错误详情 JSON。

@@ -3,22 +3,15 @@ import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import { setupProviderTestRenderer as setupTestRenderer } from '@/test/render/providerRenderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useSettingsUiStore } from '@/stores/settingsUiStore';
 import { setupStoreStateReset } from '@/test/stores/reset';
 import type { AppSettings } from '@/types';
 import { SERVER_MANAGED_API_KEY } from '@/utils/apiKeySelection';
-import { createThirdPartyConnection } from '@/test/data/factories';
 import { ApiConfigSection } from './ApiConfigSection';
 
-const {
-  getClientMock,
-  generateContentMock,
-  sendOpenAICompatibleMessageNonStreamMock,
-  sendAnthropicMessageNonStreamMock,
-} = vi.hoisted(() => ({
+const { getClientMock, generateContentMock } = vi.hoisted(() => ({
   getClientMock: vi.fn(),
   generateContentMock: vi.fn(),
-  sendOpenAICompatibleMessageNonStreamMock: vi.fn(),
-  sendAnthropicMessageNonStreamMock: vi.fn(),
 }));
 
 vi.mock('@/hooks/useDevice', () => ({
@@ -27,14 +20,6 @@ vi.mock('@/hooks/useDevice', () => ({
 
 vi.mock('@/services/api/apiClient', () => ({
   getClient: getClientMock,
-}));
-
-vi.mock('@/services/api/openaiCompatibleApi', () => ({
-  sendOpenAICompatibleMessageNonStream: sendOpenAICompatibleMessageNonStreamMock,
-}));
-
-vi.mock('@/services/api/anthropicApi', () => ({
-  sendAnthropicMessageNonStream: sendAnthropicMessageNonStreamMock,
 }));
 
 describe('ApiConfigSection', () => {
@@ -75,39 +60,9 @@ describe('ApiConfigSection', () => {
   const findButton = (label: string) =>
     Array.from(renderer.container.querySelectorAll('button')).find((button) => button.textContent?.includes(label));
 
-  const expandConnection = (name = 'OpenAI') => {
-    act(() => {
-      findButton(name)?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-  };
-
-  const withOpenaiProvider = (overrides: {
-    apiKey?: string | null;
-    baseUrl?: string | null;
-    modelId?: string;
-    models?: Array<{ id: string; name: string; isPinned?: boolean }>;
-  }): Partial<AppSettings> => {
-    return {
-      thirdPartyApi: {
-        connections: [
-          createThirdPartyConnection({
-            id: 'openai',
-            apiKey: overrides.apiKey ?? null,
-            baseUrl: overrides.baseUrl,
-            modelId: overrides.modelId,
-            models: overrides.models,
-            enabled: true,
-          }),
-        ],
-      },
-    };
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
     generateContentMock.mockResolvedValue({});
-    sendOpenAICompatibleMessageNonStreamMock.mockResolvedValue(undefined);
-    sendAnthropicMessageNonStreamMock.mockResolvedValue(undefined);
     getClientMock.mockReturnValue({
       models: {
         generateContent: generateContentMock,
@@ -157,7 +112,7 @@ describe('ApiConfigSection', () => {
 
     expect(renderer.container.textContent).not.toContain('API & Connections');
     expect(renderer.container.textContent).toContain('Test Connection');
-    expect(renderer.container.textContent).toContain('File Transfer Method');
+    expect(renderer.container.textContent).toContain('Manage Providers');
 
     act(() => {
       useSettingsStore.setState({ language: 'zh' });
@@ -165,140 +120,25 @@ describe('ApiConfigSection', () => {
 
     expect(renderer.container.textContent).not.toContain('API 与连接');
     expect(renderer.container.textContent).toContain('测试连通性');
-    expect(renderer.container.textContent).toContain('文件传输方式');
+    expect(renderer.container.textContent).toContain('前往服务商设置');
   });
 
-  it('shows the third-party provider cards without a global mode selector', async () => {
+  it('shows the providers redirect card and navigates to the providers tab', async () => {
     await renderApiConfigSection();
 
-    // No global mode toggle exists anymore — providers are enabled per-card.
-    expect(renderer.container.querySelector('[role="group"][aria-label="API Provider"]')).toBeNull();
-    expect(renderer.container.querySelector('#openai-compatible-api-enabled-toggle')).toBeNull();
-    expect(renderer.container.textContent).toContain('Add connection');
-  });
+    expect(renderer.container.textContent).toContain('Providers');
+    expect(renderer.container.textContent).toContain('Manage Providers');
 
-  it('tests the third-party openai endpoint with the active provider key', async () => {
-    await renderApiConfigSection({
-      useCustomApiConfig: false,
-      settings: {
-        ...settingsFixture,
-        ...withOpenaiProvider({
-          apiKey: 'openai-compatible-key',
-          baseUrl: 'https://api.openai.com/v1',
-          modelId: 'gpt-5.6-sol',
-        }),
-      },
-    });
-
-    expandConnection();
-
-    // The Gemini tester is always in the DOM (CSS-collapsed when custom config
-    // is off). The OpenAI card's tester is the LAST one — the Gemini tester
-    // renders first inside the collapsed custom-config block.
-    const testButtons = Array.from(renderer.container.querySelectorAll('button')).filter((button) =>
-      button.textContent?.includes('Test Connection'),
+    const manageButton = Array.from(renderer.container.querySelectorAll('button')).find((btn) =>
+      btn.textContent?.includes('Manage Providers'),
     );
-    const testButton = testButtons[testButtons.length - 1];
+    expect(manageButton).toBeDefined();
 
-    await act(async () => {
-      testButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    act(() => {
+      manageButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    expect(getClientMock).not.toHaveBeenCalled();
-    expect(sendOpenAICompatibleMessageNonStreamMock).toHaveBeenCalledWith(
-      'openai-compatible-key',
-      'gpt-5.6-sol',
-      [],
-      [{ text: 'Hello' }],
-      {
-        baseUrl: 'https://api.openai.com/v1',
-        temperature: 0,
-        extraHeaders: {},
-      },
-      expect.any(AbortSignal),
-      expect.any(Function),
-      expect.any(Function),
-      'user',
-      'openai',
-    );
-  });
-
-  it('shows the active provider base url in the third-party settings panel', async () => {
-    await renderApiConfigSection({
-      settings: {
-        ...settingsFixture,
-        ...withOpenaiProvider({ baseUrl: 'https://gateway.example.com/v1' }),
-      },
-    });
-
-    expandConnection();
-
-    const baseUrlInput = renderer.container.querySelector(
-      '#connection-openai-base-url-input',
-    ) as HTMLInputElement | null;
-    expect(baseUrlInput).not.toBeNull();
-    expect(baseUrlInput?.value).toBe('https://gateway.example.com/v1');
-  });
-
-  it('edits the active provider api key without overwriting the Gemini api key', async () => {
-    const setApiKey = vi.fn();
-    const onUpdate = vi.fn();
-
-    await renderApiConfigSection({
-      useCustomApiConfig: false, // hide the Gemini api key input so #api-key-input is the third-party one
-      setApiKey,
-      settings: {
-        ...settingsFixture,
-        ...withOpenaiProvider({ apiKey: null, baseUrl: 'https://api.openai.com/v1' }),
-      },
-      onUpdate,
-    });
-
-    expandConnection();
-
-    // The Gemini api-key input is always in the DOM (CSS-collapsed when custom
-    // config is off). The OpenAI card's input is the LAST one.
-    const apiKeyInputs = Array.from(
-      renderer.container.querySelectorAll<HTMLTextAreaElement>('#connection-openai-api-key-input'),
-    );
-    const apiKeyInput = apiKeyInputs[apiKeyInputs.length - 1];
-    expect(apiKeyInput).not.toBeNull();
-
-    await act(async () => {
-      const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
-      descriptor?.set?.call(apiKeyInput, 'sk-openai');
-      apiKeyInput!.dispatchEvent(new Event('input', { bubbles: true }));
-      apiKeyInput!.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-
-    expect(setApiKey).not.toHaveBeenCalled();
-    // The active provider api key is written through onUpdate with the full thirdPartyApi object.
-    const thirdPartyUpdate = onUpdate.mock.calls.find(([key]) => key === 'thirdPartyApi');
-    expect(thirdPartyUpdate).toBeDefined();
-    const updatedSettings = thirdPartyUpdate![1] as AppSettings['thirdPartyApi'];
-    expect(updatedSettings.connections.find((connection) => connection.id === 'openai')?.apiKey).toBe('sk-openai');
-  });
-
-  it('shows active provider model management inside the third-party API settings panel', async () => {
-    await renderApiConfigSection({
-      settings: {
-        ...settingsFixture,
-        ...withOpenaiProvider({
-          modelId: 'gpt-5.6-sol',
-          models: [
-            { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', isPinned: true },
-            { id: 'gpt-4.1', name: 'GPT-4.1' },
-          ],
-        }),
-      },
-    });
-
-    expandConnection();
-
-    expect(renderer.container.querySelector('#connection-openai-base-url-input')).not.toBeNull();
-    // Per-provider collapsible UI (no separate <select>): the active provider
-    // (openai) is expanded by default and its model list editor is rendered.
-    expect(renderer.container.querySelector('[aria-label="Model Name 1"]')).not.toBeNull();
+    expect(useSettingsUiStore.getState().activeTab).toBe('providers');
   });
 
   it('explains that Live uses the browser API key directly without token endpoint settings', async () => {
@@ -306,10 +146,20 @@ describe('ApiConfigSection', () => {
       apiKey: 'browser-key',
     });
 
-    expect(renderer.container.textContent).toContain('Live connects from this browser');
-    expect(renderer.container.textContent).toContain('uses your browser API key directly');
+    expect(renderer.container.textContent).toContain('Live API Dedicated Key (Optional)');
+    expect(renderer.container.textContent).toContain('Currently using the general Gemini API key above by default.');
     expect(renderer.container.textContent).not.toContain('/api/live-token');
     expect(renderer.container.textContent).not.toContain('Advanced Live Settings');
     expect(renderer.container.querySelector('#live-token-endpoint-input')).toBeNull();
+
+    // Clicking expands the dedicated key input
+    const toggleButton = findButton('Live API Dedicated Key');
+    expect(toggleButton).toBeDefined();
+
+    act(() => {
+      toggleButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(renderer.container.querySelector('#live-api-key-input')).not.toBeNull();
   });
 });

@@ -27,9 +27,21 @@ type MockDbService = MockRecord & {
   getLogs: MockFn;
   clearLogs: MockFn;
   pruneLogs: MockFn;
+  getStandaloneLibraryFiles: MockFn;
+  saveStandaloneLibraryFiles: MockFn;
+  addStandaloneLibraryFiles: MockFn;
+  deleteStandaloneLibraryFiles: MockFn;
+  renameStandaloneLibraryFile: MockFn;
+  fetchLibraryFileBlob: MockFn;
+  getAllHistoricalSessionFiles: MockFn;
+  getDeletedLibraryFileIds: MockFn;
+  addDeletedLibraryFileIds: MockFn;
   addApiUsageRecord: MockFn;
   getApiUsageByTimeRange: MockFn;
   clearApiUsage: MockFn;
+  saveDraftFiles: MockFn;
+  getDraftFiles: MockFn;
+  deleteDraftFiles: MockFn;
   estimateAppDataSize: MockFn;
   clearAllData: MockFn;
 };
@@ -77,9 +89,21 @@ export const createMockDbService = (overrides: Partial<MockDbService> = {}): Moc
   getLogs: asyncMockFn([]),
   clearLogs: asyncMockFn(undefined),
   pruneLogs: asyncMockFn(undefined),
+  getStandaloneLibraryFiles: asyncMockFn([]),
+  saveStandaloneLibraryFiles: asyncMockFn(undefined),
+  addStandaloneLibraryFiles: asyncMockFn(undefined),
+  deleteStandaloneLibraryFiles: asyncMockFn(undefined),
+  renameStandaloneLibraryFile: asyncMockFn(undefined),
+  fetchLibraryFileBlob: asyncMockFn(null),
+  getAllHistoricalSessionFiles: asyncMockFn([]),
+  getDeletedLibraryFileIds: asyncMockFn([]),
+  addDeletedLibraryFileIds: asyncMockFn(undefined),
   addApiUsageRecord: asyncMockFn(undefined),
   getApiUsageByTimeRange: asyncMockFn([]),
   clearApiUsage: asyncMockFn(undefined),
+  saveDraftFiles: asyncMockFn(undefined),
+  getDraftFiles: asyncMockFn([]),
+  deleteDraftFiles: asyncMockFn(undefined),
   estimateAppDataSize: asyncMockFn({
     totalBytes: 0,
     indexedDbBytes: 0,

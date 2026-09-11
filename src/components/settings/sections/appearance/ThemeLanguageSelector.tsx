@@ -3,12 +3,7 @@ import { useI18n } from '@/contexts/I18nContext';
 import type { AppSettings } from '@/types';
 import { SUPPORTED_LANGUAGES, LANGUAGE_META } from '@/i18n/languageRegistry';
 import { Select } from '@/components/shared/Select';
-import {
-  SETTINGS_SEGMENTED_ACTIVE_CLASS,
-  SETTINGS_SEGMENTED_IDLE_CLASS,
-  SETTINGS_SEGMENTED_TRACK_CLASS,
-  SETTINGS_SECTION_CARD_CLASS,
-} from '@/constants/designTokens';
+import { SETTINGS_SECTION_CARD_CLASS } from '@/constants/designTokens';
 
 export const ThemeLanguageSelector: React.FC<{
   settings: AppSettings;
@@ -20,6 +15,7 @@ export const ThemeLanguageSelector: React.FC<{
     { id: 'onyx', labelKey: 'settingsThemeDark' },
     { id: 'graphite', labelKey: 'settingsThemeGray' },
     { id: 'pearl', labelKey: 'settingsThemeLight' },
+    { id: 'sepia', labelKey: 'settingsThemeSepia' },
   ] as const;
 
   return (
@@ -29,21 +25,20 @@ export const ThemeLanguageSelector: React.FC<{
         data-settings-item="interface-theme"
       >
         <span className="text-sm font-medium text-[var(--theme-text-primary)]">{t('settingsTheme')}</span>
-        <div className={`${SETTINGS_SEGMENTED_TRACK_CLASS} flex-wrap`} role="group" aria-label={t('settingsTheme')}>
+        <Select
+          id="interface-theme-select"
+          label={t('settingsTheme')}
+          hideLabel
+          value={settings.themeId}
+          onChange={(e) => onUpdate('themeId', e.target.value as AppSettings['themeId'])}
+          wrapperClassName="w-44"
+        >
           {themeOptions.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => onUpdate('themeId', option.id)}
-              className={
-                settings.themeId === option.id ? SETTINGS_SEGMENTED_ACTIVE_CLASS : SETTINGS_SEGMENTED_IDLE_CLASS
-              }
-              title={t(option.labelKey)}
-            >
+            <option key={option.id} value={option.id}>
               {t(option.labelKey)}
-            </button>
+            </option>
           ))}
-        </div>
+        </Select>
       </div>
 
       <div

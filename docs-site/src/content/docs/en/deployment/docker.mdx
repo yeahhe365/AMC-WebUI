@@ -1,0 +1,49 @@
+---
+title: Docker Compose Deployment
+description: Deploying the web (frontend & reverse proxy) and api (Node backend & Live WS proxy) multi-container stack.
+---
+
+# Docker Compose Deployment
+
+Docker Compose is the recommended deployment mode for self-hosting. It runs as two decoupled lightweight containers:
+- **`web`**: Serves pre-built static assets, listens on `WEB_PORT` (default `8080`), and reverse-proxies `/api/*` to the backend.
+- **`api`**: Node.js backend listening on `PORT` (`3001`), hosting Gemini API proxies, third-party routes, and the Live WebSocket proxy.
+
+---
+
+## Quickstart
+
+```bash
+# 1. Build production bundles
+pnpm run build:docker
+
+# 2. Start containers in background
+docker compose up -d --build
+```
+
+Access the UI at: **`http://localhost:8080`**.
+
+---
+
+## Architecture & Optimizations
+
+- **Host Build Pipeline**: The `web` image directly copies the host's compiled `dist/`, avoiding redundant `node_modules` downloads inside Docker.
+- **Dynamic Runtime Config (`runtime-config.js`)**:
+  On startup, `docker/web-server.js` dynamically writes public environment variables into `runtime-config.js`, enabling instant reconfiguration without rebuilding container images.
+
+---
+
+## Useful Commands
+
+```bash
+# Follow logs
+docker compose logs -f
+
+# Stop containers
+docker compose down
+
+# Rebuild after pulling updates
+git pull
+pnpm run build:docker
+docker compose up -d --build
+```

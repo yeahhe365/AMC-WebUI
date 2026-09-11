@@ -1,6 +1,8 @@
 import { type AppSettings, type ChatSettings, type ThirdPartyConnection } from '@/types';
 import { API_KEY_LAST_USED_INDEX_BY_TARGET_KEY, API_KEY_LAST_USED_INDEX_KEY } from '@/constants/storageKeys';
 import { logService } from '@/services/logService';
+import { readPersistentStorageItem, writePersistentStorageItem } from '@/stores/persistentStorage';
+import { safeJsonParse } from './safeJsonParse';
 import { isUnavailableThirdPartyRoute, resolveChatApiRoute } from './chatApiRoute';
 import { SERVER_MANAGED_API_KEY } from '../../shared/serverManagedApiKey';
 
@@ -100,36 +102,28 @@ export const parseApiKeys = (apiKeysString: string | null): string[] => {
 };
 
 const readRotationMap = (): Record<string, number> => {
-  try {
-    const storedMap = localStorage.getItem(API_KEY_LAST_USED_INDEX_BY_TARGET_KEY);
-    if (storedMap) {
-      const parsed: unknown = JSON.parse(storedMap);
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return parsed as Record<string, number>;
-      }
+  const storedMap = readPersistentStorageItem(API_KEY_LAST_USED_INDEX_BY_TARGET_KEY);
+  if (storedMap) {
+    const parsed = safeJsonParse<unknown>(storedMap, null);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, number>;
     }
+  }
 
-    const legacyIndex = localStorage.getItem(API_KEY_LAST_USED_INDEX_KEY);
-    if (legacyIndex !== null) {
-      const parsed = parseInt(legacyIndex, 10);
-      if (!Number.isNaN(parsed)) {
-        return { [GEMINI_API_KEY_ROTATION_TARGET]: parsed };
-      }
+  const legacyIndex = readPersistentStorageItem(API_KEY_LAST_USED_INDEX_KEY);
+  if (legacyIndex !== null) {
+    const parsed = parseInt(legacyIndex, 10);
+    if (!Number.isNaN(parsed)) {
+      return { [GEMINI_API_KEY_ROTATION_TARGET]: parsed };
     }
-  } catch (storageError) {
-    logService.error('Could not parse last used API key index', storageError);
   }
 
   return {};
 };
 
 const writeRotationIndex = (targetId: string, index: number) => {
-  try {
-    const nextMap = { ...readRotationMap(), [targetId]: index };
-    localStorage.setItem(API_KEY_LAST_USED_INDEX_BY_TARGET_KEY, JSON.stringify(nextMap));
-  } catch (storageError) {
-    logService.error('Could not save last used API key index', storageError);
-  }
+  const nextMap = { ...readRotationMap(), [targetId]: index };
+  writePersistentStorageItem(API_KEY_LAST_USED_INDEX_BY_TARGET_KEY, JSON.stringify(nextMap));
 };
 
 export const getKeyForRequest = (
@@ -154,13 +148,19 @@ export const getKeyForRequest = (
   const shouldLogUsage = !skipUsageLogging && (apiKeyRequestMode === 'third-party' || appSettings.useCustomApiConfig);
 
   const logUsage = (key: string) => {
-    if (shouldLogUsage) {
+    if (shouldLogUsage && key !== 'auth-optional') {
       logService.recordApiKeyUsage(key);
     }
   };
 
   const { apiKeysString } = getActiveApiConfig(appSettings, currentChatSettings, options);
   if (!apiKeysString) {
+    if (apiKeyRequestMode === 'third-party') {
+      const provider = resolveProviderForKey(appSettings, currentChatSettings, options);
+      if (provider?.authOptional) {
+        return { key: 'auth-optional', isNewKey: false };
+      }
+    }
     if (shouldUseServerManagedMarker) {
       return { key: SERVER_MANAGED_API_KEY, isNewKey: false };
     }
@@ -170,6 +170,12 @@ export const getKeyForRequest = (
   const availableKeys = parseApiKeys(apiKeysString);
 
   if (availableKeys.length === 0) {
+    if (apiKeyRequestMode === 'third-party') {
+      const provider = resolveProviderForKey(appSettings, currentChatSettings, options);
+      if (provider?.authOptional) {
+        return { key: 'auth-optional', isNewKey: false };
+      }
+    }
     if (shouldUseServerManagedMarker) {
       return { key: SERVER_MANAGED_API_KEY, isNewKey: false };
     }

@@ -1,8 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, Ban, Check, ChevronDown, Copy, Hourglass, Loader2, ShieldCheck } from 'lucide-react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  Ban,
+  Check,
+  ChevronDown,
+  Copy,
+  Hourglass,
+  Loader2,
+  ShieldCheck,
+} from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import { extractMcpResultSegments } from '@/features/mcp/mcpResultSummary';
 import { resolveToolDisplay } from '@/features/mcp/toolDisplayNames';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useMcpApprovalStore } from '@/stores/mcpApprovalStore';
 import { useMcpToolRun, type McpToolRunEvent } from '@/stores/mcpToolRuntimeStore';
 
@@ -11,6 +22,35 @@ import type { FunctionCall, Part } from '@google/genai';
 const MAX_ARG_VALUE_LENGTH = 4000;
 
 export type McpToolCallStatus = 'invoking' | 'success' | 'error' | 'cancelled';
+
+const extractToolErrorMessage = (response: unknown): string | null => {
+  if (!response || typeof response !== 'object') return null;
+  const res = response as Record<string, unknown>;
+
+  if (typeof res.error === 'string' && res.error.trim()) {
+    return res.error.trim();
+  }
+  if (res.error && typeof res.error === 'object') {
+    const inner = res.error as Record<string, unknown>;
+    if (typeof inner.message === 'string' && inner.message.trim()) return inner.message.trim();
+    try {
+      return JSON.stringify(res.error);
+    } catch {
+      return String(res.error);
+    }
+  }
+  if (Array.isArray(res.content)) {
+    for (const item of res.content) {
+      if (item && typeof item === 'object' && 'text' in item && typeof item.text === 'string') {
+        if (res.isError) return item.text.trim();
+      }
+    }
+  }
+  if (typeof res.message === 'string' && res.status === 'error') {
+    return res.message.trim();
+  }
+  return null;
+};
 
 const formatElapsed = (ms: number): string => {
   const totalSeconds = Math.floor(ms / 1000);
@@ -53,7 +93,7 @@ export const McpToolCallBlock: React.FC<{
   // expanded, finished ones collapse so tool output never floods the transcript.
   const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
   const expanded = manualExpanded ?? status === 'invoking';
-  const [copied, setCopied] = useState(false);
+  const { isCopied: copied, copyToClipboard } = useCopyToClipboard(2000);
 
   // Live elapsed time while running; freezes at the last tick once settled.
   const [liveMs, setLiveMs] = useState<number | null>(null);
@@ -123,6 +163,7 @@ export const McpToolCallBlock: React.FC<{
   const argsStr = JSON.stringify(call.args, null, 2);
   const truncated = argsStr.length > MAX_ARG_VALUE_LENGTH ? argsStr.slice(0, MAX_ARG_VALUE_LENGTH) + '…' : argsStr;
   const responseSegments = extractMcpResultSegments(responsePart?.functionResponse?.response);
+  const errorMessage = status === 'error' ? extractToolErrorMessage(responsePart?.functionResponse?.response) : null;
 
   const statusLabel = awaitingApproval
     ? t('mcpToolStatusAwaitingApproval')
@@ -184,6 +225,15 @@ export const McpToolCallBlock: React.FC<{
             <span className="truncate font-mono">{formatProgressLine(latestEvent as McpToolRunEvent)}</span>
           </div>
         )}
+        {status === 'error' && errorMessage && (
+          <div
+            data-testid="mcp-tool-error-summary"
+            className="mt-1.5 flex w-full items-center gap-1.5 rounded bg-red-500/10 px-2 py-1 text-[11px] text-[var(--theme-text-danger)] font-mono"
+          >
+            <AlertCircle className="h-3.5 w-3.5 shrink-0 text-[var(--theme-text-danger)]" />
+            <span className="truncate">{errorMessage}</span>
+          </div>
+        )}
         {showHeaderBar && (
           <div className="mt-1.5 h-0.5 w-full overflow-hidden rounded-full bg-[var(--theme-bg-tertiary)]">
             {percent !== null ? (
@@ -206,6 +256,20 @@ export const McpToolCallBlock: React.FC<{
           <pre className="overflow-auto max-h-[300px] whitespace-pre-wrap">{truncated}</pre>
           {argsStr.length > MAX_ARG_VALUE_LENGTH && (
             <div className="text-[11px] text-muted">{t('mcpToolTruncated')}</div>
+          )}
+          {status === 'error' && errorMessage && (
+            <div
+              data-testid="mcp-tool-error-details"
+              className="mt-2 rounded-md border border-red-500/30 bg-red-500/5 p-2.5 text-xs text-[var(--theme-text-danger)]"
+            >
+              <div className="flex items-center gap-1.5 font-semibold text-[11px] mb-1">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                <span>{t('mcpToolExecutionFailed')}</span>
+              </div>
+              <pre className="whitespace-pre-wrap font-mono text-[11px] break-all leading-relaxed max-h-[200px] overflow-auto select-text">
+                {errorMessage}
+              </pre>
+            </div>
           )}
           {events.length > 0 && (
             <>
@@ -252,12 +316,10 @@ export const McpToolCallBlock: React.FC<{
             )}
           </div>
           <button
-            onClick={async () => {
-              await navigator.clipboard.writeText(
+            onClick={() => {
+              void copyToClipboard(
                 JSON.stringify({ params: call.args, response: responsePart?.functionResponse?.response }, null, 2),
               );
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
             }}
             className="mt-2 flex items-center gap-1 text-[11px]"
           >

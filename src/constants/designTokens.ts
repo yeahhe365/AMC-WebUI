@@ -95,7 +95,3 @@ export const SETTINGS_NAV_IDLE_CLASS =
 
 /** Quiet type=search field used in Help and Preset Scenarios. */
 export const SETTINGS_SEARCH_INPUT_CLASS = `h-10 w-full rounded-lg border border-transparent bg-[var(--theme-bg-tertiary)]/45 pl-9 pr-3 text-sm text-[var(--theme-text-primary)] placeholder:text-[var(--theme-text-tertiary)] transition-colors hover:bg-[var(--theme-bg-tertiary)]/70 focus:bg-[var(--theme-bg-tertiary)] ${FOCUS_VISIBLE_RING_INSET_CLASS} focus:ring-2 focus:ring-inset focus:ring-[var(--theme-border-focus)]/35`;
-
-/** Shared range slider track (temperature, font size, safety thresholds…). */
-export const SETTINGS_RANGE_SLIDER_CLASS =
-  'w-full h-1.5 bg-[var(--theme-border-secondary)] rounded-lg appearance-none cursor-pointer accent-[var(--theme-bg-accent)] hover:accent-[var(--theme-bg-accent-hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)]';

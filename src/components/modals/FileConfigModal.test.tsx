@@ -313,4 +313,55 @@ describe('FileConfigModal', () => {
     await openResolutionSelect();
     expect(document.body.textContent).not.toContain('Ultra High');
   });
+
+  it('sets FPS when clicking a preset chip', async () => {
+    const file = buildVideoFile('video-chip');
+    renderModal(file);
+
+    const lectureChip = getButtonByText('0.2 (Lecture)');
+    expect(lectureChip).toBeDefined();
+
+    await act(async () => {
+      lectureChip!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const inputs = Array.from(document.querySelectorAll('input')) as HTMLInputElement[];
+    expect(inputs[2].value).toBe('0.2');
+  });
+
+  it('shows trimming feedback and clears offsets when reset is clicked', async () => {
+    const file = buildVideoFile('video-trim');
+    renderModal(file);
+
+    const inputs = Array.from(document.querySelectorAll('input')) as HTMLInputElement[];
+    await act(async () => {
+      setInputValue(inputs[0], '10s');
+      setInputValue(inputs[1], '40s');
+    });
+
+    expect(document.body.textContent).toContain('Clipped span: 00:30 (30s)');
+
+    const resetButton = getButtonByText('Reset');
+    expect(resetButton).toBeDefined();
+
+    await act(async () => {
+      resetButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(inputs[0].value).toBe('');
+    expect(inputs[1].value).toBe('');
+  });
+
+  it('displays file type badge and formatted size in the header', () => {
+    const file: UploadedFile = {
+      ...buildVideoFile('video-header'),
+      name: 'recording.mp4',
+      size: 5 * 1024 * 1024,
+    };
+
+    renderModal(file);
+
+    expect(document.body.textContent).toContain('MP4');
+    expect(document.body.textContent).toContain('5.00 MB');
+  });
 });

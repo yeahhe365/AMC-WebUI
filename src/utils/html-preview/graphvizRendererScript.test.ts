@@ -136,14 +136,19 @@ const runRenderer = (
 ): {
   api: GraphvizApi;
   requests: Array<{ id: string; dot: string }>;
+  postedMessages: Array<{ event: string; payload: unknown }>;
   dispatch: (payload: unknown, source?: unknown) => void;
 } => {
   const requests: Array<{ id: string; dot: string }> = [];
+  const postedMessages: Array<{ event: string; payload: unknown }> = [];
   let messageListener: ((event: { data: unknown; source: unknown }) => void) | null = null;
 
   const parentStub = {
-    postMessage: (message: { event: string; payload: { id: string; dot: string } }) => {
-      requests.push(message.payload);
+    postMessage: (message: { event: string; payload: unknown }) => {
+      postedMessages.push(message);
+      if (message.event === 'graphviz-render-request') {
+        requests.push(message.payload as { id: string; dot: string });
+      }
     },
   };
 
@@ -165,6 +170,7 @@ const runRenderer = (
   return {
     api: (stubWindow as unknown as { __amcGraphviz: GraphvizApi }).__amcGraphviz,
     requests,
+    postedMessages,
     dispatch: (payload, source = parentStub) => {
       messageListener?.({
         data: { channel: 'amc-webui-html-preview', event: 'graphviz-render-response', payload },
@@ -392,5 +398,38 @@ describe('GRAPHVIZ_RENDERER_SCRIPT', () => {
       cleanup();
       vi.useRealTimers();
     }
+  });
+
+  it('posts a diagram-click event to parentWindow when a rendered graphviz node is clicked', () => {
+    const doc = createGraphvizDoc('digraph { A -> B }');
+    const { requests, dispatch, postedMessages } = runRenderer(doc);
+
+    dispatch({
+      id: requests[0]!.id,
+      ok: true,
+      svg: '<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>',
+    });
+
+    const node = doc.querySelector('[data-amc-graphviz]')!;
+    expect(node.getAttribute('data-amc-graphviz-state')).toBe('rendered');
+    expect(node.getAttribute('title')).toContain('点击放大查看');
+    expect((node as HTMLElement).style.cursor).toBe('zoom-in');
+
+    const svg = node.querySelector('svg')!;
+    // Untrusted click (synthetic) produces no diagram-click message
+    svg.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(postedMessages.find((m) => m.event === 'diagram-click')).toBeUndefined();
+
+    // Trusted click produces diagram-click message
+    const trustedEvent = new MouseEvent('click', { bubbles: true, cancelable: true });
+    Object.assign(trustedEvent, { _isMockTrusted: true });
+    svg.dispatchEvent(trustedEvent);
+
+    const diagramClick = postedMessages.find((m) => m.event === 'diagram-click');
+    expect(diagramClick).toBeDefined();
+    expect(diagramClick!.payload).toEqual({
+      svg: svg.outerHTML,
+      title: 'Graphviz',
+    });
   });
 });

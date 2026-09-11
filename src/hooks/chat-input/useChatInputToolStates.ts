@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react';
 import { type ChatSettings, GEMINI_PROVIDER_ID } from '@/types';
 import type { ChatToolSettingKey, ChatToolToggleStates, ToggleableChatToolId } from '@/types/chatTools';
 import { useChatStore } from '@/stores/chatStore';
+import { supportsSearchMapsCombination } from '@/utils/model/modelCapabilities';
 
 interface UseChatInputToolStatesParams {
   currentChatSettings: ChatSettings;
@@ -36,21 +37,39 @@ export const getNextSettingsForToolToggle = (settings: ChatSettings, toolId: Tog
     };
   }
 
-  // googleSearch and googleMaps are mutually exclusive (SDK rejects a request that
-  // carries both tools), so enabling one disables the other.
+  // googleSearch and deepSearch are mutually exclusive search prompt modes:
+  // enabling either one disables the other.
+  // Google Maps can be combined with Google Search on Gemini 3.5+ models.
+  // On older models (e.g. Gemini 2.5), Google Search and Google Maps remain mutually exclusive.
+  const canCombineSearchMaps = supportsSearchMapsCombination(settings.modelId);
+
   if (toolId === 'googleSearch') {
+    const willEnable = !settings.isGoogleSearchEnabled;
     return {
       ...settings,
-      isGoogleSearchEnabled: !settings.isGoogleSearchEnabled,
-      isGoogleMapsEnabled: !settings.isGoogleSearchEnabled ? false : settings.isGoogleMapsEnabled,
+      isGoogleSearchEnabled: willEnable,
+      isDeepSearchEnabled: willEnable ? false : settings.isDeepSearchEnabled,
+      isGoogleMapsEnabled: willEnable && !canCombineSearchMaps ? false : settings.isGoogleMapsEnabled,
+    };
+  }
+
+  if (toolId === 'deepSearch') {
+    const willEnable = !settings.isDeepSearchEnabled;
+    return {
+      ...settings,
+      isDeepSearchEnabled: willEnable,
+      isGoogleSearchEnabled: willEnable ? false : settings.isGoogleSearchEnabled,
+      isGoogleMapsEnabled: willEnable && !canCombineSearchMaps ? false : settings.isGoogleMapsEnabled,
     };
   }
 
   if (toolId === 'googleMaps') {
+    const willEnable = !settings.isGoogleMapsEnabled;
     return {
       ...settings,
-      isGoogleMapsEnabled: !settings.isGoogleMapsEnabled,
-      isGoogleSearchEnabled: !settings.isGoogleMapsEnabled ? false : settings.isGoogleSearchEnabled,
+      isGoogleMapsEnabled: willEnable,
+      isGoogleSearchEnabled: willEnable && !canCombineSearchMaps ? false : settings.isGoogleSearchEnabled,
+      isDeepSearchEnabled: willEnable && !canCombineSearchMaps ? false : settings.isDeepSearchEnabled,
     };
   }
 

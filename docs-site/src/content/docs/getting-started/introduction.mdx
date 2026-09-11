@@ -1,0 +1,59 @@
+---
+title: 项目简介 (Introduction)
+description: 认识 AMC WebUI 的设计理念、Local-First 架构与双路由模型控制台特性。
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+# 认识 AMC WebUI
+
+**AMC WebUI (All-in-one Model Console WebUI)** 是一款专为 AI 极客、开发者和重度研究者打造的现代大模型控制台。它以 **Google Gemini 原生高阶能力** 为核心主线，同时兼容 **OpenAI 标准聊天接口**，并在架构上坚决贯彻 **Local-First（本地与隐私优先）** 原则。
+
+---
+
+## 核心设计理念
+
+### 1. Local-First 隐私优先
+在 AMC WebUI 中，用户的对话数据、设置参数与临时文件**默认完整保存在浏览器端本地**（IndexedDB），并通过浏览器的 Web Locks API 防止多标签页并发写入冲突：
+- 敏感 API Key 默认仅存放在浏览器本地（BYOK 模式）。
+- 会话记录、Token 消耗日志由用户完全掌控，支持一键导出与离线备份。
+- 无需强制注册任何中转第三方账号。
+
+### 2. 双 API 路由引擎 (Dual Route Engine)
+与常见的简单套壳工具不同，AMC WebUI 将底层网络通信划分为两条互不干扰的独立路径：
+- **Gemini 原生路径**：深度集成 `@google/genai` 官方 SDK，直连原生 Thinking、Live API (双向音视频)、Google Grounding 搜索与地图、Cloud Files API 等独占能力。
+- **OpenAI 兼容路径**：面向通用 LLM 生态的标准端点（如 DeepSeek、Claude、OpenRouter、Qwen 及各类第三方聚合网关），使用独立的 Key、Base URL 与模型列表，互不污染。
+
+---
+
+## 核心特性全景
+
+<CardGrid>
+  <Card title="🧠 深度思维链 (Thinking)" icon="rocket">
+    精准调节思考 Token 预算（最高 32,768 Tokens）与思考强度（Low / Medium / High），并支持调用轻量模型将思考过程实时翻译为本地语言。
+  </Card>
+  <Card title="🎙️ 实时双向音视频 (Live API)" icon="laptop">
+    通过高吞吐 WebSocket 与 AudioWorklet 实现超低延迟语音通话、摄像头画面分析与屏幕共享，支持 Docker 全代理与直连双模式。
+  </Card>
+  <Card title="🧩 Live Artifacts 与图表" icon="puzzle">
+    代码块实时转译为可交互沙箱。内置 **Apache ECharts** 专业数据可视化、**Mermaid** 流程图与 **Graphviz** 图结构渲染引擎。
+  </Card>
+  <Card title="🐍 本地 Python WASM 沙箱" icon="setting">
+    基于 Pyodide 在前端 Web Worker 中直接运行 Python 科学计算代码（numpy、pandas、matplotlib），图表自动捕获输出，零服务器算力消耗。
+  </Card>
+</CardGrid>
+
+---
+
+## 部署形态与自由度
+
+AMC WebUI 提供了极其灵活的部署方案以适应不同环境：
+
+1. **纯静态部署 (Static SPA)**：
+   - 构建产物可直接一键部署至 Cloudflare Pages、Vercel 或 GitHub Pages。
+   - 浏览器直连官方端点，零服务器托管维护成本。
+2. **Docker Compose 双容器部署 (推荐自用)**：
+   - 包含轻量前端 `web` 容器与 Node `api` 后端服务。
+   - 提供 Gemini 代理反代、第三方模型路由反代、Live API WebSocket 全代理及 MCP 桥接。
+3. **静态前端 + 独立 Node API**：
+   - 前端部署在边缘 CDN，后端托管在自建云服务器，兼顾访问速度与私有密钥统一管理。

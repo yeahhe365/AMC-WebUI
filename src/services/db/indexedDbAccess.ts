@@ -103,3 +103,12 @@ export async function setKeyValue<T>(key: string, value: T): Promise<void> {
     return transactionToPromise(tx);
   });
 }
+
+export async function deleteKeyValue(key: string): Promise<void> {
+  return withWriteLock(async () => {
+    const db = await getDb();
+    const tx = db.transaction(KEY_VALUE_STORE, 'readwrite');
+    tx.objectStore(KEY_VALUE_STORE).delete(key);
+    return transactionToPromise(tx);
+  });
+}

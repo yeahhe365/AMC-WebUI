@@ -117,6 +117,29 @@ describe('useLiveConfig', () => {
     unmount();
   });
 
+  it('strips legacy visual feature markers from systemInstruction in liveConfig', () => {
+    const { result, unmount } = renderHook(() =>
+      useLiveConfig({
+        chatSettings: createChatSettings({
+          ...baseChatSettings,
+          systemInstruction: 'Voice persona\n\n[Live Artifacts Inline Protocol - zh]\nVisual rules...',
+        }),
+        sessionHandle: null,
+      }),
+    );
+
+    expect(
+      (result.current.liveConfig as { systemInstruction?: { parts: Array<{ text: string }> } }).systemInstruction,
+    ).toEqual({
+      parts: [
+        {
+          text: 'Voice persona',
+        },
+      ],
+    });
+    unmount();
+  });
+
   it('emits a translation-config for live-translate models', () => {
     const { result, unmount } = renderHook(() =>
       useLiveConfig({

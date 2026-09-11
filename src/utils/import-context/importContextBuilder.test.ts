@@ -178,4 +178,61 @@ describe('generateZipContext', () => {
     expect(output).toContain('File: src/app.ts');
     expect(output).toContain('export const zipped = true;');
   });
+
+  it('filters out Zip Slip traversal entries from zip imports', async () => {
+    const zip = new JSZip();
+    zip.file('src/safe.ts', 'export const safe = true;\n');
+
+    // Simulate an unsafe entry directly in JSZip files dictionary
+    const fakeUnsafeEntry = {
+      name: '../evil.sh',
+      dir: false,
+      date: new Date(),
+      async: vi.fn().mockResolvedValue(new Blob(['rm -rf /'])),
+    };
+    // @ts-expect-error test injection
+    zip.files['../evil.sh'] = fakeUnsafeEntry;
+
+    const loadAsyncSpy = vi.spyOn(JSZip, 'loadAsync').mockResolvedValueOnce(zip);
+
+    const zipFile = new File(['fake'], 'demo.zip', { type: 'application/zip' });
+    const contextFile = await generateZipContext(zipFile);
+    const output = await contextFile.text();
+
+    loadAsyncSpy.mockRestore();
+
+    expect(output).toContain('File: src/safe.ts');
+    expect(output).not.toContain('evil.sh');
+  });
+
+  it('pre-filters ignored directories like node_modules without extracting them', async () => {
+    const zip = new JSZip();
+    zip.file('src/index.ts', 'export const index = true;\n');
+    zip.file('node_modules/package/index.js', 'console.log("ignored");');
+
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const zipFile = new File([zipBlob], 'repo.zip', { type: 'application/zip' });
+
+    const contextFile = await generateZipContext(zipFile);
+    const output = await contextFile.text();
+
+    expect(output).toContain('File: src/index.ts');
+    expect(output).not.toContain('node_modules');
+  });
+
+  it('enforces zip safety limits when specified', async () => {
+    const zip = new JSZip();
+    zip.file('f1.txt', '1');
+    zip.file('f2.txt', '2');
+    zip.file('f3.txt', '3');
+
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const zipFile = new File([zipBlob], 'small.zip', { type: 'application/zip' });
+
+    await expect(
+      generateZipContext(zipFile, {
+        zipSafetyLimits: { maxEntries: 2 },
+      }),
+    ).rejects.toThrow('exceeding the maximum safe limit');
+  });
 });

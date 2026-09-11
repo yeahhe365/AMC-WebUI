@@ -1,4 +1,5 @@
 import { type UploadedFile } from '@/types';
+import { copyTextToClipboard } from '@/utils/clipboard';
 
 const isClipboardTextType = (mimeType: string): boolean => {
   return (
@@ -19,7 +20,10 @@ export const copyFileToClipboard = async (file: Pick<UploadedFile, 'dataUrl' | '
 
   if (isClipboardTextType(file.type)) {
     const text = await blob.text();
-    await navigator.clipboard.writeText(text);
+    const success = await copyTextToClipboard(text);
+    if (!success) {
+      throw new Error('Failed to copy file text to clipboard.');
+    }
     return;
   }
 

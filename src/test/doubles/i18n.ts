@@ -9,7 +9,8 @@ interface I18nMockOptions {
   t?: Translator;
 }
 
-export const createKeyTranslator = (): Translator => (key, fallback) => fallback ?? key;
+export const createKeyTranslator = (): Translator => (key, fallbackOrParams) =>
+  typeof fallbackOrParams === 'string' ? fallbackOrParams : key;
 
 export const createI18nMock = (options: I18nMockOptions = {}) => {
   const language = options.language ?? 'en';

@@ -1,4 +1,4 @@
-type ChatInputMode = 'idle' | 'editing' | 'queuing' | 'live' | 'processing';
+export type ChatInputMode = 'idle' | 'editing' | 'queuing' | 'live' | 'processing';
 
 export interface ChatInputMachineState {
   isTranslating: boolean;

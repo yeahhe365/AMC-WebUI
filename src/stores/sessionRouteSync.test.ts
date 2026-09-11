@@ -41,4 +41,53 @@ describe('syncActiveSessionRoute', () => {
     expect(pushStateSpy).not.toHaveBeenCalled();
     expect(replaceStateSpy).not.toHaveBeenCalled();
   });
+
+  it('preserves /library route when syncActiveSessionRoute is called without force flag', () => {
+    window.history.replaceState({}, '', '/library');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+
+    syncActiveSessionRoute('sess-1', 'auto');
+
+    expect(sessionStorage.getItem(ACTIVE_CHAT_SESSION_ID_KEY)).toBe('sess-1');
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+  });
+
+  it('updates route when force flag is set even on /library', () => {
+    window.history.replaceState({}, '', '/library');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    syncActiveSessionRoute('sess-1', 'push', { force: true });
+
+    expect(sessionStorage.getItem(ACTIVE_CHAT_SESSION_ID_KEY)).toBe('sess-1');
+    expect(pushStateSpy).toHaveBeenCalledWith({ sessionId: 'sess-1' }, '', '/chat/sess-1');
+  });
+});
+
+describe('syncLibraryRoute', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('pushes /library route when called with push or auto mode', async () => {
+    const { syncLibraryRoute } = await import('./sessionRouteSync');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    syncLibraryRoute('push');
+
+    expect(pushStateSpy).toHaveBeenCalledWith({ view: 'library' }, '', '/library');
+  });
+
+  it('does nothing when history mode is none', async () => {
+    const { syncLibraryRoute } = await import('./sessionRouteSync');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const replaceStateSpy = vi.spyOn(window.history, 'replaceState');
+
+    syncLibraryRoute('none');
+
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(replaceStateSpy).not.toHaveBeenCalled();
+  });
 });

@@ -1,0 +1,40 @@
+---
+title: 典型报错排查 (Common Errors)
+description: 常见 API 错误排查指南：Robotics 403 Forbidden、Thinking 级别不兼容、429 配额限制等。
+---
+
+# 典型报错排查 (Common Errors)
+
+以下是使用过程中最常见的几类问题与快速解决方法。
+
+---
+
+## 1. `gemini-robotics-er-2-preview` 返回 `403 Forbidden`
+
+### 错误原因
+Google 官方对具身智能 Robotics 模型实施了安全风控策略：**未配置使用限制的 API Key 会被直接拒绝**。
+
+### 解决方案
+1. 登录 [Google AI Studio API Keys](https://aistudio.google.com/api-keys)。
+2. 找到你的 API Key，点击编辑设置 **API 限制 (API restrictions)**。
+3. 将其限制为特定应用、IP 或指定端点后保存。
+4. 重新在 AMC WebUI 发起请求即可正常工作。
+
+---
+
+## 2. Thinking 等级报错（如 Minimal 级别不可用）
+
+### 错误原因
+`gemini-3.7-flash` 与 `gemini-3.8-flash` 在官方模型卡（Model Card）中明确声明：**仅支持 Low、Medium、High 三档思考等级，不支持 Minimal**。
+
+### 解决方案
+- 进入 **设置 -> 模型与生成参数**，将思考等级调整为 `Low` 或更高。
+- 只有 `gemini-3.5-flash-lite` 与旧版部分端点接受 `Minimal` 等级。
+
+---
+
+## 3. `429 Too Many Requests` 配额超限
+
+### 解决方案
+1. **添加多个 Key 自动轮询**：在服务商设置中填入多个 Google AI Studio API Key，AMC WebUI 会在每个请求间均匀轮询分发。
+2. **降低 Thinking Token 预算**：深度思考会消耗大量输出 Token，将思考预算滑动条由上限 32k 适当调低至 4096，可大幅延缓配额耗尽。

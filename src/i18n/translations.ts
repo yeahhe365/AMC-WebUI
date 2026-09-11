@@ -1,2 +1,2 @@
-export { getTranslator, translations } from './coreTranslations';
+export { getTranslator, translations, type Translator } from './coreTranslations';
 export { ensureAllFeatureTranslations, ensureFeatureTranslations } from './featureTranslations';

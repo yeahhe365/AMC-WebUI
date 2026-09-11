@@ -1,7 +1,7 @@
 import { DEFAULT_APP_SETTINGS } from '@/constants/settingsDefaults';
 
 const DARK_THEME_IDS = ['onyx', 'graphite'] as const;
-export const CONCRETE_THEME_IDS = ['onyx', 'graphite', 'pearl'] as const;
+const CONCRETE_THEME_IDS = ['onyx', 'graphite', 'pearl', 'sepia'] as const;
 export const THEME_IDS = ['system', ...CONCRETE_THEME_IDS] as const;
 
 export type ConcreteThemeId = (typeof CONCRETE_THEME_IDS)[number];

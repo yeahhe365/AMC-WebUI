@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getErrorMessage } from '@/utils/errorMessage';
-import { RadioTower } from 'lucide-react';
+import { ChevronDown, ChevronRight, Server } from 'lucide-react';
 import type { AppSettings } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
 import { DEFAULT_LIVE_ARTIFACTS_MODEL_ID } from '@/constants/modelConfiguration';
@@ -15,8 +15,8 @@ import { ApiConfigToggle } from './api-config/ApiConfigToggle';
 import { ApiKeyInput } from './api-config/ApiKeyInput';
 import { ApiProxySettings } from './api-config/ApiProxySettings';
 import { ApiConnectionTester } from './api-config/ApiConnectionTester';
-import { ThirdPartyApiSettingsPanel } from './api-config/ThirdPartyApiSettingsPanel';
-import { FileStrategyControl } from './appearance/FileStrategyControl';
+import { useSettingsUiStore } from '@/stores/settingsUiStore';
+import { getLatencyGrade, type LatencyGrade } from '@/utils/thirdPartyDiagnostics';
 
 interface ApiConfigSectionProps {
   useCustomApiConfig: boolean;
@@ -30,6 +30,7 @@ interface ApiConfigSectionProps {
   serverManagedApi: boolean;
   settings: AppSettings;
   onUpdate: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
+  hideProviderRedirect?: boolean;
 }
 
 export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
@@ -44,10 +45,13 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
   serverManagedApi,
   settings,
   onUpdate,
+  hideProviderRedirect = false,
 }) => {
   const { t } = useI18n();
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [testMessage, setTestMessage] = useState<string | null>(null);
+  const [testLatencyMs, setTestLatencyMs] = useState<number | null>(null);
+  const [testGrade, setTestGrade] = useState<LatencyGrade | null>(null);
   const [testModelId, setTestModelId] = useState<string>(DEFAULT_LIVE_ARTIFACTS_MODEL_ID);
   const [allowOverflow, setAllowOverflow] = useState(useCustomApiConfig);
   const overflowTimerRef = useRef<number | null>(null);
@@ -60,6 +64,16 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
     useApiProxy,
     apiProxyUrl,
   });
+
+  const [showDedicatedLiveKey, setShowDedicatedLiveKey] = useState(() =>
+    Boolean(settings.liveApiKey && settings.liveApiKey.trim().length > 0),
+  );
+
+  useEffect(() => {
+    if (settings.liveApiKey && settings.liveApiKey.trim().length > 0) {
+      setShowDedicatedLiveKey(true);
+    }
+  }, [settings.liveApiKey]);
 
   useEffect(() => {
     return () => {
@@ -126,7 +140,10 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
 
     setTestStatus('testing');
     setTestMessage(null);
+    setTestLatencyMs(null);
+    setTestGrade(null);
 
+    const startTime = performance.now();
     try {
       const ai = await getClient(firstKey, effectiveUrl);
 
@@ -135,8 +152,14 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
         contents: 'Hello',
       });
 
+      const latency = Math.round(performance.now() - startTime);
+      setTestLatencyMs(latency);
+      setTestGrade(getLatencyGrade(latency, true));
       setTestStatus('success');
     } catch (error) {
+      const latency = Math.round(performance.now() - startTime);
+      setTestLatencyMs(latency);
+      setTestGrade('error');
       setTestStatus('error');
       setTestMessage(getErrorMessage(error));
     }
@@ -177,30 +200,29 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
               }}
             />
 
-            <div className="space-y-3 pt-2">
-              <div className="rounded-lg border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-tertiary)]/20 p-3 space-y-3">
-                <div className="flex items-start gap-3">
-                  <RadioTower
-                    size={16}
-                    className="mt-0.5 flex-shrink-0 text-[var(--theme-text-link)]"
-                    strokeWidth={1.5}
-                  />
-                  <div className="min-w-0 flex-1 space-y-1.5">
-                    <p className="text-sm font-medium text-[var(--theme-text-primary)]">
-                      {t('settingsLiveAutomaticTitle')}
-                    </p>
-                    <p className="text-xs leading-relaxed text-[var(--theme-text-secondary)]">
-                      {t('settingsLiveAutomaticHelp')}
-                    </p>
-                    {useApiProxy && (
-                      <p className="text-xs leading-relaxed text-[var(--theme-text-secondary)]">
-                        {t('settingsLiveProxyCompatibilityHelp')}
-                      </p>
-                    )}
-                  </div>
-                </div>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowDedicatedLiveKey((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 text-xs text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] transition-colors cursor-pointer select-none focus:outline-none py-0.5"
+              >
+                {showDedicatedLiveKey ? (
+                  <ChevronDown size={14} className="text-[var(--theme-text-secondary)] flex-shrink-0" />
+                ) : (
+                  <ChevronRight size={14} className="text-[var(--theme-text-secondary)] flex-shrink-0" />
+                )}
+                <span className="font-medium">{t('settingsLiveApiKey')}</span>
+                {settings.liveApiKey ? (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                ) : (
+                  <span className="text-[10px] text-[var(--theme-text-secondary)]/60">
+                    ({t('settingsLiveDefaultKeyNotice')})
+                  </span>
+                )}
+              </button>
 
-                <div className="pt-2 border-t border-[var(--theme-border-secondary)]/40">
+              {showDedicatedLiveKey && (
+                <div className="mt-2.5 pl-3.5 border-l-2 border-[var(--theme-border-secondary)]/40 space-y-2">
                   <ApiKeyInput
                     inputId="live-api-key-input"
                     label={t('settingsLiveApiKey')}
@@ -209,14 +231,27 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
                     placeholder={t('settingsLiveApiKeyPlaceholder')}
                     helpText={t('settingsLiveApiKeyHelp')}
                   />
+                  {settings.liveApiKey && (
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => onUpdate('liveApiKey', null)}
+                        className="text-xs text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-danger)] transition-colors hover:underline"
+                      >
+                        {t('delete')}
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
 
             <ApiConnectionTester
               onTest={handleTestConnection}
               testStatus={testStatus}
               testMessage={testMessage}
+              latencyMs={testLatencyMs}
+              latencyGrade={testGrade}
               isTestDisabled={
                 testStatus === 'testing' || (!apiKey && useCustomApiConfig && !canUseServerManagedTestKey)
               }
@@ -228,18 +263,34 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
         </div>
       </div>
 
-      <ThirdPartyApiSettingsPanel
-        settings={settings}
-        onUpdateSettings={(partial) => {
-          (Object.entries(partial) as Array<[keyof AppSettings, AppSettings[keyof AppSettings]]>).forEach(
-            ([key, value]) => {
-              onUpdate(key, value);
-            },
-          );
-        }}
-      />
-
-      <FileStrategyControl settings={settings} onUpdate={onUpdate} />
+      <div
+        className={
+          hideProviderRedirect
+            ? 'hidden'
+            : 'rounded-xl border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-surface-secondary)]/50 p-4 transition-all duration-200'
+        }
+        data-settings-item="api-provider"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--theme-accent-primary)]/10 text-[var(--theme-accent-primary)]">
+              <Server size={18} />
+            </div>
+            <div>
+              <div className="text-sm font-medium text-[var(--theme-text-primary)]">{t('settingsTabProviders')}</div>
+              <div className="text-xs text-[var(--theme-text-secondary)] mt-0.5">{t('apiThirdPartyRedirectDesc')}</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => useSettingsUiStore.getState().setActiveTab('providers')}
+            className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--theme-accent-primary)] hover:bg-[var(--theme-accent-primary)]/10 border border-[var(--theme-accent-primary)]/30 transition-colors"
+          >
+            <span>{t('settingsGoToProviders')}</span>
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

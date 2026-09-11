@@ -1,0 +1,40 @@
+---
+title: Files & Multimodal Processing
+description: ZIP repository unpacking, browser-side audio compression worker, Gemini Cloud Files API management, and media previews.
+---
+
+# Files & Multimodal Processing
+
+AMC WebUI provides robust pipelines for parsing project repositories, compressing media, and managing cloud storage assets.
+
+---
+
+## 1. ZIP & Folder Codebase Parsing
+
+- **Drag & Drop**: Drop any project folder or `.zip` archive directly into the chat input.
+- **Smart Directory Tree**: Automatically filters out noise directories (`node_modules`, `.git`, `dist`), parses file hierarchies, and constructs unified multi-file prompts for codebase refactoring and analysis.
+
+---
+
+## 2. Client-Side Audio Compression Worker
+
+Audio inputs can quickly consume massive token allocations and bandwidth:
+- AMC WebUI features a dedicated browser-based **Audio Compression Worker**.
+- Recorded or uploaded audio is resampled, silence-trimmed, and compressed client-side, reducing up to 70% of audio token usage while maintaining high recognition fidelity.
+
+---
+
+## 3. Gemini Cloud Files API Manager
+
+For large documents, extended video clips, or high-res imagery:
+- **Policy Selection**: Toggle between inline Base64 payloads and Google's hosted Cloud Files API.
+- **Cloud Files Modal**:
+  - View all active cloud files tied to your API key, including byte sizes, creation dates, and expiration countdowns.
+  - Delete expired or obsolete assets with a single click.
+
+---
+
+## 4. Document & Media Previews
+- **PDF Viewer**: Embedded `pdfjs-dist` viewer with multi-page navigation and text selection.
+- **Office Previews**: Integrated `docx-preview` and `xlsx` (SheetJS) render Word documents and Excel spreadsheets into responsive tables.
+- **Visual Detail Levels**: Configure visual fidelity (Low, Medium, High, Ultra High) for precision engineering diagrams and fine OCR tasks.

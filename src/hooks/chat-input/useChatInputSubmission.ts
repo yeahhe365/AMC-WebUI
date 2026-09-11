@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useRef, type Dispatch, type RefObject, type SetStateAction } from 'react';
-import { type AppSettings, type UploadedFile, type ChatSettings } from '@/types';
+import { type AppSettings, type UploadedFile, type ChatSettings, type SetSelectedFiles } from '@/types';
 import { buildPendingChatInputSubmission } from '@/utils/chat-input/pendingSubmission';
+import { useChatDraftStore } from '@/stores/chatDraftStore';
 import { useLiveModeHandler, type LiveModeApi } from './useLiveModeHandler';
 import { useMessageQueue } from './useMessageQueue';
-
-type SetSelectedFiles = (files: UploadedFile[] | ((prevFiles: UploadedFile[]) => UploadedFile[])) => void;
 
 interface ChatInputSubmissionState {
   inputText: string;
@@ -38,7 +37,7 @@ interface UseChatInputSubmissionParams {
   submissionState: ChatInputSubmissionState;
   isNativeAudioModel: boolean;
   liveApi: LiveModeApi;
-  onUpdateMessageContent: (messageId: string, content: string) => void;
+  onUpdateMessageContent: (messageId: string, content: string, files?: UploadedFile[]) => void;
   setEditingMessageId: (id: string | null) => void;
   onMessageSent: () => void;
   onAddUserMessage?: (text: string, files?: UploadedFile[]) => void;
@@ -110,15 +109,24 @@ export const useChatInputSubmission = ({
   useEffect(() => clearSendAnimationTimer, [clearSendAnimationTimer]);
 
   const completeEditSubmission = useCallback(
-    (messageId: string, content: string) => {
-      onUpdateMessageContent(messageId, content);
+    (messageId: string, content: string, files?: UploadedFile[]) => {
+      onUpdateMessageContent(messageId, content, files);
       setEditingMessageId(null);
-      clearCurrentDraft();
-      setInputText('');
-      setQuotes([]);
+      setSelectedFiles([]);
+      const savedDraft = activeSessionId ? (useChatDraftStore.getState().drafts[activeSessionId]?.inputText ?? '') : '';
+      setInputText(savedDraft);
+      setQuotes(activeSessionId ? (useChatDraftStore.getState().drafts[activeSessionId]?.quotes ?? []) : []);
       onMessageSent();
     },
-    [clearCurrentDraft, onMessageSent, onUpdateMessageContent, setEditingMessageId, setInputText, setQuotes],
+    [
+      activeSessionId,
+      onMessageSent,
+      onUpdateMessageContent,
+      setEditingMessageId,
+      setInputText,
+      setQuotes,
+      setSelectedFiles,
+    ],
   );
 
   const completeSendSubmission = useCallback(
@@ -215,6 +223,7 @@ export const useChatInputSubmission = ({
         editMode,
         editingMessageId,
         isFastMode,
+        files: selectedFiles,
       });
 
       if (
@@ -225,7 +234,7 @@ export const useChatInputSubmission = ({
       }
 
       if (submission.kind === 'edit') {
-        completeEditSubmission(submission.messageId, submission.content);
+        completeEditSubmission(submission.messageId, submission.content, submission.files);
         return;
       }
 

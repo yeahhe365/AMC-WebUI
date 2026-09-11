@@ -67,4 +67,32 @@ describe('TranscribeCluster', () => {
 
     expect(setCurrentChatSettings).toHaveBeenCalled();
   });
+
+  it('enforces mutual exclusion between smart mode and timestamps/speaker labels in modal', () => {
+    renderCluster();
+
+    fireEvent.click(screen.getByTestId('transcribe-settings-button'));
+
+    const wordTimestampsSwitch = screen.getByRole('switch', { name: /Word timestamps|词级时间戳/i });
+    const speakerLabelsSwitch = screen.getByRole('switch', { name: /Speaker labels|说话人标记/i });
+    const smartModeSwitch = screen.getByRole('switch', { name: /Smart transcription|智能修饰/i });
+
+    // Enable word timestamps and speaker labels
+    fireEvent.click(wordTimestampsSwitch);
+    fireEvent.click(speakerLabelsSwitch);
+    expect(wordTimestampsSwitch).toHaveAttribute('aria-checked', 'true');
+    expect(speakerLabelsSwitch).toHaveAttribute('aria-checked', 'true');
+    expect(smartModeSwitch).toHaveAttribute('aria-checked', 'false');
+
+    // Enabling smart mode should automatically turn off timestamps and speaker labels
+    fireEvent.click(smartModeSwitch);
+    expect(smartModeSwitch).toHaveAttribute('aria-checked', 'true');
+    expect(wordTimestampsSwitch).toHaveAttribute('aria-checked', 'false');
+    expect(speakerLabelsSwitch).toHaveAttribute('aria-checked', 'false');
+
+    // Re-enabling word timestamps should turn off smart mode
+    fireEvent.click(wordTimestampsSwitch);
+    expect(wordTimestampsSwitch).toHaveAttribute('aria-checked', 'true');
+    expect(smartModeSwitch).toHaveAttribute('aria-checked', 'false');
+  });
 });

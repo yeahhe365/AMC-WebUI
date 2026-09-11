@@ -1,0 +1,41 @@
+---
+title: 实时音视频 (Live API)
+description: 双向低延迟流式语音通话、摄像头画面捕获、屏幕共享与 WebSocket 全代理原理。
+---
+
+# 实时音视频 (Live API)
+
+Gemini Live API 是 Google 推出的全新双向流式（Bidirectional Streaming）多模态协议。AMC WebUI 实现了对 Live API 的完整图形化支持。
+
+---
+
+## 核心交互能力
+
+### 1. 自然语音通话 (Voice Streaming)
+- 基于浏览器原生的 **AudioWorklet API** 采集麦克风音频，以 16kHz PCM 流实时推送到服务端。
+- 支持实时打断（Interruption）：只要你开口说话，AI 会瞬间停止播放当前语音并转而倾听你的输入。
+- 音频波形实时可视化：通过平滑的频率振幅波形图，直观反馈双向语音音量状态。
+
+### 2. 视觉理解与摄像头采集 (Camera Vision)
+- 点击视频摄像头开关，即可向 AI 实时传输你的本地摄像头画面帧。
+- AI 能够基于实时视频连续回答画面中的物体位置、故障部件诊断或文字解读。
+
+### 3. 屏幕共享与协同排障 (Screen Sharing)
+- 支持共享特定窗口、桌面或 Chrome 标签页。
+- 无论是在排查代码报错、观察终端运行状态，还是协同设计原型，AI 均可实时观察屏幕并给出反馈。
+
+---
+
+## 部署与通信模式说明
+
+由于 Live API 基于复杂的 WebSocket 双向信令，AMC WebUI 在两种部署模式下提供了不同的通信路径：
+
+| 部署形态 | Live 通信机制 | 适用环境 | 说明 |
+| :--- | :--- | :--- | :--- |
+| **Docker Compose 双服务** | **`/api/live` 全代理** (默认开启) | 私有服务器 / 自托管 | 由 Node API 容器代理握手并建立连接，浏览器无需配置繁琐网络。 |
+| **纯静态部署 (Cloudflare Pages)** | **浏览器直连** | 静态边缘托管 | 浏览器使用本地填写的 API Key 直连官方 `wss://generativelanguage.googleapis.com`。 |
+
+> ⚙️ **Docker 部署环境参数**：
+> - `ENABLE_LIVE_WS_PROXY=true`：开启后端 WS 代理。
+> - `RUNTIME_LIVE_API_BASE_URL=/api/live`：通知前端连接同源 `/api/live` 端点。
+> - `LIVE_WS_IDLE_TIMEOUT_MS=300000`：空闲 5 分钟自动回收连接，防止长连接悬挂消耗算力。

@@ -1,0 +1,49 @@
+---
+title: Docker Compose 双容器部署 (Docker Compose)
+description: 使用 Docker Compose 部署 web (前端静态托管与反代) 与 api (Node 后端与 WS 全代理) 双服务。
+---
+
+# Docker Compose 双容器部署
+
+Docker Compose 是官方推荐的自用与局域网私有化部署方案。它将应用解耦为两个高效运行的轻量容器：
+- **`web`**：基于轻量 Node 服务托管前端静态资源，对外监听 `WEB_PORT`（默认 `8080`），并自动反代 `/api/*` 到后台。
+- **`api`**：Node.js API 服务，内部监听 `PORT`（默认 `3001`），承载 Gemini API 代理、第三方接口转发与 Live API WebSocket 全代理。
+
+---
+
+## 快速部署步骤
+
+```bash
+# 1. 在项目根目录构建前后端生产包
+pnpm run build:docker
+
+# 2. 后台启动容器编排
+docker compose up -d --build
+```
+
+启动完成后，打开浏览器访问：**`http://localhost:8080`**。
+
+---
+
+## 容器构建机制与优化
+
+- **宿主机构建，极小镜像**：`web` 容器直接打包宿主机生成的 `dist/`，无需在 Docker 容器内部下载庞大的 `node_modules` 或重复编译，镜像构建仅需数秒。
+- **动态运行时配置写入 (`runtime-config.js`)**：
+  容器启动时，`docker/web-server.js` 会自动将环境变量（如 `RUNTIME_API_PROXY_URL`）动态生成至前端能够访问的 `runtime-config.js`，实现“同一镜像，按环境变量随意切换代理行为”。
+
+---
+
+## 常用运维命令
+
+```bash
+# 查看容器日志
+docker compose logs -f
+
+# 停止并移除容器
+docker compose down
+
+# 代码更新后的重构流程
+git pull
+pnpm run build:docker
+docker compose up -d --build
+```

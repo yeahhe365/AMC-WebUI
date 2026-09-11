@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link2Off } from 'lucide-react';
-import { Modal } from '@/components/shared/Modal';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogTitle,
+  AlertDialogDescription,
+} from '@/components/shared/AlertDialog';
 import { useI18n } from '@/contexts/I18nContext';
 import { dedupeServersById, parseMcpShareParam } from '@/features/mcp/importMcpServers';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -53,48 +58,51 @@ export const McpShareInstallGate: React.FC = () => {
   };
 
   return (
-    <Modal
-      isOpen
-      onClose={dismiss}
-      ariaLabel={t('settingsMcpShareTitle')}
-      backdropClassName="bg-black/50"
-      contentClassName="w-full max-w-md rounded-xl border bg-[var(--theme-bg-primary)] shadow-xl"
+    <AlertDialog
+      open
+      onOpenChange={(open) => {
+        if (!open) dismiss();
+      }}
     >
-      <div className="flex items-start gap-3 px-4 pt-4">
-        <Link2Off className="mt-0.5 h-5 w-5 shrink-0 text-[var(--theme-text-secondary)]" />
-        <div className="min-w-0">
-          <h2 className="text-sm font-semibold">{t('settingsMcpShareTitle')}</h2>
-          <p className="mt-1 text-xs text-[var(--theme-text-secondary)]">{t('settingsMcpShareBody')}</p>
+      <AlertDialogContent className="w-full max-w-md rounded-xl border bg-[var(--theme-bg-primary)] p-0 shadow-xl">
+        <div className="flex items-start gap-3 px-4 pt-4">
+          <Link2Off className="mt-0.5 h-5 w-5 shrink-0 text-[var(--theme-text-secondary)]" />
+          <div className="min-w-0">
+            <AlertDialogTitle className="text-sm font-semibold">{t('settingsMcpShareTitle')}</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <p className="mt-1 text-xs text-[var(--theme-text-secondary)]">{t('settingsMcpShareBody')}</p>
+            </AlertDialogDescription>
+          </div>
         </div>
-      </div>
-      <ul className="mx-4 mt-3 max-h-[220px] space-y-1 overflow-auto rounded-lg border bg-[var(--theme-bg-secondary)] p-2 text-xs">
-        {pending.map((server) => (
-          <li key={server.id} className="flex items-baseline justify-between gap-2">
-            <span className="truncate font-medium">{server.name}</span>
-            <span className="shrink-0 font-mono text-[10px] text-[var(--theme-text-secondary)]">
-              {server.transport.toUpperCase()}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <div className="flex items-center justify-end gap-2 px-4 py-3">
-        <button
-          type="button"
-          data-testid="mcp-share-cancel"
-          onClick={dismiss}
-          className="rounded-lg border px-3 py-1.5 text-sm hover:bg-[var(--theme-bg-tertiary)]"
-        >
-          {t('settingsMcpCancel')}
-        </button>
-        <button
-          type="button"
-          data-testid="mcp-share-confirm"
-          onClick={confirm}
-          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700"
-        >
-          {t('settingsMcpShareAction')}
-        </button>
-      </div>
-    </Modal>
+        <ul className="mx-4 mt-3 max-h-[220px] space-y-1 overflow-auto rounded-lg border bg-[var(--theme-bg-secondary)] p-2 text-xs">
+          {pending.map((server) => (
+            <li key={server.id} className="flex items-baseline justify-between gap-2">
+              <span className="truncate font-medium">{server.name}</span>
+              <span className="shrink-0 font-mono text-[10px] text-[var(--theme-text-secondary)]">
+                {server.transport.toUpperCase()}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="flex items-center justify-end gap-2 px-4 py-3">
+          <button
+            type="button"
+            data-testid="mcp-share-cancel"
+            onClick={dismiss}
+            className="rounded-lg border px-3 py-1.5 text-sm hover:bg-[var(--theme-bg-tertiary)]"
+          >
+            {t('settingsMcpCancel')}
+          </button>
+          <button
+            type="button"
+            data-testid="mcp-share-confirm"
+            onClick={confirm}
+            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700"
+          >
+            {t('settingsMcpShareAction')}
+          </button>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 };

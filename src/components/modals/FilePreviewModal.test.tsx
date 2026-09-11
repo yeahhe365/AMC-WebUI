@@ -72,6 +72,10 @@ vi.mock('@/components/shared/file-preview/TextFileViewer', () => ({
   TextFileViewer: mockTextFileViewer,
 }));
 
+vi.mock('@/components/shared/file-preview/DocxViewer', () => ({
+  DocxViewer: ({ file }: { file: { name: string } }) => <div data-testid="docx-viewer">{file.name}</div>,
+}));
+
 vi.mock('@/utils/file/fileClipboard', () => ({
   copyFileToClipboard: mockCopyFileToClipboard,
 }));
@@ -91,7 +95,8 @@ vi.mock('@/utils/file/fileTypeClassification', () => ({
   getFileKindFlags: (file: { name: string; type: string }) => ({
     isImage: file.type.startsWith('image/'),
     isAudio: file.type.startsWith('audio/'),
-    isVideo: file.type.startsWith('video/'),
+    isVideo: file.type.startsWith('video/') && file.type !== 'video/youtube-link',
+    isYoutube: file.type === 'video/youtube-link',
     isPdf: file.type === 'application/pdf',
     isText: file.type.startsWith('text/') || /\.(md|markdown|txt|json|js|ts|tsx|jsx|css|html)$/i.test(file.name),
     isMarkdown:
@@ -105,6 +110,14 @@ vi.mock('@/utils/file/fileTypeClassification', () => ({
     file.name.toLowerCase().endsWith('.markdown'),
   isTextFile: (file: { name: string; type: string }) =>
     file.type.startsWith('text/') || /\.(md|markdown|txt|json|js|ts|tsx|jsx|css|html)$/i.test(file.name),
+  isSpreadsheetFile: (file: { name: string; type: string }) =>
+    file.name.toLowerCase().endsWith('.xlsx') ||
+    file.name.toLowerCase().endsWith('.xls') ||
+    file.name.toLowerCase().endsWith('.csv'),
+  isArchiveFile: (file: { name: string; type: string }) =>
+    file.name.toLowerCase().endsWith('.zip') ||
+    file.name.toLowerCase().endsWith('.tar') ||
+    file.name.toLowerCase().endsWith('.gz'),
 }));
 
 vi.mock('@/utils/docxPreview', () => ({
@@ -165,6 +178,15 @@ describe('FilePreviewModal', () => {
       renderer.root.render(<FilePreviewModal file={createDocxFile()} onClose={() => {}} />);
     });
 
+    expect(document.querySelector('[data-testid="docx-viewer"]')).not.toBeNull();
+
+    const toggleBtn = Array.from(document.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('切换至纯文本模式'),
+    );
+    await act(async () => {
+      toggleBtn?.click();
+    });
+
     await vi.waitFor(() => {
       expect(mockExtractDocxText).toHaveBeenCalledTimes(1);
       expect(document.querySelector('[data-testid="text-file-viewer"]')?.textContent).toContain(
@@ -178,6 +200,13 @@ describe('FilePreviewModal', () => {
 
     await act(async () => {
       renderer.root.render(<FilePreviewModal file={createDocxFile()} onClose={() => {}} />);
+    });
+
+    const toggleBtn = Array.from(document.querySelectorAll('button')).find((b) =>
+      b.textContent?.includes('切换至纯文本模式'),
+    );
+    await act(async () => {
+      toggleBtn?.click();
     });
 
     await vi.waitFor(() => {
@@ -323,5 +352,25 @@ describe('FilePreviewModal', () => {
     expect(audio?.className).toContain('max-w-full');
     expect(audio?.className).not.toContain('w-[300px]');
     expect(shell?.className).toContain('max-w-[calc(100vw-2rem)]');
+  });
+
+  it('renders a YouTube iframe preview for youtube-link files', async () => {
+    const youtubeFile: UploadedFile = {
+      id: 'youtube-preview-1',
+      name: 'youtube.com/watch?v=MkaZ4OrbQn8',
+      type: 'video/youtube-link',
+      fileUri: 'https://www.youtube.com/watch?v=MkaZ4OrbQn8',
+      size: 0,
+      transferStrategy: 'remote-file-id',
+      uploadState: 'active',
+    };
+
+    await act(async () => {
+      renderer.root.render(<FilePreviewModal file={youtubeFile} onClose={() => {}} />);
+    });
+
+    const iframe = document.querySelector('iframe');
+    expect(iframe).not.toBeNull();
+    expect(iframe?.getAttribute('src')).toBe('https://www.youtube.com/embed/MkaZ4OrbQn8');
   });
 });

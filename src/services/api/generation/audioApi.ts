@@ -6,6 +6,7 @@ import { calculateTokenStats } from '@/utils/model/modelUsageStats';
 import { buildExactPricingFromUsageMetadata } from '@/utils/usagePricingTelemetry';
 import { AVAILABLE_TTS_VOICES } from '@/constants/voiceOptions';
 import { SUPPORTED_AUDIO_MIME_TYPES } from '@/constants/fileTypeSupport';
+import { normalizeMimeType } from '@/utils/file/fileTypeClassification';
 
 // TTS responses can hang indefinitely when the upstream proxy/relay stalls, so
 // the request gets a hard wall-clock timeout. The SDK's httpOptions.timeout is
@@ -18,10 +19,8 @@ const SPEAKER_VOICES_HEADER_REGEX = /^#{1,6}\s*SPEAKER VOICES(?:\s*\(.*\))?\s*$/
 const MARKDOWN_HEADER_REGEX = /^#{1,6}\s+\S/;
 const SPEAKER_VOICE_LINE_REGEX = /^(?:[-*]\s*)?([^:]+?)\s*:\s*([A-Za-z][\w-]*)\s*$/;
 
-const normalizeAudioMimeType = (mimeType: string): string => mimeType.trim().toLowerCase().split(';')[0];
-
 const getSupportedTranscriptionMimeType = (audioFile: File): string => {
-  const mimeType = normalizeAudioMimeType(audioFile.type);
+  const mimeType = normalizeMimeType(audioFile.type);
   if (SUPPORTED_AUDIO_MIME_TYPES.includes(mimeType)) {
     return mimeType;
   }
@@ -211,7 +210,74 @@ export const generateSpeechApi = async (
   }
 };
 
-const extractTranscriptionText = (response: GenerateContentResponse): string => {
+interface WordInfoLike {
+  word?: string;
+  text?: string;
+  startOffset?: string;
+  start_offset?: string;
+  endOffset?: string;
+  end_offset?: string;
+  speaker?: string;
+}
+
+interface AudioTranscriptionLike {
+  text?: string;
+  finished?: boolean;
+  languageCode?: string;
+  speakerLabel?: string;
+  speaker?: string;
+  words?: WordInfoLike[];
+}
+
+const formatTranscriptionFromPart = (part: Part, options?: AudioTranscriptionOptions): string => {
+  const transcription = part.audioTranscription as AudioTranscriptionLike | undefined;
+
+  if (transcription) {
+    const speaker = transcription.speakerLabel || transcription.speaker;
+    const speakerPrefix = speaker && (options?.speakerLabels || speaker) ? `[${speaker}] ` : '';
+    const words = Array.isArray(transcription.words) ? transcription.words : [];
+
+    if (words.length > 0 && options?.wordTimestamps) {
+      const formattedWords = words
+        .map((w) => {
+          const wordText = w.word ?? w.text ?? '';
+          const start = w.startOffset ?? w.start_offset;
+          const end = w.endOffset ?? w.end_offset;
+          const wordSpeaker = w.speaker ? `[${w.speaker}] ` : '';
+          const timing = start && end ? `(${start} -> ${end}) ` : '';
+          return `${wordSpeaker}${timing}${wordText}`.trim();
+        })
+        .filter(Boolean)
+        .join(' ');
+
+      if (formattedWords.length > 0) {
+        return `${speakerPrefix}${formattedWords}`.trim();
+      }
+    }
+
+    if (typeof transcription.text === 'string' && transcription.text.trim().length > 0) {
+      return `${speakerPrefix}${transcription.text.trim()}`.trim();
+    }
+
+    if (words.length > 0) {
+      const fallbackText = words
+        .map((w) => w.word ?? w.text ?? '')
+        .filter(Boolean)
+        .join(' ');
+      if (fallbackText.length > 0) {
+        return `${speakerPrefix}${fallbackText}`.trim();
+      }
+    }
+  }
+
+  if (typeof part.text === 'string' && part.text.length > 0) {
+    return part.text.trim();
+  }
+
+  return '';
+};
+
+const extractTranscriptionText = (response: GenerateContentResponse, options?: AudioTranscriptionOptions): string => {
   const candidate = response.candidates?.[0];
   if (!candidate?.content?.parts) {
     return typeof response.text === 'string' ? response.text.trim() : '';
@@ -220,15 +286,17 @@ const extractTranscriptionText = (response: GenerateContentResponse): string => 
   const extractedSegments: string[] = [];
 
   for (const part of candidate.content.parts) {
-    if (typeof part.text === 'string' && part.text.length > 0) {
-      extractedSegments.push(part.text);
-    } else if (typeof part.audioTranscription?.text === 'string' && part.audioTranscription.text.length > 0) {
-      extractedSegments.push(part.audioTranscription.text);
+    const formatted = formatTranscriptionFromPart(part, options);
+    if (formatted.length > 0) {
+      extractedSegments.push(formatted);
     }
   }
 
   if (extractedSegments.length > 0) {
-    return extractedSegments.join('').trim();
+    const hasStructuredSegments = extractedSegments.some(
+      (s) => s.startsWith('[') || s.includes(' -> ') || s.includes('\n'),
+    );
+    return extractedSegments.join(hasStructuredSegments ? '\n\n' : '').trim();
   }
 
   return typeof response.text === 'string' ? response.text.trim() : '';
@@ -296,8 +364,15 @@ export const transcribeAudioApi = async (
         },
       };
 
+      // Enforce mutual exclusion per Gemini specification:
+      // Smart mode is mutually exclusive with word timestamps and speaker diarization.
+      const hasLimitingFeatures = Boolean(options?.wordTimestamps || options?.speakerLabels);
+      const isSmartMode = Boolean(options?.smartMode && !hasLimitingFeatures);
+      const enableWordTimestamps = Boolean(!isSmartMode && options?.wordTimestamps);
+      const enableSpeakerLabels = Boolean(!isSmartMode && options?.speakerLabels);
+
       const promptInstructions: string[] = [];
-      if (options?.smartMode) {
+      if (isSmartMode) {
         promptInstructions.push('Use smart transcription: clean up disfluencies, filler words, and format text.');
       } else {
         promptInstructions.push('Transcribe voice input exactly.');
@@ -308,11 +383,11 @@ export const transcribeAudioApi = async (
         promptInstructions.push(`Primary language: ${normalizedLanguage}.`);
       }
 
-      if (options?.wordTimestamps) {
+      if (enableWordTimestamps) {
         promptInstructions.push('Include word timestamps in the output.');
       }
 
-      if (options?.speakerLabels) {
+      if (enableSpeakerLabels) {
         promptInstructions.push('Identify and label distinct speakers (e.g. Speaker 1, Speaker 2).');
       }
 
@@ -338,13 +413,16 @@ export const transcribeAudioApi = async (
       };
 
       const audioTranscriptionConfig: Record<string, unknown> = {};
+      if (isSmartMode) {
+        audioTranscriptionConfig.mode = 'SMART';
+      }
       if (normalizedLanguage) {
         audioTranscriptionConfig.languageCodes = [normalizedLanguage];
       }
-      if (options?.wordTimestamps) {
+      if (enableWordTimestamps) {
         audioTranscriptionConfig.wordTimestamp = true;
       }
-      if (options?.speakerLabels) {
+      if (enableSpeakerLabels) {
         // The v1beta reference names this field `diarization` (AudioTranscriptionConfig);
         // `speakerLabels` is not part of the documented schema.
         audioTranscriptionConfig.diarization = true;
@@ -377,7 +455,7 @@ export const transcribeAudioApi = async (
         recordAudioTokenUsage(modelId, response.usageMetadata, 'transcription');
       }
 
-      const transcriptionText = extractTranscriptionText(response);
+      const transcriptionText = extractTranscriptionText(response, options);
       if (transcriptionText.length > 0) {
         return transcriptionText;
       }

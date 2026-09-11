@@ -329,4 +329,14 @@ describe('BasicMarkdownRenderer', () => {
 
     expect(handleImageClick).not.toHaveBeenCalled();
   });
+
+  it('renders inline image locate button when link href starts with #image-seek', () => {
+    renderMarkdown({
+      content: '[图表定位](#image-seek?file=chart.png&box=100%2C200%2C300%2C400)',
+    });
+
+    const button = renderer.container.querySelector('[data-testid="inline-image-locate-btn"]');
+    expect(button).not.toBeNull();
+    expect(button?.textContent).toContain('图表定位');
+  });
 });

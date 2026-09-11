@@ -36,7 +36,7 @@ export const useFileUpload = ({
     setCurrentChatSettings,
   });
 
-  const { addFileById } = useFileIdAdder({
+  const { addFileById, addFilesFromCloud } = useFileIdAdder({
     appSettings,
     setSelectedFiles,
     setAppFileError,
@@ -86,5 +86,6 @@ export const useFileUpload = ({
     handleProcessAndAddFiles,
     handleCancelFileUpload: cancelUpload,
     handleAddFileById: addFileById,
+    handleAddFilesFromCloud: addFilesFromCloud,
   };
 };

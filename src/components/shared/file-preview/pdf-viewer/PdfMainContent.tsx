@@ -3,7 +3,7 @@ import { Document, Page } from 'react-pdf';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import type { PdfNavHighlight } from '@/stores/mediaNavStore';
-import PdfHighlightOverlay from '@/components/media-nav/PdfHighlightOverlay';
+import { PdfHighlightOverlay } from '@/components/media-nav/PdfHighlightOverlay';
 
 interface PdfMainContentProps {
   fileUrl: string | undefined;
@@ -18,6 +18,8 @@ interface PdfMainContentProps {
   containerRef: MutableRefObject<HTMLDivElement | null>;
   /** Visual-grounding box rendered on top of its page (PDF navigation panel). */
   highlight?: PdfNavHighlight | null;
+  pageNaturalWidth?: number;
+  pageNaturalHeight?: number;
 }
 
 const LazyPdfPage = ({
@@ -27,6 +29,8 @@ const LazyPdfPage = ({
   setPageRef,
   containerRef,
   highlight,
+  pageNaturalWidth = 595,
+  pageNaturalHeight = 842,
 }: {
   pageNum: number;
   scale: number;
@@ -34,14 +38,17 @@ const LazyPdfPage = ({
   setPageRef: (pageNum: number, element: HTMLDivElement | null) => void;
   containerRef: MutableRefObject<HTMLDivElement | null>;
   highlight?: PdfNavHighlight | null;
+  pageNaturalWidth?: number;
+  pageNaturalHeight?: number;
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   const isRotated = rotation === 90 || rotation === 270;
-  const estimatedWidth = (isRotated ? 842 : 595) * scale;
-  const estimatedHeight = (isRotated ? 595 : 842) * scale;
+  const effectiveWidth = isRotated ? pageNaturalHeight : pageNaturalWidth;
+  const effectiveHeight = isRotated ? pageNaturalWidth : pageNaturalHeight;
+  const estimatedWidth = effectiveWidth * scale;
+  const estimatedHeight = effectiveHeight * scale;
 
   useEffect(() => {
     const el = wrapperRef.current;
@@ -50,15 +57,7 @@ const LazyPdfPage = ({
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-        } else {
-          const rect = el.getBoundingClientRect();
-          if (rect.height > 0 && rect.width > 0) {
-            setDimensions({ width: rect.width, height: rect.height });
-          }
-          setIsVisible(false);
-        }
+        setIsVisible(entry.isIntersecting);
       },
       {
         root: container,
@@ -78,10 +77,10 @@ const LazyPdfPage = ({
         setPageRef(pageNum, el);
       }}
       data-page-number={pageNum}
-      className="shadow-2xl relative bg-white flex items-center justify-center transition-all duration-200"
+      className="shadow-2xl relative bg-white flex items-center justify-center"
       style={{
-        height: isVisible ? 'auto' : dimensions.height ? `${dimensions.height}px` : `${estimatedHeight}px`,
-        width: isVisible ? 'auto' : dimensions.width ? `${dimensions.width}px` : `${estimatedWidth}px`,
+        minHeight: `${estimatedHeight}px`,
+        minWidth: `${estimatedWidth}px`,
       }}
     >
       {isVisible ? (
@@ -103,7 +102,9 @@ const LazyPdfPage = ({
           <span className="text-sm font-mono font-medium">PAGE {pageNum}</span>
         </div>
       )}
-      {highlight && highlight.pageNumber === pageNum && <PdfHighlightOverlay highlight={highlight} />}
+      {highlight && highlight.pageNumber === pageNum && (
+        <PdfHighlightOverlay highlight={highlight} rotation={rotation} />
+      )}
     </div>
   );
 };
@@ -120,11 +121,13 @@ export const PdfMainContent: React.FC<PdfMainContentProps> = ({
   setPageRef,
   containerRef,
   highlight,
+  pageNaturalWidth,
+  pageNaturalHeight,
 }) => {
   const { t } = useI18n();
   return (
     <div className="flex-1 min-h-0 relative flex flex-col min-w-0">
-      <div ref={containerRef} className="flex-grow overflow-y-auto custom-scrollbar p-4 sm:p-8 pb-8 relative">
+      <div ref={containerRef} className="flex-grow overflow-y-auto custom-scrollbar p-2 sm:p-4 pb-8 relative">
         <div
           className={`flex flex-col items-center gap-6 transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
         >
@@ -141,13 +144,15 @@ export const PdfMainContent: React.FC<PdfMainContentProps> = ({
                 const pageNum = index + 1;
                 return (
                   <LazyPdfPage
-                    key={`${pageNum}:${scale}:${rotation}`}
+                    key={pageNum}
                     pageNum={pageNum}
                     scale={scale}
                     rotation={rotation}
                     setPageRef={setPageRef}
                     containerRef={containerRef}
                     highlight={highlight}
+                    pageNaturalWidth={pageNaturalWidth}
+                    pageNaturalHeight={pageNaturalHeight}
                   />
                 );
               })}

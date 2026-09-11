@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createAppSettings, createChatSettings, createUploadedFile } from '@/test/data/factories';
 import { renderHook } from '@/test/render/renderer';
 import { useChatStore } from '@/stores/chatStore';
+import { useChatDraftStore } from '@/stores/chatDraftStore';
 import type { UploadedFile } from '@/types';
 import { useChatInputSubmission } from './useChatInputSubmission';
 
@@ -18,9 +19,9 @@ const createSubmissionParams = () => {
     setAppFileError: vi.fn(),
     uploadFailureMessage: 'Attachment upload failed.',
     isLoading: false,
-    isEditing: false,
-    editMode: 'resend',
-    editingMessageId: null,
+    isEditing: false as boolean,
+    editMode: 'resend' as 'resend' | 'update',
+    editingMessageId: null as string | null,
     canSend: true,
     canQueueMessageBase: true,
     submissionState: {
@@ -100,5 +101,57 @@ describe('useChatInputSubmission', () => {
     expect(params.submissionState.setInputText).toHaveBeenCalledWith('');
 
     useChatStore.setState({ selectedFiles: [] });
+  });
+
+  it('completes edit submission in update mode by passing content and files and restoring draft', () => {
+    const params = createSubmissionParams();
+    const attachedFile = createUploadedFile({ id: 'file-1', name: 'photo.png' });
+    params.isEditing = true;
+    params.editMode = 'update';
+    params.editingMessageId = 'msg-1';
+    params.selectedFiles = [attachedFile];
+    params.submissionState.inputText = 'Updated text content';
+
+    const { result } = renderHook(() => useChatInputSubmission(params));
+
+    act(() => {
+      result.current.handleSubmit();
+    });
+
+    expect(params.onUpdateMessageContent).toHaveBeenCalledWith('msg-1', 'Updated text content', [attachedFile]);
+    expect(params.setEditingMessageId).toHaveBeenCalledWith(null);
+    expect(params.setSelectedFiles).toHaveBeenCalledWith([]);
+    expect(params.submissionState.setInputText).toHaveBeenCalledWith('');
+    expect(params.onSendMessage).not.toHaveBeenCalled();
+  });
+
+  it('restores draft and quotes from chatDraftStore when completing update edit', () => {
+    useChatDraftStore.setState({
+      drafts: {
+        'session-1': {
+          inputText: 'My preserved draft',
+          quotes: ['saved quote'],
+          ttsContext: '',
+        },
+      },
+    });
+
+    const params = createSubmissionParams();
+    params.activeSessionId = 'session-1';
+    params.isEditing = true;
+    params.editMode = 'update';
+    params.editingMessageId = 'msg-1';
+    params.submissionState.inputText = 'Edited message';
+
+    const { result } = renderHook(() => useChatInputSubmission(params));
+
+    act(() => {
+      result.current.handleSubmit();
+    });
+
+    expect(params.submissionState.setInputText).toHaveBeenCalledWith('My preserved draft');
+    expect(params.submissionState.setQuotes).toHaveBeenCalledWith(['saved quote']);
+
+    useChatDraftStore.setState({ drafts: {} });
   });
 });

@@ -16,6 +16,7 @@ import {
 import { CATEGORY_STYLES, getResolutionColor } from '@/utils/file/fileDisplayStyles';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { formatFileSize } from '@/utils/file/fileSize';
+import { formatDisplayFileName } from '@/utils/file/fileName';
 import { isTextFile } from '@/utils/file/fileTypeClassification';
 import { getFileCardMeta } from '@/components/shared/file-preview/fileCardMeta';
 import { useI18n } from '@/contexts/I18nContext';
@@ -40,14 +41,6 @@ const MENU_ITEM_CLASS =
   'flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs leading-tight text-[var(--theme-text-secondary)] transition-colors hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)]';
 const FILE_PREVIEW_BOX_CLASS =
   'file-preview-box relative w-full aspect-square rounded-xl border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-tertiary)]/30 flex items-center justify-center transition-colors group-hover:border-[var(--theme-border-focus)]/50';
-
-const formatDisplayFileName = (fileName: string): string => {
-  const recordingMatch = fileName.match(/^recording-\d{4}-\d{2}-\d{2}-(\d{2})(\d{2})(\d{2})(\.[^.]+)$/);
-  if (recordingMatch) {
-    return `rec-${recordingMatch[1]}:${recordingMatch[2]}:${recordingMatch[3]}${recordingMatch[4]}`;
-  }
-  return fileName;
-};
 
 export const SelectedFileDisplay: React.FC<SelectedFileDisplayProps> = ({
   file,
@@ -142,13 +135,17 @@ export const SelectedFileDisplay: React.FC<SelectedFileDisplayProps> = ({
             </div>
           )}
 
-          {isUploading && (
+          {(isUploading || file.uploadState === 'processing_api') && (
             <div className="absolute inset-x-2 bottom-2 z-20">
               <div className="h-1.5 overflow-hidden rounded-full bg-black/25">
-                <div
-                  className="h-full rounded-full bg-[var(--theme-text-link)] transition-[width] duration-300"
-                  style={{ width: `${uploadPercent}%` }}
-                />
+                {file.uploadState === 'processing_api' ? (
+                  <div className="h-full w-full rounded-full bg-[var(--theme-text-link)]/75 animate-pulse" />
+                ) : (
+                  <div
+                    className="h-full rounded-full bg-[var(--theme-text-link)] transition-[width] duration-300"
+                    style={{ width: `${uploadPercent}%` }}
+                  />
+                )}
               </div>
             </div>
           )}

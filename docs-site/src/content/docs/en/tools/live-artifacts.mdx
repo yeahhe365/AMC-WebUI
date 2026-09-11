@@ -1,0 +1,31 @@
+---
+title: Live Artifacts
+description: Automatic sandbox rendering of interactive HTML/SVG, Apache ECharts, Mermaid, and Graphviz visualization engines.
+---
+
+# Live Artifacts
+
+AMC WebUI features **Live Artifacts**, transforming static code blocks into secure, interactive web sandboxes and dynamic charts in real time.
+
+---
+
+## Capabilities & Engines
+
+### 1. Interactive HTML & SVG Sandboxes
+- When models produce interactive HTML, SVG diagrams, or form controls, AMC WebUI displays an instant "Fullscreen Preview" action.
+- **Security Sandbox**: Executes inside a secure `iframe` sandbox with strict Content Security Policies (CSP).
+- **Follow-up Interaction**: Supports dispatching user interactions back into the conversation for iterative prompt refinement.
+
+### 2. Multi-Engine Visualizations
+- **Apache ECharts**: Smooth interactive line charts, logarithmic scales, bar charts, and tooltips styled to match the dark Onyx aesthetic.
+- **Mermaid.js**: Flowcharts, sequence diagrams, state machines, and Gantt charts compiled directly from markdown blocks.
+- **Graphviz (viz.js)**: Automated node and edge layout for complex network graphs and finite state automata.
+
+---
+
+## Custom Artifact Prompts
+
+Under **Settings -> Live Artifacts**:
+- **Artifact Generator Model**: Specify which model handles complex artifact synthesis (default: `gemini-3.8-flash`).
+- **Custom System Prompts**: Inject tailored style preferences (e.g. demanding Tailwind CSS classes or specific widget frameworks).
+- **Shortcut**: Toggle prompt injection in chat anytime using `/artifacts`.

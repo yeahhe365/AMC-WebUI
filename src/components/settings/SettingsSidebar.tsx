@@ -1,6 +1,6 @@
 import React from 'react';
 import { useI18n } from '@/contexts/I18nContext';
-import { KeyRound, LayoutPanelLeft, Bot, SlidersHorizontal, X } from 'lucide-react';
+import { KeyRound, LayoutPanelLeft, Bot, SlidersHorizontal, X, Server } from 'lucide-react';
 import { type SettingsTab, type SettingsTabDescriptor, useSettingsUiStore } from '@/stores/settingsUiStore';
 import { IconAbout, IconData, IconKeyboard, IconMcp } from '@/components/icons';
 import { Toggle } from '@/components/shared/Toggle';
@@ -10,6 +10,7 @@ import { interpolate } from '@/i18n/interpolate';
 
 const SETTINGS_TAB_ICONS: Record<SettingsTab, React.ElementType> = {
   models: Bot,
+  providers: Server,
   interface: LayoutPanelLeft,
   api: KeyRound,
   mcp: IconMcp,
@@ -35,17 +36,20 @@ interface SettingsSidebarProps {
   searchActiveOptionId?: string | null;
 }
 
-const SIDEBAR_GROUPS: Array<{ id: string; tabIds: SettingsTab[] }> = [
+const SIDEBAR_GROUPS: Array<{ id: string; titleKey?: string; tabIds: SettingsTab[] }> = [
   {
-    id: 'primary',
-    tabIds: ['models', 'api', 'mcp', 'interface', 'data'],
+    id: 'ai',
+    titleKey: 'settingsGroupAi',
+    tabIds: ['providers', 'models', 'mcp'],
   },
   {
-    id: 'shortcuts',
-    tabIds: ['shortcuts'],
+    id: 'system',
+    titleKey: 'settingsGroupSystem',
+    tabIds: ['interface', 'data', 'shortcuts'],
   },
   {
     id: 'about',
+    titleKey: 'settingsGroupAbout',
     tabIds: ['about'],
   },
 ];
@@ -70,27 +74,28 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   const tabsById = new Map(tabs.map((tab) => [tab.id, tab]));
   const groupedTabs = SIDEBAR_GROUPS.map((group) => ({
     id: group.id,
+    titleKey: group.titleKey,
     tabs: group.tabIds.map((tabId) => tabsById.get(tabId)).filter((tab): tab is SettingsTabDescriptor => !!tab),
   })).filter((group) => group.tabs.length > 0);
   const isSearching = searchQuery.trim().length > 0;
 
   const renderTabButton = (tab: SettingsTabDescriptor) => {
     const Icon = SETTINGS_TAB_ICONS[tab.id];
-    const isActive = !isSearching && activeTab === tab.id;
+    const isActive = !isSearching && (activeTab === tab.id || (activeTab === 'api' && tab.id === 'providers'));
 
     return (
       <button
         key={tab.id}
         ref={isActive ? activeTabRef : undefined}
         onClick={() => setActiveTab(tab.id)}
-        className={`flex-shrink-0 flex items-center gap-3 px-3 py-2.5 md:px-4 md:py-3 text-sm rounded-lg transition-colors outline-none select-none w-auto md:w-full text-left focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] ${
+        className={`flex-shrink-0 flex items-center gap-3 px-3 py-2.5 md:px-3 md:py-2 text-sm rounded-xl transition-colors outline-none select-none w-auto md:w-full text-left focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] ${
           isActive ? SETTINGS_NAV_ACTIVE_CLASS : SETTINGS_NAV_IDLE_CLASS
         }`}
         role="tab"
         aria-selected={isActive}
       >
-        <Icon size={18} strokeWidth={isActive ? 2.2 : 2} className="text-[var(--theme-text-primary)]" />
-        <span>{t(tab.labelKey)}</span>
+        <Icon size={17} strokeWidth={isActive ? 2.2 : 2} className="text-[var(--theme-text-primary)] shrink-0" />
+        <span className="truncate">{t(tab.labelKey)}</span>
       </button>
     );
   };
@@ -140,15 +145,20 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
         </div>
       ) : (
         <nav
-          className="flex flex-1 gap-1 overflow-x-auto px-4 pb-2 pt-1 md:flex-col md:gap-1.5 md:overflow-x-hidden md:overflow-y-auto md:px-3 md:pb-3 md:pt-1 custom-scrollbar"
+          className="flex flex-1 gap-1 overflow-x-auto px-4 pb-2 pt-1 md:flex-col md:gap-3 md:overflow-x-hidden md:overflow-y-auto md:px-3 md:pb-3 md:pt-1 custom-scrollbar"
           role="tablist"
         >
-          {groupedTabs.map((group) => (
+          {groupedTabs.map((group, idx) => (
             <div
               key={group.id}
               data-settings-group={group.id}
-              className="flex flex-shrink-0 md:w-full md:flex-col gap-1 md:gap-1.5"
+              className={`flex flex-shrink-0 md:w-full md:flex-col gap-1 md:gap-1 ${idx > 0 ? 'md:pt-2' : ''}`}
             >
+              {group.titleKey && (
+                <div className="hidden md:block px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--theme-text-secondary)]/50 select-none">
+                  {t(group.titleKey)}
+                </div>
+              )}
               {group.tabs.map(renderTabButton)}
             </div>
           ))}

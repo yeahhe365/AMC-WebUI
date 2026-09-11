@@ -1,5 +1,6 @@
 import { act, type ReactNode } from 'react';
 import { vi } from 'vitest';
+import type { File as GeminiFile } from '@google/genai';
 
 import {
   ChatRuntimeProvider,
@@ -45,6 +46,7 @@ type ChatAreaInputValue = {
   onCancelEdit: () => void;
   onProcessFiles: (files: FileList | File[]) => Promise<void>;
   onAddFileById: (fileId: string) => Promise<void>;
+  onAddFilesFromCloud?: (files: GeminiFile[]) => void;
   onCancelUpload: (fileId: string) => void;
   onTranscribeAudio: (file: File) => Promise<string | null>;
   isProcessingFile: boolean;
@@ -81,6 +83,7 @@ type ChatAreaInputValue = {
   isBBoxModeActive: boolean;
   onToggleGuide: () => void;
   isGuideModeActive: boolean;
+  isLiveArtifactsPromptActive?: boolean;
   themeId: string;
 };
 
@@ -192,6 +195,7 @@ export const createChatAreaProviderValue = (overrides: ChatAreaProviderValueOver
       onCancelEdit: vi.fn(),
       onProcessFiles: vi.fn(async () => {}),
       onAddFileById: vi.fn(async () => {}),
+      onAddFilesFromCloud: vi.fn(),
       onCancelUpload: vi.fn(),
       onTranscribeAudio: vi.fn(async () => null),
       isProcessingFile: false,
@@ -228,6 +232,7 @@ export const createChatAreaProviderValue = (overrides: ChatAreaProviderValueOver
       isBBoxModeActive: false,
       onToggleGuide: vi.fn(),
       isGuideModeActive: false,
+      isLiveArtifactsPromptActive: false,
       themeId: 'pearl',
       ...inputOverrides,
     },
@@ -355,6 +360,7 @@ export const createChatRuntimeApp = (value: ChatAreaProviderValue): AppViewModel
       setCommandedInput: vi.fn(),
       handleProcessAndAddFiles: value.input.onProcessFiles,
       handleAddFileById: value.input.onAddFileById,
+      handleAddFilesFromCloud: value.input.onAddFilesFromCloud ?? vi.fn(),
       handleCancelFileUpload: value.input.onCancelUpload,
       handleTranscribeAudio: value.input.onTranscribeAudio,
       handleClearCurrentChat: value.input.onClearChat,
@@ -403,6 +409,7 @@ export const createChatRuntimeApp = (value: ChatAreaProviderValue): AppViewModel
     handleSaveSettings: vi.fn(),
     handleSaveCurrentChatSettings: vi.fn(),
     handleLoadLiveArtifactsPromptAndSave: async () => value.input.onToggleLiveArtifactsPrompt(),
+    handleDeactivateLiveArtifactsPrompt: vi.fn(),
     handleToggleBBoxMode: async () => value.input.onToggleBBox(),
     handleToggleGuideMode: async () => value.input.onToggleGuide(),
     handleSuggestionClick: vi.fn(),

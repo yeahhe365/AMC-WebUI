@@ -1,9 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { type UploadedFile } from '@/types';
 import { usePdfViewer } from '@/hooks/ui/usePdfViewer';
 import { PdfSidebar } from './pdf-viewer/PdfSidebar';
 import { PdfMainContent } from './pdf-viewer/PdfMainContent';
 import { PdfToolbar } from './pdf-viewer/PdfToolbar';
+import { PdfSelectionBubble } from './pdf-viewer/PdfSelectionBubble';
+import { usePdfHotkeys } from './pdf-viewer/usePdfHotkeys';
 import type { PdfNavHighlight } from '@/stores/mediaNavStore';
 
 interface PdfViewerProps {
@@ -15,6 +17,9 @@ interface PdfViewerProps {
   onTargetPageConsumed?: () => void;
   /** Notified whenever scroll tracking lands on a different page. */
   onCurrentPageChange?: (page: number) => void;
+  defaultShowSidebar?: boolean;
+  isCompact?: boolean;
+  onQuote?: (text: string) => void;
 }
 
 const PdfViewerContent: React.FC<PdfViewerProps> = ({
@@ -23,7 +28,11 @@ const PdfViewerContent: React.FC<PdfViewerProps> = ({
   targetPage,
   onTargetPageConsumed,
   onCurrentPageChange,
+  defaultShowSidebar = false,
+  isCompact = true,
+  onQuote,
 }) => {
+  const viewerWrapperRef = useRef<HTMLDivElement>(null);
   const {
     numPages,
     currentPage,
@@ -32,6 +41,9 @@ const PdfViewerContent: React.FC<PdfViewerProps> = ({
     isLoading,
     error,
     showSidebar,
+    isFitToWidth,
+    pageNaturalWidth,
+    pageNaturalHeight,
     containerRef,
     sidebarRef,
     setPageRef,
@@ -44,23 +56,59 @@ const PdfViewerContent: React.FC<PdfViewerProps> = ({
     handleZoomIn,
     handleZoomOut,
     handleRotate,
+    handleFitToWidth,
     toggleSidebar,
-  } = usePdfViewer(file);
+    closeSidebar,
+  } = usePdfViewer(file, {
+    defaultShowSidebar,
+    defaultFitToWidth: true,
+  });
+
+  usePdfHotkeys({
+    containerRef: viewerWrapperRef,
+    onPrevPage: previousPage,
+    onNextPage: nextPage,
+    onFirstPage: () => scrollToPage(1),
+    onLastPage: () => scrollToPage(numPages || 1),
+    onZoomIn: handleZoomIn,
+    onZoomOut: handleZoomOut,
+    onRotate: handleRotate,
+    onFitToWidth: handleFitToWidth,
+    onToggleSidebar: toggleSidebar,
+  });
+
+  const isHighlightForCurrentFile =
+    !highlight?.docName ||
+    highlight.docName.toLowerCase() === file.name.toLowerCase() ||
+    file.name.toLowerCase().includes(highlight.docName.toLowerCase()) ||
+    highlight.docName.toLowerCase().includes(file.name.toLowerCase());
+  const effectiveHighlight = isHighlightForCurrentFile ? highlight : null;
 
   useEffect(() => {
     if (targetPage == null || !numPages) return;
+    // If targetPage is invalid / out of bounds, clamp and consume to prevent stuck queue
+    if (targetPage < 1 || targetPage > numPages) {
+      const clampedPage = Math.max(1, Math.min(numPages, targetPage));
+      scrollToPage(clampedPage, effectiveHighlight?.pageNumber === targetPage ? effectiveHighlight : null);
+      onTargetPageConsumed?.();
+      return;
+    }
     // Pages render lazily; keep the request queued until the page exists.
-    if (scrollToPage(targetPage)) {
+    if (scrollToPage(targetPage, effectiveHighlight?.pageNumber === targetPage ? effectiveHighlight : null)) {
       onTargetPageConsumed?.();
     }
-  }, [targetPage, numPages, scrollToPage, onTargetPageConsumed]);
+  }, [targetPage, numPages, scrollToPage, onTargetPageConsumed, effectiveHighlight]);
 
   useEffect(() => {
     onCurrentPageChange?.(currentPage);
   }, [currentPage, onCurrentPageChange]);
 
   return (
-    <div className="w-full h-full relative flex flex-row bg-gray-900 overflow-hidden select-none">
+    <div
+      ref={viewerWrapperRef}
+      tabIndex={0}
+      className="w-full h-full relative flex flex-row bg-gray-900 overflow-hidden focus:outline-none"
+    >
       <PdfSidebar
         fileUrl={file.dataUrl}
         numPages={numPages}
@@ -68,6 +116,8 @@ const PdfViewerContent: React.FC<PdfViewerProps> = ({
         showSidebar={showSidebar}
         onPageClick={scrollToPage}
         sidebarRef={sidebarRef}
+        isOverlay={isCompact}
+        onClose={closeSidebar}
       />
 
       <div className="flex-grow h-full relative flex flex-col min-w-0">
@@ -82,7 +132,9 @@ const PdfViewerContent: React.FC<PdfViewerProps> = ({
           onLoadError={onDocumentLoadError}
           setPageRef={setPageRef}
           containerRef={containerRef}
-          highlight={highlight}
+          highlight={effectiveHighlight}
+          pageNaturalWidth={pageNaturalWidth}
+          pageNaturalHeight={pageNaturalHeight}
         />
 
         <PdfToolbar
@@ -90,6 +142,7 @@ const PdfViewerContent: React.FC<PdfViewerProps> = ({
           numPages={numPages}
           scale={scale}
           showSidebar={showSidebar}
+          isFitToWidth={isFitToWidth}
           onPageInputCommit={handlePageInputCommit}
           onPrevPage={previousPage}
           onNextPage={nextPage}
@@ -97,7 +150,10 @@ const PdfViewerContent: React.FC<PdfViewerProps> = ({
           onZoomOut={handleZoomOut}
           onRotate={handleRotate}
           onToggleSidebar={toggleSidebar}
+          onFitToWidth={handleFitToWidth}
         />
+
+        <PdfSelectionBubble containerRef={containerRef} onQuote={onQuote} />
       </div>
     </div>
   );

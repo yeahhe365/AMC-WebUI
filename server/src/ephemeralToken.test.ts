@@ -166,4 +166,32 @@ describe('handleEphemeralTokenRequest', () => {
       }),
     );
   });
+
+  it('forwards newSessionExpireTime when provided', async () => {
+    const req = createMockRequest(
+      'POST',
+      {},
+      {
+        model: 'gemini-3.1-flash-live-preview',
+        newSessionExpireTime: '2026-09-01T21:35:00Z',
+      },
+    );
+    const res = createMockResponse();
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        name: 'authTokens/test-ephemeral-token-session-expire',
+        expireTime: '2026-09-01T22:00:00Z',
+        newSessionExpireTime: '2026-09-01T21:35:00Z',
+      }),
+    });
+
+    await handleEphemeralTokenRequest(req, res, baseConfig, mockFetch as unknown as typeof fetch);
+
+    const callArgs = mockFetch.mock.calls[0];
+    const sentBody = JSON.parse(callArgs[1].body);
+    expect(sentBody.newSessionExpireTime).toBe('2026-09-01T21:35:00Z');
+  });
 });

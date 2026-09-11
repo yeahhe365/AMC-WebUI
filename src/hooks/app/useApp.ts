@@ -63,6 +63,7 @@ export interface AppViewModel {
   handleSaveSettings: (newSettings: AppSettings) => void;
   handleSaveCurrentChatSettings: (newSettings: ChatSettings) => void;
   handleLoadLiveArtifactsPromptAndSave: () => Promise<void>;
+  handleDeactivateLiveArtifactsPrompt: () => void;
   handleToggleBBoxMode: () => Promise<void>;
   handleToggleGuideMode: () => Promise<void>;
   handleSuggestionClick: (type: AppSuggestionSource, text: string) => Promise<void>;
@@ -257,6 +258,7 @@ export const useApp = (): AppViewModel => {
 
   const {
     handleLoadLiveArtifactsPromptAndSave,
+    handleDeactivateLiveArtifactsPrompt,
     handleToggleBBoxMode,
     handleToggleGuideMode,
     handleSuggestionClick,
@@ -349,6 +351,7 @@ export const useApp = (): AppViewModel => {
     handleSaveSettings,
     handleSaveCurrentChatSettings,
     handleLoadLiveArtifactsPromptAndSave,
+    handleDeactivateLiveArtifactsPrompt,
     handleToggleBBoxMode,
     handleToggleGuideMode,
     handleSuggestionClick,

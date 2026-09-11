@@ -1,0 +1,48 @@
+---
+title: MCP 协议生态 (Model Context Protocol)
+description: 在 AMC WebUI 中接入 Anthropic 开源的 MCP 协议，支持本地 stdio 进程服务、远程 SSE/Stream 服务与工具调用安全审批。
+---
+
+# MCP 协议生态 (Model Context Protocol)
+
+**MCP (Model Context Protocol)** 是一套旨在将大型模型与外部工具、本地系统数据源（如数据库、文件系统、GitHub、浏览器自动化）无缝连接的开放标准。AMC WebUI 实现了完整的 MCP 客户端支持。
+
+---
+
+## 支持的服务传输形态
+
+### 1. 本地进程服务 (`stdio`)
+- **运行环境**：需在 **Docker Compose** 或自托管 Node API 环境下运行。
+- **配置示例**：
+  ```json
+  {
+    "mcpServers": {
+      "filesystem": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"]
+      }
+    }
+  }
+  ```
+- **安全开关**：服务端必须显式设置环境变量 `ENABLE_MCP_STDIO=true` 允许启动子进程。
+
+### 2. 远程网络服务 (`sse` / `http-stream`)
+- **运行机制**：通过 Server-Sent Events (SSE) 或 HTTP 长连接与远程部署的 MCP 服务通信。
+- **架构与部署依赖**：所有 MCP 传输形态（无论是本地 `stdio` 还是远程 `sse` / `http-stream`）均统一由后端 Node API 服务（`api` 容器或独立 `server/` 服务）作为安全桥接代理转发（端点为 `/api/mcp/*`）。纯静态托管（如 Cloudflare Pages）必须配置后端 Node API 地址，无法脱离后端独立运行 MCP。
+- **内网保护**：若需允许 Node API 服务访问局域网或本机 HTTP MCP 服务，需在服务端显式设置 `ENABLE_MCP_PRIVATE_HTTP=true`。
+
+---
+
+## 核心功能与操作面板
+
+进入 **设置 -> MCP 服务与扩展**：
+
+1. **MCP Tools (工具链)**：
+   - 自动拉取已连接 MCP 服务暴露的函数列表与 JSON Schema。
+   - **调用审批流 (Human-in-the-loop)**：可开启「工具调用前确认」，当模型意图调用敏感工具（如修改本地文件或执行数据库 SQL）时，界面会弹出参数审批确认框，由用户审核后才执行。
+2. **MCP Prompts (提示词模板)**：
+   - 查看与一键应用服务端预设的高级提示词模板，自动填充对话上下文。
+3. **MCP Resources (动态资源)**：
+   - 浏览服务端暴露的资源 URI（如 `file:///...` 或 `db://...`），一键将资源文本挂载到当前对话。
+4. **实时日志监视器 (MCP Logs)**：
+   - 实时查看客户端与 MCP 服务端之间的 JSON-RPC 通信报文、错误码与心跳状态。

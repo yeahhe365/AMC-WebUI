@@ -29,7 +29,8 @@ vi.mock('@/features/stream-jobs/amcStreamJobs', () => ({
 import { useChatEffects } from './useChatEffects';
 import { renderHook } from '@/test/render/renderer';
 import { createChatSettings } from '@/test/data/factories';
-import type { ChatMessage } from '@/types';
+import type { ChatMessage, UploadedFile } from '@/types';
+import { getTranslator } from '@/i18n/translations';
 import { readPendingStreamJob } from '@/features/stream-jobs/amcStreamJobs';
 import { isGenerationLeaseHeldByTab } from '@/features/message-sender/generationLease';
 import { startActiveGenerationJob } from '@/features/message-sender/activeGenerationJobs';
@@ -366,6 +367,20 @@ describe('useChatEffects', () => {
     });
 
     expect(resumePendingStream).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it('clears messageSenderWaitForFiles error across all supported languages once files finish processing', () => {
+    const setAppFileError = vi.fn();
+    const jaError = getTranslator('ja')('messageSenderWaitForFiles');
+    const props = createProps({
+      selectedFiles: [{ id: 'f1', name: 'img.png', isProcessing: false } as UploadedFile],
+      appFileError: jaError,
+      setAppFileError,
+    });
+
+    const hook = renderHook(() => useChatEffects(props));
+    expect(setAppFileError).toHaveBeenCalledWith(null);
     hook.unmount();
   });
 });

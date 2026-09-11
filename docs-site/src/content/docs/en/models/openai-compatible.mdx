@@ -1,0 +1,52 @@
+---
+title: OpenAI-Compatible Models
+description: Connecting DeepSeek, Claude, OpenRouter, and standard endpoints with complete configuration isolation.
+---
+
+# OpenAI-Compatible Models
+
+In addition to Google Gemini, AMC WebUI connects to standard OpenAI `/chat/completions` API endpoints across the AI ecosystem.
+
+---
+
+## Configuration Isolation
+
+AMC WebUI implements strict data isolation:
+- **Independent Base URL**: Configured in **Settings -> Providers & API -> OpenAI Compatible**, completely separated from Gemini routes.
+- **Independent Key Storage**: Saved in a separate IndexedDB table, preventing accidental exposure to Google endpoints.
+- **Custom Model Lists**: Manage custom model names (e.g., `deepseek-chat`, `deepseek-reasoner`, `claude-3-5-sonnet`) independently.
+
+---
+
+## Provider Setup Examples
+
+### 1. DeepSeek
+- **Base URL**: `https://api.deepseek.com/v1`
+- **Models**: `deepseek-chat`, `deepseek-reasoner`
+- **Reasoning Support**: AMC WebUI detects `deepseek-reasoner` and folds thinking tokens into the UI thought container.
+
+### 2. OpenRouter
+- **Base URL**: `https://openrouter.ai/api/v1`
+- **Models**: `anthropic/claude-3.5-sonnet`, `meta-llama/llama-3.3-70b-instruct`
+
+### 3. Google AI Studio (OpenAI Endpoint)
+- **Base URL**: `https://generativelanguage.googleapis.com/v1beta/openai`
+- **API Key**: Use your `GEMINI_API_KEY`
+
+---
+
+## Server-Side Proxy Routing (`THIRD_PARTY_ROUTES`)
+
+When deploying via Docker, configure `THIRD_PARTY_ROUTES` to route requests through your server proxy:
+
+```json
+{
+  "deepseek": {
+    "baseUrl": "https://api.deepseek.com/v1",
+    "apiKey": "sk-your-server-deepseek-key"
+  }
+}
+```
+
+- Requests go to `/api/openai/*` with header `x-third-party-provider: deepseek`.
+- Browser API keys take priority, falling back to server keys when absent.

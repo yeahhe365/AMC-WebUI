@@ -9,6 +9,7 @@ import { ModelsSection } from './sections/ModelsSection';
 import { McpSection } from './sections/McpSection';
 import { ShortcutsSection } from './sections/ShortcutsSection';
 import { AboutSection } from './sections/AboutSection';
+import { ProviderSettingsSection } from './sections/providers/ProviderSettingsSection';
 import { type SettingsTransferProps } from './settingsTypes';
 import type { LogViewerProps } from '@/components/log-viewer/LogViewer';
 import { resolveChatApiRoute } from '@/utils/chatApiRoute';
@@ -30,6 +31,7 @@ interface SettingsContentProps extends SettingsTransferProps {
   onExportSettings: () => void;
   onImportHistory: (file: File) => void;
   onExportHistory: () => void;
+  onCloseModal?: () => void;
   /** Badge text for the selected model in the Models tab; see ModelCatalogList.activeBadgeLabel. */
   activeModelBadgeLabel?: string;
 }
@@ -78,6 +80,7 @@ export const SettingsContent: React.FC<SettingsContentProps> = ({
   onExportHistory,
   onImportScenarios,
   onExportScenarios,
+  onCloseModal,
   activeModelBadgeLabel,
 }) => {
   const animClass = 'animate-in fade-in duration-200 ease-out';
@@ -116,7 +119,13 @@ export const SettingsContent: React.FC<SettingsContentProps> = ({
   };
 
   return (
-    <div className="max-w-3xl mx-auto w-full">
+    <div
+      className={
+        activeTab === 'providers'
+          ? 'w-full h-full flex-1 flex flex-col min-h-0 overflow-hidden'
+          : 'max-w-3xl mx-auto w-full'
+      }
+    >
       {activeTab === 'models' && (
         <div className={animClass}>
           <ModelsSection
@@ -131,6 +140,16 @@ export const SettingsContent: React.FC<SettingsContentProps> = ({
             currentThemeId={currentThemeId}
             onUpdateSettings={handleBatchUpdate}
             activeModelBadgeLabel={activeModelBadgeLabel}
+          />
+        </div>
+      )}
+
+      {activeTab === 'providers' && (
+        <div className="w-full h-full flex-1 flex flex-col min-h-0 overflow-hidden">
+          <ProviderSettingsSection
+            settings={currentSettings}
+            onUpdateSettings={handleBatchUpdate}
+            onCloseModal={onCloseModal}
           />
         </div>
       )}

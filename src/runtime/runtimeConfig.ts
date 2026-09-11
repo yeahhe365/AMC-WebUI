@@ -70,8 +70,21 @@ export function getLiveApiProxyBaseUrl(): string | null {
  * the Docker web container (RUNTIME_THIRD_PARTY_PROXY_URL). Returns null in
  * static/Pages deploys so the frontend falls back to direct browser requests.
  */
-export function getThirdPartyProxyBaseUrl(): string | null {
+function getThirdPartyProxyBaseUrl(): string | null {
   return readNullableString(getRuntimeConfig()?.thirdPartyProxyUrl) ?? null;
+}
+
+/**
+ * Resolves the effective base URL for a third-party model provider.
+ * When running in Docker behind an injected third-party proxy, routes via proxy.
+ * Otherwise returns the trimmed configured baseUrl or null.
+ */
+export function resolveThirdPartyBaseUrl(baseUrl?: string | null): string | null {
+  const proxyUrl = getThirdPartyProxyBaseUrl();
+  if (proxyUrl) {
+    return proxyUrl;
+  }
+  return baseUrl?.trim() || null;
 }
 
 /**

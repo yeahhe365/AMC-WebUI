@@ -289,4 +289,16 @@ describe('appSettingsSchema', () => {
 
     expect(settings.autoOpenHtmlPreview).toBe(false);
   });
+
+  it('preserves an explicit showVoiceInputButton from imported settings', () => {
+    const settings = sanitizeImportedAppSettings({ showVoiceInputButton: true });
+
+    expect(settings.showVoiceInputButton).toBe(true);
+  });
+
+  it('defaults a missing showVoiceInputButton to false', () => {
+    const settings = sanitizeImportedAppSettings({});
+
+    expect(settings.showVoiceInputButton).toBe(false);
+  });
 });

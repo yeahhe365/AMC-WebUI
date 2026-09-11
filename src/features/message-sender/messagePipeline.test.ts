@@ -361,4 +361,33 @@ describe('messagePipeline', () => {
       }),
     );
   });
+
+  it('inherits appSettings.systemInstruction when currentChatSettings.systemInstruction is empty', async () => {
+    let sessions: SavedChatSession[] = [];
+    const updateAndPersistSessions = vi.fn((updater: (prev: SavedChatSession[]) => SavedChatSession[]) => {
+      sessions = updater(sessions);
+    });
+
+    await runOptimisticMessagePipeline({
+      activeSessionId: null,
+      appSettings: createAppSettings({
+        systemInstruction: '[Live Artifacts Protocol - zh]',
+      }),
+      currentChatSettings: createChatSettings({
+        systemInstruction: '',
+      }),
+      updateAndPersistSessions,
+      setActiveSessionId: vi.fn(),
+      text: 'hello',
+      generationId: 'gen-1',
+      createSessionId: () => 'new-session',
+      abortController: new AbortController(),
+      errorPrefix: 'Test Error',
+      runMessageLifecycle: vi.fn(async () => undefined),
+      execute: async () => undefined,
+    });
+
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].settings.systemInstruction).toBe('[Live Artifacts Protocol - zh]');
+  });
 });

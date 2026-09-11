@@ -1,6 +1,8 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { type VirtuosoHandle } from 'react-virtuoso';
 import { type ChatMessage } from '@/types';
+import { CHAT_SCROLL_POS_STORAGE_PREFIX } from '@/constants/storageKeys';
+import { readPersistentStorageItem, writePersistentStorageItem } from '@/stores/persistentStorage';
 
 interface UseMessageListScrollProps {
   messages: ChatMessage[];
@@ -30,7 +32,7 @@ type StoredBottomScrollSnapshot = {
 
 type StoredScrollSnapshot = StoredMessageScrollSnapshot | StoredBottomScrollSnapshot;
 
-const getScrollStorageKey = (sessionId: string) => `chat_scroll_pos_${sessionId}`;
+const getScrollStorageKey = (sessionId: string) => `${CHAT_SCROLL_POS_STORAGE_PREFIX}${sessionId}`;
 
 const parseStoredScrollSnapshot = (rawValue: string | null): StoredScrollSnapshot | number | null => {
   if (rawValue === null) {
@@ -428,7 +430,7 @@ export const useMessageListScroll = ({
     scrollSaveTimeoutRef.current = window.setTimeout(() => {
       scrollSaveTimeoutRef.current = null;
       lastPersistedSnapshotJsonRef.current = serialized;
-      localStorage.setItem(getScrollStorageKey(activeSessionId), serialized);
+      writePersistentStorageItem(getScrollStorageKey(activeSessionId), serialized);
     }, 300);
   }, [scrollerRef, activeSessionId, messages.length]);
 
@@ -449,7 +451,9 @@ export const useMessageListScroll = ({
 
     if (lastRestoredSessionIdRef.current !== activeSessionId) {
       if (messages.length > 0) {
-        const savedSnapshot = parseStoredScrollSnapshot(localStorage.getItem(getScrollStorageKey(activeSessionId)));
+        const savedSnapshot = parseStoredScrollSnapshot(
+          readPersistentStorageItem(getScrollStorageKey(activeSessionId)),
+        );
         const sessionIdForRestore = activeSessionId;
         clearRestoreTimeout();
 

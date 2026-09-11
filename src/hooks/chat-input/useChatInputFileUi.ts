@@ -9,7 +9,9 @@ import {
   useState,
 } from 'react';
 
-import type { UploadedFile } from '@/types';
+import type { UploadedFile, AttachmentAction, LibraryItem } from '@/types';
+import { dbService } from '@/services/db/dbService';
+import { resolveLibraryItemToUploadedFile } from '@/utils/library/libraryFiles';
 import { EXTENSION_TO_MIME } from '@/constants/fileTypeSupport';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 import { cleanupFilePreviewUrl, cleanupReplacedFilePreviewUrl } from '@/utils/file/filePreviewUrls';
@@ -60,10 +62,13 @@ export const useChatInputFileUi = ({
   const [editingFile, setEditingFile] = useState<UploadedFile | null>(null);
   const [showRecorder, setShowRecorder] = useState(false);
   const [showAddByIdInput, setShowAddByIdInput] = useState(false);
+  const [showCloudFilesModal, setShowCloudFilesModal] = useState(false);
   const [showAddByUrlInput, setShowAddByUrlInput] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [showTtsContextEditor, setShowTtsContextEditor] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false);
+  const [showFolderZipModal, setShowFolderZipModal] = useState(false);
 
   const {
     previewFile,
@@ -79,10 +84,22 @@ export const useChatInputFileUi = ({
     isPreviewEditable,
   } = useFileModalState<UploadedFile>(selectedFiles);
 
+  const handleSelectFolderImport = useCallback(() => {
+    setShowFolderZipModal(false);
+    if (window.showDirectoryPicker) {
+      void onOpenFolderPicker();
+    } else {
+      folderInputRef.current?.click();
+    }
+  }, [folderInputRef, onOpenFolderPicker]);
+
+  const handleSelectZipImport = useCallback(() => {
+    setShowFolderZipModal(false);
+    zipInputRef.current?.click();
+  }, [zipInputRef]);
+
   const handleAttachmentAction = useCallback(
-    (
-      action: 'upload' | 'gallery' | 'folder' | 'zip' | 'camera' | 'recorder' | 'id' | 'url' | 'text' | 'screenshot',
-    ) => {
+    (action: AttachmentAction) => {
       setShowAddByIdInput(false);
       setShowAddByUrlInput(false);
 
@@ -90,15 +107,14 @@ export const useChatInputFileUi = ({
         case 'upload':
           fileInputRef.current?.click();
           break;
+        case 'library':
+          setShowLibraryPicker(true);
+          break;
         case 'gallery':
           imageInputRef.current?.click();
           break;
         case 'folder':
-          if (window.showDirectoryPicker) {
-            void onOpenFolderPicker();
-          } else {
-            folderInputRef.current?.click();
-          }
+          setShowFolderZipModal(true);
           break;
         case 'zip':
           zipInputRef.current?.click();
@@ -110,7 +126,7 @@ export const useChatInputFileUi = ({
           setShowRecorder(true);
           break;
         case 'id':
-          setShowAddByIdInput(true);
+          setShowCloudFilesModal(true);
           break;
         case 'url':
           setShowAddByUrlInput(true);
@@ -124,7 +140,29 @@ export const useChatInputFileUi = ({
           break;
       }
     },
-    [cameraInputRef, fileInputRef, folderInputRef, imageInputRef, onOpenFolderPicker, onScreenshot, zipInputRef],
+    [cameraInputRef, fileInputRef, imageInputRef, onScreenshot, zipInputRef],
+  );
+
+  const handleImportFromLibrary = useCallback(
+    async (items: LibraryItem[]) => {
+      if (!items.length) return;
+
+      const newUploadedFiles: UploadedFile[] = await Promise.all(
+        items.map((item) =>
+          resolveLibraryItemToUploadedFile(item, (i) => dbService.fetchLibraryFileBlob(i), { generateNewId: true }),
+        ),
+      );
+
+      setSelectedFiles((prev) => {
+        const existingIds = new Set(prev.map((f) => f.id));
+        const nonDuplicates = newUploadedFiles.filter((f) => !existingIds.has(f.id));
+        return [...prev, ...nonDuplicates];
+      });
+
+      setShowLibraryPicker(false);
+      textareaRef.current?.focus();
+    },
+    [setSelectedFiles, textareaRef],
   );
 
   const handleConfirmCreateTextFile = useCallback(
@@ -140,7 +178,10 @@ export const useChatInputFileUi = ({
       }
 
       const extension = `.${finalFilename.split('.').pop()?.toLowerCase()}`;
-      const mimeType = EXTENSION_TO_MIME[extension] || 'text/plain';
+      const mimeType =
+        content instanceof Blob
+          ? content.type || EXTENSION_TO_MIME[extension] || 'application/octet-stream'
+          : EXTENSION_TO_MIME[extension] || 'text/plain';
       const newFile = new File([content], finalFilename, { type: mimeType });
 
       setShowCreateTextFileEditor(false);
@@ -168,9 +209,18 @@ export const useChatInputFileUi = ({
   const handleSaveTextFile = useCallback(
     async (content: string | Blob, filename: string) => {
       if (editingFile) {
-        const size = content instanceof Blob ? content.size : content.length;
-        const type = content instanceof Blob ? content.type : 'text/markdown';
-        const finalName = filename.includes('.') ? filename : `${filename}.md`;
+        const sanitizeFilename = (name: string) => name.trim().replace(/[<>:"/\\|?*]+/g, '_');
+        let finalName = filename.trim() ? sanitizeFilename(filename) : `file-${Date.now()}.txt`;
+        if (!finalName.includes('.')) {
+          finalName += '.md';
+        }
+
+        const extension = `.${finalName.split('.').pop()?.toLowerCase()}`;
+        const type =
+          content instanceof Blob
+            ? content.type || EXTENSION_TO_MIME[extension] || 'application/octet-stream'
+            : EXTENSION_TO_MIME[extension] || editingFile.type || 'text/plain';
+
         const nextRawFile = new File([content], finalName, { type });
         const nextDataUrl = createManagedObjectUrl(nextRawFile, { ownerId: `selected-file:${editingFile.id}` });
 
@@ -181,8 +231,9 @@ export const useChatInputFileUi = ({
                   const nextFile = {
                     ...file,
                     name: finalName,
+                    type,
                     textContent: typeof content === 'string' ? content : undefined,
-                    size,
+                    size: nextRawFile.size,
                     rawFile: nextRawFile,
                     dataUrl: nextDataUrl,
                   };
@@ -275,6 +326,23 @@ export const useChatInputFileUi = ({
     [setAppFileError, setInputText, setSelectedFiles, t, textareaRef],
   );
 
+  const handleConvertZipToContext = useCallback(
+    async (contextFile: File) => {
+      const currentPreview = previewFile;
+      closePreview();
+
+      if (currentPreview) {
+        setSelectedFiles((prev) => {
+          cleanupFilePreviewUrl(currentPreview);
+          return prev.filter((candidate) => candidate.id !== currentPreview.id);
+        });
+      }
+
+      await onProcessFiles([contextFile]);
+    },
+    [closePreview, onProcessFiles, previewFile, setSelectedFiles],
+  );
+
   const modalsState = useMemo(
     () => ({
       showCreateTextFileEditor,
@@ -285,12 +353,21 @@ export const useChatInputFileUi = ({
       setShowRecorder,
       showAddByIdInput,
       setShowAddByIdInput,
+      showCloudFilesModal,
+      setShowCloudFilesModal,
       showAddByUrlInput,
       setShowAddByUrlInput,
       isHelpModalOpen,
       setIsHelpModalOpen,
       showTtsContextEditor,
       setShowTtsContextEditor,
+      showLibraryPicker,
+      setShowLibraryPicker,
+      handleImportFromLibrary,
+      showFolderZipModal,
+      setShowFolderZipModal,
+      handleSelectFolderImport,
+      handleSelectZipImport,
       fileInputRef,
       imageInputRef,
       folderInputRef,
@@ -310,11 +387,17 @@ export const useChatInputFileUi = ({
       handleAudioRecord,
       handleConfirmCreateTextFile,
       handleEditFile,
+      handleImportFromLibrary,
+      handleSelectFolderImport,
+      handleSelectZipImport,
       imageInputRef,
       isHelpModalOpen,
       showAddByIdInput,
+      showCloudFilesModal,
       showAddByUrlInput,
       showCreateTextFileEditor,
+      showFolderZipModal,
+      showLibraryPicker,
       showRecorder,
       showTtsContextEditor,
       zipInputRef,
@@ -341,12 +424,14 @@ export const useChatInputFileUi = ({
       handleNextImage,
       inputImages,
       currentImageIndex,
+      handleConvertZipToContext,
     }),
     [
       closePreview,
       configuringFile,
       currentImageIndex,
       handleConfigureFile,
+      handleConvertZipToContext,
       handleMoveTextFileToInput,
       handleNextImage,
       handlePreviewFile,

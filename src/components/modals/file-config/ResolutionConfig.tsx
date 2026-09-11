@@ -50,17 +50,26 @@ export const ResolutionConfig: React.FC<ResolutionConfigProps> = ({
   })();
 
   return (
-    <div className="space-y-3 pb-4 border-b border-[var(--theme-border-secondary)]/50">
+    <div className="space-y-1.5 pb-4 border-b border-[var(--theme-border-secondary)]/50">
       <Select
         id="file-media-resolution"
         label={t('fileSettingsResolution')}
-        layout="horizontal"
+        layout="vertical"
         value={mediaResolution}
         onChange={(e) => setMediaResolution(e.target.value as MediaResolution)}
         labelContent={
-          <div className="flex items-center gap-2">
-            <Icon size={14} className="text-[var(--theme-text-secondary)]" />
-            <span>{t('fileSettingsResolution')}</span>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <Icon size={14} className="text-[var(--theme-text-secondary)]" />
+              <span className="text-xs font-bold uppercase text-[var(--theme-text-tertiary)]">
+                {t('fileSettingsResolution')}
+              </span>
+            </div>
+            {tokenEstimate && (
+              <span className="text-[11px] font-medium text-[var(--theme-text-secondary)] bg-[var(--theme-bg-tertiary)] px-2 py-0.5 rounded-md border border-[var(--theme-border-secondary)]/50">
+                {tokenEstimate}
+              </span>
+            )}
           </div>
         }
       >
@@ -72,8 +81,7 @@ export const ResolutionConfig: React.FC<ResolutionConfigProps> = ({
           <option value={MediaResolution.MEDIA_RESOLUTION_ULTRA_HIGH}>{t('mediaResolutionUltraHigh')}</option>
         )}
       </Select>
-      {tokenEstimate && <p className="text-xs text-[var(--theme-text-secondary)]">{tokenEstimate}</p>}
-      <p className="text-xs text-[var(--theme-text-tertiary)] italic">{t('fileSettingsResolutionHelp')}</p>
+      <p className="text-xs text-[var(--theme-text-tertiary)] italic pt-0.5">{t('fileSettingsResolutionHelp')}</p>
     </div>
   );
 };

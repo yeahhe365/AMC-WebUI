@@ -1,0 +1,73 @@
+---
+title: Quickstart
+description: Get AMC WebUI running in 3 minutes via Live Demo, local development, or Docker Compose.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+# Quickstart Guide
+
+Choose the quickest way to get started based on your workflow.
+
+---
+
+## Method 1: Live Demo (Instant Try)
+
+You can try the online demo hosted on Cloudflare Pages without installing anything:
+👉 **[Live Demo](https://all-model-chat.pages.dev/)**
+
+1. Click the **Settings** icon in the upper right corner.
+2. Enter your Google Gemini API Key under **Providers & API**.
+3. Start chatting immediately! All data is stored in your local browser.
+
+---
+
+## Method 2: Local Development
+
+### Prerequisites
+- **Node.js**: Recommended **Node.js 26** (`.nvmrc` provided in repo), minimum Node.js 24.
+- **Package Manager**: **pnpm 11+**.
+
+<Tabs>
+  <TabItem label="Git Clone & Run">
+```bash
+# 1. Clone the repository
+git clone https://github.com/yeahhe365/AMC-WebUI.git
+cd AMC-WebUI
+
+# 2. Use recommended Node version
+nvm use
+
+# 3. Install dependencies
+pnpm install
+
+# 4. Start development server
+pnpm dev
+```
+  </TabItem>
+  <TabItem label="Preconfigured Env (Optional)">
+Create a `.env.local` in the project root:
+
+```bash
+VITE_GEMINI_API_KEY=AIzaSyYourGeminiApiKey
+VITE_OPENAI_API_KEY=sk-YourOpenAiKey
+```
+  </TabItem>
+</Tabs>
+
+Visit `http://localhost:5175` in your browser.
+
+---
+
+## Method 3: Docker Compose (Recommended for Self-Hosting)
+
+```bash
+# 1. Build frontend & backend artifacts
+pnpm run build:docker
+
+# 2. Launch containers
+docker compose up -d --build
+```
+
+- Accessible at **`http://localhost:8080`**.
+- Stop anytime with `docker compose down`.

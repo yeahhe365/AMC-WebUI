@@ -9,6 +9,7 @@ import {
   SUPPORTED_TEXT_MIME_TYPES,
   SUPPORTED_VIDEO_MIME_TYPES,
   TEXT_BASED_EXTENSIONS,
+  EXTENSION_TO_MIME,
 } from '@/constants/fileTypeSupport';
 
 export type FileCategory =
@@ -17,6 +18,7 @@ export type FileCategory =
   | 'video'
   | 'pdf'
   | 'youtube'
+  | 'code'
   | 'text'
   | 'spreadsheet'
   | 'doc'
@@ -39,11 +41,12 @@ interface FileKindFlags {
   isVideo: boolean;
   isYoutube: boolean;
   isPdf: boolean;
+  isCode: boolean;
   isInlineData: boolean;
   isTextFallback: boolean;
 }
 
-const normalizeMimeType = (mimeType?: string): string => (mimeType || '').trim().toLowerCase();
+export const normalizeMimeType = (mimeType?: string): string => (mimeType || '').trim().toLowerCase().split(';')[0];
 
 const normalizeFileName = (name?: string): string => (name || '').trim().toLowerCase();
 
@@ -86,8 +89,122 @@ export const isVideoMimeType = (mimeType?: string): boolean => {
 export const isPdfMimeType = (mimeType?: string): boolean =>
   SUPPORTED_PDF_MIME_TYPES.includes(normalizeMimeType(mimeType));
 
-const isPdfFile = (file: FileKindInput): boolean =>
+export const isPdfFile = (file: FileKindInput): boolean =>
   isPdfMimeType(file.type) || normalizeFileName(file.name).endsWith('.pdf');
+
+export const isVideoFile = (file: FileKindInput): boolean => {
+  if (isVideoMimeType(file.type)) return true;
+  const ext = getFileExtension(file.name);
+  return Boolean(ext && EXTENSION_TO_MIME[ext] && isVideoMimeType(EXTENSION_TO_MIME[ext]));
+};
+
+export const isImageFile = (file: FileKindInput): boolean => {
+  if (isImageMimeType(file.type)) return true;
+  const ext = getFileExtension(file.name);
+  return Boolean(ext && EXTENSION_TO_MIME[ext] && isImageMimeType(EXTENSION_TO_MIME[ext]));
+};
+
+export const isAudioFile = (file: FileKindInput): boolean => {
+  if (isAudioMimeType(file.type)) return true;
+  const ext = getFileExtension(file.name);
+  return Boolean(ext && EXTENSION_TO_MIME[ext] && isAudioMimeType(EXTENSION_TO_MIME[ext]));
+};
+
+export const isSpreadsheetFile = (file: FileKindInput): boolean => {
+  const ext = getFileExtension(file.name);
+  const mime = normalizeMimeType(file.type);
+  return (
+    SUPPORTED_SPREADSHEET_MIME_TYPES.includes(mime) ||
+    mime === 'text/csv' ||
+    mime === 'application/vnd.ms-excel' ||
+    ['.xlsx', '.xls', '.csv', '.tsv'].includes(ext)
+  );
+};
+
+export const isArchiveFile = (file: FileKindInput): boolean => {
+  const ext = getFileExtension(file.name);
+  const mime = normalizeMimeType(file.type);
+  return SUPPORTED_ARCHIVE_MIME_TYPES.includes(mime) || ['.zip', '.tar', '.gz', '.tgz', '.7z', '.rar'].includes(ext);
+};
+
+const isDocFile = (file: FileKindInput): boolean => {
+  const ext = getFileExtension(file.name);
+  const mime = normalizeMimeType(file.type);
+  return SUPPORTED_DOC_MIME_TYPES.includes(mime) || ['.doc', '.docx', '.rtf', '.odt', '.epub'].includes(ext);
+};
+
+const isPresentationFile = (file: FileKindInput): boolean => {
+  const ext = getFileExtension(file.name);
+  const mime = normalizeMimeType(file.type);
+  return SUPPORTED_PRESENTATION_MIME_TYPES.includes(mime) || ['.ppt', '.pptx', '.key', '.odp'].includes(ext);
+};
+
+const CODE_EXTENSIONS = new Set([
+  'js',
+  'jsx',
+  'ts',
+  'tsx',
+  'py',
+  'json',
+  'html',
+  'htm',
+  'css',
+  'scss',
+  'less',
+  'java',
+  'c',
+  'cpp',
+  'h',
+  'hpp',
+  'cs',
+  'go',
+  'rs',
+  'php',
+  'sh',
+  'bash',
+  'zsh',
+  'yaml',
+  'yml',
+  'toml',
+  'sql',
+  'xml',
+  'graphql',
+  'vue',
+  'svelte',
+]);
+
+const isCodeFile = (file: FileKindInput): boolean => {
+  const ext = getFileExtension(file.name).replace(/^\./, '').toLowerCase();
+  if (ext && CODE_EXTENSIONS.has(ext)) return true;
+  const mime = normalizeMimeType(file.type);
+  return (
+    mime.includes('javascript') ||
+    mime.includes('typescript') ||
+    mime.includes('python') ||
+    mime.includes('json') ||
+    mime.includes('x-sh') ||
+    mime.includes('x-c') ||
+    mime.includes('x-java') ||
+    mime.includes('yaml') ||
+    mime.includes('sql')
+  );
+};
+
+export const resolveFileCategory = (file: FileKindInput): FileCategory => {
+  if (file.error) return 'error';
+  const mime = normalizeMimeType(file.type);
+  if (isYoutubeMimeType(mime)) return 'youtube';
+  if (isAudioFile(file)) return 'audio';
+  if (isVideoFile(file)) return 'video';
+  if (isPdfFile(file)) return 'pdf';
+  if (isImageFile(file)) return 'image';
+  if (isSpreadsheetFile(file)) return 'spreadsheet';
+  if (isDocFile(file)) return 'doc';
+  if (isPresentationFile(file)) return 'presentation';
+  if (isArchiveFile(file)) return 'archive';
+  if (isCodeFile(file)) return 'code';
+  return 'text';
+};
 
 const isKnownNonTextMimeType = (mimeType?: string): boolean => {
   const normalized = normalizeMimeType(mimeType);
@@ -127,7 +244,11 @@ const isInlineDataMimeType = (mimeType?: string): boolean =>
   isVideoMimeType(mimeType) ||
   isPdfMimeType(mimeType);
 
-export const getFileTypeCategory = (mimeType: string, error?: string): FileCategory => {
+export const getFileTypeCategory = (mimeType: string, error?: string, filename?: string): FileCategory => {
+  if (filename) {
+    return resolveFileCategory({ type: mimeType, error, name: filename });
+  }
+
   const normalized = normalizeMimeType(mimeType);
 
   if (error) return 'error';
@@ -151,12 +272,13 @@ export const getFileTypeCategory = (mimeType: string, error?: string): FileCateg
 };
 
 export const getFileKindFlags = (file: FileKindInput): FileKindFlags => {
-  const category = getFileTypeCategory(file.type || '', file.error || undefined);
+  const category = resolveFileCategory(file);
   const isPdf = category === 'pdf' || isPdfFile(file);
   const isYoutube = category === 'youtube';
-  const isVideo = category === 'video';
-  const isAudio = category === 'audio';
-  const isImage = category === 'image';
+  const isVideo = category === 'video' || isVideoFile(file);
+  const isAudio = category === 'audio' || isAudioFile(file);
+  const isImage = category === 'image' || isImageFile(file);
+  const isCode = category === 'code' || isCodeFile(file);
 
   return {
     category,
@@ -165,6 +287,7 @@ export const getFileKindFlags = (file: FileKindInput): FileKindFlags => {
     isVideo,
     isYoutube,
     isPdf,
+    isCode,
     isInlineData: isInlineDataMimeType(file.type),
     isTextFallback: !isImage && !isPdf && !isVideo && !isYoutube && !isAudio,
   };

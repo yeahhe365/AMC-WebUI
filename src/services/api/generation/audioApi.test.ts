@@ -300,4 +300,105 @@ describe('transcribeAudioApi request config', () => {
     expect(config.audioTranscriptionConfig.diarization).toBe(true);
     expect(config.audioTranscriptionConfig.speakerLabels).toBeUndefined();
   });
+
+  it('sends mode: SMART in audioTranscriptionConfig when smartMode is enabled', async () => {
+    await transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe', { smartMode: true });
+
+    const config = generateContentMock.mock.calls[0][0].config;
+    expect(config.audioTranscriptionConfig.mode).toBe('SMART');
+    expect(config.audioTranscriptionConfig.wordTimestamp).toBeUndefined();
+    expect(config.audioTranscriptionConfig.diarization).toBeUndefined();
+  });
+
+  it('enforces mutual exclusion when smartMode and diarization/timestamps are both requested', async () => {
+    await transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe', {
+      smartMode: true,
+      speakerLabels: true,
+      wordTimestamps: true,
+    });
+
+    const call = generateContentMock.mock.calls[0][0];
+    // Limiting features take precedence, disabling smartMode to prevent API 400
+    expect(call.config.audioTranscriptionConfig.mode).toBeUndefined();
+    expect(call.config.audioTranscriptionConfig.diarization).toBe(true);
+    expect(call.config.audioTranscriptionConfig.wordTimestamp).toBe(true);
+    expect(call.contents.parts[0].text).toContain('Include word timestamps in the output.');
+    expect(call.contents.parts[0].text).toContain('Identify and label distinct speakers');
+    expect(call.contents.parts[0].text).not.toContain('Use smart transcription');
+  });
+
+  it('formats structured speaker labels and word-level timestamps from audioTranscription parts', async () => {
+    generateContentMock.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                audioTranscription: {
+                  speakerLabel: 'spk_1',
+                  text: 'Hello world',
+                  words: [
+                    { word: 'Hello', startOffset: '0.100s', endOffset: '0.450s' },
+                    { word: 'world', startOffset: '0.500s', endOffset: '0.850s' },
+                  ],
+                },
+              },
+              {
+                audioTranscription: {
+                  speakerLabel: 'spk_2',
+                  text: 'Hi there',
+                  words: [
+                    { word: 'Hi', startOffset: '1.000s', endOffset: '1.200s' },
+                    { word: 'there', startOffset: '1.250s', endOffset: '1.600s' },
+                  ],
+                },
+              },
+            ],
+            role: 'model',
+          },
+          finishReason: 'STOP',
+        },
+      ],
+    });
+
+    const result = await transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe', {
+      wordTimestamps: true,
+      speakerLabels: true,
+    });
+
+    expect(result).toBe(
+      '[spk_1] (0.100s -> 0.450s) Hello (0.500s -> 0.850s) world\n\n[spk_2] (1.000s -> 1.200s) Hi (1.250s -> 1.600s) there',
+    );
+  });
+
+  it('formats speaker labels without word timestamps when only speakerLabels is requested', async () => {
+    generateContentMock.mockResolvedValue({
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                audioTranscription: {
+                  speakerLabel: 'spk_1',
+                  text: 'Hello world',
+                  words: [
+                    { word: 'Hello', startOffset: '0.100s', endOffset: '0.450s' },
+                    { word: 'world', startOffset: '0.500s', endOffset: '0.850s' },
+                  ],
+                },
+              },
+            ],
+            role: 'model',
+          },
+          finishReason: 'STOP',
+        },
+      ],
+    });
+
+    const result = await transcribeAudioApi('api-key', audioFile, 'gemini-3.5-transcribe', {
+      speakerLabels: true,
+    });
+
+    expect(result).toBe('[spk_1] Hello world');
+  });
 });

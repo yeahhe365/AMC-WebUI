@@ -1,6 +1,16 @@
-import React, { useRef, type RefObject } from 'react';
+import React, { useCallback, useRef, type RefObject } from 'react';
 import { useI18n } from '@/contexts/I18nContext';
-import { Settings, MessageSquare, AlertTriangle, Upload, Download, Trash2, Database, RefreshCw } from 'lucide-react';
+import {
+  Settings,
+  MessageSquare,
+  AlertTriangle,
+  Upload,
+  Download,
+  Trash2,
+  Database,
+  RefreshCw,
+  Network,
+} from 'lucide-react';
 import { IconScenarios } from '@/components/icons';
 import type { LogViewerProps } from '@/components/log-viewer/LogViewer';
 import type { PwaInstallState } from '@/pwa/install';
@@ -13,6 +23,10 @@ import {
   SETTINGS_OUTLINE_BUTTON_CLASS,
 } from '@/constants/buttonClasses';
 import { SETTINGS_SECTION_CARD_CLASS, SETTINGS_SECTION_LABEL_CLASS } from '@/constants/designTokens';
+import { applyImportedProviders, exportProvidersBackupFile, parseProvidersBackupText } from '@/utils/thirdPartyBackup';
+import { toastError, toastSuccess, toastWarning } from '@/stores/toastStore';
+import { interpolate } from '@/i18n/interpolate';
+import { FileStrategyControl } from '@/components/settings/sections/appearance/FileStrategyControl';
 
 interface DataManagementSectionProps {
   onClearHistory: () => void;
@@ -27,6 +41,8 @@ interface DataManagementSectionProps {
   onExportHistory: () => void;
   onImportScenarios: (file: File) => void;
   onExportScenarios: () => void;
+  onImportProviders?: (file: File) => void;
+  onExportProviders?: () => void;
   onReset: () => void;
   settings: AppSettings;
   onUpdate: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
@@ -79,6 +95,8 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
   onExportHistory,
   onImportScenarios,
   onExportScenarios,
+  onImportProviders,
+  onExportProviders,
   onReset,
   settings,
   onUpdate,
@@ -87,12 +105,56 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
   const settingsImportRef = useRef<HTMLInputElement>(null);
   const historyImportRef = useRef<HTMLInputElement>(null);
   const scenariosImportRef = useRef<HTMLInputElement>(null);
+  const providersImportRef = useRef<HTMLInputElement>(null);
   const {
     formattedTotalSize,
     hasError: hasAppDataSizeError,
     isLoading: isAppDataSizeLoading,
     refresh: refreshAppDataSize,
   } = useAppDataSize();
+
+  const handleExportProviders = useCallback(() => {
+    if (onExportProviders) {
+      onExportProviders();
+    } else {
+      const connections = settings.thirdPartyApi?.connections ?? [];
+      if (connections.length === 0) {
+        toastWarning(t('thirdPartyExportEmpty'));
+        return;
+      }
+      exportProvidersBackupFile(connections, { includeApiKeys: true });
+    }
+  }, [onExportProviders, settings.thirdPartyApi, t]);
+
+  const handleImportProviders = useCallback(
+    (file: File) => {
+      if (onImportProviders) {
+        onImportProviders(file);
+      } else {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const text = (reader.result ?? e.target?.result) as string;
+          const parsed = parseProvidersBackupText(text);
+          if (parsed.validCount === 0) {
+            toastError(t('thirdPartyImportError'));
+            return;
+          }
+          const currentConnections = settings.thirdPartyApi?.connections ?? [];
+          const next = applyImportedProviders(currentConnections, parsed.connections, 'merge');
+          onUpdate('thirdPartyApi', {
+            ...settings.thirdPartyApi,
+            connections: next,
+          });
+          toastSuccess(interpolate(t('thirdPartyImportSuccess'), { count: parsed.validCount }));
+        };
+        reader.onerror = () => {
+          toastError(t('thirdPartyImportError'));
+        };
+        reader.readAsText(file);
+      }
+    },
+    [onImportProviders, onUpdate, settings.thirdPartyApi, t],
+  );
 
   const isInstallDisabled = installState === 'installed';
   const installDescription =
@@ -114,6 +176,14 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
       importRef: settingsImportRef,
       onImport: onImportSettings,
       onExport: onExportSettings,
+    },
+    {
+      key: 'providers',
+      label: t('settingsDataProviders'),
+      icon: <Network size={16} strokeWidth={1.5} />,
+      importRef: providersImportRef,
+      onImport: handleImportProviders,
+      onExport: handleExportProviders,
     },
     {
       key: 'history',
@@ -162,6 +232,8 @@ export const DataManagementSection: React.FC<DataManagementSectionProps> = ({
           ))}
         </DataCard>
       </div>
+
+      <FileStrategyControl settings={settings} onUpdate={onUpdate} />
 
       <div data-settings-item="data-system-tools">
         <DataCard title={t('settingsSystemTools')} icon={<Settings size={14} strokeWidth={1.5} />}>

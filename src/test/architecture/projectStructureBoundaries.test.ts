@@ -106,8 +106,7 @@ describe('project structure boundaries', () => {
     const iconsIndexSource = readProjectFile('src/components/icons/index.ts');
 
     expect(generalIconsSource).not.toContain('LanguageMark');
-    expect(generalIconsSource).not.toContain('IconPython');
-    expect(languageIconsSource).toContain('IconPython');
+    expect(languageIconsSource).toContain('IconHtml5');
     expect(iconsIndexSource).toContain("export * from './groups/LanguageIcons';");
   });
 

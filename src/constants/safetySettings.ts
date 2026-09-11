@@ -16,6 +16,7 @@ export const DEFAULT_SAFETY_SETTINGS: SafetySetting[] = [
   { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.OFF },
   { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.OFF },
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.OFF },
+  { category: HarmCategory.HARM_CATEGORY_JAILBREAK, threshold: HarmBlockThreshold.OFF },
 ];
 
 /**
@@ -28,6 +29,7 @@ const API_SUPPORTED_CATEGORIES: ReadonlySet<HarmCategory> = new Set([
   HarmCategory.HARM_CATEGORY_HATE_SPEECH,
   HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
   HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+  HarmCategory.HARM_CATEGORY_JAILBREAK,
 ]);
 
 export const toApiSafetySettings = (settings?: SafetySetting[]): SafetySetting[] | undefined =>

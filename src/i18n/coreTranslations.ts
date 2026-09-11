@@ -3,6 +3,7 @@ import { headerTranslations } from './translations/header';
 import { chatInputTranslations } from './translations/chatInput';
 import { messagesTranslations } from './translations/messages';
 import { historyTranslations } from './translations/history';
+import { libraryTranslations } from './translations/library';
 import { commonTranslations } from './translations/common';
 import { chatTranslations } from './translations/chat';
 import { ttsStyleTranslations } from './voiceStyleTranslations';
@@ -133,6 +134,7 @@ export const translations: TranslationMap = {
   ...chatInputTranslations,
   ...messagesTranslations,
   ...historyTranslations,
+  ...libraryTranslations,
   ...commonTranslations,
   ...chatTranslations,
   ...shellFeatureTranslations,
@@ -144,9 +146,22 @@ export const registerTranslations = (translationMap: TranslationMap) => {
 
 export const getTranslator =
   (lang: SupportedLanguage) =>
-  (key: keyof typeof translations | string, fallback?: string): string => {
+  (
+    key: keyof typeof translations | string,
+    fallbackOrParams?: string | Record<string, string | number>,
+    params?: Record<string, string | number>,
+  ): string => {
     const translationSet = translations as TranslationMap;
-    // 优先级：当前语言 > 英语兜底 > 调用方传入的 fallback > 键名本身。
-    // 旧实现把 fallback 放在 en 之前，会掩盖缺译（en 存在时仍返回 fallback）。
-    return translationSet[key]?.[lang] ?? translationSet[key]?.en ?? fallback ?? key;
+    const fallback = typeof fallbackOrParams === 'string' ? fallbackOrParams : undefined;
+    const interpolationParams =
+      typeof fallbackOrParams === 'object' && fallbackOrParams !== null ? fallbackOrParams : params;
+    let text = translationSet[key]?.[lang] ?? translationSet[key]?.en ?? fallback ?? key;
+    if (interpolationParams) {
+      for (const [paramKey, paramVal] of Object.entries(interpolationParams)) {
+        text = text.replaceAll(`{${paramKey}}`, String(paramVal));
+      }
+    }
+    return text;
   };
+
+export type Translator = ReturnType<typeof getTranslator>;

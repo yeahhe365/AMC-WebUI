@@ -1,0 +1,25 @@
+---
+title: 语音合成与转写 (TTS & Transcribe)
+description: Gemini 3.1 Flash TTS 30 种拟真角色语音合成、语速调节与 Gemini 3.5 语音转文字能力。
+---
+
+# 语音合成与转写 (TTS & Transcribe)
+
+AMC WebUI 提供了高表现力的多模态音频生成与转写引擎。
+
+---
+
+## 1. 文本转语音 (Text-to-Speech / TTS)
+
+- **核心模型**：默认采用 `gemini-3.1-flash-tts-preview`。
+- **30 种拟真音色**：
+  - 涵盖男声、女声、青年声线、沉稳解说与播报风格（包括 Zephyr、Aoede、Charon、Fenrir、Kore、Puck、Orpheus 等官方音色）。
+  - 支持在 **设置 -> 语言与语音 (Language & Voice)** 中试听并选择默认音色。
+- **一键朗读消息**：在任意 AI 回复气泡下方，点击 **喇叭朗读图标**，应用会即时请求生成音频并呼出播放器控件，支持暂停、快进与倍速调节。
+
+---
+
+## 2. 语音转文字 (Speech-to-Text / Transcribe)
+
+- **核心模型**：采用 `gemini-3.5-transcribe` 或 `gemini-3.5-transcribe-live` 高精度语音识别模型。
+- **录音输入**：点击输入框的麦克风按钮即可开始录制语音，松开或点击停止后，录音会由转写模型解析为文字并填入输入框，识别准确度极高并能自动纠正常见专业术语。

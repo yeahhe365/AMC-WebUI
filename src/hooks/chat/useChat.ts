@@ -309,6 +309,7 @@ export const useChat = (
     handleAppDrop: dragDropHandler.handleAppDrop,
     handleCancelFileUpload: fileHandler.handleCancelFileUpload,
     handleAddFileById: fileHandler.handleAddFileById,
+    handleAddFilesFromCloud: fileHandler.handleAddFilesFromCloud,
 
     // Message handlers
     handleSendMessage: messageSender.handleSendMessage,

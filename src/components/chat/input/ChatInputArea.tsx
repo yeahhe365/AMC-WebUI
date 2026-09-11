@@ -10,13 +10,15 @@ import { LiveStatusBanner } from './LiveStatusBanner';
 import { QueuedSubmissionList } from './QueuedSubmissionList';
 import { HiddenFileInputs } from './files/HiddenFileInputs';
 import { getChatInputAreaLayout } from './chatInputAreaLayout';
-import { closeMediaNavPanel, openAudioNavPanel, openPdfNavPanel, openVideoNavPanel } from '@/stores/mediaNavStore';
+import { closeMediaNavPanel, useMediaNavStore, type MediaNavKind } from '@/stores/mediaNavStore';
 import { CHAT_INPUT_MAX_WIDTH_CLASS, FOCUS_BLOCKING_SELECTOR } from '@/constants/layout';
+import { applyMediaNavKindToSettings } from '@/utils/media-nav/mediaNavSettings';
 import { useI18n } from '@/contexts/I18nContext';
 import { useChatInputContext } from './ChatInputContext';
 import { ChatInputExpandCorner } from './ChatInputExpandCorner';
 import { useChatInputExpandSizing } from './useChatInputExpandSizing';
 import { useCompactChatInputPresentation } from './useCompactChatInputPresentation';
+import { GEMINI_PROVIDER_ID } from '@/types';
 
 export const ChatInputArea: React.FC = () => {
   const { t } = useI18n();
@@ -36,37 +38,48 @@ export const ChatInputArea: React.FC = () => {
 
   const isFullscreen = inputState.isFullscreen;
   const isPipActive = chatInput.isPipActive;
+  const providerId = chatInput.currentChatSettings?.providerId;
+  const isGeminiNative = providerId === undefined || providerId === GEMINI_PROVIDER_ID;
   const { setCurrentChatSettings } = chatInput;
-  const isPdfNavEnabled = !!chatInput.currentChatSettings.isPdfNavEnabled;
-  const isVideoNavEnabled = !!chatInput.currentChatSettings.isVideoNavEnabled;
-  const isAudioNavEnabled = !!chatInput.currentChatSettings.isAudioNavEnabled;
-  const handleTogglePdfNav = useCallback(() => {
-    const next = !isPdfNavEnabled;
-    setCurrentChatSettings((prev) => ({ ...prev, isPdfNavEnabled: next }));
-    if (next) {
-      openPdfNavPanel();
-    } else {
-      closeMediaNavPanel();
-    }
-  }, [isPdfNavEnabled, setCurrentChatSettings]);
-  const handleToggleVideoNav = useCallback(() => {
-    const next = !isVideoNavEnabled;
-    setCurrentChatSettings((prev) => ({ ...prev, isVideoNavEnabled: next }));
-    if (next) {
-      openVideoNavPanel();
-    } else {
-      closeMediaNavPanel();
-    }
-  }, [isVideoNavEnabled, setCurrentChatSettings]);
-  const handleToggleAudioNav = useCallback(() => {
-    const next = !isAudioNavEnabled;
-    setCurrentChatSettings((prev) => ({ ...prev, isAudioNavEnabled: next }));
-    if (next) {
-      openAudioNavPanel();
-    } else {
-      closeMediaNavPanel();
-    }
-  }, [isAudioNavEnabled, setCurrentChatSettings]);
+  const isMediaNavOpen = useMediaNavStore((state) => state.isOpen);
+  const mediaNavOpenKind = useMediaNavStore((state) => state.openKind);
+  const isPdfNavOpen = isMediaNavOpen && mediaNavOpenKind === 'pdf';
+  const isVideoNavOpen = isMediaNavOpen && mediaNavOpenKind === 'video';
+  const isAudioNavOpen = isMediaNavOpen && mediaNavOpenKind === 'audio';
+  const isImageNavOpen = isMediaNavOpen && mediaNavOpenKind === 'image';
+
+  const isPdfNavActive = Boolean(chatInput.currentChatSettings?.isPdfNavEnabled) || isPdfNavOpen;
+  const isVideoNavActive = Boolean(chatInput.currentChatSettings?.isVideoNavEnabled) || isVideoNavOpen;
+  const isAudioNavActive = Boolean(chatInput.currentChatSettings?.isAudioNavEnabled) || isAudioNavOpen;
+  const isImageNavActive = Boolean(chatInput.currentChatSettings?.isImageNavEnabled) || isImageNavOpen;
+
+  const toggleMediaNav = useCallback(
+    (kind: MediaNavKind, isActive: boolean) => {
+      const next = !isActive;
+      if (next) {
+        chatInput.onDeactivateLiveArtifactsPrompt?.();
+        useMediaNavStore.getState().openAs(kind);
+      } else {
+        closeMediaNavPanel();
+      }
+      setCurrentChatSettings((prev) => applyMediaNavKindToSettings(prev, next ? kind : null));
+    },
+    [chatInput, setCurrentChatSettings],
+  );
+
+  const handleToggleImageNav = useCallback(
+    () => toggleMediaNav('image', isImageNavActive),
+    [toggleMediaNav, isImageNavActive],
+  );
+  const handleTogglePdfNav = useCallback(() => toggleMediaNav('pdf', isPdfNavActive), [toggleMediaNav, isPdfNavActive]);
+  const handleToggleVideoNav = useCallback(
+    () => toggleMediaNav('video', isVideoNavActive),
+    [toggleMediaNav, isVideoNavActive],
+  );
+  const handleToggleAudioNav = useCallback(
+    () => toggleMediaNav('audio', isAudioNavActive),
+    [toggleMediaNav, isAudioNavActive],
+  );
   const isAnimatingSend = inputState.isAnimatingSend;
   const isMobile = inputState.isMobile;
   const isConverting = localFileState.isConverting;
@@ -187,16 +200,18 @@ export const ChatInputArea: React.FC = () => {
             show={chatInput.showEmptyStateSuggestions}
             onSuggestionClick={chatInput.onSuggestionClick}
             onOrganizeInfoClick={chatInput.onOrganizeInfoClick}
-            onToggleBBox={chatInput.onToggleBBox}
+            onToggleBBox={isGeminiNative ? chatInput.onToggleBBox : undefined}
             isBBoxModeActive={chatInput.isBBoxModeActive}
-            onToggleGuide={chatInput.onToggleGuide}
+            onToggleGuide={isGeminiNative ? chatInput.onToggleGuide : undefined}
             isGuideModeActive={chatInput.isGuideModeActive}
-            onTogglePdfNav={!capabilities.isGemmaModel ? handleTogglePdfNav : undefined}
-            isPdfNavEnabled={isPdfNavEnabled}
-            onToggleVideoNav={!capabilities.isGemmaModel ? handleToggleVideoNav : undefined}
-            isVideoNavEnabled={isVideoNavEnabled}
-            onToggleAudioNav={!capabilities.isGemmaModel ? handleToggleAudioNav : undefined}
-            isAudioNavEnabled={isAudioNavEnabled}
+            onToggleImageNav={isGeminiNative && !capabilities.isGemmaModel ? handleToggleImageNav : undefined}
+            isImageNavEnabled={isImageNavActive}
+            onTogglePdfNav={isGeminiNative && !capabilities.isGemmaModel ? handleTogglePdfNav : undefined}
+            isPdfNavEnabled={isPdfNavActive}
+            onToggleVideoNav={isGeminiNative && !capabilities.isGemmaModel ? handleToggleVideoNav : undefined}
+            isVideoNavEnabled={isVideoNavActive}
+            onToggleAudioNav={isGeminiNative && !capabilities.isGemmaModel ? handleToggleAudioNav : undefined}
+            isAudioNavEnabled={isAudioNavActive}
             isFullscreen={isFullscreen}
           />
         )}

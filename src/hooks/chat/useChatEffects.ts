@@ -9,10 +9,15 @@ import {
   normalizeImageSizeForModel,
 } from '@/utils/model/modelCapabilities';
 import { getTranslator } from '@/i18n/translations';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languageRegistry';
 import { readPendingStreamJob } from '@/features/stream-jobs/amcStreamJobs';
 import { isGenerationLeaseHeldByTab } from '@/features/message-sender/generationLease';
 import { hasActiveGenerationJobForSession } from '@/features/message-sender/activeGenerationJobs';
 import { useChatStore } from '@/stores/chatStore';
+
+const WAIT_FOR_FILES_MESSAGES = new Set(
+  SUPPORTED_LANGUAGES.map((lang) => getTranslator(lang)('messageSenderWaitForFiles')),
+);
 
 interface UseChatEffectsProps {
   activeSessionId: string | null;
@@ -143,11 +148,7 @@ export const useChatEffects = ({
 
   useEffect(() => {
     const isFileProcessing = selectedFiles.some((file) => file.isProcessing);
-    const waitForFilesMessages = [
-      getTranslator('en')('messageSenderWaitForFiles'),
-      getTranslator('zh')('messageSenderWaitForFiles'),
-    ];
-    if (appFileError && waitForFilesMessages.includes(appFileError) && !isFileProcessing) {
+    if (appFileError && WAIT_FOR_FILES_MESSAGES.has(appFileError) && !isFileProcessing) {
       setAppFileError(null);
     }
   }, [selectedFiles, appFileError, setAppFileError]);

@@ -1,0 +1,48 @@
+---
+title: Model Context Protocol (MCP)
+description: Integrating Anthropic open Model Context Protocol in AMC WebUI, supporting stdio processes, remote SSE/Stream servers, and tool approval workflows.
+---
+
+# Model Context Protocol (MCP)
+
+**MCP (Model Context Protocol)** is an open standard designed to seamlessly bridge AI models with external tools, local data sources, file systems, and databases. AMC WebUI delivers a complete MCP client implementation.
+
+---
+
+## Supported Server Transports
+
+### 1. Local Process (`stdio`)
+- **Prerequisite**: Requires **Docker Compose** or self-hosted Node backend.
+- **Sample Configuration**:
+  ```json
+  {
+    "mcpServers": {
+      "filesystem": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
+      }
+    }
+  }
+  ```
+- **Security Flag**: Backend must have `ENABLE_MCP_STDIO=true` explicitly set.
+
+### 2. Remote Network Service (`sse` / `http-stream`)
+- **Protocol**: Connects via Server-Sent Events (SSE) or long-polling HTTP streams to remote MCP hosts.
+- **Backend Requirement**: All MCP transports (both local `stdio` and remote `sse` / `http-stream`) are securely bridged through the Node API service (`api` container or standalone `server/`) via `/api/mcp/*`. Pure static frontend hosting (e.g. Cloudflare Pages) requires a companion Node API backend and cannot run MCP independently.
+- **Private Network Access**: To allow the API server to connect to intranet or localhost HTTP MCP servers, explicitly enable `ENABLE_MCP_PRIVATE_HTTP=true` on the server.
+
+---
+
+## Key Management Tabs
+
+Navigate to **Settings -> MCP & Extensions**:
+
+1. **MCP Tools**:
+   - Automatically synchronizes tool schemas from active servers.
+   - **Human-in-the-loop Approvals**: Require user confirmation before executing potentially destructive actions (e.g., file edits or database mutations).
+2. **MCP Prompts**:
+   - Discover and apply server-provided prompt templates to instantly scaffold multi-step tasks.
+3. **MCP Resources**:
+   - Mount server-side data files (`file:///...` or `db://...`) into conversational context.
+4. **Live Logs**:
+   - Monitor real-time JSON-RPC request and response payloads for rapid debugging.

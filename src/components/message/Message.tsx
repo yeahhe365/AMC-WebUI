@@ -1,9 +1,12 @@
 import React from 'react';
-import { type ChatMessage, type UploadedFile, type SideViewContent } from '@/types';
+import type { FunctionCall, Part } from '@google/genai';
+import { type ChatMessage, type UploadedFile, type MessageAppSettings, type SideViewContent } from '@/types';
 import type { OpenHtmlPreviewHandler } from '@/utils/html-preview/previewPrivilege';
 import { MessageContent } from './MessageContent';
 import { MessageActions } from './MessageActions';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useChatStore } from '@/stores/chatStore';
+import { useShallow } from 'zustand/react/shallow';
 import { CHAT_USER_MESSAGE_INSET_CLASS } from '@/constants/layout';
 import type { LiveArtifactFollowupPayload } from '@/utils/live-artifacts/liveArtifactFollowup';
 import type { UserMessageCollapseController } from './content/userMessageCollapse';
@@ -28,12 +31,34 @@ interface MessageProps {
   onConfigureFile?: (file: UploadedFile, messageId: string) => void;
   isGemini3?: boolean;
   userMessageCollapse?: UserMessageCollapseController;
+  mcpPair?: { calls: FunctionCall[]; responses: Part[] };
+  isTurnActive?: boolean;
 }
 
 export const Message: React.FC<MessageProps> = React.memo((props) => {
   const { message, prevMessage } = props;
-  const appSettings = useSettingsStore((state) => state.appSettings);
+  const appSettings = useSettingsStore(
+    useShallow((state): MessageAppSettings => ({
+      baseFontSize: state.appSettings.baseFontSize,
+      expandCodeBlocksByDefault: state.appSettings.expandCodeBlocksByDefault,
+      isMermaidRenderingEnabled: state.appSettings.isMermaidRenderingEnabled,
+      isGraphvizRenderingEnabled: state.appSettings.isGraphvizRenderingEnabled,
+      unwrapMislabeledHtmlBlocks: state.appSettings.unwrapMislabeledHtmlBlocks,
+      liveArtifactsCustomFontSize: state.appSettings.liveArtifactsCustomFontSize,
+      systemInstruction: state.appSettings.systemInstruction,
+      isLiveArtifactsEnabled: state.appSettings.isLiveArtifactsEnabled,
+      liveArtifactsPromptMode: state.appSettings.liveArtifactsPromptMode,
+      liveArtifactsSystemPrompt: state.appSettings.liveArtifactsSystemPrompt,
+      liveArtifactsSystemPrompts: state.appSettings.liveArtifactsSystemPrompts,
+      autoOpenHtmlPreview: state.appSettings.autoOpenHtmlPreview,
+      hideThinkingInContext: state.appSettings.hideThinkingInContext,
+      thoughtTranslationTargetLanguage: state.appSettings.thoughtTranslationTargetLanguage,
+      thoughtTranslationModelId: state.appSettings.thoughtTranslationModelId,
+    })),
+  );
   const themeId = useSettingsStore((state) => state.currentTheme.id);
+  const editingMessageId = useChatStore((state) => state.editingMessageId);
+  const isCurrentlyEditing = editingMessageId === message.id;
 
   const isGrouped = !!(
     prevMessage &&
@@ -59,12 +84,22 @@ export const Message: React.FC<MessageProps> = React.memo((props) => {
     bubbleClasses += 'w-fit px-4 py-3 sm:px-5 sm:py-4 card-shadow ';
     bubbleClasses +=
       'bg-[var(--theme-bg-user-message)] text-[var(--theme-bg-user-message-text)] rounded-2xl border border-[var(--theme-border-secondary)]/30';
+    if (isCurrentlyEditing) {
+      bubbleClasses += ' ring-2 ring-[var(--theme-border-focus)] shadow-lg';
+    }
   } else if (message.role === 'model') {
     bubbleClasses += `w-full py-0 text-[var(--theme-text-primary)] ${isModelThinkingOrHasThoughts ? 'sm:min-w-[320px]' : ''}`;
+    if (isCurrentlyEditing) {
+      bubbleClasses +=
+        ' ring-2 ring-[var(--theme-border-focus)]/70 rounded-2xl p-3 sm:p-4 bg-[var(--theme-bg-secondary)]/40 shadow-sm';
+    }
   } else {
     bubbleClasses += 'w-fit px-4 py-3 card-shadow ';
     bubbleClasses +=
       'bg-[var(--theme-bg-error-message)] text-[var(--theme-bg-error-message-text)] rounded-2xl border border-[var(--theme-text-danger)]/20';
+    if (isCurrentlyEditing) {
+      bubbleClasses += ' ring-2 ring-[var(--theme-border-focus)] shadow-lg';
+    }
   }
 
   const messageActions = (
@@ -83,7 +118,12 @@ export const Message: React.FC<MessageProps> = React.memo((props) => {
   );
 
   return (
-    <div className="relative" data-message-id={message.id} data-message-role={message.role}>
+    <div
+      className="relative"
+      data-message-id={message.id}
+      data-message-role={message.role}
+      data-is-editing={isCurrentlyEditing ? 'true' : undefined}
+    >
       <div className={`${messageContainerClasses}`}>
         {message.role !== 'user' && messageActions}
         <div className={`${bubbleClasses}`}>
@@ -105,6 +145,8 @@ export const Message: React.FC<MessageProps> = React.memo((props) => {
             onConfigureFile={props.onConfigureFile}
             isGemini3={props.isGemini3}
             userMessageCollapse={props.userMessageCollapse}
+            mcpPair={props.mcpPair}
+            isTurnActive={props.isTurnActive}
           />
         </div>
         {message.role === 'user' && messageActions}

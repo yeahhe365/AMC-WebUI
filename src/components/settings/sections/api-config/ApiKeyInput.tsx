@@ -29,10 +29,13 @@ export const ApiKeyInput: React.FC<ApiKeyInputProps> = ({
   const apiKeyBlurClass =
     !isFocused && apiKey ? 'text-transparent [text-shadow:0_0_6px_var(--theme-text-primary)] tracking-widest' : '';
   const inputBaseClasses =
-    'w-full p-3 rounded-lg border transition-all duration-200 focus:ring-2 focus:ring-offset-0 text-sm custom-scrollbar font-mono';
+    'w-full py-2 px-3 rounded-lg border transition-all duration-200 focus:ring-2 focus:ring-offset-0 text-sm custom-scrollbar font-mono';
+
+  const lineCount = (apiKey || '').split('\n').length;
+  const rows = Math.min(Math.max(lineCount, 1), 4);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <label
         htmlFor={inputId}
         className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-secondary)]"
@@ -42,7 +45,7 @@ export const ApiKeyInput: React.FC<ApiKeyInputProps> = ({
       <div className="relative">
         <textarea
           id={inputId}
-          rows={3}
+          rows={rows}
           value={apiKey || ''}
           onChange={(e) => {
             setApiKey(e.target.value || null);
@@ -52,12 +55,12 @@ export const ApiKeyInput: React.FC<ApiKeyInputProps> = ({
             onFocus?.();
           }}
           onBlur={() => setIsFocused(false)}
-          className={`${inputBaseClasses} ${SETTINGS_INPUT_CLASS} resize-y min-h-[80px] ${apiKeyBlurClass}`}
+          className={`${inputBaseClasses} ${SETTINGS_INPUT_CLASS} resize-y min-h-[38px] ${apiKeyBlurClass}`}
           placeholder={placeholder || t('apiConfigKeyPlaceholder')}
           spellCheck={false}
         />
         {!isFocused && apiKey && (
-          <div className="absolute top-3 right-3 pointer-events-none">
+          <div className="absolute top-2.5 right-3 pointer-events-none">
             <Check size={16} className="text-[var(--theme-text-success)]" strokeWidth={1.5} />
           </div>
         )}

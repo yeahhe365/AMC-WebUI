@@ -5,6 +5,7 @@ import { isGemini3Model } from '@/utils/model/modelCapabilities';
 import { normalizeModelId } from '@/utils/model/modelId';
 import { blobToBase64, fileToString } from '@/utils/file/fileEncoding';
 import { getFileKindFlags, isImageMimeType, isTextFile } from '@/utils/file/fileTypeClassification';
+import { normalizeYoutubeUrl } from '@/utils/file/youtubeUrl';
 
 import { usesRemoteFileReference } from './fileTransferStrategy';
 import { formatHistoryFileApiUnavailablePartText } from './geminiFilesApi';
@@ -18,7 +19,9 @@ const isGeminiImageHistoryTarget = (modelId?: string): boolean => {
 
   const normalizedId = normalizeModelId(modelId);
   return (
+    normalizedId === 'gemini-3-pro-image' ||
     normalizedId === 'gemini-3-pro-image-preview' ||
+    normalizedId === 'gemini-3.1-flash-image' ||
     normalizedId === 'gemini-3.1-flash-image-preview' ||
     normalizedId === 'gemini-3.1-flash-lite-image'
   );
@@ -88,8 +91,9 @@ const buildFilePart = async (
   if (usesRemoteFileReference(file) && file.fileUri) {
     // Remote file references are already available to Gemini by URI.
     if (isYoutube) {
-      // YouTube URLs should be sent without a mimeType.
-      part = { fileData: { fileUri: file.fileUri } };
+      // YouTube URLs should be sent without a mimeType and normalized to canonical format.
+      const canonicalUri = normalizeYoutubeUrl(file.fileUri) ?? file.fileUri;
+      part = { fileData: { fileUri: canonicalUri } };
     } else {
       part = { fileData: { mimeType: file.type, fileUri: file.fileUri } };
     }
@@ -173,6 +177,37 @@ const buildFilePart = async (
 
         if (base64DataForApi) {
           part = { inlineData: { mimeType: file.type, data: base64DataForApi } };
+        }
+      } else if (file.textContent) {
+        part = { text: `[Document: ${file.name}]\n${file.textContent}` };
+      } else if (file.name.toLowerCase().endsWith('.docx')) {
+        try {
+          const { extractDocxText } = await import('@/utils/docxPreview');
+          if (fileSource && fileSource instanceof Blob) {
+            const { text } = await extractDocxText(fileSource as File);
+            enrichedFile.textContent = text;
+            part = { text: `[Document: ${file.name}]\n${text}` };
+          }
+        } catch (error) {
+          logService.error(`Failed to extract text from docx for chat: ${file.name}`, { error });
+          part = { text: `[Attachment: ${file.name}]` };
+        }
+      } else if (file.name.toLowerCase().endsWith('.zip')) {
+        try {
+          const { generateZipContext } = await import('@/utils/import-context/loaders');
+          if (fileSource) {
+            const fileObj =
+              fileSource instanceof File
+                ? fileSource
+                : new File([fileSource], file.name, { type: file.type || 'application/zip' });
+            const contextFile = await generateZipContext(fileObj);
+            const text = await fileToString(contextFile);
+            enrichedFile.textContent = text;
+            part = { text: `[Archive Context: ${file.name}]\n${text}` };
+          }
+        } catch (error) {
+          logService.error(`Failed to generate zip context for chat: ${file.name}`, { error });
+          part = { text: `[Attachment: ${file.name}]` };
         }
       } else {
         part = { text: `[Attachment: ${file.name} (Binary content not supported for direct reading)]` };
@@ -395,5 +430,136 @@ export const createChatHistoryForApi = async (
     }
   }
 
-  return historyItems;
+  return sanitizeChatHistoryForApi(historyItems);
+};
+
+/**
+ * Sanitizes chat history items to enforce LLM protocol invariants before sending to the API:
+ * 1. Prunes empty messages and drops leading 'model' messages when user messages exist.
+ * 2. Enforces pairing between functionCall (model) and functionResponse (user):
+ *    - Unanswered functionCalls (e.g. from aborted runs or round caps) are stripped.
+ *    - Orphaned functionResponses (without preceding matching call) are stripped.
+ * 3. Prunes incomplete trailing tool turns (unclosed calls/responses at the end of history).
+ * 4. Merges consecutive messages of the same role to guarantee strict user/model alternation.
+ */
+export const sanitizeChatHistoryForApi = (items: ChatHistoryItem[]): ChatHistoryItem[] => {
+  if (!items || items.length === 0) return [];
+
+  // Pass 1: Prune empty parts and drop leading 'model' messages if any user messages exist
+  const candidateItems = items
+    .map((item) => ({
+      ...item,
+      parts: item.parts.filter((p) => Object.keys(p).length > 0),
+    }))
+    .filter((item) => item.parts.length > 0);
+
+  const hasAnyUserMessage = candidateItems.some((item) => item.role === 'user');
+  if (hasAnyUserMessage) {
+    while (candidateItems.length > 0 && candidateItems[0].role === 'model') {
+      candidateItems.shift();
+    }
+  }
+
+  if (candidateItems.length === 0) return [];
+
+  // Pass 2: Enforce pairing between functionCall (model) and functionResponse (user)
+  // when adjacent turns follow each other.
+  const sanitized: ChatHistoryItem[] = [];
+
+  for (let i = 0; i < candidateItems.length; i++) {
+    const current = candidateItems[i];
+    const next = candidateItems[i + 1];
+    const prev = sanitized[sanitized.length - 1];
+
+    if (current.role === 'model') {
+      const callParts = current.parts.filter((p) => Boolean(p.functionCall));
+
+      // If followed by a user turn, the user turn MUST supply matching functionResponses
+      if (callParts.length > 0 && next && next.role === 'user') {
+        const nextUserResponses = next.parts.filter((p) => Boolean(p.functionResponse));
+        const availableResponseNames = new Set(nextUserResponses.map((p) => p.functionResponse?.name).filter(Boolean));
+        const validCallParts = callParts.filter((p) => availableResponseNames.has(p.functionCall?.name));
+
+        if (validCallParts.length === 0) {
+          // User turn had no matching responses (e.g. user typed a regular prompt instead)
+          const validParts = current.parts.filter((p) => !p.functionCall);
+          if (validParts.length > 0) {
+            sanitized.push({ ...current, parts: validParts });
+          }
+          continue;
+        }
+
+        const validCallNames = new Set(validCallParts.map((p) => p.functionCall?.name).filter(Boolean));
+        const finalParts = current.parts.filter((p) => !p.functionCall || validCallNames.has(p.functionCall.name));
+        if (finalParts.length > 0) {
+          sanitized.push({ ...current, parts: finalParts });
+        }
+        continue;
+      }
+
+      sanitized.push(current);
+    } else {
+      // Role is 'user'
+      const responseParts = current.parts.filter((p) => Boolean(p.functionResponse));
+
+      // If preceded by a model turn, the model turn MUST have supplied matching functionCalls
+      if (responseParts.length > 0 && prev && prev.role === 'model') {
+        const prevModelCalls = prev.parts.filter((p) => Boolean(p.functionCall));
+        const availableCallNames = new Set(prevModelCalls.map((p) => p.functionCall?.name).filter(Boolean));
+        const validResponseParts = responseParts.filter((p) => availableCallNames.has(p.functionResponse?.name));
+
+        if (validResponseParts.length === 0) {
+          const validParts = current.parts.filter((p) => !p.functionResponse);
+          if (validParts.length > 0) {
+            sanitized.push({ ...current, parts: validParts });
+          }
+          continue;
+        }
+
+        const validResponseNames = new Set(validResponseParts.map((p) => p.functionResponse?.name).filter(Boolean));
+        const finalParts = current.parts.filter(
+          (p) => !p.functionResponse || validResponseNames.has(p.functionResponse.name),
+        );
+        if (finalParts.length > 0) {
+          sanitized.push({ ...current, parts: finalParts });
+        }
+        continue;
+      }
+
+      sanitized.push(current);
+    }
+  }
+
+  // Pass 3: Drop leading model messages if prior pruning created one at index 0
+  if (hasAnyUserMessage) {
+    while (sanitized.length > 0 && sanitized[0].role === 'model') {
+      sanitized.shift();
+    }
+  }
+
+  // Pass 4: Merge consecutive same-role items to ensure strict alternation
+  const merged: ChatHistoryItem[] = [];
+  for (const item of sanitized) {
+    const last = merged[merged.length - 1];
+    if (last && last.role === item.role) {
+      last.parts = last.parts.concat(item.parts);
+    } else {
+      merged.push({ role: item.role, parts: [...item.parts] });
+    }
+  }
+
+  return merged;
+};
+
+/**
+ * Safely appends a new turn to chat history, merging if the last history item
+ * matches the incoming role and sanitizing against LLM protocol violations.
+ */
+export const appendTurnToHistory = (
+  history: ChatHistoryItem[],
+  role: 'user' | 'model',
+  parts: ContentPart[],
+): ChatHistoryItem[] => {
+  const combined = [...(history || []), { role, parts }];
+  return sanitizeChatHistoryForApi(combined);
 };

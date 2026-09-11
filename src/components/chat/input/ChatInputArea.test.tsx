@@ -131,4 +131,22 @@ describe('ChatInputArea default spacing', () => {
     expect(designTokensSource).toContain("pill: 'rounded-[20px]'");
     expect(designTokensSource).toContain('COMPOSER_SHELL_RADIUS_CLASS = RADIUS_CLASS.pill');
   });
+
+  it('deactivates Live Artifacts when media navigation is toggled on', () => {
+    const source = fs.readFileSync(chatInputAreaPath, 'utf8');
+
+    expect(source).toContain('chatInput.onDeactivateLiveArtifactsPrompt?.()');
+    expect(source).toContain('applyMediaNavKindToSettings');
+  });
+
+  it('guards ChatSuggestions media nav and bbox/guide toggles with isGeminiNative', () => {
+    const source = fs.readFileSync(chatInputAreaPath, 'utf8');
+
+    expect(source).toContain('const isGeminiNative = providerId === undefined || providerId === GEMINI_PROVIDER_ID;');
+    expect(source).toContain('onToggleBBox={isGeminiNative ? chatInput.onToggleBBox : undefined}');
+    expect(source).toContain('onToggleGuide={isGeminiNative ? chatInput.onToggleGuide : undefined}');
+    expect(source).toContain(
+      'onToggleImageNav={isGeminiNative && !capabilities.isGemmaModel ? handleToggleImageNav : undefined}',
+    );
+  });
 });

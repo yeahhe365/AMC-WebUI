@@ -8,6 +8,7 @@ import { isDarkThemeId } from '@/utils/themeMode';
 import { svgToUploadedFile } from '@/utils/export/svgToUploadedFile';
 import { useDebouncedDiagramRender } from '@/hooks/diagram/useDebouncedDiagramRender';
 import { useDiagramExport } from '@/hooks/diagram/useDiagramExport';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 // Strip script tags and event handlers from mermaid-rendered SVG before injection.
 // With securityLevel 'strict', mermaid already escapes HTML labels; this is a
@@ -78,7 +79,7 @@ export const MermaidBlock: React.FC<MermaidBlockProps> = ({
         if (isMessageLoading) {
           setIsRendering(true);
         } else {
-          const errorMessage = error instanceof Error ? error.message : t('diagramRenderMermaidFailed');
+          const errorMessage = getErrorMessage(error, t('diagramRenderMermaidFailed'));
           setError(errorMessage.replace(/.*error:\s*/, ''));
           setSvg('');
           setIsRendering(false);

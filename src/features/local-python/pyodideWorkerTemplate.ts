@@ -2,6 +2,109 @@
 // __PYODIDE_BASE_URL__ is replaced by buildPyodideWorkerScript at runtime.
 export const PYODIDE_WORKER_CODE_TEMPLATE = `
 const PYODIDE_BASE_URL = "__PYODIDE_BASE_URL__";
+
+const JSDELIVR_HOST = 'cdn.jsdelivr.net';
+const JSDELIVR_MIRRORS = [
+  'cdn.jsdelivr.net',
+  'fastly.jsdelivr.net',
+  'gcore.jsdelivr.net',
+  'testingcf.jsdelivr.net',
+];
+
+const originalFetch = typeof self !== 'undefined' && self.fetch ? self.fetch.bind(self) : null;
+
+async function fetchWithTimeout(url, init, timeoutMs = 20000) {
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const res = await originalFetch(url, {
+      ...init,
+      signal: init && init.signal ? init.signal : (controller ? controller.signal : undefined),
+    });
+    if (timer) clearTimeout(timer);
+    return res;
+  } catch (timeoutFetchError) {
+    if (timer) clearTimeout(timer);
+    throw timeoutFetchError;
+  }
+}
+
+async function resilientFetch(input, init) {
+  if (!originalFetch) return fetch(input, init);
+  const urlStr = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+  const isPyodideAsset = urlStr.includes('.whl') || urlStr.includes('pyodide-lock.json') || urlStr.includes('.wasm') || urlStr.includes('.zip');
+
+  if (!isPyodideAsset) {
+    return originalFetch(input, init);
+  }
+
+  // 1. Try local CacheStorage in Worker if supported
+  let cache = null;
+  try {
+    if (typeof self !== 'undefined' && 'caches' in self && self.caches) {
+      cache = await self.caches.open('pyodide-package-cache-v1');
+      const cached = await cache.match(urlStr);
+      if (cached) {
+        return cached;
+      }
+    }
+  } catch (cacheErr) {
+    // Ignore cache read failures
+  }
+
+  // 2. Fetch with CDN mirrors
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(urlStr, self.location ? self.location.href : undefined);
+  } catch (urlParseError) {
+    return originalFetch(input, init);
+  }
+
+  const isJsdelivr = parsedUrl.hostname === JSDELIVR_HOST;
+  if (!isJsdelivr) {
+    // Same-origin or other non-CDN asset roots (the default local deployment):
+    // fetch as-is. Rebuilding the URL against a forced https host would drop
+    // the port and break local dev/Docker origins.
+    return originalFetch(input, init);
+  }
+  const hostsToTry = JSDELIVR_MIRRORS;
+  let lastError = null;
+
+  for (const host of hostsToTry) {
+    const targetUrl = new URL(parsedUrl.pathname + parsedUrl.search, 'https://' + host).href;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await fetchWithTimeout(targetUrl, init, 15000);
+        if (response.ok) {
+          // If we successfully fetched from CDN, persist to CacheStorage in background
+          if (cache) {
+            try {
+              cache.put(urlStr, response.clone());
+            } catch (putErr) {
+              // Ignore cache write failures
+            }
+          }
+          return response;
+        } else if (response.status === 404) {
+          lastError = new Error('HTTP 404 from ' + host);
+          break;
+        } else {
+          lastError = new Error('HTTP ' + response.status + ' from ' + host);
+        }
+      } catch (hostFetchError) {
+        lastError = hostFetchError;
+        await new Promise((r) => setTimeout(r, 300));
+      }
+    }
+  }
+
+  throw lastError || new Error('Failed to fetch Pyodide asset: ' + urlStr);
+}
+
+if (typeof self !== 'undefined' && originalFetch) {
+  self.fetch = resilientFetch;
+}
+
 importScripts(PYODIDE_BASE_URL + "pyodide.js");
 
 let pyodide = null;
@@ -12,7 +115,17 @@ async function loadPyodideAndPackages() {
     pyodide = await loadPyodide({
       indexURL: PYODIDE_BASE_URL,
     });
-    await pyodide.loadPackage(['micropip', 'pandas', 'numpy', 'matplotlib']);
+    // Non-blocking stdin: raises EOFError immediately on interactive input() instead of hanging
+    pyodide.setStdin({
+      isatty: false,
+      read: () => '',
+    });
+    // Best-effort micropip preload for dynamic package installation without blocking offline starts
+    try {
+      await pyodide.loadPackage(['micropip']);
+    } catch (micropipError) {
+      // Allow execution to proceed offline with standard library
+    }
   }
   return pyodide;
 }
@@ -38,9 +151,6 @@ function getMimeType(filename) {
   return mimeMap[ext] || 'application/octet-stream';
 }
 
-// FS.readFile returns a Uint8Array view that may share a larger backing buffer;
-// copy the bytes into an exact-sized standalone ArrayBuffer so it can be
-// transferred back to the main thread without dragging unrelated bytes along.
 function ensureArrayBuffer(data) {
     const u8 = data instanceof Uint8Array ? data : new Uint8Array(data);
     return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
@@ -53,6 +163,14 @@ function normalizeErrorMessage(error) {
     return String(error);
 }
 
+function sanitizeRelativePath(name) {
+    // NOTE: this template is embedded in an outer JS template literal, so every
+    // backslash here must be doubled ([/\\\\]) to survive as [/\\] in the worker.
+    const clean = String(name || '').replace(/^[/\\\\]+/, '').replace(/^[a-zA-Z]:[/\\\\]+/, '');
+    const parts = clean.split(/[/\\\\]+/).filter((p) => p && p !== '.' && p !== '..');
+    return parts.join('/') || 'file';
+}
+
 function ensureDir(path) {
     const segments = path.split('/').filter(Boolean);
     let current = '';
@@ -60,11 +178,11 @@ function ensureDir(path) {
         current += '/' + segment;
         try {
             pyodide.FS.mkdir(current);
-        } catch (error) {
-            if (error && error.errno === 20) {
+        } catch (mkdirError) {
+            if (mkdirError && mkdirError.errno === 20) {
                 continue;
             }
-            throw error;
+            throw mkdirError;
         }
     }
 }
@@ -82,23 +200,33 @@ function removePath(path) {
             return;
         }
         pyodide.FS.unlink(path);
-    } catch (error) {
+    } catch (removePathError) {
         // Best-effort cleanup
     }
 }
 
-function listFilesRecursively(currentPath) {
+function listFilesRecursively(targetDir, subPath = '') {
     const files = [];
-    const entries = pyodide.FS.readdir(currentPath);
+    const dirToRead = subPath ? targetDir + '/' + subPath : targetDir;
+    let entries = [];
+    try {
+        entries = pyodide.FS.readdir(dirToRead);
+    } catch (readdirError) {
+        return files;
+    }
     for (const entry of entries) {
         if (entry === '.' || entry === '..') continue;
-        const absolutePath = currentPath === '.' ? './' + entry : currentPath + '/' + entry;
-        const stat = pyodide.FS.stat(absolutePath);
-        if (pyodide.FS.isDir(stat.mode)) {
-            files.push(...listFilesRecursively(absolutePath));
-        } else if (pyodide.FS.isFile(stat.mode)) {
-            const relativePath = absolutePath.replace(/^\\.\\//, '');
-            files.push(relativePath);
+        const relativePath = subPath ? subPath + '/' + entry : entry;
+        const fullPath = targetDir + '/' + relativePath;
+        try {
+            const stat = pyodide.FS.stat(fullPath);
+            if (pyodide.FS.isDir(stat.mode)) {
+                files.push(...listFilesRecursively(targetDir, relativePath));
+            } else if (pyodide.FS.isFile(stat.mode)) {
+                files.push(relativePath);
+            }
+        } catch (statError) {
+            // best-effort
         }
     }
     return files;
@@ -106,22 +234,19 @@ function listFilesRecursively(currentPath) {
 
 async function installDependencies(code) {
     try {
-        // loadPackagesFromImports parses the code's import statements (AST-level,
-        // not substring matching) and loads every importable package from the
-        // Pyodide lock file. Pyodide de-dupes packages already loaded at init,
-        // so this is a no-op for the preloaded set.
         await pyodide.loadPackagesFromImports(code);
     } catch (dependencyError) {
         const message = normalizeErrorMessage(dependencyError);
         if (/No known package|not found|could not find|unknown package/i.test(message)) {
-            throw new Error("A requested dependency is not available in the browser Pyodide environment: " + message);
+            throw new Error("A requested dependency is not available in Pyodide: " + message + ". CRITICAL: Do NOT retry run_local_python. Provide the code or text representation directly.");
         }
-        throw new Error("Dependency download failed, please retry: " + message);
+        throw new Error("Python dependency download failed (network/CDN mirror unreachable): " + message + ". CRITICAL: Do NOT retry run_local_python. Provide the Python code or text representation directly.");
     }
 }
 
 self.onmessage = async (event) => {
   const { type, id, code, files } = event.data;
+  let stdout = [];
 
   try {
     if (!pyodideReadyPromise) {
@@ -130,8 +255,6 @@ self.onmessage = async (event) => {
     await pyodideReadyPromise;
 
     if (type === 'WARMUP') {
-      // No code to run; just ensure the runtime + packages are loaded so the
-      // next real execution skips the cold load.
       self.postMessage({ status: 'success', type: 'WARMUP_READY' });
       return;
     }
@@ -148,13 +271,12 @@ self.onmessage = async (event) => {
     try {
       if (files && Array.isArray(files)) {
           for (const file of files) {
-              const normalizedName = String(file.name || '').replace(/^\\/+/, '');
-              if (!normalizedName) continue;
-              const parentDir = normalizedName.includes('/')
-                  ? runDir + '/' + normalizedName.split('/').slice(0, -1).join('/')
+              const safeName = sanitizeRelativePath(file.name);
+              const parentDir = safeName.includes('/')
+                  ? runDir + '/' + safeName.split('/').slice(0, -1).join('/')
                   : runDir;
               ensureDir(parentDir);
-              pyodide.FS.writeFile(runDir + '/' + normalizedName, new Uint8Array(file.data));
+              pyodide.FS.writeFile(runDir + '/' + safeName, new Uint8Array(file.data));
           }
       }
 
@@ -168,7 +290,6 @@ self.onmessage = async (event) => {
         // Listing the starting file set is best-effort; an empty dir is fine.
       }
 
-      let stdout = [];
       pyodide.setStdout({ batched: (msg) => stdout.push(msg) });
       pyodide.setStderr({ batched: (msg) => stdout.push(msg) });
 
@@ -181,18 +302,27 @@ self.onmessage = async (event) => {
           matplotlib.use("Agg")
           import matplotlib.pyplot as plt
           plt.close('all')
-        except ImportError:
+        except Exception:
           pass
       \`);
 
-      result = await pyodide.runPythonAsync(code);
+      const executionGlobals = pyodide.globals.get('dict')();
+      try {
+        result = await pyodide.runPythonAsync(code, { globals: executionGlobals });
+      } finally {
+        try {
+          executionGlobals.destroy();
+        } catch (globalsCleanupError) {
+          // best-effort cleanup
+        }
+      }
 
       const generatedOutputFiles = [];
       try {
           const finalFiles = listFilesRecursively(runDir);
           for (const filePath of finalFiles) {
               if (!initialFiles.has(filePath)) {
-                   const content = pyodide.FS.readFile(filePath);
+                   const content = pyodide.FS.readFile(runDir + '/' + filePath);
                    const fileBuffer = ensureArrayBuffer(content);
                    generatedOutputFiles.push({
                        name: filePath,
@@ -260,14 +390,19 @@ self.onmessage = async (event) => {
       }
       try {
           pyodide.FS.chdir(previousDir);
-      } catch (error) {
+      } catch (restoreDirError) {
           // ignore best-effort restore
       }
       removePath(runDir);
     }
 
   } catch (executionError) {
-    self.postMessage({ id, status: 'error', error: normalizeErrorMessage(executionError) });
+    self.postMessage({
+      id,
+      status: 'error',
+      output: stdout && stdout.length > 0 ? stdout.join('\\n') : undefined,
+      error: normalizeErrorMessage(executionError)
+    });
   }
 };
 `;

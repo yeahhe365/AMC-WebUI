@@ -243,6 +243,9 @@ const FileConfigModalContent: React.FC<FileConfigModalContentProps> = ({
         showResolutionSettings={showResolutionSettings}
         isVideo={supportsVideoConfiguration}
         fileName={file.name}
+        fileSize={file.size}
+        fileType={file.type}
+        isYoutube={isYoutube}
       />
 
       <div className="p-6 space-y-6">
@@ -271,6 +274,12 @@ const FileConfigModalContent: React.FC<FileConfigModalContentProps> = ({
             setFps={(value) => setDraft((prev) => ({ ...prev, fps: value }))}
             setFpsBlur={handleFpsBlur}
             fpsError={fpsError}
+            onResetOffsets={() => setDraft((prev) => ({ ...prev, startOffset: '', endOffset: '' }))}
+            startSeconds={startSeconds}
+            endSeconds={endSeconds}
+            perFrameTokens={
+              (draft.mediaResolution || globalMediaResolution) === MediaResolution.MEDIA_RESOLUTION_HIGH ? 280 : 70
+            }
           />
         )}
 

@@ -1,4 +1,8 @@
-import { HTML_PREVIEW_GRAPHVIZ_RENDER_RESPONSE_EVENT, HTML_PREVIEW_MESSAGE_CHANNEL } from './previewMessageProtocol';
+import {
+  HTML_PREVIEW_DIAGRAM_CLICK_EVENT,
+  HTML_PREVIEW_GRAPHVIZ_RENDER_RESPONSE_EVENT,
+  HTML_PREVIEW_MESSAGE_CHANNEL,
+} from './previewMessageProtocol';
 
 /**
  * Lightweight completeness heuristic for streaming DOT: balanced parens /
@@ -122,6 +126,7 @@ export const GRAPHVIZ_RENDERER_SCRIPT = `
   const STATE_ATTR = 'data-amc-graphviz-state';
   const channel = ${JSON.stringify(HTML_PREVIEW_MESSAGE_CHANNEL)};
   const responseEvent = ${JSON.stringify(HTML_PREVIEW_GRAPHVIZ_RENDER_RESPONSE_EVENT)};
+  const diagramClickEvent = ${JSON.stringify(HTML_PREVIEW_DIAGRAM_CLICK_EVENT)};
   const parentWindow = window.parent;
 
   const hash = (s) => {
@@ -248,6 +253,8 @@ export const GRAPHVIZ_RENDERER_SCRIPT = `
       // diagrams scroll instead of being clipped or squashed.
       node.style.overflowX = 'auto';
       node.style.maxWidth = '100%';
+      node.style.cursor = 'zoom-in';
+      node.setAttribute('title', '点击放大查看 / Click to zoom');
       node.replaceChildren(svgRoot);
       setState(node, 'rendered');
       return;
@@ -338,6 +345,42 @@ export const GRAPHVIZ_RENDERER_SCRIPT = `
     // iframe self-posting a forged response must be ignored.
     if (event.source !== window.parent) return;
     handleRenderResponse(event.data);
+  });
+
+  document.addEventListener('click', (event) => {
+    if (event.isTrusted === false && !event._isMockTrusted) return;
+    try {
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && sel.toString().trim().length > 0) return;
+    } catch {}
+
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const graphvizContainer = target.closest('[' + ATTR + ']');
+    if (!graphvizContainer || graphvizContainer.getAttribute(STATE_ATTR) !== 'rendered') return;
+
+    if (target.closest('a, button, input, select, textarea')) return;
+
+    const svgEl = graphvizContainer.querySelector('svg');
+    if (!svgEl) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (parentWindow && typeof parentWindow.postMessage === 'function') {
+      parentWindow.postMessage(
+        {
+          channel,
+          event: diagramClickEvent,
+          payload: {
+            svg: svgEl.outerHTML,
+            title: 'Graphviz',
+          },
+        },
+        '*',
+      );
+    }
   });
 
   renderAll();

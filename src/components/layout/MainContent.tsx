@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import { ChatArea } from './ChatArea';
 import { AppModals } from '@/components/modals/AppModals';
 import type { AppViewModel } from '@/hooks/app/useApp';
+import { useChatStore } from '@/stores/chatStore';
 import { useMainContentViewModel } from './useMainContentViewModel';
 import { ChatRuntimeProvider } from './chat-runtime/ChatRuntimeContext';
 import { lazyNamedComponent } from '@/utils/lazyNamedComponent';
@@ -10,6 +11,7 @@ import { isDarkThemeId } from '@/utils/themeMode';
 const LazyHistorySidebar = lazyNamedComponent(() => import('@/components/sidebar/HistorySidebar'), 'HistorySidebar');
 const LazySidePanel = lazyNamedComponent(() => import('./SidePanel'), 'SidePanel');
 const LazyMediaNavPanel = lazyNamedComponent(() => import('@/components/media-nav/MediaNavPanel'), 'MediaNavPanel');
+const LazyLibraryView = lazyNamedComponent(() => import('@/components/library/LibraryView'), 'LibraryView');
 
 interface MainContentProps {
   app: AppViewModel;
@@ -34,6 +36,8 @@ export const MainContent: React.FC<MainContentProps> = ({ app }) => {
     overlayVisible,
     currentThemeId,
     closeHistorySidebar,
+    activeView,
+    setActiveView,
   } = useMainContentViewModel({ app });
 
   return (
@@ -55,9 +59,39 @@ export const MainContent: React.FC<MainContentProps> = ({ app }) => {
       <Suspense fallback={<HistorySidebarFallback isOpen={sidebarProps.isOpen} themeId={currentThemeId} />}>
         <LazyHistorySidebar {...sidebarProps} />
       </Suspense>
-      <ChatRuntimeProvider app={app}>
-        <ChatArea />
-      </ChatRuntimeProvider>
+
+      {activeView === 'library' ? (
+        <Suspense
+          fallback={<div className="flex-1 h-full flex items-center justify-center bg-[var(--theme-bg-primary)]" />}
+        >
+          <LazyLibraryView
+            onNewChat={(initialFiles) => {
+              setActiveView('chat');
+              app.chatState.startNewChat();
+              if (initialFiles && initialFiles.length > 0) {
+                useChatStore.getState().setSelectedFiles(initialFiles);
+              }
+            }}
+            onSelectSession={sidebarProps.onSelectSession}
+            onClose={() => {
+              if (
+                typeof window !== 'undefined' &&
+                window.history.state?.view === 'library' &&
+                window.history.length > 1
+              ) {
+                window.history.back();
+              } else {
+                setActiveView('chat');
+              }
+            }}
+            themeId={currentThemeId}
+          />
+        </Suspense>
+      ) : (
+        <ChatRuntimeProvider app={app}>
+          <ChatArea />
+        </ChatRuntimeProvider>
+      )}
 
       <Suspense fallback={null}>
         <LazyMediaNavPanel />

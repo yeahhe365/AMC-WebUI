@@ -22,5 +22,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "exclude": ["dist", "server/dist"]
+  "exclude": ["dist", "server/dist", "docs-site"]
 }

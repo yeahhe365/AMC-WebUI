@@ -16,23 +16,23 @@ Node.js 26 is recommended for local development. The repository includes `.nvmrc
 ```bash
 nvm use
 npm ci
-npm run dev
+pnpm dev
 ```
 
 Useful verification commands:
 
 ```bash
-npm run typecheck
-npm run lint
-npm run test
-npm run build
+pnpm run typecheck
+pnpm run lint
+pnpm run test
+pnpm run build
 ```
 
 For end-to-end coverage:
 
 ```bash
 npx playwright install --with-deps chromium
-npm run test:e2e
+pnpm run test:e2e
 ```
 
 ## Adding a new language
@@ -49,8 +49,8 @@ npm run test:e2e
 3. Fill `ko: ''` in each `src/i18n/translations/**/*.ts` with translations (keep `{placeholders}` intact).
 4. Verify:
    ```bash
-   npm run i18n:check
-   npm run typecheck && npm run lint && npm test
+   pnpm run i18n:check
+   pnpm run typecheck && pnpm run lint && pnpm test
    ```
 
 ## Pull Requests

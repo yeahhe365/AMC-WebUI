@@ -1,0 +1,39 @@
+---
+title: Common Error Troubleshooting
+description: Diagnostic resolutions for Robotics 403 Forbidden, incompatible Thinking levels, and 429 quota exhaustion.
+---
+
+# Common Error Troubleshooting
+
+Quick solutions for frequent upstream error codes and parameter mismatches.
+
+---
+
+## 1. `403 Forbidden` on `gemini-robotics-er-2-preview`
+
+### Cause
+Google enforces a mandatory policy for Robotics models: **API Keys without explicit usage restrictions are rejected**.
+
+### Resolution
+1. Visit [Google AI Studio API Keys](https://aistudio.google.com/api-keys).
+2. Edit your key and apply an **API Restriction** (e.g., restricting by domain, IP, or project).
+3. Save changes and retry your request in AMC WebUI.
+
+---
+
+## 2. Incompatible Thinking Level Errors
+
+### Cause
+Per official model cards, `gemini-3.7-flash` and `gemini-3.8-flash` reject `Minimal` reasoning levels with API validation errors.
+
+### Resolution
+- Adjust the reasoning depth to `Low`, `Medium`, or `High`.
+- Only `gemini-3.5-flash-lite` accepts `Minimal`.
+
+---
+
+## 3. `429 Too Many Requests` (Quota Limit Reached)
+
+### Resolution
+1. **Key Rotation**: Provide multiple Gemini API keys in Settings. AMC WebUI will round-robin across them automatically.
+2. **Cap Thinking Budget**: Dial down reasoning token budget sliders from 32K to 4096 to conserve quota.

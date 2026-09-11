@@ -1,4 +1,4 @@
-import { CHART_RENDERER_SCRIPT } from './chartRendererScript';
+import { ECHARTS_RENDERER_SCRIPT } from './echartsRendererScript';
 import { GRAPHVIZ_RENDERER_SCRIPT } from './graphvizRendererScript';
 import {
   HTML_PREVIEW_COPY_EVENT,
@@ -429,7 +429,7 @@ export const PREVIEW_BRIDGE_SCRIPT = `<script>
     event.preventDefault();
     notify('followup', payload);
   });
-${CHART_RENDERER_SCRIPT}
+${ECHARTS_RENDERER_SCRIPT}
 ${GRAPHVIZ_RENDERER_SCRIPT}
 })();
 </script>`;

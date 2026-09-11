@@ -27,6 +27,8 @@ const HEADING_FONT_SIZE_BY_DEPTH: Record<number, number> = { 1: TEXT.h1, 2: TEXT
 const LINE_HEIGHT = 5.8;
 const CODE_LINE_HEIGHT = 5;
 const TEXT_STROKE_WIDTH = 0.06;
+const CJK_TEXT_STROKE_WIDTH = 0.07;
+const CJK_HEADING_STROKE_WIDTH = 0.22;
 
 const getTextColor = (themeId: string) => (isDarkThemeId(themeId) ? [255, 255, 255] : [0, 0, 0]);
 const getMutedTextColor = (themeId: string) => (isDarkThemeId(themeId) ? [161, 161, 170] : [82, 82, 91]);
@@ -34,6 +36,7 @@ const getRuleColor = (themeId: string) => (isDarkThemeId(themeId) ? [63, 63, 70]
 const getCodeFillColor = (themeId: string) => (isDarkThemeId(themeId) ? [39, 39, 42] : [244, 244, 245]);
 
 const normalizeWhitespace = (value: string): string => value.replace(/\s+/g, ' ').trim();
+const normalizeLineWhitespace = (value: string): string => value.replace(/[^\S\r\n]+/g, ' ').trim();
 
 const collectInlineText = (node: MarkdownNode): string => {
   if (node.type === 'text' || node.type === 'inlineCode') {
@@ -147,21 +150,34 @@ export class MarkdownPdfRenderer {
     this.applyBodyStyle();
   }
 
-  private writeLines(lines: string[], options: { fontSize?: number; color?: number[]; indent?: number } = {}) {
+  private writeLines(
+    lines: string[],
+    options: { fontSize?: number; color?: number[]; indent?: number; isBold?: boolean } = {},
+  ) {
     const fontSize = options.fontSize ?? TEXT.body;
     const color = options.color ?? getTextColor(this.themeId);
     const indent = options.indent ?? 0;
+    const isBold = options.isBold ?? false;
     const lineHeight = fontSize <= TEXT.code ? CODE_LINE_HEIGHT : LINE_HEIGHT;
 
     this.doc.setFontSize(fontSize);
     this.setTextColor(color);
     this.doc.setDrawColor(color[0], color[1], color[2]);
-    this.doc.setLineWidth(TEXT_STROKE_WIDTH);
+
+    const strokeWidth = this.shouldUseCjkFont
+      ? isBold
+        ? CJK_HEADING_STROKE_WIDTH
+        : CJK_TEXT_STROKE_WIDTH
+      : isBold
+        ? 0.12
+        : TEXT_STROKE_WIDTH;
+
+    this.doc.setLineWidth(strokeWidth);
 
     lines.forEach((line) => {
       this.ensureSpace(lineHeight);
       this.doc.text(line, PAGE.marginX + indent, this.cursorY, {
-        renderingMode: this.shouldUseCjkFont ? 'fill' : 'fillThenStroke',
+        renderingMode: 'fillThenStroke',
       });
       this.cursorY += lineHeight;
     });
@@ -182,20 +198,43 @@ export class MarkdownPdfRenderer {
 
   private splitMeasuredText(text: string, width: number): string[] {
     const lines: string[] = [];
-    let current = '';
+    let currentLine = '';
 
-    for (const character of text) {
-      const next = current + character;
-      if (current && this.doc.getTextWidth(next) > width) {
-        lines.push(current);
-        current = character;
+    const tokenPattern =
+      /(\s+)|([a-zA-Z0-9_#@$%^&*+\-=~]+)|([\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff][，。！？；：）》、’”.,!?:;)\]}>]*)|([，。！？；：）》、’”.,!?:;)\]}>]+)|(.)/gu;
+
+    let match: RegExpExecArray | null;
+    while ((match = tokenPattern.exec(text)) !== null) {
+      const token = match[0];
+
+      if (!currentLine && /^\s+$/.test(token)) {
+        continue;
+      }
+
+      const candidate = currentLine + token;
+      if (this.doc.getTextWidth(candidate) <= width) {
+        currentLine = candidate;
       } else {
-        current = next;
+        if (!currentLine) {
+          let piece = '';
+          for (const char of token) {
+            if (piece && this.doc.getTextWidth(piece + char) > width) {
+              lines.push(piece);
+              piece = char;
+            } else {
+              piece += char;
+            }
+          }
+          currentLine = piece;
+        } else {
+          lines.push(currentLine.trimEnd());
+          currentLine = /^\s+$/.test(token) ? '' : token;
+        }
       }
     }
 
-    if (current) {
-      lines.push(current);
+    if (currentLine.trimEnd()) {
+      lines.push(currentLine.trimEnd());
     }
 
     return lines.length > 0 ? lines : [''];
@@ -246,12 +285,12 @@ export class MarkdownPdfRenderer {
   private renderHeading(node: MarkdownNode) {
     const depth = Number((node as MarkdownNode & { depth?: number }).depth ?? 1);
     const fontSize = HEADING_FONT_SIZE_BY_DEPTH[depth] ?? TEXT.h3;
-    const text = normalizeWhitespace((node.children ?? []).map(collectInlineText).join(''));
+    const text = normalizeLineWhitespace((node.children ?? []).map(collectInlineText).join(''));
     if (!text) return;
 
     this.cursorY += this.cursorY === PAGE.marginTop ? 0 : 3;
     this.doc.setFont(this.bodyFontFamily, this.bodyFontFamily === CJK_FONT_NAME ? 'normal' : 'bold');
-    this.writeLines(this.splitText(text, this.contentWidth, fontSize), { fontSize });
+    this.writeLines(this.splitText(text, this.contentWidth, fontSize), { fontSize, isBold: true });
     this.doc.setFont(this.bodyFontFamily, 'normal');
     this.cursorY += 2;
   }
@@ -264,23 +303,35 @@ export class MarkdownPdfRenderer {
       return;
     }
 
-    const text = normalizeWhitespace(`${options.prefix ?? ''}${children.map(collectInlineText).join('')}`);
+    const rawText = `${options.prefix ?? ''}${children.map(collectInlineText).join('')}`;
+    const text = normalizeLineWhitespace(rawText);
     if (!text) return;
 
     const indent = options.indent ?? 0;
     this.applyBodyStyle();
-    this.writeLines(this.splitText(text, this.contentWidth - indent), { indent });
+    const paragraphLines = text.split('\n');
+    for (const paragraphLine of paragraphLines) {
+      const trimmed = paragraphLine.trim();
+      if (!trimmed) continue;
+      this.writeLines(this.splitText(trimmed, this.contentWidth - indent), { indent });
+    }
     this.cursorY += 3;
   }
 
   private async renderParagraphWithImages(children: MarkdownNode[], options: { indent?: number; prefix?: string }) {
     const flushText = (parts: string[], prefix = '') => {
-      const text = normalizeWhitespace(`${prefix}${parts.join('')}`);
+      const rawText = `${prefix}${parts.join('')}`;
+      const text = normalizeLineWhitespace(rawText);
       if (!text) return;
 
       const indent = options.indent ?? 0;
       this.applyBodyStyle();
-      this.writeLines(this.splitText(text, this.contentWidth - indent), { indent });
+      const paragraphLines = text.split('\n');
+      for (const paragraphLine of paragraphLines) {
+        const trimmed = paragraphLine.trim();
+        if (!trimmed) continue;
+        this.writeLines(this.splitText(trimmed, this.contentWidth - indent), { indent });
+      }
       this.cursorY += 3;
     };
 
@@ -302,11 +353,16 @@ export class MarkdownPdfRenderer {
   }
 
   private renderPlainText(text: string, options: { indent?: number }) {
-    const normalizedText = normalizeWhitespace(text);
+    const normalizedText = normalizeLineWhitespace(text);
     if (!normalizedText) return;
 
     const indent = options.indent ?? 0;
-    this.writeLines(this.splitText(normalizedText, this.contentWidth - indent), { indent });
+    const lines = normalizedText.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      this.writeLines(this.splitText(trimmed, this.contentWidth - indent), { indent });
+    }
     this.cursorY += 3;
   }
 
@@ -363,8 +419,14 @@ export class MarkdownPdfRenderer {
     const items = node.children ?? [];
 
     for (let index = 0; index < items.length; index += 1) {
-      const marker = node.ordered ? `${index + 1}. ` : '- ';
-      await this.renderListItem(items[index], marker, baseIndent);
+      const item = items[index];
+      let marker: string;
+      if (typeof item.checked === 'boolean') {
+        marker = item.checked ? '[x] ' : '[ ] ';
+      } else {
+        marker = node.ordered ? `${index + 1}. ` : '- ';
+      }
+      await this.renderListItem(item, marker, baseIndent);
       this.cursorY += 1.5;
     }
 
@@ -419,10 +481,12 @@ export class MarkdownPdfRenderer {
     const indent = (options.indent ?? 0) + 5;
     const [r, g, b] = getRuleColor(this.themeId);
     this.ensureSpace(8);
-    this.doc.setDrawColor(r, g, b);
-    this.doc.setLineWidth(0.4);
-    this.doc.line(PAGE.marginX + indent - 3, this.cursorY - 2, PAGE.marginX + indent - 3, this.cursorY + 8);
+    const startY = this.cursorY - 2;
     await this.renderBlocks(node.children ?? [], { indent });
+    const endY = Math.max(startY + 6, this.cursorY - 1);
+    this.doc.setDrawColor(r, g, b);
+    this.doc.setLineWidth(0.6);
+    this.doc.line(PAGE.marginX + indent - 3, startY, PAGE.marginX + indent - 3, endY);
     this.cursorY += 2;
   }
 

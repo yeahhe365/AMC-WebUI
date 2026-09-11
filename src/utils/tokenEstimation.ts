@@ -1,6 +1,7 @@
 import { MediaResolution } from '@/types';
 import { isGemini3Model } from './model/modelCapabilities';
 import { isVideoMimeType } from './file/fileTypeClassification';
+import { probeMediaDuration } from '@/utils/media/mediaDuration';
 
 // Token cost per video frame for Gemini 3 models, by media resolution.
 // Source: https://ai.google.dev/gemini-api/docs/media-resolution
@@ -57,29 +58,6 @@ interface VideoDurationSource {
   videoMetadata?: { startOffset?: string; endOffset?: string; fps?: number };
 }
 
-const readBlobVideoDuration = (blob: Blob): Promise<number | null> =>
-  new Promise((resolve) => {
-    if (typeof document === 'undefined') {
-      resolve(null);
-      return;
-    }
-    const url = URL.createObjectURL(blob);
-    const video = document.createElement('video');
-    video.preload = 'metadata';
-    let settled = false;
-    const finish = (value: number | null) => {
-      if (settled) return;
-      settled = true;
-      URL.revokeObjectURL(url);
-      resolve(value);
-    };
-    video.onloadedmetadata = () => finish(Number.isFinite(video.duration) ? video.duration : null);
-    video.onerror = () => finish(null);
-    // ponytail: metadata parse can hang on some containers; bail after 3s.
-    window.setTimeout(() => finish(null), 3000);
-    video.src = url;
-  });
-
 /**
  * Resolves the analysable duration (seconds) of a video file, honouring the
  * start/end offsets when set. Returns null when no local blob is available
@@ -100,7 +78,7 @@ const getVideoDurationSeconds = async (file: VideoDurationSource): Promise<numbe
   }
   if (!blob) return null;
 
-  const fullDuration = await readBlobVideoDuration(blob);
+  const fullDuration = await probeMediaDuration('video', blob);
   if (fullDuration === null) return null;
   if (start !== null) return Math.max(0, fullDuration - start);
   if (end !== null) return Math.min(fullDuration, end);

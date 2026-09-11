@@ -1,8 +1,12 @@
-import { lazy, memo, Suspense, useEffect, useRef, useState, type ElementType, type FC, type ReactNode } from 'react';
+import { lazy, memo, Suspense, useState, type ElementType, type FC, type ReactNode } from 'react';
 import type { UploadedFile } from '@/types';
+import { useVisibleThumbnailGate } from '@/hooks/ui/useVisibleThumbnailGate';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/constants/fileTypeSupport';
-import { getFileTypeCategory } from '@/utils/file/fileTypeClassification';
-import { FileCode } from 'lucide-react';
+import { resolveFileCategory } from '@/utils/file/fileTypeClassification';
+import { FileCode2, Play } from 'lucide-react';
+import { extractYoutubeVideoId } from '@/utils/file/youtubeUrl';
+import { MaterialIcon } from '@/components/message/code/MaterialIcon';
+import { MATERIAL_ICONS } from '@/components/message/code/materialIcons.generated';
 
 const LazyPdfFileThumbnail = lazy(() =>
   import('./PdfFileThumbnail').then((module) => ({ default: module.PdfFileThumbnail })),
@@ -15,85 +19,44 @@ interface FileThumbnailProps {
   bgClass: string;
 }
 
-const CODE_EXTENSIONS = new Set([
-  'js',
-  'jsx',
-  'ts',
-  'tsx',
-  'py',
-  'json',
-  'html',
-  'htm',
-  'css',
-  'scss',
-  'less',
-  'java',
-  'c',
-  'cpp',
-  'h',
-  'hpp',
-  'cs',
-  'go',
-  'rs',
-  'php',
-  'sh',
-  'bash',
-  'zsh',
-  'yaml',
-  'yml',
-  'toml',
-  'sql',
-  'xml',
-  'graphql',
-  'vue',
-  'svelte',
-]);
-
-const isCodeExtension = (filename: string): boolean => {
-  const extension = filename.split('.').pop()?.toLowerCase();
-  return extension ? CODE_EXTENSIONS.has(extension) : false;
-};
-
-const getDisplayExtension = (file: UploadedFile) => {
-  const extension = file.name.split('.').pop()?.trim();
-  if (extension && extension !== file.name) {
-    return extension.slice(0, 4).toUpperCase();
-  }
-
-  const mimeSuffix = file.type.split('/').pop()?.split(/[+;]/)[0];
-  return (mimeSuffix || 'FILE').slice(0, 4).toUpperCase();
-};
-
-const useVisibleThumbnailGate = (enabled: boolean) => {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [isVisible, setIsVisible] = useState(() => !enabled || typeof IntersectionObserver === 'undefined');
-
-  useEffect(() => {
-    if (!enabled || isVisible) {
-      return undefined;
-    }
-
-    const element = containerRef.current;
-    if (!element || typeof IntersectionObserver === 'undefined') {
-      queueMicrotask(() => setIsVisible(true));
-      return undefined;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '120px' },
-    );
-
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [enabled, isVisible]);
-
-  return { containerRef, isVisible };
+const EXTENSION_TO_MATERIAL_ICON: Record<string, string> = {
+  py: 'python',
+  pyw: 'python',
+  ts: 'typescript',
+  tsx: 'react-ts',
+  js: 'javascript',
+  mjs: 'javascript',
+  cjs: 'javascript',
+  jsx: 'react',
+  json: 'json',
+  html: 'html',
+  htm: 'html',
+  css: 'css',
+  scss: 'sass',
+  sass: 'sass',
+  less: 'less',
+  go: 'go',
+  rs: 'rust',
+  java: 'java',
+  c: 'c',
+  h: 'c',
+  cpp: 'cpp',
+  hpp: 'cpp',
+  cs: 'c-sharp',
+  php: 'php',
+  sh: 'bash',
+  bash: 'bash',
+  zsh: 'bash',
+  sql: 'database',
+  yaml: 'yaml',
+  yml: 'yaml',
+  xml: 'xml',
+  vue: 'vue',
+  svelte: 'svelte',
+  graphql: 'graphql',
+  gql: 'graphql',
+  md: 'markdown',
+  markdown: 'markdown',
 };
 
 const PdfThumbnail = ({ file, fallback }: { file: UploadedFile; fallback: ReactNode }) => {
@@ -139,21 +102,61 @@ const VideoThumbnail = memo(
   (prev, next) => prev.file.id === next.file.id && prev.file.dataUrl === next.file.dataUrl,
 );
 
+const YoutubeThumbnail = memo(
+  ({ file, fallback }: { file: UploadedFile; fallback: ReactNode }) => {
+    const videoId = extractYoutubeVideoId(file.fileUri || file.name);
+    const [hasError, setHasError] = useState(false);
+
+    if (!videoId || hasError) {
+      return <>{fallback}</>;
+    }
+
+    const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
+
+    return (
+      <div
+        data-thumbnail-kind="youtube"
+        className="relative h-full w-full overflow-hidden bg-black flex items-center justify-center"
+      >
+        <img
+          src={thumbnailUrl}
+          alt={file.name}
+          onError={() => setHasError(true)}
+          className="h-full w-full object-cover"
+          loading="lazy"
+        />
+        <div className="absolute inset-0 flex items-center justify-center bg-black/25 transition-colors group-hover:bg-black/15">
+          <div className="flex items-center justify-center w-5 h-5 rounded-full bg-red-600 text-white shadow-md transition-transform group-hover:scale-110 duration-200">
+            <Play size={10} fill="currentColor" className="ml-0.5" />
+          </div>
+        </div>
+      </div>
+    );
+  },
+  (prev, next) =>
+    prev.file.id === next.file.id &&
+    prev.file.fileUri === next.file.fileUri &&
+    prev.file.name === next.file.name &&
+    prev.file.error === next.file.error,
+);
+
 const CoverThumbnail = ({
   file,
   Icon: defaultIcon,
   colorClass: defaultColorClass,
   bgClass: defaultBgClass,
 }: FileThumbnailProps) => {
-  const category = getFileTypeCategory(file.type, file.error);
-  const extension = getDisplayExtension(file);
+  const category = resolveFileCategory(file);
+  const ext = file.name ? file.name.split('.').pop()?.toLowerCase() : '';
+  const materialIconName = ext ? EXTENSION_TO_MATERIAL_ICON[ext] : undefined;
+  const hasMaterialIcon = Boolean(materialIconName && MATERIAL_ICONS[materialIconName]);
 
   let Icon = defaultIcon;
   let colorClass = defaultColorClass;
   let bgClass = defaultBgClass;
 
-  if (category === 'text' && isCodeExtension(file.name)) {
-    Icon = FileCode;
+  if (category === 'code') {
+    Icon = FileCode2;
     colorClass = 'text-cyan-600 dark:text-cyan-400';
     bgClass = 'bg-[var(--theme-bg-code-block)]';
   }
@@ -161,21 +164,20 @@ const CoverThumbnail = ({
   return (
     <div
       data-thumbnail-kind={category}
-      className={`relative h-full w-full overflow-hidden ${bgClass} p-2 flex flex-col items-center justify-center gap-1`}
+      className={`relative h-full w-full overflow-hidden ${bgClass} flex items-center justify-center transition-transform group-hover:scale-105 duration-200`}
     >
-      <div className="rounded-lg bg-[var(--theme-bg-primary)]/90 p-1.5 shadow-sm border border-[var(--theme-border-secondary)]/50">
-        <Icon size={19} className={colorClass} strokeWidth={1.6} />
-      </div>
-      <span className="max-w-full truncate rounded bg-[var(--theme-bg-primary)]/90 px-1.5 py-0.5 text-[10px] font-bold leading-none tracking-wide text-[var(--theme-text-secondary)] shadow-xs border border-[var(--theme-border-secondary)]/40">
-        {extension}
-      </span>
+      {hasMaterialIcon && materialIconName ? (
+        <MaterialIcon name={materialIconName} size={26} />
+      ) : (
+        <Icon size={24} className={colorClass} strokeWidth={1.75} />
+      )}
     </div>
   );
 };
 
 const FileThumbnailComponent: FC<FileThumbnailProps> = (props) => {
   const { file } = props;
-  const category = getFileTypeCategory(file.type, file.error);
+  const category = resolveFileCategory(file);
   const fallback = <CoverThumbnail {...props} />;
 
   if (file.dataUrl && SUPPORTED_IMAGE_MIME_TYPES.includes(file.type)) {
@@ -197,6 +199,10 @@ const FileThumbnailComponent: FC<FileThumbnailProps> = (props) => {
     return <VideoThumbnail file={file} fallback={fallback} />;
   }
 
+  if (category === 'youtube') {
+    return <YoutubeThumbnail file={file} fallback={fallback} />;
+  }
+
   return fallback;
 };
 
@@ -205,6 +211,8 @@ export const FileThumbnail: FC<FileThumbnailProps> = memo(
   (prev, next) =>
     prev.file.id === next.file.id &&
     prev.file.dataUrl === next.file.dataUrl &&
+    prev.file.fileUri === next.file.fileUri &&
+    prev.file.name === next.file.name &&
     prev.file.type === next.file.type &&
     prev.file.error === next.file.error &&
     prev.Icon === next.Icon &&

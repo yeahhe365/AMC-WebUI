@@ -4,8 +4,11 @@ import { DOT_MAX_CHARS, DOT_MAX_EDGES } from './graphvizLimits';
 import {
   applyThemeAndLayout,
   buildThemeDefaults,
+  compensateCjkNodeWidths,
+  estimateCjkNodeWidth,
   flattenGraphvizFill,
   getGraphvizCacheKey,
+  isCjkText,
   normalizeGraphvizColor,
   renderDotToSvg,
   renderDotToSvgCached,
@@ -70,7 +73,7 @@ describe('getGraphvizCacheKey', () => {
   });
 
   it('prefixes the key with the render style version', () => {
-    expect(getGraphvizCacheKey('digraph { A -> B }')).toMatch(/^v6:/);
+    expect(getGraphvizCacheKey('digraph { A -> B }')).toMatch(/^v7:/);
   });
 
   it('normalizes style="rounded" to style="rounded,filled" so fill is preserved', () => {
@@ -188,7 +191,7 @@ describe('applyThemeAndLayout (v2 theme defaults)', () => {
     expect(code).toContain(`fillcolor="${successFill}"`);
     expect(code).toContain(`fillcolor="${warningFill}"`);
     expect(code).toContain('color="#16a34a"'); // pearl textSuccess paired onto n1
-    expect(code).toContain('fontcolor="#16a34a"');
+    expect(code).toContain('fontcolor="#1a1a1f"'); // pearl textPrimary paired for high-contrast readability
     expect(code).toContain('color="#825f0a"'); // pearl textWarning paired onto n2
     expect(code).not.toContain('rgba(');
     expect(code).not.toMatch(/fillcolor="#[0-9a-fA-F]{8}"/);
@@ -451,8 +454,13 @@ describe('hydrateGraphvizIntoDocument', () => {
     );
     await hydrateGraphvizIntoDocument(doc, { themeId: 'pearl' });
 
-    const node = doc.querySelector('[data-amc-graphviz]')!;
+    const node = doc.querySelector('[data-amc-graphviz]') as HTMLElement;
     expect(node.querySelector('svg')).not.toBeNull();
+    expect(node.style.overflowX).toBe('auto');
+    expect(node.style.maxWidth).toBe('100%');
+    expect(node.style.cursor).toBe('zoom-in');
+    expect(node.getAttribute('data-amc-graphviz-state')).toBe('rendered');
+    expect(node.getAttribute('title')).toContain('放大');
   });
 
   it('leaves nodes untouched when rendering fails', async () => {
@@ -466,5 +474,73 @@ describe('hydrateGraphvizIntoDocument', () => {
     const node = doc.querySelector('[data-amc-graphviz]')!;
     expect(node.querySelector('svg')).toBeNull();
     expect(node.textContent).toContain('placeholder');
+  });
+});
+
+describe('compensateCjkNodeWidths and CJK metrics', () => {
+  it('identifies Cjk characters and punctuation accurately', () => {
+    expect(isCjkText('中央能量电池')).toBe(true);
+    expect(isCjkText('Hello World')).toBe(false);
+    expect(isCjkText('（离子鲨 / 意志之力）')).toBe(true);
+    expect(isCjkText('123456')).toBe(false);
+  });
+
+  it('estimates node width with comfortable breathing room for CJK text', () => {
+    const batteryWidth = estimateCjkNodeWidth('中央能量电池 (离子鲨 / 意志之力)', 14);
+    // 13 CJK characters + 5 ASCII characters should require at least 3.4 inches
+    expect(batteryWidth).toBeGreaterThan(3.2);
+
+    const shortWidth = estimateCjkNodeWidth('开始', 14);
+    expect(shortWidth).toBeGreaterThanOrEqual(0.75);
+  });
+
+  it('handles multi-line labels by taking the widest line', () => {
+    const single = estimateCjkNodeWidth('短文本', 14);
+    const multi = estimateCjkNodeWidth('短文本\\n较长的一行中文字符测试', 14);
+    expect(multi).toBeGreaterThan(single);
+  });
+
+  it('injects width attribute on CJK node declarations', () => {
+    const dot = 'digraph { n1[label="中央能量电池 (离子鲨 / 意志之力)" shape=box]; }';
+    const processed = compensateCjkNodeWidths(dot);
+    expect(processed).toMatch(/n1\[label="中央能量电池 \(离子鲨 \/ 意志之力\)" shape=box width="[0-9.]+"\]/);
+  });
+
+  it('leaves Latin-only node declarations untouched', () => {
+    const dot = 'digraph { n1[label="Only English Text" shape=box]; }';
+    const processed = compensateCjkNodeWidths(dot);
+    expect(processed).not.toContain('width=');
+  });
+
+  it('does not add width to edge declarations with CJK labels', () => {
+    const dot = 'digraph { A -> B [label="流向分支"]; }';
+    const processed = compensateCjkNodeWidths(dot);
+    expect(processed).not.toContain('width=');
+  });
+
+  it('expands an existing width that is too small for CJK text', () => {
+    const dot = 'digraph { n1[label="中央能量电池 (离子鲨 / 意志之力)" width="1.0"]; }';
+    const processed = compensateCjkNodeWidths(dot);
+    expect(processed).not.toContain('width="1.0"');
+    expect(processed).toMatch(/width="[3-9]\.[0-9]+"/);
+  });
+
+  it('preserves an existing width that is already generously sized', () => {
+    const dot = 'digraph { n1[label="中央能量电池 (离子鲨 / 意志之力)" width="8.5"]; }';
+    const processed = compensateCjkNodeWidths(dot);
+    expect(processed).toContain('width="8.5"');
+  });
+
+  it('correctly handles brackets inside quoted labels without breaking the attribute block', () => {
+    const dot = 'digraph { sys[label="[系统] 核心机密" shape=box]; }';
+    const processed = compensateCjkNodeWidths(dot);
+    expect(processed).toContain('[系统] 核心机密');
+    expect(processed).toContain('width=');
+  });
+
+  it('applies CJK width compensation end-to-end through applyThemeAndLayout', () => {
+    const dot = 'digraph { battery[label="中央能量电池 (离子鲨 / 意志之力)" shape=box]; }';
+    const processed = applyThemeAndLayout(dot, { themeId: 'pearl' });
+    expect(processed).toMatch(/battery\[label="中央能量电池 \(离子鲨 \/ 意志之力\)" shape=box width="[0-9.]+"\]/);
   });
 });

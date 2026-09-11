@@ -61,7 +61,6 @@ describe('UI clarity regressions', () => {
       'components/chat/input/LiveStatusBanner.tsx',
       'components/chat/input/QueuedSubmissionCard.tsx',
       'components/chat/message-list/text-selection/AudioPlayerView.tsx',
-      'components/modals/MarkdownPreviewModal.tsx',
     ];
 
     for (const relativePath of files) {
@@ -214,7 +213,6 @@ describe('UI clarity regressions', () => {
     const mapsWidget = readSourceFile('components/message/grounded-response/MapsWidget.tsx');
     const logColors = readSourceFile('components/log-viewer/logColorClasses.ts');
     const collapsedRecent = readSourceFile('components/sidebar/CollapsedRecentChatsButton.tsx');
-    const markdownPreview = readSourceFile('components/modals/MarkdownPreviewModal.tsx');
     const filePreview = readSourceFile('components/modals/FilePreviewModal.tsx');
     const openaiModels = readSourceFile(
       'components/settings/sections/api-config/OpenAICompatibleCurrentModelsPanel.tsx',
@@ -279,8 +277,6 @@ describe('UI clarity regressions', () => {
     expect(logColors).toContain('theme-text-danger');
 
     expect(collapsedRecent).not.toContain('rounded-2xl');
-    expect(markdownPreview).not.toContain('rounded-2xl');
-    expect(markdownPreview).not.toContain('hover:text-red-500');
     expect(filePreview).not.toContain('bg-white/15');
     expect(openaiModels).toContain('SETTINGS_SEARCH_INPUT_CLASS');
     expect(pdfMain).not.toContain('tracking-widest');

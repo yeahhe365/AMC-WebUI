@@ -13,4 +13,12 @@ describe('getMarkdownDocumentStats', () => {
       words: 3,
     });
   });
+
+  it('accurately counts words for CJK and mixed language documents', () => {
+    expect(getMarkdownDocumentStats('你好 世界\nHello world')).toEqual({
+      characters: 17,
+      lines: 2,
+      words: 6, // 4 CJK chars ('你好世界') + 2 English words ('Hello', 'world')
+    });
+  });
 });

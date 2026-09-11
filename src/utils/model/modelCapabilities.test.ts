@@ -3,12 +3,16 @@ import { MODELS_SUPPORTING_RAW_MODE } from '@/constants/modelConfiguration';
 import {
   getDefaultThinkingLevelForModel,
   getModelCapabilities,
+  isDeepSeekReasoningModel,
   isGemini3Model,
   isLiveTranslateModel,
   isLiveTranscribeModel,
+  isQwenReasoningModel,
+  isReasoningModel,
   isTranscribeModel,
   normalizeThinkingLevelForModel,
   shouldStripThinkingFromContext,
+  supportsSearchMapsCombination,
 } from './modelCapabilities';
 
 describe('raw mode support', () => {
@@ -66,6 +70,32 @@ describe('isGemini3Model', () => {
   });
 });
 
+describe('supportsSearchMapsCombination', () => {
+  it('returns true for Gemini 3 models', () => {
+    expect(supportsSearchMapsCombination('gemini-3.8-flash')).toBe(true);
+    expect(supportsSearchMapsCombination('gemini-3.7-flash')).toBe(true);
+    expect(supportsSearchMapsCombination('gemini-3.6-flash')).toBe(true);
+    expect(supportsSearchMapsCombination('gemini-3.5-flash-lite')).toBe(true);
+    expect(supportsSearchMapsCombination('gemini-3.1-pro-preview')).toBe(true);
+    expect(supportsSearchMapsCombination('gemini-3-flash-preview')).toBe(true);
+  });
+
+  it('returns true for Gemini Robotics models', () => {
+    expect(supportsSearchMapsCombination('gemini-robotics-er-2-preview')).toBe(true);
+  });
+
+  it('returns false for Gemini 2.5 and older models', () => {
+    expect(supportsSearchMapsCombination('gemini-2.5-flash')).toBe(false);
+    expect(supportsSearchMapsCombination('gemini-2.5-pro')).toBe(false);
+  });
+
+  it('returns false for Gemma and empty model IDs', () => {
+    expect(supportsSearchMapsCombination('gemma-3-27b-it')).toBe(false);
+    expect(supportsSearchMapsCombination('')).toBe(false);
+    expect(supportsSearchMapsCombination(null)).toBe(false);
+  });
+});
+
 describe('getModelCapabilities', () => {
   it('treats flash live preview models as live audio models', () => {
     expect(getModelCapabilities('gemini-3.1-flash-live-preview').isNativeAudioModel).toBe(true);
@@ -94,13 +124,66 @@ describe('getModelCapabilities', () => {
 
   it('marks third-party reasoning models as supporting thinking levels', () => {
     expect(getModelCapabilities('gpt-5.6-sol').supportsThinkingLevel).toBe(true);
+    expect(getModelCapabilities('o4').supportsThinkingLevel).toBe(true);
+    expect(getModelCapabilities('o4-mini').supportsThinkingLevel).toBe(true);
+    expect(getModelCapabilities('o1').supportsThinkingLevel).toBe(false);
+    expect(getModelCapabilities('o3-mini').supportsThinkingLevel).toBe(false);
+    expect(getModelCapabilities('muse-spark-1.3-contributor').supportsThinkingLevel).toBe(true);
     expect(getModelCapabilities('kimi-k3').supportsThinkingLevel).toBe(true);
     expect(getModelCapabilities('claude-sonnet-5').supportsThinkingLevel).toBe(true);
     expect(getModelCapabilities('claude-opus-5').supportsThinkingLevel).toBe(true);
     expect(getModelCapabilities('claude-fable-5').supportsThinkingLevel).toBe(true);
     expect(getModelCapabilities('glm-5.2').supportsThinkingLevel).toBe(true);
+    expect(getModelCapabilities('qwq-32b').supportsThinkingLevel).toBe(true);
+    expect(getModelCapabilities('qvq-72b-preview').supportsThinkingLevel).toBe(true);
+    expect(getModelCapabilities('deepseek-reasoner').supportsThinkingLevel).toBe(true);
+    expect(getModelCapabilities('deepseek-ai/DeepSeek-R1').supportsThinkingLevel).toBe(true);
+    expect(getModelCapabilities('deepseek-r1-distill-qwen-32b').supportsThinkingLevel).toBe(true);
+    expect(getModelCapabilities('r1-distill-llama-70b').supportsThinkingLevel).toBe(true);
+    expect(getModelCapabilities('deepseek-v4-pro').supportsThinkingLevel).toBe(true);
     expect(getModelCapabilities('gpt-4o-mini').supportsThinkingLevel).toBe(false);
     expect(getModelCapabilities('claude-haiku-4-5').supportsThinkingLevel).toBe(false);
+    expect(getModelCapabilities('qwen2.5-72b-instruct').supportsThinkingLevel).toBe(false);
+    expect(getModelCapabilities('gemma-4-31b-it').supportsThinkingLevel).toBe(true);
+    expect(getModelCapabilities('gemma-4-26b-a4b-it').supportsThinkingLevel).toBe(true);
+  });
+
+  describe('reasoning model identification', () => {
+    it('identifies DeepSeek reasoning model families', () => {
+      expect(isDeepSeekReasoningModel('deepseek-reasoner')).toBe(true);
+      expect(isDeepSeekReasoningModel('deepseek-r1')).toBe(true);
+      expect(isDeepSeekReasoningModel('deepseek-ai/DeepSeek-R1')).toBe(true);
+      expect(isDeepSeekReasoningModel('deepseek-r1-distill-qwen-32b')).toBe(true);
+      expect(isDeepSeekReasoningModel('r1-distill-llama-70b')).toBe(true);
+      expect(isDeepSeekReasoningModel('deepseek-v4-flash')).toBe(true);
+      expect(isDeepSeekReasoningModel('deepseek-chat')).toBe(false);
+      expect(isDeepSeekReasoningModel('deepseek-coder')).toBe(false);
+    });
+
+    it('identifies Qwen reasoning models', () => {
+      expect(isQwenReasoningModel('qwq-32b')).toBe(true);
+      expect(isQwenReasoningModel('qwq-32b-preview')).toBe(true);
+      expect(isQwenReasoningModel('qwen/qwq-32b')).toBe(true);
+      expect(isQwenReasoningModel('qvq-72b-preview')).toBe(true);
+      expect(isQwenReasoningModel('qwen-qwq-32b')).toBe(true);
+      expect(isQwenReasoningModel('qwen2.5-72b-thinking')).toBe(true);
+      expect(isQwenReasoningModel('qwen2.5-72b-instruct')).toBe(false);
+      expect(isQwenReasoningModel('qwen-plus')).toBe(false);
+    });
+
+    it('unifies reasoning model detection with isReasoningModel', () => {
+      expect(isReasoningModel('o4')).toBe(true);
+      expect(isReasoningModel('o4-mini')).toBe(true);
+      expect(isReasoningModel('o1')).toBe(false);
+      expect(isReasoningModel('o3-mini')).toBe(false);
+      expect(isReasoningModel('gpt-5.6-sol')).toBe(true);
+      expect(isReasoningModel('deepseek-reasoner')).toBe(true);
+      expect(isReasoningModel('qwq-32b')).toBe(true);
+      expect(isReasoningModel('glm-5.2')).toBe(true);
+      expect(isReasoningModel('kimi-k3')).toBe(true);
+      expect(isReasoningModel('claude-sonnet-5')).toBe(true);
+      expect(isReasoningModel('gpt-4o-mini')).toBe(false);
+    });
   });
 
   it('exposes raw reasoning prefill support as a model capability', () => {
@@ -168,6 +251,21 @@ describe('getDefaultThinkingLevelForModel', () => {
     expect(getDefaultThinkingLevelForModel('gemini-3.1-flash-image-preview')).toBe('MINIMAL');
   });
 
+  it('defaults Gemini 3.8 Flash, 3.7 Flash and Robotics to MEDIUM per official API', () => {
+    expect(getDefaultThinkingLevelForModel('gemini-3.8-flash')).toBe('MEDIUM');
+    expect(getDefaultThinkingLevelForModel('gemini-3.7-flash')).toBe('MEDIUM');
+    expect(getDefaultThinkingLevelForModel('gemini-robotics-er-2-preview')).toBe('MEDIUM');
+  });
+
+  it('defaults Gemini 3.5 Flash-Lite and Gemma 4 to MINIMAL per official API', () => {
+    expect(getDefaultThinkingLevelForModel('gemini-3.5-flash-lite')).toBe('MINIMAL');
+    expect(getDefaultThinkingLevelForModel('gemma-4-31b-it')).toBe('MINIMAL');
+  });
+
+  it('defaults Gemini 3.1 Pro to HIGH per official API', () => {
+    expect(getDefaultThinkingLevelForModel('gemini-3.1-pro-preview')).toBe('HIGH');
+  });
+
   it('keeps fallback thinking level for non-special models', () => {
     expect(getDefaultThinkingLevelForModel('gemini-2.5-flash', 'HIGH')).toBe('HIGH');
   });
@@ -184,7 +282,15 @@ describe('normalizeThinkingLevelForModel', () => {
     expect(normalizeThinkingLevelForModel('gemini-3.8-flash', 'MINIMAL')).toBe('LOW');
   });
 
-  it('keeps MINIMAL for Gemini 3 Flash models', () => {
+  it('normalizes unsupported levels to HIGH for Gemma 4 and Flash Image models', () => {
+    expect(normalizeThinkingLevelForModel('gemma-4-31b-it', 'LOW')).toBe('HIGH');
+    expect(normalizeThinkingLevelForModel('gemma-4-31b-it', 'MEDIUM')).toBe('HIGH');
+    expect(normalizeThinkingLevelForModel('gemma-4-31b-it', 'NONE')).toBe('MINIMAL');
+    expect(normalizeThinkingLevelForModel('gemini-3.1-flash-lite-image', 'LOW')).toBe('HIGH');
+    expect(normalizeThinkingLevelForModel('gemini-3.1-flash-lite-image', 'MINIMAL')).toBe('MINIMAL');
+  });
+
+  it('keeps MINIMAL for Gemini 3 Flash models that support minimal', () => {
     expect(normalizeThinkingLevelForModel('gemini-3-flash-preview', 'MINIMAL')).toBe('MINIMAL');
     expect(normalizeThinkingLevelForModel('gemini-3.5-flash-lite', 'MINIMAL')).toBe('MINIMAL');
     expect(normalizeThinkingLevelForModel('gemini-3.6-flash', 'MINIMAL')).toBe('MINIMAL');

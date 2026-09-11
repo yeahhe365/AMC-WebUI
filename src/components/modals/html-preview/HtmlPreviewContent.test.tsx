@@ -68,4 +68,23 @@ describe('HtmlPreviewContent', () => {
     expect(srcDoc).not.toContain('onclick=');
     expect(srcDoc).toContain('data-amc-live-artifact-theme');
   });
+
+  it('applies device frame styling when in mobile device mode', () => {
+    const iframeRef = React.createRef<HTMLIFrameElement>();
+    act(() => {
+      renderer.root.render(
+        <HtmlPreviewContent
+          iframeRef={iframeRef}
+          htmlContent="<p>Mobile test</p>"
+          scale={1}
+          contentHeight={0}
+          deviceMode="mobile"
+        />,
+      );
+    });
+
+    const frameContainer = renderer.container.querySelector('[data-device-frame="mobile"]');
+    expect(frameContainer).not.toBeNull();
+    expect(frameContainer?.className).toContain('max-w-[375px]');
+  });
 });

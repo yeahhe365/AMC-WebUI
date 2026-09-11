@@ -7,6 +7,7 @@ import { getTabCycleModelIds } from '@/utils/model/modelCatalog';
 import { resolveChatApiRoute } from '@/utils/chatApiRoute';
 import { buildProviderAwareModelList } from '@/utils/thirdPartyApiProviders';
 import { isEditableElement } from '@/utils/chat-input/focus';
+import { useUIStore } from '@/stores/uiStore';
 
 interface UseGlobalShortcutsProps {
   appSettings: AppSettings;
@@ -68,6 +69,12 @@ export const useGlobalShortcuts = ({
       if (isShortcutPressed(event, 'general.searchChats', appSettings)) {
         event.preventDefault();
         targetDocument.dispatchEvent(new Event(FOCUS_HISTORY_SEARCH_EVENT));
+        return;
+      }
+
+      if (isShortcutPressed(event, 'general.commandPalette', appSettings)) {
+        event.preventDefault();
+        useUIStore.getState().toggleCommandPalette();
         return;
       }
 

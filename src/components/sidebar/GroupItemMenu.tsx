@@ -1,15 +1,10 @@
 import React, { type RefObject } from 'react';
 import { useI18n } from '@/contexts/I18nContext';
 import { MessageSquarePlus, SquarePen, Trash2, Eraser } from 'lucide-react';
-import {
-  MENU_ITEM_BUTTON_CLASS,
-  MENU_ITEM_DEFAULT_STATE_CLASS,
-  MENU_ITEM_DANGER_STATE_CLASS,
-  MENU_PANEL_CLASS,
-} from '@/constants/menuClasses';
+import { DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/shared/DropdownMenu';
 
-interface GroupItemMenuProps {
-  menuRef: RefObject<HTMLDivElement>;
+export interface GroupItemMenuProps {
+  menuRef?: RefObject<HTMLDivElement>;
   onNewChat: () => void;
   onStartEdit: () => void;
   onDelete: () => void;
@@ -26,28 +21,34 @@ export const GroupItemMenu: React.FC<GroupItemMenuProps> = ({
   hasSessions = true,
 }) => {
   const { t } = useI18n();
+
   return (
-    <div ref={menuRef} className="relative z-10">
-      <div className={`${MENU_PANEL_CLASS} -top-1`}>
-        <button onClick={onNewChat} className={`${MENU_ITEM_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS}`}>
-          <MessageSquarePlus size={14} /> <span>{t('historyNewChatInGroup')}</span>
-        </button>
-        <button onClick={onStartEdit} className={`${MENU_ITEM_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS}`}>
-          <SquarePen size={14} /> <span>{t('edit')}</span>
-        </button>
-        {onClear && (
-          <button
-            onClick={onClear}
-            disabled={!hasSessions}
-            className={`${MENU_ITEM_BUTTON_CLASS} ${hasSessions ? MENU_ITEM_DEFAULT_STATE_CLASS : 'text-[var(--theme-text-tertiary)] opacity-50 cursor-not-allowed'}`}
-          >
-            <Eraser size={14} /> <span>{t('historyClearGroup')}</span>
-          </button>
-        )}
-        <button onClick={onDelete} className={`${MENU_ITEM_BUTTON_CLASS} ${MENU_ITEM_DANGER_STATE_CLASS}`}>
-          <Trash2 size={14} /> <span>{t('delete')}</span>
-        </button>
-      </div>
-    </div>
+    <DropdownMenuContent
+      ref={menuRef}
+      align="end"
+      sideOffset={4}
+      className="w-48 p-1"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <DropdownMenuItem onClick={onNewChat} className="rounded-lg">
+        <MessageSquarePlus size={14} className="text-[var(--theme-text-secondary)] shrink-0" />
+        <span className="truncate">{t('historyNewChatInGroup')}</span>
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={onStartEdit} className="rounded-lg">
+        <SquarePen size={14} className="text-[var(--theme-text-secondary)] shrink-0" />
+        <span>{t('edit')}</span>
+      </DropdownMenuItem>
+      {onClear && (
+        <DropdownMenuItem onClick={onClear} disabled={!hasSessions} className="rounded-lg">
+          <Eraser size={14} className="text-[var(--theme-text-secondary)] shrink-0" />
+          <span className="truncate">{t('historyClearGroup')}</span>
+        </DropdownMenuItem>
+      )}
+      <DropdownMenuSeparator className="my-1 -mx-1 h-px bg-[var(--theme-border-secondary)]" />
+      <DropdownMenuItem onClick={onDelete} variant="danger" className="rounded-lg">
+        <Trash2 size={14} className="shrink-0" />
+        <span>{t('delete')}</span>
+      </DropdownMenuItem>
+    </DropdownMenuContent>
   );
 };

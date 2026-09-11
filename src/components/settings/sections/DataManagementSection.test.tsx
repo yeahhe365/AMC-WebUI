@@ -65,6 +65,7 @@ describe('DataManagementSection', () => {
     expect(renderer.container.textContent).toContain('Open Logs & Usage');
     expect(renderer.container.textContent).toContain('Destructive Actions');
     expect(renderer.container.textContent).toContain('Export');
+    expect(renderer.container.textContent).toContain('File Transfer Method');
 
     act(() => {
       useSettingsStore.setState({ language: 'zh' });
@@ -73,6 +74,7 @@ describe('DataManagementSection', () => {
     expect(renderer.container.textContent).toContain('打开日志与用量');
     expect(renderer.container.textContent).toContain('高风险操作');
     expect(renderer.container.textContent).toContain('导出');
+    expect(renderer.container.textContent).toContain('文件传输方式');
   });
 
   it('keeps the install action enabled when manual browser guidance is needed', async () => {
@@ -111,11 +113,15 @@ describe('DataManagementSection', () => {
 
     expect(renderer.container.textContent).toContain('Enable Logging');
 
-    const toggle = renderer.container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    const toggle = renderer.container.querySelector(
+      '[data-settings-item="data-enable-logging"] input[type="checkbox"]',
+    ) as HTMLInputElement;
     expect(toggle).not.toBeNull();
     expect(toggle.checked).toBe(false);
 
-    toggle.click();
+    await act(async () => {
+      toggle.click();
+    });
 
     expect(onUpdate).toHaveBeenCalledWith('isLoggingEnabled', true);
   });
@@ -125,7 +131,9 @@ describe('DataManagementSection', () => {
       settings: { ...getDefaultAppSettings(), isLoggingEnabled: true },
     });
 
-    const toggle = renderer.container.querySelector('input[type="checkbox"]') as HTMLInputElement;
+    const toggle = renderer.container.querySelector(
+      '[data-settings-item="data-enable-logging"] input[type="checkbox"]',
+    ) as HTMLInputElement;
     expect(toggle.checked).toBe(true);
   });
 
@@ -152,5 +160,31 @@ describe('DataManagementSection', () => {
     expect(clearHistoryButton.className).toContain('text-[var(--theme-text-danger)]');
     expect(clearHistoryButton.className).toContain('bg-transparent');
     expect(clearCacheButton.className).toContain('bg-[var(--theme-bg-danger)]');
+  });
+
+  it('renders the file strategy control and allows toggling file types', async () => {
+    const onUpdate = vi.fn();
+    await renderDataManagementSection({ settings: getDefaultAppSettings(), onUpdate });
+
+    expect(renderer.container.textContent).toContain('File Transfer Method');
+    expect(renderer.container.textContent).toContain('Images');
+    expect(renderer.container.textContent).toContain('PDFs');
+
+    const fileStrategyAnchor = renderer.container.querySelector('[data-settings-item="data-files-strategy"]');
+    expect(fileStrategyAnchor).not.toBeNull();
+
+    const toggles = fileStrategyAnchor!.querySelectorAll('input[type="checkbox"]');
+    expect(toggles.length).toBe(5);
+
+    await act(async () => {
+      (toggles[0] as HTMLInputElement).click();
+    });
+
+    expect(onUpdate).toHaveBeenCalledWith(
+      'filesApiConfig',
+      expect.objectContaining({
+        images: expect.any(Boolean),
+      }),
+    );
   });
 });

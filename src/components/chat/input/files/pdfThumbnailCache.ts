@@ -1,9 +1,19 @@
+import type { UploadedFile, LibraryItem } from '@/types';
+
+export type PdfThumbnailTargetFile =
+  UploadedFile | (Pick<LibraryItem, 'name'> & Partial<Pick<LibraryItem, 'size' | 'type' | 'dataUrl' | 'fileApiName'>>);
+
+export const getPdfThumbnailCacheKey = (file: PdfThumbnailTargetFile, width?: number) => {
+  const baseKey = file.dataUrl ?? file.fileApiName ?? `${file.name}:${file.size ?? 0}:${file.type ?? ''}`;
+  return width && width !== 92 ? `${baseKey}:${width}` : baseKey;
+};
+
 /**
  * Module-level PDF thumbnail cache (PNG data URLs from ~92px canvases).
  * Bounded LRU so long sessions with many distinct PDFs cannot grow without limit.
  * Same Map insertion-order pattern as GraphvizBlock / usePyodide.
  */
-export const PDF_THUMBNAIL_CACHE_LIMIT = 32;
+export const PDF_THUMBNAIL_CACHE_LIMIT = 64;
 
 const pdfThumbnailImageCache = new Map<string, string>();
 

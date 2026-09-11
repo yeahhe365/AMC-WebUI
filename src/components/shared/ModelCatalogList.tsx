@@ -37,6 +37,8 @@ interface ModelCatalogListProps {
   activeEntryId?: string;
   /** Click behavior for an available entry; unavailable entries stay inert. */
   onSelectEntry: (entry: ModelCatalogEntry) => void;
+  /** Optional hover callback for showing detailed model specifications card. */
+  onHoverEntry?: (entry: ModelCatalogEntry | null) => void;
 }
 
 /**
@@ -55,6 +57,7 @@ export const ModelCatalogList: React.FC<ModelCatalogListProps> = ({
   activeBadgeLabel,
   activeEntryId,
   onSelectEntry,
+  onHoverEntry,
 }) => {
   const { t } = useI18n();
 
@@ -98,6 +101,11 @@ export const ModelCatalogList: React.FC<ModelCatalogListProps> = ({
                   aria-disabled={isUnavailable}
                   disabled={isUnavailable}
                   onClick={() => onSelectEntry(entry)}
+                  onMouseEnter={() => onHoverEntry?.(entry)}
+                  onMouseLeave={() => onHoverEntry?.(null)}
+                  onPointerEnter={() => onHoverEntry?.(entry)}
+                  onFocus={() => onHoverEntry?.(entry)}
+                  onBlur={() => onHoverEntry?.(null)}
                   className={`group w-full text-left px-3 py-2.5 text-sm rounded-xl flex items-start justify-between transition-colors outline-none border ${
                     isUnavailable
                       ? 'opacity-50 cursor-not-allowed border-transparent'

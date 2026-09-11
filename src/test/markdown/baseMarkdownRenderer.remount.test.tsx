@@ -2,6 +2,7 @@ import { act, type ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupTestRenderer } from '@/test/render/renderer';
 import { BasicMarkdownRenderer } from '@/components/message/BasicMarkdownRenderer';
+import { clearCodeBlockExpandedCache } from '@/hooks/ui/useCodeBlock';
 
 // jsdom reports scrollHeight as 0, so a long code block would never measure as
 // overflowing and the expand control would never render. Mock the measurement
@@ -51,6 +52,7 @@ describe('BaseMarkdownRenderer CodeBlock remount regression', () => {
   const renderer = setupTestRenderer();
 
   beforeEach(() => {
+    clearCodeBlockExpandedCache();
     Object.defineProperty(Element.prototype, 'scrollHeight', {
       configurable: true,
       get: () => SCROLL_HEIGHT_VALUE,
@@ -109,6 +111,44 @@ describe('BaseMarkdownRenderer CodeBlock remount regression', () => {
     });
 
     // Collapsing removes the button again (the overlay is now a plain gradient).
+    expect(collapseButton()).toBeNull();
+  });
+
+  it('persists expanded state across unmount and remount (virtual list scrolling simulation)', () => {
+    renderBlock({ ...baseProps, messageId: 'test-message-1' });
+
+    expect(collapseButton()).toBeNull();
+
+    act(() => {
+      renderer.container.querySelector<HTMLElement>('.code-block-expand-overlay')!.click();
+    });
+
+    expect(collapseButton()).not.toBeNull();
+
+    // Unmount the component (simulate Virtuoso virtual list scrolling item out of view)
+    act(() => {
+      renderer.render(<div data-testid="offscreen" />);
+    });
+    expect(collapseButton()).toBeNull();
+
+    // Remount the component (simulate scrolling back into view)
+    renderBlock({ ...baseProps, messageId: 'test-message-1' });
+    expect(collapseButton()).not.toBeNull();
+
+    // Now click collapse button
+    act(() => {
+      collapseButton()!.click();
+    });
+    expect(collapseButton()).toBeNull();
+
+    // Unmount and remount again
+    act(() => {
+      renderer.render(<div data-testid="offscreen" />);
+    });
+    expect(collapseButton()).toBeNull();
+
+    renderBlock({ ...baseProps, messageId: 'test-message-1' });
+    // It should remain collapsed
     expect(collapseButton()).toBeNull();
   });
 });

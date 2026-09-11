@@ -47,6 +47,21 @@ const ChatInputContent: React.FC = () => {
         setConfiguringFile={localFileState.setConfiguringFile}
         showTokenModal={localFileState.showTokenModal}
         setShowTokenModal={localFileState.setShowTokenModal}
+        showLibraryPicker={modalsState.showLibraryPicker}
+        setShowLibraryPicker={modalsState.setShowLibraryPicker}
+        onImportFromLibrary={modalsState.handleImportFromLibrary}
+        showCloudFilesModal={modalsState.showCloudFilesModal}
+        setShowCloudFilesModal={modalsState.setShowCloudFilesModal}
+        onAddFilesFromCloud={chatInput.onAddFilesFromCloud}
+        onAddFileById={chatInput.onAddFileById}
+        showFolderZipModal={modalsState.showFolderZipModal}
+        setShowFolderZipModal={modalsState.setShowFolderZipModal}
+        onSelectFolderImport={modalsState.handleSelectFolderImport}
+        onSelectZipImport={modalsState.handleSelectZipImport}
+        rawAppSettings={chatInput.appSettings}
+        currentChatSettings={chatInput.currentChatSettings}
+        isImageGenerationModel={capabilities.isImageGenerationModel}
+        isTranscribeModel={capabilities.isTranscribeModel}
         previewFile={localFileState.previewFile}
         onClosePreview={localFileState.closePreviewFile}
         inputText={inputState.inputText}
@@ -61,6 +76,7 @@ const ChatInputContent: React.FC = () => {
         isGemini3={capabilities.isGemini3}
         isPreviewEditable={localFileState.isPreviewEditable}
         onSaveTextFile={localFileState.handleSavePreviewTextFile}
+        onConvertToContext={localFileState.handleConvertZipToContext}
         onSaveFileConfig={handlers.handleSaveFileConfig}
         previewNavigation={{
           handlePrevImage: localFileState.handlePrevImage,

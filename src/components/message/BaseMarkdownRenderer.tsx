@@ -9,13 +9,16 @@ import { CodeExecutionBlock } from './blocks/CodeExecutionBlock';
 import { DeferredDiagramBlock } from './blocks/DeferredDiagramBlock';
 import { type UploadedFile, type SideViewContent } from '@/types';
 import type { OpenHtmlPreviewHandler } from '@/utils/html-preview/previewPrivilege';
-import { extractTextFromNode } from '@/utils/reactNodeText';
+import { extractTextFromNode, findCodeElement } from '@/utils/reactNodeText';
 import { InlineCode } from './code/InlineCode';
 import { transformMarkdownTextSegments } from '@/utils/markdownSegments';
 import { stripGemmaThoughtMarkup, wrapReasoningMarkup } from '@/utils/chat/reasoning';
 import { normalizePreviewableMarkdownContent } from '@/utils/previewableMarkdown';
 import type { LiveArtifactFollowupPayload } from '@/utils/live-artifacts/liveArtifactFollowup';
 import { loadNamedComponent } from '@/utils/lazyNamedComponent';
+import { InlineTimestampSeekButton } from '@/components/media-nav/InlineTimestampSeekButton';
+import { InlinePdfLocateButton } from '@/components/media-nav/InlinePdfLocateButton';
+import { InlineImageLocateButton } from '@/components/media-nav/InlineImageLocateButton';
 
 const loadMermaidBlock = () => loadNamedComponent(() => import('./blocks/MermaidBlock'), 'MermaidBlock');
 const loadGraphvizBlock = () => loadNamedComponent(() => import('./blocks/GraphvizBlock'), 'GraphvizBlock');
@@ -63,12 +66,6 @@ type MarkdownPreProps = React.ComponentPropsWithoutRef<'pre'> & {
       };
     };
   };
-};
-type CodeElementProps = {
-  className?: string;
-  children?: React.ReactNode;
-  onClick?: React.MouseEventHandler<HTMLElement>;
-  title?: string;
 };
 
 interface BaseMarkdownRendererProps extends MarkdownRendererProps {
@@ -212,6 +209,202 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
         table: (props: MarkdownTableProps) => <TableBlock {...props} />,
         a: (props: MarkdownAnchorProps) => {
           const { href, children, ...rest } = props;
+          if (href?.startsWith('#video-seek') || href?.startsWith('#audio-seek') || href?.startsWith('#time-seek')) {
+            const queryIndex = href.indexOf('?');
+            const queryStr = queryIndex !== -1 ? href.slice(queryIndex + 1) : '';
+            const searchParams = new URLSearchParams(queryStr);
+            const start = Number.parseFloat(searchParams.get('start') || '0');
+            const endParam = searchParams.get('end');
+            const end = endParam ? Number.parseFloat(endParam) : undefined;
+            const pointParam = searchParams.get('point');
+            const boxParam = searchParams.get('box');
+            const kindParam = searchParams.get('kind');
+            const videoParam = searchParams.get('video') || searchParams.get('audio') || undefined;
+            const snippetParam = searchParams.get('snippet') || undefined;
+            const mediaKind =
+              kindParam === 'audio' || href.startsWith('#audio-seek')
+                ? ('audio' as const)
+                : kindParam === 'video'
+                  ? ('video' as const)
+                  : undefined;
+
+            let annotation:
+              { point?: [number, number]; box2d?: [number, number, number, number]; snippet?: string } | undefined;
+            if (pointParam || boxParam || snippetParam) {
+              let point: [number, number] | undefined;
+              if (pointParam) {
+                const pointParts = pointParam
+                  .replace(/[()[\]]/g, '')
+                  .split(/[,;\s]+/)
+                  .map((v) => Number.parseFloat(v.trim()))
+                  .filter(Number.isFinite);
+                if (pointParts.length === 2) {
+                  const isZeroToOne =
+                    pointParts.every((v) => v >= 0 && v <= 1.0) && pointParts.some((v) => v > 0 && v < 1.0);
+                  const scale = isZeroToOne ? 1000 : 1;
+                  point = [Math.round(pointParts[0] * scale), Math.round(pointParts[1] * scale)];
+                }
+              }
+
+              let box2d: [number, number, number, number] | undefined;
+              if (boxParam) {
+                const boxParts = boxParam
+                  .replace(/[()[\]]/g, '')
+                  .split(/[,;\s]+/)
+                  .map((v) => Number.parseFloat(v.trim()))
+                  .filter(Number.isFinite);
+                if (boxParts.length === 4) {
+                  const isZeroToOne =
+                    boxParts.every((v) => v >= 0 && v <= 1.0) && boxParts.some((v) => v > 0 && v < 1.0);
+                  const scale = isZeroToOne ? 1000 : 1;
+                  box2d = [
+                    Math.round(boxParts[0] * scale),
+                    Math.round(boxParts[1] * scale),
+                    Math.round(boxParts[2] * scale),
+                    Math.round(boxParts[3] * scale),
+                  ];
+                }
+              }
+
+              annotation = {
+                point,
+                box2d,
+                snippet: snippetParam,
+              };
+            }
+
+            return (
+              <InlineTimestampSeekButton
+                startSeconds={start}
+                endSeconds={end}
+                videoName={videoParam}
+                mediaKind={mediaKind}
+                annotation={annotation}
+                messageId={messageId}
+              >
+                {children}
+              </InlineTimestampSeekButton>
+            );
+          }
+
+          if (href?.startsWith('#pdf-seek')) {
+            const queryIndex = href.indexOf('?');
+            const queryStr = queryIndex !== -1 ? href.slice(queryIndex + 1) : '';
+            const searchParams = new URLSearchParams(queryStr);
+            const page = Number.parseInt(searchParams.get('page') || '1', 10);
+            const docParam = searchParams.get('doc') || undefined;
+            const boxParam = searchParams.get('box');
+            const pointParam = searchParams.get('point');
+            const snippetParam = searchParams.get('snippet') || undefined;
+
+            let box2d: [number, number, number, number] | undefined;
+            if (boxParam) {
+              const boxParts = boxParam
+                .replace(/[()[\]]/g, '')
+                .split(/[,;\s]+/)
+                .map((v) => Number.parseFloat(v.trim()))
+                .filter(Number.isFinite);
+              if (boxParts.length === 4) {
+                const isZeroToOne = boxParts.every((v) => v >= 0 && v <= 1.0) && boxParts.some((v) => v > 0 && v < 1.0);
+                const scale = isZeroToOne ? 1000 : 1;
+                box2d = [
+                  Math.round(boxParts[0] * scale),
+                  Math.round(boxParts[1] * scale),
+                  Math.round(boxParts[2] * scale),
+                  Math.round(boxParts[3] * scale),
+                ];
+              }
+            }
+
+            let point: [number, number] | undefined;
+            if (pointParam) {
+              const pointParts = pointParam
+                .replace(/[()[\]]/g, '')
+                .split(/[,;\s]+/)
+                .map((v) => Number.parseFloat(v.trim()))
+                .filter(Number.isFinite);
+              if (pointParts.length === 2) {
+                const isZeroToOne =
+                  pointParts.every((v) => v >= 0 && v <= 1.0) && pointParts.some((v) => v > 0 && v < 1.0);
+                const scale = isZeroToOne ? 1000 : 1;
+                point = [Math.round(pointParts[0] * scale), Math.round(pointParts[1] * scale)];
+              }
+            }
+
+            return (
+              <InlinePdfLocateButton
+                pageNumber={page}
+                docName={docParam}
+                box2d={box2d}
+                point={point}
+                snippet={snippetParam}
+                messageId={messageId}
+              >
+                {children}
+              </InlinePdfLocateButton>
+            );
+          }
+
+          if (href?.startsWith('#image-seek')) {
+            const queryIndex = href.indexOf('?');
+            const queryStr = queryIndex !== -1 ? href.slice(queryIndex + 1) : '';
+            const searchParams = new URLSearchParams(queryStr);
+            const fileParam = searchParams.get('file') || undefined;
+            const boxParam = searchParams.get('box');
+            const pointParam = searchParams.get('point');
+            const arrowParam = searchParams.get('arrow') || undefined;
+            const labelParam = searchParams.get('label') || undefined;
+            const snippetParam = searchParams.get('snippet') || undefined;
+
+            let box2d: [number, number, number, number] | undefined;
+            if (boxParam) {
+              const boxParts = boxParam
+                .replace(/[()[\]]/g, '')
+                .split(/[,;\s]+/)
+                .map((v) => Number.parseFloat(v.trim()))
+                .filter(Number.isFinite);
+              if (boxParts.length === 4) {
+                const isZeroToOne = boxParts.every((v) => v >= 0 && v <= 1.0) && boxParts.some((v) => v > 0 && v < 1.0);
+                const scale = isZeroToOne ? 1000 : 1;
+                box2d = [
+                  Math.round(boxParts[0] * scale),
+                  Math.round(boxParts[1] * scale),
+                  Math.round(boxParts[2] * scale),
+                  Math.round(boxParts[3] * scale),
+                ];
+              }
+            }
+
+            let point: [number, number] | undefined;
+            if (pointParam) {
+              const pointParts = pointParam
+                .replace(/[()[\]]/g, '')
+                .split(/[,;\s]+/)
+                .map((v) => Number.parseFloat(v.trim()))
+                .filter(Number.isFinite);
+              if (pointParts.length === 2) {
+                const isZeroToOne =
+                  pointParts.every((v) => v >= 0 && v <= 1.0) && pointParts.some((v) => v > 0 && v < 1.0);
+                const scale = isZeroToOne ? 1000 : 1;
+                point = [Math.round(pointParts[0] * scale), Math.round(pointParts[1] * scale)];
+              }
+            }
+
+            return (
+              <InlineImageLocateButton
+                fileName={fileParam}
+                box2d={box2d}
+                point={point}
+                arrow={arrowParam}
+                label={labelParam}
+                snippet={snippetParam}
+                messageId={messageId}
+              >
+                {children}
+              </InlineImageLocateButton>
+            );
+          }
+
           const isInternal = href && (href.startsWith('#') || href.startsWith('/'));
 
           return (
@@ -248,14 +441,7 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
         pre: (props: MarkdownPreProps) => {
           const { children, node, ...rest } = props;
 
-          const codeElement = React.Children.toArray(children).find(
-            (child): child is React.ReactElement<CodeElementProps> => {
-              return (
-                React.isValidElement<CodeElementProps>(child) &&
-                (child.type === 'code' || Boolean(child.props.className?.includes('language-')))
-              );
-            },
-          );
+          const codeElement = findCodeElement(children);
 
           const codeClassName = codeElement?.props.className || '';
           const codeContent = codeElement?.props.children;
@@ -271,6 +457,8 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
           const codeBlock = (
             <CodeBlock
               {...rest}
+              files={files}
+              messageId={messageId}
               cacheKey={
                 messageId && node?.position?.start?.offset !== undefined
                   ? `${messageId}:${node.position.start.offset}`
@@ -279,6 +467,7 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
               className={codeClassName}
               onOpenHtmlPreview={handlersRef.current.onOpenHtmlPreview}
               onLiveArtifactFollowUp={handlersRef.current.onLiveArtifactFollowUp}
+              onImageClick={handlersRef.current.onImageClick}
               expandCodeBlocksByDefault={expandCodeBlocksByDefault}
               showPreviewControls={isInteractive}
               isLoading={isLoading}
@@ -380,9 +569,12 @@ export const BaseMarkdownRenderer: React.FC<BaseMarkdownRendererProps> = React.m
         <div className={isLoading ? 'is-loading' : ''}>
           <CodeBlock
             cacheKey={messageId ? `${messageId}:direct-live-artifact` : undefined}
+            files={files}
+            messageId={messageId}
             className={`language-${singleLiveArtifact.language}`}
             onOpenHtmlPreview={onOpenHtmlPreview}
             onLiveArtifactFollowUp={onLiveArtifactFollowUp}
+            onImageClick={onImageClick}
             expandCodeBlocksByDefault={expandCodeBlocksByDefault}
             showPreviewControls={isInteractive}
             isLoading={isLoading}

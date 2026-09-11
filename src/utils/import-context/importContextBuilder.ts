@@ -10,11 +10,20 @@ import { IGNORED_DIRS, IGNORED_EXTENSIONS } from './defaultIgnorePatterns';
 import { IMPORT_CONTEXT_LANGUAGE_MAP } from './languageMap';
 import { compareFilePaths, sortTreeNodes } from './treeSorting';
 import { countLines, estimateTokens } from './textStats';
+import {
+  DEFAULT_ZIP_CONCURRENCY,
+  DEFAULT_ZIP_SAFETY_LIMITS,
+  runWithConcurrency,
+  sanitizeZipEntryPath,
+  validateZipStructure,
+  type ZipSafetyLimits,
+} from './zipSafety';
 import type { AnalysisSummary, FileContent, FileNode, ProcessedFiles, SecurityFinding } from './importContextTypes';
 
 export interface ImportContextBuildOptions {
   includeEmptyDirectories?: boolean;
   emptyDirectoryPaths?: string[];
+  zipSafetyLimits?: ZipSafetyLimits;
 }
 
 export interface PathFileInput {
@@ -161,31 +170,61 @@ async function filterDirectoryPaths(
   return results.filter((path): path is string => path !== null);
 }
 
-async function processZipFile(zipFile: File): Promise<ZipExtractionResult> {
+async function processZipFile(
+  zipFile: File,
+  limits: ZipSafetyLimits = DEFAULT_ZIP_SAFETY_LIMITS,
+): Promise<ZipExtractionResult> {
   const zip = await JSZip.loadAsync(zipFile);
+  const validation = validateZipStructure(zip, limits);
+  if (!validation.valid) {
+    throw new Error(validation.reason);
+  }
+
   const files: File[] = [];
   const zipRoot = zipFile.name.replace(/\.zip$/i, '');
   const directoryCandidates = new Set<string>();
+  const maxTotalBytes = limits.maxTotalUncompressedBytes ?? DEFAULT_ZIP_SAFETY_LIMITS.maxTotalUncompressedBytes;
+  let totalExtractedBytes = 0;
 
-  const promises = Object.values(zip.files).map(async (entry) => {
-    if (entry.dir) {
-      const normalized = entry.name.replace(/\/$/, '');
-      if (normalized) {
-        directoryCandidates.add(`${zipRoot}/${normalized}`);
-      }
-      return;
+  const validEntries: { entry: JSZip.JSZipObject; safePath: string }[] = [];
+
+  for (const entry of Object.values(zip.files)) {
+    const safePath = sanitizeZipEntryPath(entry.name);
+    if (!safePath) {
+      continue;
     }
 
+    if (entry.dir) {
+      directoryCandidates.add(`${zipRoot}/${safePath}`);
+      continue;
+    }
+
+    const pathSegments = safePath.split('/');
+    if (pathSegments.some((part) => IGNORED_DIRS.has(part))) {
+      continue;
+    }
+
+    validEntries.push({ entry, safePath });
+  }
+
+  await runWithConcurrency(validEntries, DEFAULT_ZIP_CONCURRENCY, async ({ entry, safePath }) => {
     const blob = await entry.async('blob');
-    const file = new File([blob], entry.name, {
+    totalExtractedBytes += blob.size;
+
+    if (totalExtractedBytes > maxTotalBytes) {
+      throw new Error(
+        `ZIP extraction exceeded uncompressed size limit of ${Math.round(maxTotalBytes / 1024 / 1024)}MB.`,
+      );
+    }
+
+    const fileName = safePath.split('/').pop() || safePath;
+    const file = new File([blob], fileName, {
       type: blob.type,
       lastModified: entry.date.getTime(),
     });
 
-    files.push(attachRelativePath(file, `${zipRoot}/${entry.name}`));
+    files.push(attachRelativePath(file, `${zipRoot}/${safePath}`));
   });
-
-  await Promise.all(promises);
 
   const filePathSet = new Set(files.map((file) => getFilePath(file)));
   const emptyDirectoryPaths = [...directoryCandidates].filter((dirPath) => {
@@ -208,7 +247,7 @@ async function processImportFiles(
 
   for (const file of files) {
     if (file.name.toLowerCase().endsWith('.zip') && shouldExpandZipFile(file)) {
-      const unzipped = await processZipFile(file);
+      const unzipped = await processZipFile(file, options.zipSafetyLimits);
       allNonZipFiles.push(...unzipped.files);
       zipEmptyDirectoryPaths.push(...unzipped.emptyDirectoryPaths);
     } else {
@@ -342,6 +381,7 @@ export async function buildImportContextFile(
   const normalizedOptions: Required<ImportContextBuildOptions> = {
     includeEmptyDirectories: options.includeEmptyDirectories ?? false,
     emptyDirectoryPaths: options.emptyDirectoryPaths ?? [],
+    zipSafetyLimits: options.zipSafetyLimits ?? DEFAULT_ZIP_SAFETY_LIMITS,
   };
   const files = toInputFileArray(inputs);
   const processed = await processImportFiles(files, normalizedOptions);

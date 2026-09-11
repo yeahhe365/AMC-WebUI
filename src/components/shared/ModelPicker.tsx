@@ -11,6 +11,7 @@ import {
 } from '@/utils/model/modelCatalog';
 import { getModelIcon } from './ModelIcon';
 import { ModelCatalogList } from './ModelCatalogList';
+import { ModelDetailCard } from './ModelDetailCard';
 
 interface ModelPickerProps {
   models: ModelOption[];
@@ -44,6 +45,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   // Bottom-edge fade while the list still has content below the fold — gone
   // once the user scrolls to the end, so the last row is never obscured.
   const [showBottomFade, setShowBottomFade] = useState(false);
+  const [hoveredEntry, setHoveredEntry] = useState<ModelCatalogEntry | null>(null);
+  const [detailSide, setDetailSide] = useState<'right' | 'left'>('right');
+
   const updateBottomFade = useCallback(() => {
     const el = listRef.current;
     if (!el) return;
@@ -92,8 +96,22 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   const { isOpen, activeIndex } = navigation;
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setHoveredEntry(null);
+      return;
+    }
     updateBottomFade();
+
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const dropdownWidth = 320;
+    const cardWidth = 320;
+    const rightSpace = window.innerWidth - (rect.left + dropdownWidth);
+    if (rightSpace < cardWidth + 24 && rect.left >= cardWidth + 24) {
+      setDetailSide('left');
+    } else {
+      setDetailSide('right');
+    }
   }, [isOpen, sections, updateBottomFade]);
 
   const handleSelectModel = (entry: ModelCatalogEntry) => {
@@ -159,11 +177,26 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                     isEntrySelected={(entry) => entry.id === selectedId}
                     activeEntryId={activeEntry?.id}
                     onSelectEntry={handleSelectModel}
+                    onHoverEntry={setHoveredEntry}
                   />
                 )}
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {isOpen && (hoveredEntry?.model || activeEntry?.model || selectedModel) && (
+        <div
+          data-testid="model-picker-detail-hovercard"
+          className={`hidden sm:block absolute top-full mt-1 z-50 transition-all duration-150 animate-in fade-in zoom-in-95 pointer-events-none ${
+            detailSide === 'left' ? 'right-[calc(100%+8px)]' : 'left-[328px]'
+          }`}
+        >
+          <ModelDetailCard
+            model={(hoveredEntry?.model || activeEntry?.model || selectedModel)!}
+            renderModelIcon={getModelIcon}
+          />
         </div>
       )}
     </div>

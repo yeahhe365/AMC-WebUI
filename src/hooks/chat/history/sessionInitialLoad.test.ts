@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createChatMessage, createChatSettings, createSavedChatSession } from '@/test/data/factories';
 
-const { mockGetSession, mockGetAllSessionMetadata, mockGetAllGroups, mockRehydrateSessionFiles } = vi.hoisted(() => ({
-  mockGetSession: vi.fn(),
-  mockGetAllSessionMetadata: vi.fn(),
-  mockGetAllGroups: vi.fn(),
-  mockRehydrateSessionFiles: vi.fn((session: { messages?: unknown[]; [key: string]: unknown }) => session),
-}));
+const { mockGetSession, mockGetAllSessionMetadata, mockGetAllGroups, mockRehydrateSessionFiles, mockGetDraftFiles } =
+  vi.hoisted(() => ({
+    mockGetSession: vi.fn(),
+    mockGetAllSessionMetadata: vi.fn(),
+    mockGetAllGroups: vi.fn(),
+    mockGetDraftFiles: vi.fn<() => Promise<any>>(async () => []),
+    mockRehydrateSessionFiles: vi.fn((session: { messages?: unknown[]; [key: string]: unknown }) => session),
+  }));
 
 vi.mock('@/services/db/dbService', async () => {
   const { createDbServiceMockModule } = await import('@/test/doubles/moduleMocks');
@@ -15,6 +17,7 @@ vi.mock('@/services/db/dbService', async () => {
     getSession: mockGetSession,
     getAllSessionMetadata: mockGetAllSessionMetadata,
     getAllGroups: mockGetAllGroups,
+    getDraftFiles: mockGetDraftFiles,
   });
 });
 
@@ -82,6 +85,34 @@ describe('loadInitialSessionData', () => {
     expect(setActiveSessionId).toHaveBeenCalledWith('session-abc', { history: 'replace' });
     // startNewChat must not run for a session that was restored.
     // (Asserted via setActiveSessionId above; startNewChat is a no-op spy.)
+  });
+
+  it('restores draft files from IndexedDB for the active session after refresh', async () => {
+    stubPathname('/chat/session-draft');
+    const fullSession = createFullSession('session-draft', 'existing chat');
+    const draftFiles = [{ id: 'draft-file-1', name: 'draft.png', type: 'image/png', size: 123 }];
+    mockGetAllSessionMetadata.mockResolvedValue([
+      createSavedChatSession({ id: 'session-draft', title: 't', timestamp: Date.now(), messages: [] }),
+    ]);
+    mockGetAllGroups.mockResolvedValue([]);
+    mockGetSession.mockResolvedValue(fullSession);
+    mockGetDraftFiles.mockResolvedValue(draftFiles);
+
+    const restoreDraftFiles = vi.fn();
+
+    await loadInitialSessionData({
+      appSettings: {} as never,
+      setSavedSessions: vi.fn(),
+      setSavedGroups: vi.fn(),
+      setActiveSessionId: vi.fn(),
+      setActiveMessages: vi.fn(),
+      restoreDraftFiles,
+      updateAndPersistSessions: vi.fn(),
+      startNewChat: vi.fn(),
+    });
+
+    expect(mockGetDraftFiles).toHaveBeenCalledWith('session-draft');
+    expect(restoreDraftFiles).toHaveBeenCalledWith('session-draft', draftFiles);
   });
 
   it('falls back to a fresh chat when the URL session is not in the DB', async () => {
@@ -165,5 +196,31 @@ describe('loadInitialSessionData', () => {
     });
 
     expect(startNewChat).not.toHaveBeenCalled();
+  });
+
+  it('uses history: none when restoring initial session while on /library route', async () => {
+    stubPathname('/library');
+    sessionStorage.setItem(ACTIVE_CHAT_SESSION_ID_KEY, 'session-abc');
+    const fullSession = createFullSession('session-abc', 'persisted message content');
+    mockGetAllSessionMetadata.mockResolvedValue([
+      createSavedChatSession({ id: 'session-abc', title: 't', timestamp: Date.now(), messages: [] }),
+    ]);
+    mockGetAllGroups.mockResolvedValue([]);
+    mockGetSession.mockResolvedValue(fullSession);
+
+    const setActiveSessionId = vi.fn();
+
+    await loadInitialSessionData({
+      appSettings: {} as never,
+      setSavedSessions: vi.fn(),
+      setSavedGroups: vi.fn(),
+      setActiveSessionId,
+      setActiveMessages: vi.fn(),
+      restoreDraftFiles: vi.fn(),
+      updateAndPersistSessions: vi.fn(),
+      startNewChat: vi.fn(),
+    });
+
+    expect(setActiveSessionId).toHaveBeenCalledWith('session-abc', { history: 'none' });
   });
 });

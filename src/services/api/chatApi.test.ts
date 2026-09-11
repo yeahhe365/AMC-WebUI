@@ -28,7 +28,7 @@ describe('chatApi media resolution routing', () => {
     });
   });
 
-  it('uses v1alpha for streaming requests with per-part media resolution', async () => {
+  it('does not force v1alpha for streaming requests with per-part media resolution', async () => {
     mockGenerateContentStream.mockResolvedValue(
       (async function* () {
         yield {
@@ -61,12 +61,10 @@ describe('chatApi media resolution routing', () => {
       vi.fn(),
     );
 
-    expect(mockGetConfiguredApiClient).toHaveBeenCalledWith('key', {
-      apiVersion: 'v1alpha',
-    });
+    expect(mockGetConfiguredApiClient).toHaveBeenCalledWith('key', undefined);
   });
 
-  it('uses v1alpha for non-stream requests when history carries per-part media resolution', async () => {
+  it('does not force v1alpha for non-stream requests when history carries per-part media resolution', async () => {
     mockGenerateContent.mockResolvedValue({
       candidates: [
         {
@@ -101,9 +99,7 @@ describe('chatApi media resolution routing', () => {
       vi.fn(),
     );
 
-    expect(mockGetConfiguredApiClient).toHaveBeenCalledWith('key', {
-      apiVersion: 'v1alpha',
-    });
+    expect(mockGetConfiguredApiClient).toHaveBeenCalledWith('key', undefined);
   });
 
   it('uses the provided role for non-stream prefilled model turns', async () => {

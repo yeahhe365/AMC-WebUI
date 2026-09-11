@@ -91,6 +91,13 @@ const interfaceEntries: SettingsSearchEntry[] = [
     groupKey: 'settingsChatBehavior',
   },
   {
+    id: 'interface-token-stats',
+    tab: 'interface',
+    labelKey: 'settingsShowMessageTokenStatsLabel',
+    descriptionKey: 'settingsShowMessageTokenStatsTooltip',
+    groupKey: 'settingsChatBehavior',
+  },
+  {
     id: 'interface-clipboard',
     tab: 'interface',
     labelKey: 'settingsClipboardInput',
@@ -327,21 +334,8 @@ const apiEntries: SettingsSearchEntry[] = [
   {
     id: 'api-provider',
     tab: 'api',
-    labelKey: 'settingsApiModeLabel',
-    groupKey: 'settingsTabApi',
-  },
-  {
-    id: 'api-third-party',
-    tab: 'api',
-    labelKey: 'settingsApiModeThirdParty',
-    descriptionKey: 'settingsOpenAICompatibleToggleHelp',
-    groupKey: 'settingsTabApi',
-  },
-  {
-    id: 'api-files-strategy',
-    tab: 'api',
-    labelKey: 'settingsFilesApiTitle',
-    descriptionKey: 'settingsFilesApiDesc',
+    labelKey: 'settingsTabProviders',
+    descriptionKey: 'apiThirdPartyRedirectDesc',
     groupKey: 'settingsTabApi',
   },
   {
@@ -382,6 +376,12 @@ const dataEntries: SettingsSearchEntry[] = [
     groupKey: 'settingsDataImportsExports',
   },
   {
+    id: 'data-providers',
+    tab: 'data',
+    labelKey: 'settingsDataProviders',
+    groupKey: 'settingsDataImportsExports',
+  },
+  {
     id: 'data-history',
     tab: 'data',
     labelKey: 'settingsDataHistory',
@@ -392,6 +392,13 @@ const dataEntries: SettingsSearchEntry[] = [
     tab: 'data',
     labelKey: 'settingsDataScenarios',
     groupKey: 'settingsDataImportsExports',
+  },
+  {
+    id: 'data-files-strategy',
+    tab: 'data',
+    labelKey: 'settingsFilesApiTitle',
+    descriptionKey: 'settingsFilesApiDesc',
+    groupKey: 'settingsTabData',
   },
   {
     id: 'data-system-tools',
@@ -484,9 +491,32 @@ const aboutEntries: SettingsSearchEntry[] = [
   },
 ];
 
+const providerEntries: SettingsSearchEntry[] = [
+  {
+    id: 'providers-root',
+    tab: 'providers',
+    labelKey: 'settingsTabProviders',
+    descriptionKey: 'apiThirdPartyRedirectDesc',
+    groupKey: 'settingsTabProviders',
+  },
+  {
+    id: 'providers-add',
+    tab: 'providers',
+    labelKey: 'thirdPartyAddConnectionTitle',
+    groupKey: 'settingsTabProviders',
+  },
+  {
+    id: 'providers-models',
+    tab: 'providers',
+    labelKey: 'settingsOpenAICompatibleModelId',
+    groupKey: 'settingsTabProviders',
+  },
+];
+
 /** Flat catalog of settings destinations for in-modal search. */
 export const SETTINGS_SEARCH_CATALOG: SettingsSearchEntry[] = [
   ...modelsEntries,
+  ...providerEntries,
   ...apiEntries,
   ...mcpEntries,
   ...interfaceEntries,

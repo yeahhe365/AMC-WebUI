@@ -6,3 +6,4 @@ export * from './logging';
 export * from './slashCommands';
 export * from './sync';
 export * from './theme';
+export * from './library';

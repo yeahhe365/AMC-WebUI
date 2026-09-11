@@ -93,6 +93,15 @@ describe('vite.config runtime ownership', () => {
     );
   });
 
+  it('copies the ECharts standalone bundle to dist/vendor', () => {
+    const config = fs.readFileSync(viteConfigPath, 'utf8');
+    const staticAssets = fs.readFileSync(viteStaticAssetsPath, 'utf8');
+
+    expect(staticAssets).toContain("export const ECHARTS_COPY_SOURCE = 'node_modules/echarts/dist/echarts.min.js'");
+    expect(config).toContain('src: ECHARTS_COPY_SOURCE');
+    expect(config).toContain("dest: 'vendor'");
+  });
+
   it('centralizes PDF worker runtime configuration', () => {
     const pdfRuntimeSource = fs.readFileSync(pdfRuntimePath, 'utf8');
     const thumbnailSource = fs.readFileSync(pdfFileThumbnailPath, 'utf8');

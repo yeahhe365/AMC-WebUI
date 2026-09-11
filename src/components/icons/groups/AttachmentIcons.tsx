@@ -1,5 +1,5 @@
 import React from 'react';
-import { HardDriveUpload, Crop } from 'lucide-react';
+import { HardDriveUpload, Crop, Cloud } from 'lucide-react';
 import {
   type IconProps,
   StrokeIcon,
@@ -47,12 +47,13 @@ export const IconMicrophone: React.FC<IconProps> = (props) => (
   </StrokeIcon>
 );
 
-export const IconLink: React.FC<IconProps> = (props) => (
-  <StrokeIcon {...props}>
-    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-  </StrokeIcon>
-);
+// 借鉴 Cherry Studio SettingsPage.tsx: icon={<Cloud />} (模型服务 / 通过文件 ID 添加)
+export const IconCloud: React.FC<IconProps> = ({
+  size = defaultSize,
+  strokeWidth = defaultStroke,
+  className,
+  color = defaultColor,
+}) => <Cloud size={size} strokeWidth={strokeWidth} className={className} color={color} />;
 
 export const IconYoutube: React.FC<IconProps> = ({ color, ...props }) => (
   <StrokeIcon color={color} {...props}>
@@ -76,22 +77,6 @@ export const IconZip: React.FC<IconProps> = (props) => (
     <path d="m3.3 7 8.7 5 8.7-5" />
     <path d="M12 22V12" />
   </StrokeIcon>
-);
-
-export const IconMarkdown: React.FC<IconProps> = ({ size = defaultSize, className, color = defaultColor }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 208 128"
-    fill="none"
-    className={className}
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <path
-      fill={color}
-      d="M193 128H15a15 15 0 0 1-15-15V15A15 15 0 0 1 15 0h178a15 15 0 0 1 15 15v98a15 15 0 0 1-15 15zM50 98V59l20 25 20-25v39h20V30H90L70 55 50 30H30v68zm134-34h-20V30h-20v34h-20l30 35z"
-    />
-  </svg>
 );
 
 /**

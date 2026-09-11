@@ -1,12 +1,16 @@
 import { logService } from '@/services/logService';
 import { useCallback } from 'react';
-import { type AppSettings, type ChatSettings, type UploadedFile, type MediaResolution } from '@/types';
+import {
+  type AppSettings,
+  type ChatSettings,
+  type UploadedFile,
+  type MediaResolution,
+  type SetSelectedFiles,
+} from '@/types';
 import { buildContentParts } from '@/utils/chat/builder';
 import { useI18n } from '@/contexts/I18nContext';
 import { formatApiKeyErrorMessage, getGeminiKeyForRequest } from '@/utils/apiKeySelection';
 import { ensureFilesApiReferences, formatFileReferenceErrorMessage } from '@/features/message-sender/fileApiReference';
-
-type SetSelectedFiles = (files: UploadedFile[] | ((prevFiles: UploadedFile[]) => UploadedFile[])) => void;
 
 export interface LiveModeApi {
   isConnected: boolean;

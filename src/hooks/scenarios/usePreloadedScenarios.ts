@@ -1,5 +1,5 @@
 import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
-import { type ChatMessage, type SavedScenario, type SavedChatSession, type AppSettings } from '@/types';
+import { type ChatMessage, type SavedScenario, type AppSettings, type SessionsUpdater } from '@/types';
 import { logService } from '@/services/logService';
 import { generateUniqueId } from '@/utils/chat/ids';
 import { generateSessionTitle, createNewSession } from '@/utils/chat/session';
@@ -11,21 +11,15 @@ import {
   initializeScenarioState,
 } from '@/features/scenarios/scenarioLibrary';
 
-type SessionsUpdater = (
-  updater: (prev: SavedChatSession[]) => SavedChatSession[],
-  options?: { persist?: boolean },
-) => void | Promise<void>;
-
 interface PreloadedScenariosProps {
   appSettings: AppSettings;
-  setAppSettings: Dispatch<SetStateAction<AppSettings>>;
+  setAppSettings?: Dispatch<SetStateAction<AppSettings>>;
   updateAndPersistSessions: SessionsUpdater;
   setActiveSessionId: Dispatch<SetStateAction<string | null>>;
 }
 
 export const usePreloadedScenarios = ({
   appSettings,
-  setAppSettings,
   updateAndPersistSessions,
   setActiveSessionId,
 }: PreloadedScenariosProps) => {
@@ -80,11 +74,6 @@ export const usePreloadedScenarios = ({
     updateAndPersistSessions((prev) => [newSession, ...prev.filter((session) => session.id !== newSession.id)]);
     setActiveSessionId(newSession.id);
     dbService.setActiveSessionId(newSession.id);
-
-    setAppSettings((prev) => ({
-      ...prev,
-      systemInstruction,
-    }));
   };
 
   return {

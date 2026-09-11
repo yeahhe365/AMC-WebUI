@@ -3,6 +3,7 @@ import { Info, Type } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import type { AppSettings } from '@/types';
 import { Tooltip } from '@/components/shared/Tooltip';
+import { Slider } from '@/components/shared/Slider';
 import {
   LIVE_ARTIFACTS_CUSTOM_FONT_SIZE_MAX,
   LIVE_ARTIFACTS_CUSTOM_FONT_SIZE_MIN,
@@ -40,17 +41,14 @@ export const LiveArtifactsFontSizeControl: React.FC<LiveArtifactsFontSizeControl
         </div>
         <span className={SETTINGS_VALUE_BADGE_CLASS}>{customFontSize}px</span>
       </div>
-      <input
+      <Slider
         id="live-artifacts-custom-font-size"
-        type="range"
         min={LIVE_ARTIFACTS_CUSTOM_FONT_SIZE_MIN}
         max={LIVE_ARTIFACTS_CUSTOM_FONT_SIZE_MAX}
-        step="1"
+        step={1}
         value={customFontSize}
-        onChange={(event) =>
-          onUpdate('liveArtifactsCustomFontSize', clampLiveArtifactsCustomFontSize(Number(event.target.value)))
-        }
-        className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-[var(--theme-border-secondary)] accent-[var(--theme-bg-accent)] hover:accent-[var(--theme-bg-accent-hover)]"
+        onChange={(val) => onUpdate('liveArtifactsCustomFontSize', clampLiveArtifactsCustomFontSize(Math.round(val)))}
+        ariaLabel={t('settingsLiveArtifactsFontSize')}
       />
       <div className="flex justify-between px-1 font-mono text-xs text-[var(--theme-text-secondary)]">
         <span>{LIVE_ARTIFACTS_CUSTOM_FONT_SIZE_MIN}px</span>

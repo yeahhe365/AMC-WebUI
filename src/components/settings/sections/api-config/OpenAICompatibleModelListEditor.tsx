@@ -97,6 +97,9 @@ export const OpenAICompatibleModelListEditor: React.FC<OpenAICompatibleModelList
       <div className="flex flex-wrap items-center justify-between gap-3">
         <label className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-secondary)]">
           {t('settingsOpenAICompatibleModelId')}
+          {rows.length > 0 && (
+            <span className="ml-1 font-normal text-[var(--theme-text-secondary)]/70">({rows.length})</span>
+          )}
         </label>
         <div className="flex flex-wrap items-center gap-2">
           {onFetchModelsForImportPreview && (
@@ -132,7 +135,7 @@ export const OpenAICompatibleModelListEditor: React.FC<OpenAICompatibleModelList
         </div>
       </div>
 
-      <div className="rounded-lg bg-[var(--theme-bg-input)]/45 p-1.5">
+      <div className="rounded-lg bg-[var(--theme-bg-input)]/45 p-1.5 max-h-60 overflow-y-auto custom-scrollbar">
         {rows.length > 0 ? (
           <div className="space-y-1">
             {rows.map((row, index) => (

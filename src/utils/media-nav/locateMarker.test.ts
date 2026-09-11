@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildAudioLocateDirective,
+  buildImageLocateDirective,
   buildPdfLocateDirective,
   buildVideoLocateDirective,
   parseLocateMarkers,
   stripLocateMarkers,
+  toImageNavHighlight,
   toPdfNavHighlight,
 } from './locateMarker';
 
@@ -16,6 +18,7 @@ describe('parseLocateMarkers (pdf)', () => {
       pdfLocates: [],
       videoLocates: [],
       audioLocates: [],
+      imageLocates: [],
     });
   });
 
@@ -77,6 +80,54 @@ describe('parseLocateMarkers (pdf)', () => {
     const { pdfLocates } = parseLocateMarkers(content);
     expect(pdfLocates[0].box2d).toBeUndefined();
   });
+
+  it('supports single-quoted and unquoted attributes', () => {
+    const content =
+      "<pdf-locate page='5' doc='handbook.pdf' box='100,200,300,400'>单引号</pdf-locate> <pdf-locate page=7>无引号</pdf-locate>";
+    const { pdfLocates, cleanContent } = parseLocateMarkers(content);
+    expect(pdfLocates).toHaveLength(2);
+    expect(pdfLocates[0]).toEqual({
+      pageNumber: 5,
+      docName: 'handbook.pdf',
+      box2d: [100, 200, 300, 400],
+      point: undefined,
+      snippet: '单引号',
+    });
+    expect(pdfLocates[1]).toEqual({
+      pageNumber: 7,
+      docName: undefined,
+      box2d: undefined,
+      point: undefined,
+      snippet: '无引号',
+    });
+    expect(cleanContent.trim()).toBe('');
+  });
+
+  it('supports self-closing tags', () => {
+    const content =
+      '正文开始 <pdf-locate page="3" box="50,60,70,80" /> 补充说明 <image-locate point="500,500" arrow="top" label="Logo" /> 结尾';
+    const { pdfLocates, imageLocates, cleanContent } = parseLocateMarkers(content);
+    expect(pdfLocates).toEqual([
+      {
+        pageNumber: 3,
+        docName: undefined,
+        box2d: [50, 60, 70, 80],
+        point: undefined,
+        snippet: undefined,
+      },
+    ]);
+    expect(imageLocates).toEqual([
+      {
+        imageName: undefined,
+        box2d: undefined,
+        point: [500, 500],
+        arrow: 'top',
+        label: 'Logo',
+        snippet: undefined,
+      },
+    ]);
+    expect(cleanContent.replace(/\s+/g, ' ').trim()).toBe('正文开始 补充说明 结尾');
+  });
 });
 
 describe('parseLocateMarkers (video)', () => {
@@ -108,6 +159,13 @@ describe('parseLocateMarkers (video)', () => {
     expect(videoLocates).toEqual([]);
   });
 
+  it('parses spatial point and box coordinates even when wrapped in brackets', () => {
+    const content = '<video-locate start="00:15" point="[350, 520]" box="[100, 200, 300, 400]">测试标注</video-locate>';
+    const { videoLocates } = parseLocateMarkers(content);
+    expect(videoLocates[0].point).toEqual([350, 520]);
+    expect(videoLocates[0].box2d).toEqual([100, 200, 300, 400]);
+  });
+
   it('ignores markers without a parsable start', () => {
     const content = '<video-locate start="abc">x</video-locate> 尾部';
     const { videoLocates, cleanContent } = parseLocateMarkers(content);
@@ -127,6 +185,31 @@ describe('parseLocateMarkers (video)', () => {
     expect(videoLocates).toHaveLength(1);
     expect(cleanContent).not.toContain('<pdf-locate');
     expect(cleanContent).not.toContain('<video-locate');
+  });
+
+  it('extracts box2d and point attributes on video markers', () => {
+    const content = [
+      '<video-locate video="clip.mp4" start="00:15" end="00:20" box="100,200,500,600">目标人物</video-locate>',
+      '<video-locate video="clip.mp4" start="01:30" point="450,550">点击按钮</video-locate>',
+    ].join('\n');
+    const { videoLocates } = parseLocateMarkers(content);
+    expect(videoLocates).toHaveLength(2);
+    expect(videoLocates[0]).toEqual({
+      videoName: 'clip.mp4',
+      startSeconds: 15,
+      endSeconds: 20,
+      snippet: '目标人物',
+      box2d: [100, 200, 500, 600],
+      point: undefined,
+    });
+    expect(videoLocates[1]).toEqual({
+      videoName: 'clip.mp4',
+      startSeconds: 90,
+      endSeconds: undefined,
+      snippet: '点击按钮',
+      box2d: undefined,
+      point: [450, 550],
+    });
   });
 });
 
@@ -223,5 +306,70 @@ describe('buildVideoLocateDirective', () => {
 
   it('omits the name list when empty', () => {
     expect(buildVideoLocateDirective([])).not.toContain('available video file names');
+  });
+});
+
+describe('parseLocateMarkers (image)', () => {
+  it('extracts an image marker with box, point, arrow, and label', () => {
+    const content =
+      '找到目标元素：\n<image-locate file="screen.png" box="100,200,300,400" point="150,250" arrow="top-left" label="搜索栏">搜索框入口</image-locate>';
+    const { cleanContent, imageLocates } = parseLocateMarkers(content);
+    expect(cleanContent.trim()).toBe('找到目标元素：');
+    expect(imageLocates).toHaveLength(1);
+    expect(imageLocates[0]).toEqual({
+      imageName: 'screen.png',
+      box2d: [100, 200, 300, 400],
+      point: [150, 250],
+      arrow: 'top-left',
+      label: '搜索栏',
+      snippet: '搜索框入口',
+    });
+  });
+
+  it('supports an image marker with only box or only point', () => {
+    const content =
+      '<image-locate box="50,60,70,80">区域</image-locate> 和 <image-locate point="500,500">中心点</image-locate>';
+    const { imageLocates } = parseLocateMarkers(content);
+    expect(imageLocates).toHaveLength(2);
+    expect(imageLocates[0].box2d).toEqual([50, 60, 70, 80]);
+    expect(imageLocates[0].point).toBeUndefined();
+    expect(imageLocates[1].box2d).toBeUndefined();
+    expect(imageLocates[1].point).toEqual([500, 500]);
+  });
+
+  it('converts to ImageNavHighlight', () => {
+    const highlight = toImageNavHighlight(
+      {
+        imageName: 'ui.png',
+        box2d: [10, 20, 30, 40],
+        point: [15, 25],
+        arrow: 'right',
+        label: '按钮',
+        snippet: '确定',
+      },
+      { messageId: 'm1', focusToken: 5 },
+    );
+    expect(highlight).toEqual({
+      messageId: 'm1',
+      imageName: 'ui.png',
+      box2d: [10, 20, 30, 40],
+      point: [15, 25],
+      arrow: 'right',
+      label: '按钮',
+      snippet: '确定',
+      focusToken: 5,
+    });
+  });
+});
+
+describe('buildImageLocateDirective', () => {
+  it('describes the image visual grounding protocol and lists image names', () => {
+    const directive = buildImageLocateDirective(['shot1.png', 'shot2.jpg']);
+    expect(directive).toContain('"shot1.png", "shot2.jpg"');
+    expect(directive).toContain('<image-locate file="FILE_NAME" box="ymin,xmin,ymax,xmax"');
+  });
+
+  it('omits the name list when empty', () => {
+    expect(buildImageLocateDirective([])).not.toContain('available image file names');
   });
 });

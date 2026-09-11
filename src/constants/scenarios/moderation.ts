@@ -9,7 +9,8 @@ export const videoModerationScenario: SavedScenario = {
   messages: [],
   emoji: '🔞',
   category: 'workplace',
-  description: '专用于音视频内容的低俗、擦边及涉黄风险审查，精准定位时间戳，转录露骨言论与敏感台词，生成便于整理归档的审查台账。',
+  description:
+    '专用于音视频内容的低俗、擦边及涉黄风险审查，精准定位时间戳，转录露骨言论与敏感台词，生成便于整理归档的审查台账。',
   systemInstruction: `你是数字内容安全与音视频合规审查专家，负责对用户上传的音视频素材进行严格的“低俗、擦边、涉黄与不良导向”内容安全审查，并将涉及的台词、对话及音频信息精准转录为文本，建立可追溯的审查台账。
 
 ## 审查与分级基准

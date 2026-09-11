@@ -11,6 +11,7 @@ describe('useChatState', () => {
       activeSessionId: null,
       activeMessages: [],
       pendingLockedApiKey: null,
+      pendingChatSettings: null,
     });
   });
 
@@ -20,6 +21,21 @@ describe('useChatState', () => {
     const { result, unmount } = renderHook(() => useChatState(createAppSettings({ lockedApiKey: null })));
 
     expect(result.current.currentChatSettings.lockedApiKey).toBe('pending-key');
+    unmount();
+  });
+
+  it('merges pendingChatSettings before the first session exists', () => {
+    useChatStore.setState({
+      pendingChatSettings: {
+        systemInstruction: 'pending-system-prompt',
+        modelId: 'custom-model-id',
+      },
+    });
+
+    const { result, unmount } = renderHook(() => useChatState(createAppSettings()));
+
+    expect(result.current.currentChatSettings.systemInstruction).toBe('pending-system-prompt');
+    expect(result.current.currentChatSettings.modelId).toBe('custom-model-id');
     unmount();
   });
 

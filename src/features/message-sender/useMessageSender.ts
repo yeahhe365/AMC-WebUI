@@ -11,6 +11,7 @@ import { useI18n } from '@/contexts/I18nContext';
 import { logService } from '@/services/logService';
 import { formatApiKeyErrorMessage } from '@/utils/apiKeySelection';
 import { useChatStore } from '@/stores/chatStore';
+import { toastError } from '@/stores/toastStore';
 import { isServerCodeExecutionMode } from '@/utils/codeExecution';
 import { getModelCapabilities } from '@/utils/model/modelCapabilities';
 import { resolveChatApiRoute } from '@/utils/chatApiRoute';
@@ -164,6 +165,7 @@ export const useMessageSender = (props: MessageSenderProps) => {
       if (!validation.ok) {
         if (validation.fileError !== undefined) {
           setAppFileError(validation.fileError);
+          toastError(validation.fileError);
         }
         return;
       }
@@ -172,11 +174,15 @@ export const useMessageSender = (props: MessageSenderProps) => {
 
       const continueTargetMessage =
         isContinueMode && effectiveEditingId ? messages.find((message) => message.id === effectiveEditingId) : null;
+      const isResendingEdit = Boolean(effectiveEditingId && !isContinueMode);
+      const editIndex = isResendingEdit ? messages.findIndex((message) => message.id === effectiveEditingId) : -1;
+      const historyMessagesForTurn = editIndex !== -1 ? messages.slice(0, editIndex) : messages;
+
       const request = prepareModelRequest({
         activeModelId,
         apiRoute,
         files: filesToUse,
-        historyMessages: messages,
+        historyMessages: historyMessagesForTurn,
         keySettings: sessionToUpdate,
         generationId: continueTargetMessage ? (effectiveEditingId ?? undefined) : undefined,
         // Continue reuses the target's generation id so stream state stays
@@ -206,7 +212,24 @@ export const useMessageSender = (props: MessageSenderProps) => {
                 files: filesToUse,
                 apiKey: keyToUse,
                 abortSignal: newAbortController.signal,
+                allowDegrade: Boolean(effectiveEditingId),
                 onFileUpdate: (fileId, patch) => {
+                  if (effectiveEditingId && activeSessionId) {
+                    updateAndPersistSessions((prev) =>
+                      updateSessionById(prev, activeSessionId, (session) => ({
+                        ...session,
+                        messages: session.messages.map((msg) =>
+                          msg.id === effectiveEditingId
+                            ? {
+                                ...msg,
+                                files: msg.files?.map((file) => (file.id === fileId ? { ...file, ...patch } : file)),
+                              }
+                            : msg,
+                        ),
+                      })),
+                    );
+                  }
+
                   if (overrideOptions?.files !== undefined) {
                     return;
                   }
@@ -216,12 +239,26 @@ export const useMessageSender = (props: MessageSenderProps) => {
               });
 
         if (!fileReferenceResult.ok) {
-          setAppFileError(formatFileReferenceErrorMessage(fileReferenceResult, t));
-          return;
+          const canWaitForFiles =
+            fileReferenceResult.errorKey === 'messageSenderWaitForFiles' &&
+            !isTtsModel &&
+            !isTranscribeModel &&
+            !(isGemini3Image && appSettings.generateQuadImages);
+
+          if (canWaitForFiles) {
+            filesReadyForSend = fileReferenceResult.files;
+            setAppFileError(null);
+          } else {
+            const errorMessage = formatFileReferenceErrorMessage(fileReferenceResult, t);
+            setAppFileError(errorMessage);
+            toastError(errorMessage);
+            return;
+          }
+        } else {
+          filesReadyForSend = fileReferenceResult.files;
         }
-        filesReadyForSend = fileReferenceResult.files;
       }
-      let messagesForTurn = messages;
+      let messagesForTurn = historyMessagesForTurn;
 
       const persistHistoryIfChanged = (nextMessages: ChatMessage[], changed: boolean) => {
         if (!changed || !activeSessionId) {
@@ -243,20 +280,22 @@ export const useMessageSender = (props: MessageSenderProps) => {
 
       if (apiRoute.apiMode === 'third-party' && !isTtsModel) {
         const historyReferenceResult = await prepareHistoryForOpenAICompatibleMode({
-          messages,
+          messages: historyMessagesForTurn,
           translate: t,
         });
         messagesForTurn = historyReferenceResult.messages;
         persistHistoryIfChanged(historyReferenceResult.messages, historyReferenceResult.changed);
       } else if (apiRoute.apiMode !== 'third-party' && !isTtsModel) {
         const historyReferenceResult = await ensureHistoryFilesApiReferences({
-          messages,
+          messages: historyMessagesForTurn,
           apiKey: keyToUse,
           abortSignal: newAbortController.signal,
           translate: t,
         });
         if (!historyReferenceResult.ok) {
-          setAppFileError(formatFileReferenceErrorMessage(historyReferenceResult, t));
+          const errorMessage = formatFileReferenceErrorMessage(historyReferenceResult, t);
+          setAppFileError(errorMessage);
+          toastError(errorMessage);
           return;
         }
         messagesForTurn = historyReferenceResult.messages;

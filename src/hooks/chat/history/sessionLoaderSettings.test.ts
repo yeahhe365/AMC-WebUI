@@ -91,6 +91,55 @@ describe('createSettingsForNewChat', () => {
     expect(settings.thinkingLevel).toBe('HIGH');
     expect(settings.ttsVoice).toBe('Aoede');
   });
+
+  it('does not leak isLiveArtifactsEnabled or visionPromptMode from an implicit template session into a new chat', () => {
+    const appSettings = createAppSettings({
+      isLiveArtifactsEnabled: false,
+    });
+    const templateSession = createSavedChatSession({
+      id: 'template',
+      title: 'Previous Chat',
+      timestamp: Date.now(),
+      messages: [],
+      settings: createChatSettings({
+        isLiveArtifactsEnabled: true,
+        visionPromptMode: 'bbox',
+      }),
+    });
+
+    const settings = createSettingsForNewChat({
+      appSettings,
+      savedSessions: [templateSession],
+    });
+
+    expect(settings.isLiveArtifactsEnabled).toBe(false);
+    expect(settings.visionPromptMode).toBeNull();
+  });
+
+  it('inherits isLiveArtifactsEnabled and visionPromptMode when an explicitTemplateSession is provided', () => {
+    const appSettings = createAppSettings({
+      isLiveArtifactsEnabled: false,
+    });
+    const explicitTemplateSession = createSavedChatSession({
+      id: 'explicit-template',
+      title: 'Template Chat',
+      timestamp: Date.now(),
+      messages: [],
+      settings: createChatSettings({
+        isLiveArtifactsEnabled: true,
+        visionPromptMode: 'hdGuide',
+      }),
+    });
+
+    const settings = createSettingsForNewChat({
+      appSettings,
+      savedSessions: [],
+      explicitTemplateSession,
+    });
+
+    expect(settings.isLiveArtifactsEnabled).toBe(true);
+    expect(settings.visionPromptMode).toBe('hdGuide');
+  });
 });
 
 const makeSession = (id: string, modelId = 'gemini-3-flash-preview'): SavedChatSession =>

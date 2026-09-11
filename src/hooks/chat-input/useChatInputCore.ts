@@ -33,12 +33,14 @@ export const useChatInputCore = () => {
     onCancelEdit,
     onProcessFiles,
     onAddFileById,
+    onAddFilesFromCloud,
     onCancelUpload,
     onTranscribeAudio,
     onClearChat,
     onNewChat,
     onOpenSettings,
     onToggleLiveArtifactsPrompt,
+    onDeactivateLiveArtifactsPrompt,
     onTogglePinCurrentSession,
     onRetryLastTurn,
     onSelectModel,
@@ -56,6 +58,7 @@ export const useChatInputCore = () => {
     onToggleBBox,
     onToggleGuide,
     onToggleQuadImages,
+    isLiveArtifactsPromptActive,
   } = useChatInputRuntime();
   const { activeSessionId, currentChatSettings, isLoading } = useChatState(appSettings);
   const isEditing = !!editingMessageId;
@@ -98,6 +101,7 @@ export const useChatInputCore = () => {
       onCancelEdit,
       onProcessFiles,
       onAddFileById,
+      onAddFilesFromCloud,
       onCancelUpload,
       onTranscribeAudio,
       isProcessingFile,
@@ -106,6 +110,7 @@ export const useChatInputCore = () => {
       onNewChat,
       onOpenSettings,
       onToggleLiveArtifactsPrompt,
+      onDeactivateLiveArtifactsPrompt,
       onSelectModel,
       availableModels,
       onTogglePinCurrentSession,
@@ -122,9 +127,16 @@ export const useChatInputCore = () => {
       onLiveTranscript,
       liveClientFunctions,
       onToggleBBox,
-      isBBoxModeActive: !isThirdPartyChat && isBboxSystemInstruction(currentChatSettings.systemInstruction),
+      isBBoxModeActive:
+        !isThirdPartyChat &&
+        (currentChatSettings.visionPromptMode === 'bbox' ||
+          isBboxSystemInstruction(currentChatSettings.systemInstruction)),
       onToggleGuide,
-      isGuideModeActive: !isThirdPartyChat && isHdGuideSystemInstruction(currentChatSettings.systemInstruction),
+      isGuideModeActive:
+        !isThirdPartyChat &&
+        (currentChatSettings.visionPromptMode === 'hdGuide' ||
+          isHdGuideSystemInstruction(currentChatSettings.systemInstruction)),
+      isLiveArtifactsPromptActive: Boolean(isLiveArtifactsPromptActive),
       onToggleQuadImages,
       themeId,
     }),
@@ -137,12 +149,14 @@ export const useChatInputCore = () => {
       editMode,
       editingMessageId,
       isEditing,
+      isLiveArtifactsPromptActive,
       isLoading,
       isPipActive,
       isProcessingFile,
       isThirdPartyChat,
       liveClientFunctions,
       onAddFileById,
+      onAddFilesFromCloud,
       onAddUserMessage,
       onCancelEdit,
       onCancelUpload,
@@ -162,6 +176,7 @@ export const useChatInputCore = () => {
       onToggleBBox,
       onToggleGuide,
       onToggleLiveArtifactsPrompt,
+      onDeactivateLiveArtifactsPrompt,
       onTogglePip,
       onTogglePinCurrentSession,
       onToggleQuadImages,

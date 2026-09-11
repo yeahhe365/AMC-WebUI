@@ -57,6 +57,7 @@ describe('translation coverage for protected UI surfaces', () => {
     expect(t('scenariosCopyTitle').replace('{title}', 'A')).toBe('A（副本）');
     expect(t('scenariosMessageCount').replace('{count}', '2')).toBe('2 条消息');
     expect(t('assistantAvatarAlt')).toBe('助手头像');
+    expect(t('modelCardThinkingLevel')).toBe('思考等级');
     expect(t('messageSenderErrorWithPrefix').replace('{prefix}', '错误').replace('{message}', 'X')).toBe('错误：X');
     expect(t('messageSenderApiKeyNotConfigured')).toBe('未在设置中配置 API 密钥。');
     expect(t('messageSenderEmptyReply')).toBe('模型结束了这一轮，但没有给出可见回复。请重试。');

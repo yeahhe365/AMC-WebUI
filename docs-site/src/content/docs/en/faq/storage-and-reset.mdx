@@ -1,0 +1,27 @@
+---
+title: Storage Maintenance & Reset
+description: IndexedDB troubleshooting, clearing temporary caches, and complete factory resets.
+---
+
+# Storage Maintenance & Reset
+
+AMC WebUI uses browser IndexedDB for local persistence. Here is how to maintain cache health and perform backups.
+
+---
+
+## 1. Troubleshooting Sync Delays or Freezes
+
+1. **Check Background Tabs**: Web Locks API prevents simultaneous multi-tab collisions. If a tab crashed while holding a lock, close duplicate tabs and refresh.
+2. **Unregister Service Worker**:
+   - Open Developer Tools (F12) -> **Application** -> **Service Workers**.
+   - Click **Unregister** and hard refresh (`Cmd+Shift+R` or `Ctrl+F5`) to fetch fresh assets.
+
+---
+
+## 2. Factory Reset & Restoration
+
+To return AMC WebUI to clean factory defaults:
+1. Navigate to **Settings -> Data Management** and click **Export Full Data (JSON)** to archive your history.
+2. Open Developer Tools (F12) -> **Application** -> **Storage** -> Click **Clear site data**.
+3. Refresh the page to initialize a clean slate.
+4. To restore previous sessions, import the saved `.json` backup file.

@@ -33,7 +33,14 @@ export const createLocalPythonToolHandler = <RunOptions extends PythonRunOptions
   runPython,
 }: CreateLocalPythonToolHandlerOptions<RunOptions>) => {
   return async (args: unknown, options?: { abortSignal?: AbortSignal }) => {
-    const code = typeof args === 'object' && args !== null ? (args as { code?: unknown }).code : undefined;
+    const code =
+      typeof args === 'object' && args !== null
+        ? ((args as { code?: unknown }).code ??
+          (args as { python_code?: unknown }).python_code ??
+          (args as { script?: unknown }).script)
+        : typeof args === 'string'
+          ? args
+          : undefined;
 
     if (typeof code !== 'string' || !code.trim()) {
       throw new Error('run_local_python requires a non-empty "code" string.');
@@ -47,11 +54,13 @@ export const createLocalPythonToolHandler = <RunOptions extends PythonRunOptions
       generatedFiles.unshift(createUploadedFileFromBytes(result.image, 'image/png', `generated-plot-${Date.now()}`));
     }
 
+    const hasImage = Boolean(result.image || hasGeneratedImageFile(outputFiles));
+
     return {
       response: {
         output: result.output || null,
         result: result.result || null,
-        imageGenerated: !!result.image,
+        imageGenerated: hasImage,
         generatedFiles: outputFiles.map(({ name, type }) => ({ name, type })),
       },
       generatedFiles,

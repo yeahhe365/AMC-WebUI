@@ -7,8 +7,6 @@ export interface LiveArtifactFollowupPayload {
   source?: string;
 }
 
-type PromptLanguage = SupportedLanguage;
-
 const MAX_INSTRUCTION_LENGTH = 2000;
 const MAX_OPTIONAL_TEXT_LENGTH = 500;
 const MAX_STATE_JSON_LENGTH = 6000;
@@ -78,7 +76,10 @@ export const normalizeLiveArtifactFollowupPayload = (payload: unknown): LiveArti
   };
 };
 
-export const formatLiveArtifactFollowupPrompt = (payload: unknown, language: PromptLanguage = 'zh'): string | null => {
+export const formatLiveArtifactFollowupPrompt = (
+  payload: unknown,
+  language: SupportedLanguage = 'zh',
+): string | null => {
   const normalizedPayload = normalizeLiveArtifactFollowupPayload(payload);
   if (!normalizedPayload) {
     return null;

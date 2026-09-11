@@ -12,6 +12,15 @@ const appearanceSettings = {
   settingsThemeDark: { en: 'Dark', zh: '暗色', ja: 'ダーク', ko: '다크', es: 'Oscuro', fr: 'Sombre', de: 'Dunkel' },
   settingsThemeGray: { en: 'Gray', zh: '灰色', ja: 'グレー', ko: '그레이', es: 'Gris', fr: 'Gris', de: 'Grau' },
   settingsThemeLight: { en: 'Light', zh: '浅色', ja: 'ライト', ko: '라이트', es: 'Claro', fr: 'Clair', de: 'Hell' },
+  settingsThemeSepia: {
+    en: 'Sepia',
+    zh: '羊皮纸',
+    ja: 'セピア',
+    ko: '세피아',
+    es: 'Sepia',
+    fr: 'Sépia',
+    de: 'Sepia',
+  },
   settingsFontSize: {
     en: 'Reading Size',
     zh: '阅读字号',
@@ -562,6 +571,24 @@ const appearanceSettings = {
     es: 'Reproduce el texto completo de razonamiento de turnos anteriores en cada solicitud de API posterior para que el modelo conserve su razonamiento anterior. Mutuamente excluyente con la opción anterior. Aumenta significativamente el uso de tokens y la longitud del contexto.',
     fr: "Rejoue le texte complet de raisonnement des tours précédents dans chaque requête API suivante afin que le modèle conserve son raisonnement antérieur. Mutuellement exclusif avec l'option ci-dessus. Augmente considérablement l'utilisation de jetons et la longueur du contexte.",
     de: 'Spielt den vollständigen Reasoning-Text früherer Turns in jeder Folge-API-Anfrage erneut ab, damit das Modell sein früheres Reasoning behält. Schließt sich gegenseitig mit der obigen Option aus. Erhöht Token-Verbrauch und Kontextlänge erheblich.',
+  },
+  settingsShowMessageTokenStatsLabel: {
+    en: 'Message Token Stats',
+    zh: '消息 Token 统计',
+    ja: 'メッセージのトークン統計',
+    ko: '메시지 토큰 통계',
+    es: 'Estadísticas de tokens por mensaje',
+    fr: 'Statistiques de jetons par message',
+    de: 'Token-Statistik pro Nachricht',
+  },
+  settingsShowMessageTokenStatsTooltip: {
+    en: 'Show a compact token count under each model message. Hover or focus it for the input / cache / tool / reasoning breakdown, or click to copy.',
+    zh: '在每条模型消息下方显示紧凑的 Token 计数。悬停或聚焦查看输入 / 缓存 / 工具 / 推理明细，点击可复制。',
+    ja: '各モデルメッセージの下にコンパクトなトークン数を表示します。ホバーやフォーカスで入力 / キャッシュ / ツール / 推論の内訳を確認でき、クリックでコピーできます。',
+    ko: '각 모델 메시지 아래에 간결한 토큰 수를 표시합니다. 호버하거나 포커스하면 입력 / 캐시 / 도구 / 추론 세부 정보를 볼 수 있고, 클릭하면 복사됩니다.',
+    es: 'Muestra un recuento compacto de tokens debajo de cada mensaje del modelo. Pasa el cursor o enfoca para ver el desglose de entrada / caché / herramienta / razonamiento, o haz clic para copiar.',
+    fr: 'Affiche un compteur de jetons compact sous chaque message du modèle. Survolez ou focalisez pour voir le détail entrée / cache / outil / raisonnement, ou cliquez pour copier.',
+    de: 'Zeigt unter jeder Modellnachricht eine kompakte Token-Anzahl. Hover oder Fokus für die Aufschlüsselung Eingabe / Cache / Tool / Reasoning, Klick zum Kopieren.',
   },
 };
 export default appearanceSettings;

@@ -3,6 +3,8 @@ import { useI18n } from '@/contexts/I18nContext';
 import { Check, ClipboardCopy } from 'lucide-react';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
+import { toastSuccess } from '@/stores/toastStore';
+
 interface MessageCopyButtonProps {
   textToCopy?: string;
   className?: string;
@@ -14,7 +16,10 @@ export const MessageCopyButton: React.FC<MessageCopyButtonProps> = ({ textToCopy
   const { isCopied, copyToClipboard } = useCopyToClipboard();
 
   const handleCopy = () => {
-    if (textToCopy) copyToClipboard(textToCopy);
+    if (textToCopy) {
+      copyToClipboard(textToCopy);
+      toastSuccess(t('copiedButtonTitle') || 'Copied to clipboard');
+    }
   };
 
   return (

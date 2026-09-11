@@ -4,7 +4,7 @@ import { getThirdPartyTemplateLogo } from '@/components/shared/ModelIcon';
 import { THIRD_PARTY_TEMPLATE_IDS, type ThirdPartyTemplateId } from '@/types';
 import { getThirdPartyTemplateDefaults, THIRD_PARTY_TEMPLATE_LABELS } from '@/utils/thirdPartyApiProviders';
 
-const TEMPLATE_LABEL_KEYS: Record<ThirdPartyTemplateId, string> = {
+const TEMPLATE_LABEL_KEYS: Partial<Record<ThirdPartyTemplateId, string>> = {
   openai: 'thirdPartyTemplateOpenai',
   deepseek: 'thirdPartyTemplateDeepseek',
   anthropic: 'thirdPartyTemplateAnthropic',
@@ -12,6 +12,9 @@ const TEMPLATE_LABEL_KEYS: Record<ThirdPartyTemplateId, string> = {
   qwen: 'thirdPartyTemplateQwen',
   kimi: 'thirdPartyTemplateKimi',
   glm: 'thirdPartyTemplateGlm',
+  siliconflow: 'thirdPartyTemplateSiliconflow',
+  groq: 'thirdPartyTemplateGroq',
+  together: 'thirdPartyTemplateTogether',
   nvidia: 'thirdPartyTemplateNvidia',
   minimax: 'thirdPartyTemplateMinimax',
   grok: 'thirdPartyTemplateGrok',
@@ -75,7 +78,10 @@ export const ThirdPartyAddConnectionDialog: React.FC<ThirdPartyAddConnectionDial
               />
               <span className="min-w-0">
                 <span className="block truncate">
-                  {t(TEMPLATE_LABEL_KEYS[templateId]) || THIRD_PARTY_TEMPLATE_LABELS[templateId]}
+                  {(() => {
+                    const labelKey = TEMPLATE_LABEL_KEYS[templateId];
+                    return labelKey ? t(labelKey) : THIRD_PARTY_TEMPLATE_LABELS[templateId];
+                  })()}
                 </span>
                 <span className="mt-0.5 block truncate font-mono text-[11px] text-[var(--theme-text-secondary)]">
                   {defaultUrl || t('thirdPartyTemplateSetUrlAfterAdd')}

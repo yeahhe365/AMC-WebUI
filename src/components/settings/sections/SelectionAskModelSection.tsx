@@ -4,6 +4,7 @@ import { useI18n } from '@/contexts/I18nContext';
 import type { AppSettings, ModelOption } from '@/types';
 import { ModelPicker } from '@/components/shared/ModelPicker';
 import { buildProviderAwareModelList } from '@/utils/thirdPartyApiProviders';
+import { getCachedModelCapabilities } from '@/stores/modelCapabilitiesStore';
 import { SETTINGS_SECTION_CARD_CLASS, SETTINGS_SECTION_LABEL_CLASS } from '@/constants/designTokens';
 import { FOCUS_VISIBLE_RING_BASE_CLASS } from '@/constants/focusClasses';
 
@@ -15,7 +16,19 @@ export const SelectionAskModelSection: React.FC<{
   availableModels: ModelOption[];
 }> = ({ settings, onUpdate, availableModels }) => {
   const { t } = useI18n();
-  const models = useMemo(() => buildProviderAwareModelList(settings, availableModels), [settings, availableModels]);
+  const models = useMemo(() => {
+    const list = buildProviderAwareModelList(settings, availableModels);
+    return list.filter((model) => {
+      const caps = getCachedModelCapabilities(model.id);
+      return (
+        !caps.isImageGenerationModel &&
+        !caps.isTtsModel &&
+        !caps.isTranscribeModel &&
+        !caps.isLiveTranscribe &&
+        !caps.isLiveTranslate
+      );
+    });
+  }, [settings, availableModels]);
   const selectedId = settings.selectionAskModelId;
   const selectionAskProviderId = settings.selectionAskProviderId;
   const selectedModel = selectedId

@@ -18,11 +18,14 @@ export const FileStrategyControl: React.FC<FileStrategyControlProps> = ({ settin
   };
 
   return (
-    <div className={SETTINGS_SECTION_CARD_CLASS} data-settings-item="api-files-strategy">
+    <div className={SETTINGS_SECTION_CARD_CLASS} data-settings-item="data-files-strategy">
       <div className="mb-3 flex items-start justify-between">
         <label className={`${SETTINGS_SECTION_LABEL_CLASS} flex items-center gap-2`}>
           <CloudUpload size={14} strokeWidth={1.5} />
-          {t('settingsFilesApiTitle')}
+          <span>{t('settingsFilesApiTitle')}</span>
+          <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-secondary)]">
+            Gemini
+          </span>
         </label>
         <Tooltip text={t('settingsFilesApiTooltip')}>
           <Info size={14} className="cursor-help text-[var(--theme-text-secondary)]" strokeWidth={1.5} />

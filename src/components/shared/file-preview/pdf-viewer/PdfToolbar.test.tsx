@@ -194,4 +194,40 @@ describe('PdfToolbar', () => {
       consoleError.mockRestore();
     }
   });
+
+  it('preserves the current page when zooming in and out', async () => {
+    await act(async () => {
+      renderer.root.render(<PdfToolbarHarness file={file} />);
+    });
+
+    const jumpButton = Array.from(renderer.container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Jump to page 4'),
+    );
+    await act(async () => {
+      jumpButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    let input = renderer.container.querySelector('input[aria-label="Page number"]') as HTMLInputElement | null;
+    expect(input?.value).toBe('4');
+
+    const zoomInButton = renderer.container.querySelector('button[title="Zoom In"]');
+    if (zoomInButton) {
+      await act(async () => {
+        zoomInButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+    }
+
+    input = renderer.container.querySelector('input[aria-label="Page number"]') as HTMLInputElement | null;
+    expect(input?.value).toBe('4');
+
+    const zoomOutButton = renderer.container.querySelector('button[title="Zoom Out"]');
+    if (zoomOutButton) {
+      await act(async () => {
+        zoomOutButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      });
+    }
+
+    input = renderer.container.querySelector('input[aria-label="Page number"]') as HTMLInputElement | null;
+    expect(input?.value).toBe('4');
+  });
 });

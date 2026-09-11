@@ -1,0 +1,38 @@
+---
+title: PWA & Desktop Experience
+description: Install AMC WebUI as a standalone desktop or mobile application with offline shell and Picture-in-Picture mode.
+---
+
+# PWA & Desktop Experience
+
+AMC WebUI features full **PWA (Progressive Web App)** support, allowing you to run it as a lightweight desktop application without browser clutter.
+
+---
+
+## Desktop Installation (macOS / Windows / Linux)
+
+### Chrome / Edge
+1. Navigate to AMC WebUI in your browser.
+2. Click the **Install App icon** on the right side of the address bar.
+3. Once installed, it launches in an independent window, accessible from your dock, taskbar, or desktop.
+
+### Mobile Installation (iOS Safari / Android Chrome)
+- **iOS Safari**: Tap "Share" -> "Add to Home Screen".
+- **Android Chrome**: Tap the menu -> "Add to Home Screen" or "Install App".
+
+---
+
+## Offline Shell & Caching Strategy
+
+Powered by an optimized Workbox Service Worker:
+- **Offline Shell**: HTML, CSS, JavaScript bundles, and UI icons are pre-cached for instant loading even without internet connectivity.
+- **Large Chunk Dynamic Loading**: Pyodide WASM runtime assets for local Python execution are excluded from precache to save initial bandwidth and downloaded only on demand.
+- **Network-First API Requests**: All live conversational and streaming requests bypass the service worker to ensure fresh responses.
+
+---
+
+## Picture-in-Picture (PiP) Window
+
+Multitask while coding, watching videos, or writing documentation:
+- Click the **PiP icon** on the header bar, or type `/pip` in the chat input.
+- A floating window appears, pinned on top of all application windows, maintaining continuous streaming model responses.

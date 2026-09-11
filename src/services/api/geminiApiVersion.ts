@@ -2,16 +2,11 @@ import type { HttpOptions, Part } from '@google/genai';
 
 export type GeminiClientHttpOptions = Pick<HttpOptions, 'apiVersion' | 'baseUrl' | 'headers' | 'timeout'>;
 
-const MEDIA_RESOLUTION_API_VERSION = 'v1alpha';
-
-const hasPerPartMediaResolution = (parts: Part[] = []): boolean =>
-  parts.some((part) => Boolean((part as Part & { mediaResolution?: unknown }).mediaResolution));
-
-export const getHttpOptionsForContents = (contents: Array<{ parts?: Part[] }>): GeminiClientHttpOptions | undefined => {
-  if (contents.some((content) => hasPerPartMediaResolution(content.parts))) {
-    return { apiVersion: MEDIA_RESOLUTION_API_VERSION };
-  }
-
+// Per-part media resolution is supported in the standard v1beta API version used
+// by the @google/genai SDK by default. No v1alpha override is needed.
+export const getHttpOptionsForContents = (
+  _contents: Array<{ parts?: Part[] }>,
+): GeminiClientHttpOptions | undefined => {
   return undefined;
 };
 

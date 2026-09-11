@@ -22,6 +22,18 @@ import {
   searchSessions,
   setAllSessions,
 } from './sessionRecords';
+import {
+  getStandaloneLibraryFiles,
+  saveStandaloneLibraryFiles,
+  addStandaloneLibraryFiles,
+  deleteStandaloneLibraryFiles,
+  renameStandaloneLibraryFile,
+  fetchLibraryFileBlob,
+  getAllHistoricalSessionFiles,
+  getDeletedLibraryFileIds,
+  addDeletedLibraryFileIds,
+} from './libraryRecords';
+import { deleteDraftFiles, getDraftFiles, saveDraftFiles } from './draftFileRecords';
 
 export type {
   ApiUsageExactPricing,
@@ -58,9 +70,23 @@ export const dbService = {
   clearLogs,
   pruneLogs,
 
+  getStandaloneLibraryFiles,
+  saveStandaloneLibraryFiles,
+  addStandaloneLibraryFiles,
+  deleteStandaloneLibraryFiles,
+  renameStandaloneLibraryFile,
+  fetchLibraryFileBlob,
+  getAllHistoricalSessionFiles,
+  getDeletedLibraryFileIds,
+  addDeletedLibraryFileIds,
+
   addApiUsageRecord,
   getApiUsageByTimeRange,
   clearApiUsage,
+
+  saveDraftFiles,
+  getDraftFiles,
+  deleteDraftFiles,
 
   estimateAppDataSize,
   clearAllData: () =>

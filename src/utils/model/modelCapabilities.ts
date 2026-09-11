@@ -19,6 +19,15 @@ export const isGeminiRoboticsModel = (modelId: string): boolean =>
   !!modelId && modelId.toLowerCase().includes('gemini-robotics-er');
 
 /**
+ * Gemini 3.5 Flash and later models support combining Grounding with Google Maps
+ * with other built-in tools like Grounding with Google Search.
+ */
+export const supportsSearchMapsCombination = (modelId?: string | null): boolean => {
+  if (!modelId) return false;
+  return isGemini3Model(modelId) || isGeminiRoboticsModel(modelId);
+};
+
+/**
  * gemini-3.7-flash and gemini-3.8-flash have thinking levels low/medium/high
  * — minimal is not supported and returns an error per their model cards.
  * 3.5/3.6 Flash and 3.5 Flash-Lite do accept MINIMAL.
@@ -37,6 +46,12 @@ export const isLiveTranscribeModel = (modelId: string): boolean =>
 
 export const isTranscribeModel = (modelId: string): boolean =>
   !!modelId && modelId.toLowerCase().includes('transcribe') && !modelId.toLowerCase().includes('transcribe-live');
+
+export const bansModelTurnPrefill = (modelId: string): boolean => {
+  if (!modelId) return false;
+  const lowerId = modelId.toLowerCase();
+  return /gemini-3\.[6-9]/.test(lowerId) || lowerId.includes('gemini-3.5-flash-lite') || /gemini-[4-9]/.test(lowerId);
+};
 
 const isNativeAudioModel = (modelId: string): boolean => {
   const lowerId = modelId.toLowerCase();
@@ -67,6 +82,72 @@ export const isOpenAIGpt5FamilyModel = (modelId: string): boolean => {
   return lowerId.startsWith('gpt-5') || lowerId.includes('/gpt-5');
 };
 
+export const isDeepSeekReasoningModel = (modelId: string): boolean => {
+  if (!modelId) return false;
+  const lowerId = modelId.toLowerCase();
+  return (
+    lowerId.includes('deepseek-r1') ||
+    lowerId.includes('deepseek-reasoner') ||
+    lowerId.includes('r1-distill') ||
+    lowerId.includes('r1-zero') ||
+    lowerId.includes('deepseek-v4') ||
+    lowerId.includes('deepseek/r1') ||
+    lowerId.includes('deepseek-ai/deepseek-r1')
+  );
+};
+
+export const isQwenReasoningModel = (modelId: string): boolean => {
+  if (!modelId) return false;
+  const lowerId = modelId.toLowerCase();
+  return (
+    lowerId.includes('qwq') ||
+    lowerId.includes('qvq') ||
+    (lowerId.includes('qwen') && (lowerId.includes('thinking') || lowerId.includes('reasoning')))
+  );
+};
+
+export const isOpenAIReasoningModel = (modelId: string): boolean => {
+  if (!modelId) return false;
+  const lowerId = modelId.toLowerCase();
+  if (
+    lowerId.startsWith('gpt-4') ||
+    lowerId.startsWith('gpt-3') ||
+    lowerId.includes('turbo') ||
+    lowerId.startsWith('o1') ||
+    lowerId.includes('/o1') ||
+    lowerId.startsWith('o3') ||
+    lowerId.includes('/o3')
+  ) {
+    return false;
+  }
+  return (
+    lowerId.startsWith('o4') ||
+    lowerId.includes('/o4') ||
+    lowerId.startsWith('gpt-5') ||
+    lowerId.includes('/gpt-5') ||
+    lowerId.startsWith('muse-') ||
+    lowerId.includes('muse-') ||
+    lowerId.includes('reasoner') ||
+    lowerId.includes('thinking') ||
+    isDeepSeekReasoningModel(modelId) ||
+    isQwenReasoningModel(modelId)
+  );
+};
+
+export const isReasoningModel = (modelId: string): boolean => {
+  if (!modelId) return false;
+  return (
+    isOpenAIReasoningModel(modelId) ||
+    isOpenAIGpt5FamilyModel(modelId) ||
+    isDeepSeekReasoningModel(modelId) ||
+    isQwenReasoningModel(modelId) ||
+    isGlmModel(modelId) ||
+    isKimiK3Model(modelId) ||
+    isAnthropicEffortModel(modelId) ||
+    isAnthropicThinkingModel(modelId)
+  );
+};
+
 export const isKimiK3Model = (modelId: string): boolean => {
   const lowerId = modelId.toLowerCase();
   return lowerId === 'kimi-k3' || lowerId.startsWith('kimi-k3-') || lowerId.includes('kimi-k3');
@@ -88,19 +169,34 @@ export const isAnthropicEffortModel = (modelId: string): boolean => {
   );
 };
 
+export const isAnthropicThinkingModel = (modelId: string): boolean => {
+  if (!modelId) return false;
+  const id = modelId.toLowerCase();
+  return isAnthropicEffortModel(id) || /claude-3-7|claude-3\.7/.test(id);
+};
+
 /** GLM-5 series models use the OpenAI-compatible thinking parameter. */
 export const isGlmModel = (modelId: string): boolean => modelId.toLowerCase().startsWith('glm-');
 
 const supportsThinkingLevel = (modelId: string): boolean => {
-  // GLM-5 series supports thinking via the OpenAI-compatible thinking parameter.
-  if (isGlmModel(modelId)) {
+  // GLM-5 series and specialized reasoning models support thinking.
+  if (isGlmModel(modelId) || isQwenReasoningModel(modelId) || isDeepSeekReasoningModel(modelId)) {
     return true;
   }
-  // Third-party reasoning controls mapped in openaiCompatibleMessages / anthropicMessages.
-  if (isOpenAIGpt5FamilyModel(modelId) || isKimiK3Model(modelId) || isAnthropicEffortModel(modelId)) {
+  // Third-party reasoning controls mapped in openaiCompatibleMessages / openaiResponsesMessages / anthropicMessages.
+  if (
+    isOpenAIReasoningModel(modelId) ||
+    isOpenAIGpt5FamilyModel(modelId) ||
+    isKimiK3Model(modelId) ||
+    isAnthropicEffortModel(modelId) ||
+    isAnthropicThinkingModel(modelId)
+  ) {
     return true;
   }
   if (isGemini31FlashImageModel(modelId)) {
+    return true;
+  }
+  if (isGemmaModel(modelId)) {
     return true;
   }
   return (
@@ -111,9 +207,15 @@ const supportsThinkingLevel = (modelId: string): boolean => {
   );
 };
 
-const isGemini3ImageModel = (modelId: string): boolean =>
-  normalizeModelId(modelId) === 'gemini-3-pro-image-preview' ||
-  normalizeModelId(modelId) === 'gemini-3.1-flash-image-preview';
+const isGemini3ImageModel = (modelId: string): boolean => {
+  const norm = normalizeModelId(modelId);
+  return (
+    norm === 'gemini-3-pro-image' ||
+    norm === 'gemini-3-pro-image-preview' ||
+    norm === 'gemini-3.1-flash-image' ||
+    norm === 'gemini-3.1-flash-image-preview'
+  );
+};
 
 export const isImageGenerationModel = (modelId: string): boolean => modelId.toLowerCase().includes('image');
 
@@ -152,6 +254,7 @@ export interface ModelCapabilities {
   isLiveTranslate: boolean;
   isLiveTranscribe: boolean;
   supportsBuiltInCustomToolCombination: boolean;
+  supportsSearchMapsCombination: boolean;
   permissions: ModelInteractionPermissions;
   supportedAspectRatios?: string[];
   supportedImageSizes?: string[];
@@ -260,6 +363,7 @@ export const getModelCapabilities = (modelId: string): ModelCapabilities => {
     isLiveTranslate: isLiveTranslateModel(modelId),
     isLiveTranscribe: isLiveTranscribeModel(modelId),
     supportsBuiltInCustomToolCombination: isGemini3,
+    supportsSearchMapsCombination: isGemini3 || roboticsModel,
     permissions,
     supportedAspectRatios,
     supportedImageSizes,
@@ -294,17 +398,35 @@ export const normalizeImageSizeForModel = (modelId: string, imageSize?: string):
   return supportedImageSizes[0];
 };
 
-export const getDefaultThinkingLevelForModel = (modelId: string, fallback: ThinkingLevel = 'HIGH'): ThinkingLevel => {
+const isGemini3ProTextModel = (modelId: string): boolean => {
+  const lowerId = modelId.toLowerCase();
+  return lowerId.includes('gemini-3.1-pro') || (lowerId.includes('gemini-3-pro') && !lowerId.includes('image'));
+};
+
+export const getDefaultThinkingLevelForModel = (modelId: string, fallback?: ThinkingLevel): ThinkingLevel => {
+  const lowerId = (modelId || '').toLowerCase();
   if (isGemini31FlashLiveModel(modelId) || isGemini31FlashImageModel(modelId)) {
     return 'MINIMAL';
   }
 
-  return fallback;
-};
+  if (fallback !== undefined) {
+    return fallback;
+  }
 
-const isGemini3ProTextModel = (modelId: string): boolean => {
-  const lowerId = modelId.toLowerCase();
-  return lowerId.includes('gemini-3.1-pro') || (lowerId.includes('gemini-3-pro') && !lowerId.includes('image'));
+  if (lowerId.includes('flash-lite') || isGemmaModel(modelId)) {
+    return 'MINIMAL';
+  }
+
+  if (
+    isGemini37Or38FlashModel(modelId) ||
+    lowerId.includes('gemini-3.5-flash') ||
+    lowerId.includes('gemini-3.6-flash') ||
+    isGeminiRoboticsModel(modelId)
+  ) {
+    return 'MEDIUM';
+  }
+
+  return 'HIGH';
 };
 
 export const normalizeThinkingLevelForModel = (
@@ -315,8 +437,28 @@ export const normalizeThinkingLevelForModel = (
   const resolvedLevel = thinkingLevel ?? fallback;
 
   // Both families reject MINIMAL with an API error per their model cards.
-  if (resolvedLevel === 'MINIMAL' && (isGemini3ProTextModel(modelId) || isGemini37Or38FlashModel(modelId))) {
+  if (
+    (resolvedLevel === 'MINIMAL' || resolvedLevel === 'NONE') &&
+    (isGemini3ProTextModel(modelId) || isGemini37Or38FlashModel(modelId))
+  ) {
     return 'LOW';
+  }
+
+  // Gemma and Flash Image only accept MINIMAL and HIGH in the Gemini API.
+  if (isGemmaModel(modelId) || isGemini31FlashImageModel(modelId)) {
+    if (resolvedLevel === 'NONE' || resolvedLevel === 'MINIMAL') {
+      return 'MINIMAL';
+    }
+    return 'HIGH';
+  }
+
+  if (isGemini3Model(modelId) || isGeminiRoboticsModel(modelId)) {
+    if (resolvedLevel === 'NONE') {
+      return 'MINIMAL';
+    }
+    if (resolvedLevel === 'XHIGH' || resolvedLevel === 'MAX') {
+      return 'HIGH';
+    }
   }
 
   return resolvedLevel;

@@ -1,7 +1,6 @@
 import React from 'react';
 import { useI18n } from '@/contexts/I18nContext';
 import { ChevronDown } from 'lucide-react';
-import { GoogleSpinner } from '@/components/icons/GoogleSpinner';
 import { ThinkingTimer } from '@/components/message/ThinkingTimer';
 import { formatDuration } from '@/utils/durationFormat';
 import { interpolate } from '@/i18n/interpolate';
@@ -32,12 +31,6 @@ export const ThinkingHeader: React.FC<ThinkingHeaderProps> = ({
 
   return (
     <div className="flex items-center gap-2 min-w-0 overflow-hidden flex-grow">
-      {isLoading && (
-        <div className="flex items-center justify-center flex-shrink-0">
-          <GoogleSpinner size={14} />
-        </div>
-      )}
-
       <div className="flex items-center gap-2 min-w-0">
         <div className="flex flex-col min-w-0 justify-center min-h-[1.75rem] sm:min-h-[2rem]">
           {hasSettledThinking ? (

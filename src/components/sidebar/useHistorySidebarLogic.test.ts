@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { SavedChatSession } from '@/types';
 import { createChatSettings } from '@/test/data/factories';
 import { renderHook } from '@/test/render/renderer';
@@ -58,6 +58,44 @@ describe('categorizeSessionsByDate', () => {
 
     expect(categoryOrder).toEqual(['Previous 30 Days']);
     expect(categories['Previous 30 Days'].map((session) => session.id)).toEqual(['older']);
+    unmount();
+  });
+});
+
+describe('handleRegenerateTitle', () => {
+  it('delegates to onRegenerateTitleSession prop when provided', async () => {
+    const customRegen = vi.fn();
+    const { result, unmount } = renderHook(() =>
+      useHistorySidebarLogic({
+        isOpen: true,
+        onToggle: () => {},
+        onAutoClose: () => {},
+        sessions: [createSession('s1', 0)],
+        groups: [],
+        generatingTitleSessionIds: new Set(),
+        onRenameSession: () => {},
+        onRenameGroup: () => {},
+        onMoveSessionToGroup: () => {},
+        onSelectSession: () => {},
+        onRegenerateTitleSession: customRegen,
+      }),
+    );
+
+    await result.current.handleRegenerateTitle('s1');
+    expect(customRegen).toHaveBeenCalledWith('s1');
+    unmount();
+  });
+
+  it('shows toast when session has no completed exchanges', async () => {
+    const { useToastStore } = await import('@/stores/toastStore');
+    useToastStore.setState({ toasts: [] });
+
+    const { result, unmount } = renderHistoryLogic([createSession('empty-sess', 0)]);
+    await result.current.handleRegenerateTitle('empty-sess');
+
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts.length).toBeGreaterThan(0);
+    expect(toasts[0].type).toBe('info');
     unmount();
   });
 });

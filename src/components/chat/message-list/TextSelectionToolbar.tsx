@@ -7,7 +7,8 @@ import { useSelectionPosition } from '@/hooks/text-selection/useSelectionPositio
 import { useSelectionDrag } from '@/hooks/text-selection/useSelectionDrag';
 import { useSelectionAudio } from '@/hooks/text-selection/useSelectionAudio';
 import type { QuickTtsResult } from '@/hooks/chat/message/useTextToSpeechHandler';
-import { writeSelectionTextToClipboard } from '@/utils/text-selection/selectionClipboard';
+import { copyTextToClipboard } from '@/utils/clipboard';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 import { ToolbarContainer } from './text-selection/ToolbarContainer';
 import { AudioPlayerView } from './text-selection/AudioPlayerView';
@@ -106,7 +107,7 @@ export const TextSelectionToolbar: React.FC<TextSelectionToolbarProps> = ({
   const handleCopyClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (await writeSelectionTextToClipboard(selectedCopyText || selectedText)) {
+    if (await copyTextToClipboard(selectedCopyText || selectedText)) {
       showCopiedFeedback();
       if (copyClearTimeoutRef.current) {
         window.clearTimeout(copyClearTimeoutRef.current);
@@ -156,7 +157,7 @@ export const TextSelectionToolbar: React.FC<TextSelectionToolbarProps> = ({
     } catch (ttsError) {
       ttsInFlightRef.current = false;
       logService.error('TTS Failed:', ttsError);
-      audioState.fail(ttsError instanceof Error ? ttsError.message : 'TTS generation failed.');
+      audioState.fail(getErrorMessage(ttsError, 'TTS generation failed.'));
     } finally {
       audioState.setIsLoading(false);
     }

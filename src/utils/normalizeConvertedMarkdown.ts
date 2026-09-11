@@ -7,4 +7,6 @@
 export const normalizeConvertedMarkdown = (markdown: string): string =>
   markdown
     .replace(/!\\?\[([^\]]*?)\\?\]\s+\(/g, '![$1](')
-    .replace(/\\?\[!\\?\[([^\]]*?)\\?\]\(([^)]+)\)[\s\S]{0,200}?\\?\]\((https?:[^)]+)\)/g, '![$1]($2)');
+    .replace(/\\?\[!\\?\[([^\]]*?)\\?\]\(([^)]+)\)[\s\S]{0,200}?\\?\]\((https?:[^)]+)\)/g, '![$1]($2)')
+    .replace(/^([ \t]*)[•·●○▪][ \t]+/gm, '$1- ')
+    .replace(/^[—–]{3,}$/gm, '---');

@@ -1,0 +1,139 @@
+---
+title: AMC WebUI
+description: All-in-one Model Console WebUI featuring native Google Gemini capabilities and OpenAI-compatible endpoints.
+template: splash
+hero:
+  title: AMC WebUI
+  tagline: Advanced model console engineered for deep workflows · Native Google Gemini reasoning, real-time Live API, and OpenAI-compatible ecosystem.
+  actions:
+    - text: Get Started
+      link: /en/getting-started/introduction/
+      icon: right-arrow
+      variant: primary
+    - text: Live Demo
+      link: https://all-model-chat.pages.dev/
+      icon: external
+      variant: secondary
+    - text: GitHub
+      link: https://github.com/yeahhe365/AMC-WebUI
+      icon: github
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+<div class="preview-container">
+
+![AMC WebUI Console Interface Preview](../../../assets/app-preview.png)
+
+</div>
+
+## Core Capabilities
+
+<CardGrid stagger>
+  <Card title="Deep Reasoning (Thinking)" icon="open-book">
+    Visualized chain-of-thought for Gemini 3.x models, custom token budgets, and real-time thought translation. [Explore
+    Thinking Mode & Translation →](/en/models/thinking/)
+  </Card>
+  <Card title="Real-time Audio & Video (Live API)" icon="laptop">
+    Bidirectional streaming voice calls, screen sharing, camera vision input, and AudioWorklet visualization. [Learn
+    about Live API Voice & Vision →](/en/models/live-api/)
+  </Card>
+  <Card title="Live Artifacts" icon="puzzle">
+    Automatic sandbox rendering of interactive HTML/SVG with Apache ECharts, Mermaid flowcharts, and Graphviz. [Explore
+    Chart Sandbox & Visualizations →](/en/tools/live-artifacts/)
+  </Card>
+  <Card title="Local Python Sandbox (Pyodide)" icon="setting">
+    Browser-side WASM environment with numpy/pandas preloaded, dynamic package installation, and plot capture. [Discover
+    WASM Python with Pyodide →](/en/tools/code-and-sandbox/)
+  </Card>
+  <Card title="Model Context Protocol (MCP)" icon="add-document">
+    Full MCP client supporting local stdio and remote SSE/Stream servers with human-in-the-loop tool approvals. [Connect
+    Stdio & SSE MCP Servers →](/en/tools/mcp/)
+  </Card>
+  <Card title="Local-First Architecture" icon="bars">
+    IndexedDB persistence with Web Locks API concurrency control; Gemini and OpenAI settings strictly isolated. [Read
+    Local Storage & Security Specs →](/en/deployment/architecture/)
+  </Card>
+</CardGrid>
+
+---
+
+## Explore by Needs
+
+Find documentation, guides, and best practices tailored to your workflow:
+
+### Getting Started
+
+<CardGrid>
+  <LinkCard
+    title="Quickstart Guide"
+    description="Get started in 3 simple steps — choose between cloud-hosted and local deployment."
+    href="/en/getting-started/quickstart/"
+  />
+  <LinkCard
+    title="Provider & API Setup"
+    description="BYOK architecture guide: configure Gemini Native and OpenAI-compatible dual routes."
+    href="/en/getting-started/api-configuration/"
+  />
+  <LinkCard
+    title="PWA & Desktop Experience"
+    description="Install AMC WebUI as a borderless native app on macOS, Windows, Linux, and mobile."
+    href="/en/getting-started/pwa/"
+  />
+  <LinkCard
+    title="Built-in Model Matrix"
+    description="Compare Gemini 3.x and embodied model capabilities, context windows, and recommended use cases."
+    href="/en/models/model-matrix/"
+  />
+</CardGrid>
+
+### Productivity & Tools
+
+<CardGrid>
+  <LinkCard
+    title="Search & Maps Grounding"
+    description="Verified live Google Search and interactive Maps widgets with citations to eliminate hallucination."
+    href="/en/tools/web-search-maps/"
+  />
+  <LinkCard
+    title="Advanced Multimodal & Media Seek"
+    description="Instant PDF page jump, bounding box coordinates, video timestamp seeking, and audio optimization."
+    href="/en/tools/files-multimodal/"
+  />
+  <LinkCard
+    title="Slash Commands Reference"
+    description="Fast commands: /model, /fast, /retry, and all 17 interactive slash commands."
+    href="/en/power-user/slash-commands/"
+  />
+  <LinkCard
+    title="Shortcuts & Gestures"
+    description="Command Palette, Tab model cycling, Selection Ask, and Picture-in-Picture keybindings."
+    href="/en/power-user/shortcuts/"
+  />
+</CardGrid>
+
+### Deployment & Operations
+
+<CardGrid>
+  <LinkCard
+    title="Docker Compose Deployment"
+    description="One-command dual container stack (Web UI + Node API) with proxy and intranet support."
+    href="/en/deployment/docker/"
+  />
+  <LinkCard
+    title="Static Hosting + Standalone API"
+    description="Deploy frontend on Cloudflare Pages / Vercel with a secured backend proxy."
+    href="/en/deployment/static-and-api/"
+  />
+  <LinkCard
+    title="Environment & Security Boundaries"
+    description="Production security checklists, API key isolation, and rate limiting guidelines."
+    href="/en/deployment/environment-variables/"
+  />
+  <LinkCard
+    title="Storage Maintenance & Reset"
+    description="IndexedDB quota management, JSON conversation backup, and migration procedures."
+    href="/en/faq/storage-and-reset/"
+  />
+</CardGrid>

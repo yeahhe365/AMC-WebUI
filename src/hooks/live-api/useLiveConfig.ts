@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { type ChatSettings, type LiveClientFunctions, type ThinkingLevel } from '@/types';
 import type { Tool } from '@google/genai';
 import { LOCAL_PYTHON_SYSTEM_PROMPT } from '@/features/prompts/localPython';
+import { stripLegacyFeatureMarkers } from '@/features/prompts/promptCompositor';
 import { getCachedModelCapabilities } from '@/stores/modelCapabilitiesStore';
 import { buildLiveTranslateConfig } from './useLiveTranslateConfig';
 
@@ -100,11 +101,12 @@ export const useLiveConfig = ({
     }
 
     const hasLocalPythonTool = functionDeclarations.some((declaration) => declaration.name === 'run_local_python');
+    const cleanUserInstruction = stripLegacyFeatureMarkers(chatSettings.systemInstruction);
     const effectiveSystemInstruction = hasLocalPythonTool
-      ? chatSettings.systemInstruction
-        ? `${chatSettings.systemInstruction}\n\n${LOCAL_PYTHON_SYSTEM_PROMPT}`
+      ? cleanUserInstruction
+        ? `${cleanUserInstruction}\n\n${LOCAL_PYTHON_SYSTEM_PROMPT}`
         : LOCAL_PYTHON_SYSTEM_PROMPT
-      : chatSettings.systemInstruction;
+      : cleanUserInstruction || undefined;
 
     const liveConfig: LiveConfig = {
       responseModalities: ['AUDIO'],

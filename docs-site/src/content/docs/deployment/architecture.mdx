@@ -1,0 +1,50 @@
+---
+title: 架构原理与 Local-First (Architecture & Local-First)
+description: AMC WebUI 前端 React SPA、IndexedDB 存储层、Web Locks 并发锁与 Node 后端职责划分。
+---
+
+# 架构原理与 Local-First
+
+理解 AMC WebUI 的整体技术架构与数据流向，有助于进行深度的企业级部署与二次开发。
+
+---
+
+## 整体架构分层
+
+```text
+┌──────────────────────────────────────────────────────────┐
+│                    用户浏览器 (Browser Context)          │
+│  ┌─────────────────────────┐  ┌───────────────────────┐  │
+│  │   React 18 前端 SPA     │  │  IndexedDB 持久化层   │  │
+│  │  Zustand 状态 / UI 组件 │  │ (Web Locks 跨标签写锁)│  │
+│  └───────────┬─────────────┘  └───────────┬───────────┘  │
+│              │ (BYOK 直连 或 代理转发)    │              │
+└──────────────┼────────────────────────────┼──────────────┘
+               │                            │
+   ┌───────────▼────────────────────────────▼───────────┐
+   │         【可选】独立 Node API 服务 (Docker / VM)      │
+   │  • /api/gemini/*    -> 统一代理与服务端密钥兜底   │
+   │  • /api/openai/*    -> 第三方服务商安全路由转发   │
+   │  • /api/live (WS)   -> Live 双向 WebSocket 全代理 │
+   │  • /api/mcp/*       -> MCP 协议全桥接 (stdio/SSE) │
+   └───────────┬────────────────────────────────────────┘
+               │
+   ┌───────────▼────────────────────────────────────────┐
+   │             云端上游服务提供商 (Cloud Upstreams)   │
+   │  • Google Gemini 官方 API (HTTP / WSS)             │
+   │  • OpenAI / DeepSeek / OpenRouter 等第三方服务商   │
+   └────────────────────────────────────────────────────┘
+```
+
+---
+
+## 核心设计要点
+
+### 1. IndexedDB + Web Locks 跨标签写锁
+为了在支持同时开启多个浏览器标签页的同时避免数据覆写，AMC WebUI 通过 `navigator.locks.request` 为数据库写操作加排他锁，并利用 `BroadcastChannel` 实时跨标签页广播会话变更事件，达成类似协同编辑的数据一致性。
+
+### 2. Node API 服务的定位与边界
+Node API 服务（`server/` 源码）是专为**可信自托管环境 (Trusted Self-Hosted)** 设计的轻量级辅助网关：
+- 默认遵循 **BYOK 优先**：如果浏览器请求携带了用户自备的 API Key，Node 服务仅负责透传网络，绝不强制覆盖。
+- 当浏览器未携带 Key 时，才回落至服务端配置的 `GEMINI_API_KEY`。
+- 如果打算对公网无限制开放，建议在外部结合 Cloudflare Access、Authelia 或 Nginx 补充鉴权与审计流控。

@@ -118,7 +118,7 @@ describe('TableBlock', () => {
     expect(actionBar?.className).not.toContain('sm:opacity-0');
   });
 
-  it('exports Excel using the safe HTML workbook fallback without loading xlsx', async () => {
+  it('exports genuine .xlsx workbook when clicking export to Excel', async () => {
     const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:table-export');
 
     await act(async () => {
@@ -150,15 +150,88 @@ describe('TableBlock', () => {
 
     await act(async () => {
       excelButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await flushPromises();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await flushPromises();
     });
 
-    expect(createObjectUrl).toHaveBeenCalledWith(expect.objectContaining({ type: 'application/vnd.ms-excel' }));
+    expect(createObjectUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    );
     expect(triggerDownloadMock).toHaveBeenCalledWith(
       'blob:table-export',
-      expect.stringMatching(/^table-export-\d+\.xls$/),
+      expect.stringMatching(/^table-export-\d+\.xlsx$/),
     );
 
     createObjectUrl.mockRestore();
+  });
+
+  it('copies dual-channel rich text (html and plainText) when ClipboardItem is available', async () => {
+    const writeMock = vi.fn().mockResolvedValue(undefined);
+    const originalClipboard = navigator.clipboard;
+    const originalClipboardItem = globalThis.ClipboardItem;
+
+    try {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { write: writeMock },
+      });
+
+      class MockClipboardItem {
+        items: Record<string, Blob>;
+        constructor(items: Record<string, Blob>) {
+          this.items = items;
+        }
+      }
+      // @ts-expect-error mock ClipboardItem
+      globalThis.ClipboardItem = MockClipboardItem;
+
+      await act(async () => {
+        renderer.root.render(
+          <WindowProvider window={window} document={document}>
+            <TableBlock>
+              <thead>
+                <tr>
+                  <th>Col A</th>
+                  <th>Col B</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>1</td>
+                  <td>2</td>
+                </tr>
+              </tbody>
+            </TableBlock>
+          </WindowProvider>,
+        );
+      });
+
+      const copyButton = renderer.container.querySelector('button[aria-label="Copy table as markdown"]');
+
+      await act(async () => {
+        copyButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        await flushPromises();
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        await flushPromises();
+      });
+
+      expect(writeMock).toHaveBeenCalledTimes(1);
+      const passedItem = writeMock.mock.calls[0][0][0] as MockClipboardItem;
+      expect(passedItem.items['text/plain']).toBeDefined();
+      expect(passedItem.items['text/html']).toBeDefined();
+    } finally {
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: originalClipboard,
+      });
+      if (originalClipboardItem) {
+        globalThis.ClipboardItem = originalClipboardItem;
+      } else {
+        // @ts-expect-error cleanup mock
+        delete globalThis.ClipboardItem;
+      }
+    }
   });
 
   it('renders fullscreen tables above modal chrome with contained overlay scrolling', () => {

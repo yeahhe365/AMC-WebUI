@@ -7,7 +7,7 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { getManualChunk, HEAVY_PRELOAD_PATTERNS } from './vite/chunks';
 import { createDisabledMermaidDiagramPlugin } from './vite/disabledMermaidDiagramsPlugin';
 import { createLocalApiPlugin } from './vite/localApiPlugin';
-import { LAMEJS_WORKER_COPY_SOURCE, PDF_WORKER_COPY_SOURCE } from './vite/staticAssets';
+import { ECHARTS_COPY_SOURCE, LAMEJS_WORKER_COPY_SOURCE, PDF_WORKER_COPY_SOURCE } from './vite/staticAssets';
 
 export default defineConfig(async ({ mode }) => {
   const analyzerPlugin =
@@ -80,6 +80,10 @@ export default defineConfig(async ({ mode }) => {
             src: LAMEJS_WORKER_COPY_SOURCE,
             dest: '.',
           },
+          {
+            src: ECHARTS_COPY_SOURCE,
+            dest: 'vendor',
+          },
         ],
       }),
       ...analyzerPlugin,
@@ -87,6 +91,7 @@ export default defineConfig(async ({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve('./src'),
+        '@panzoom/panzoom': path.resolve('./node_modules/@panzoom/panzoom/dist/panzoom.es.js'),
       },
     },
     build: {

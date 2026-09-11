@@ -50,7 +50,6 @@ export const ScenarioList: React.FC<ScenarioListProps> = ({
   const setOwnerScope = useScenarioUiStore((state) => state.setOwnerScope);
   const activeCategory = useScenarioUiStore((state) => state.activeCategory);
   const setActiveCategory = useScenarioUiStore((state) => state.setActiveCategory);
-  const scrollPositions = useScenarioUiStore((state) => state.scrollPositions);
   const setScrollPosition = useScenarioUiStore((state) => state.setScrollPosition);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -59,7 +58,7 @@ export const ScenarioList: React.FC<ScenarioListProps> = ({
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const savedScrollTop = scrollPositions[ownerScope] ?? 0;
+    const savedScrollTop = useScenarioUiStore.getState().scrollPositions[ownerScope] ?? 0;
     const rafId = requestAnimationFrame(() => {
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = savedScrollTop;

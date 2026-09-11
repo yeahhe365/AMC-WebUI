@@ -4,17 +4,14 @@ import {
   type AppSettings,
   type ChatMessage,
   type ChatSettings as IndividualChatSettings,
-  type SavedChatSession,
   type UploadedFile,
   type ImageOutputMode,
+  type SessionsUpdater,
 } from '@/types';
 import type { Part, UsageMetadata } from '@google/genai';
 import type { getTranslator } from '@/i18n/translations';
 
-export type SessionsUpdater = (
-  updater: (prev: SavedChatSession[]) => SavedChatSession[],
-  options?: { persist?: boolean },
-) => void;
+export type { SessionsUpdater };
 
 export type MessageSenderTranslator = ReturnType<typeof getTranslator>;
 

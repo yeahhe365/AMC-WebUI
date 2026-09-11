@@ -477,4 +477,56 @@ describe('useHtmlPreviewModal', () => {
 
     unmount();
   });
+
+  it('manages viewMode and deviceMode and captures diagnostics', async () => {
+    const iframe = document.createElement('iframe');
+    const contentWindowStub = {} as Window;
+    Object.defineProperty(iframe, 'contentWindow', {
+      value: contentWindowStub,
+      configurable: true,
+    });
+    const iframeRef = { current: iframe } as RefObject<HTMLIFrameElement>;
+
+    const { result, unmount } = renderHook(
+      () =>
+        useHtmlPreviewModal({
+          isOpen: true,
+          onClose: vi.fn(),
+          htmlContent: '<html><body>Test</body></html>',
+          iframeRef,
+        }),
+      { attachToDocument: true, wrapper: HtmlPreviewWrapper },
+    );
+
+    expect(result.current.viewMode).toBe('preview');
+    expect(result.current.deviceMode).toBe('desktop');
+    expect(result.current.diagnostics).toEqual([]);
+
+    act(() => {
+      result.current.setViewMode('code');
+      result.current.setDeviceMode('mobile');
+    });
+
+    expect(result.current.viewMode).toBe('code');
+    expect(result.current.deviceMode).toBe('mobile');
+
+    await act(async () => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: {
+            channel: HTML_PREVIEW_MESSAGE_CHANNEL,
+            event: 'diagnostic',
+            payload: { type: 'runtime-error', message: 'Test error', line: 10 },
+          },
+          origin: 'null',
+          source: contentWindowStub,
+        }),
+      );
+    });
+
+    expect(result.current.diagnostics).toHaveLength(1);
+    expect(result.current.diagnostics[0].message).toBe('Test error');
+
+    unmount();
+  });
 });

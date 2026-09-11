@@ -1,0 +1,34 @@
+---
+title: Model Matrix
+description: Comprehensive overview of native Google Gemini models, context window specifications, and recommended use cases in AMC WebUI.
+---
+
+import { ModelBadgeList } from '@/components/ModelBadgeList';
+
+# Built-in Model Matrix
+
+AMC WebUI natively supports Google's latest Gemini 3.x series, embodied robotics models, and dedicated multimodal endpoints.
+
+<ModelBadgeList client:visible locale="en" />
+
+---
+
+## Model Selection Guidelines
+
+### 1. Primary Workhorse: `gemini-3.8-flash`
+- **Role**: Default recommended model for daily programming, writing, tool invocation, and long-context processing.
+- **Highlights**: Extremely low latency, full Thinking levels (Low / Medium / High), multimodal file analysis, and Live Artifacts generation.
+
+### 2. Ultra-fast & Lightweight: `gemini-3.5-flash-lite`
+- **Role**: High-throughput micro-queries, rapid classifications, and the dedicated background engine for **real-time chain-of-thought translation**.
+- **Highlights**: Minimal token cost and latency with support for the `Minimal` thinking level.
+
+### 3. Advanced Reasoning: `gemini-3.1-pro-preview`
+- **Role**: Complex mathematical reasoning, academic research, and massive cross-repository codebase refactoring.
+- **Highlights**: 1M token context window and up to 32,768 thinking token budget.
+
+### 4. Embodied & Spatial Intelligence: `gemini-robotics-er-2-preview`
+- **Role**: Spatial geometry, 3D spatial relationship deduction, and robotic task planning.
+- **Key Requirement**:
+  - Google requires the calling API Key to have **API Restrictions applied in [Google AI Studio](https://aistudio.google.com/api-keys)**. Unrestricted keys will be rejected with `403 Forbidden`.
+  - Recommended `Thinking Level: Medium` to balance spatial calculation accuracy with latency.

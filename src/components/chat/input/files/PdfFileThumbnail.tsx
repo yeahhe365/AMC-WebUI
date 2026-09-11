@@ -1,31 +1,46 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Document, Page } from 'react-pdf';
-import type { UploadedFile } from '@/types';
 import { ensurePdfWorkerConfigured } from '@/utils/pdfRuntime';
-import { readPdfThumbnailCache, writePdfThumbnailCache } from './pdfThumbnailCache';
-
-const getPdfThumbnailCacheKey = (file: UploadedFile) =>
-  file.dataUrl ?? file.fileApiName ?? `${file.name}:${file.size}:${file.type}`;
+import {
+  readPdfThumbnailCache,
+  writePdfThumbnailCache,
+  getPdfThumbnailCacheKey,
+  type PdfThumbnailTargetFile,
+} from './pdfThumbnailCache';
 
 interface PdfFileThumbnailProps {
-  file: UploadedFile;
+  file: PdfThumbnailTargetFile;
   fallback: React.ReactNode;
+  width?: number;
+  className?: string;
 }
 
-export const PdfFileThumbnail: React.FC<PdfFileThumbnailProps> = ({ file, fallback }) => {
+export const PdfFileThumbnail: React.FC<PdfFileThumbnailProps> = ({ file, fallback, width, className }) => {
   ensurePdfWorkerConfigured();
 
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const cacheKey = useMemo(() => getPdfThumbnailCacheKey(file), [file]);
+  const cacheKey = useMemo(() => getPdfThumbnailCacheKey(file, width), [file, width]);
   const [cachedImageUrl, setCachedImageUrl] = useState(() => readPdfThumbnailCache(cacheKey) ?? null);
   const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setCachedImageUrl(readPdfThumbnailCache(cacheKey) ?? null);
+    setHasError(false);
+  }, [cacheKey]);
 
   if (!file.dataUrl || hasError) {
     return <>{fallback}</>;
   }
 
+  const objectFitClass = className?.match(/\bobject-(contain|cover|fill|none|scale-down)\b/)?.[0] ?? 'object-cover';
+  const cleanedClassName = className
+    ? className.replace(/\bobject-(contain|cover|fill|none|scale-down)\b/g, '').trim()
+    : '';
+
   if (cachedImageUrl) {
-    return <img src={cachedImageUrl} alt={file.name} className="h-full w-full object-cover" />;
+    return (
+      <img src={cachedImageUrl} alt={file.name} className={`h-full w-full ${objectFitClass} ${cleanedClassName}`} />
+    );
   }
 
   const handleRenderSuccess = () => {
@@ -44,7 +59,7 @@ export const PdfFileThumbnail: React.FC<PdfFileThumbnailProps> = ({ file, fallba
   };
 
   return (
-    <div ref={containerRef} className="h-full w-full overflow-hidden bg-white">
+    <div ref={containerRef} className={`h-full w-full overflow-hidden bg-white ${cleanedClassName}`}>
       <Document
         file={file.dataUrl}
         loading={fallback}
@@ -54,7 +69,7 @@ export const PdfFileThumbnail: React.FC<PdfFileThumbnailProps> = ({ file, fallba
       >
         <Page
           pageNumber={1}
-          width={92}
+          width={width ?? 92}
           renderAnnotationLayer={false}
           renderTextLayer={false}
           loading={fallback}

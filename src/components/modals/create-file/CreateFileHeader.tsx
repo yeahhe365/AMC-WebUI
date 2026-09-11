@@ -1,6 +1,6 @@
 import React from 'react';
 import { useI18n } from '@/contexts/I18nContext';
-import { FileText, Download, Loader2, Edit3, Eye, X, ChevronDown } from 'lucide-react';
+import { FileText, Download, Loader2, Edit3, Eye, X, ChevronDown, Sparkles } from 'lucide-react';
 import { CREATE_FILE_EXTENSION_OPTIONS } from './createFileExtensionOptions';
 
 interface CreateFileHeaderProps {
@@ -20,6 +20,9 @@ interface CreateFileHeaderProps {
   extension: string;
   setExtension: (ext: string) => void;
   onSaveKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
+  canGenerateAiFilename?: boolean;
+  isGeneratingAiFilename?: boolean;
+  handleGenerateAiFilename?: () => void;
 }
 
 export const CreateFileHeader: React.FC<CreateFileHeaderProps> = ({
@@ -39,6 +42,9 @@ export const CreateFileHeader: React.FC<CreateFileHeaderProps> = ({
   extension,
   setExtension,
   onSaveKeyDown,
+  canGenerateAiFilename = false,
+  isGeneratingAiFilename = false,
+  handleGenerateAiFilename,
 }) => {
   const { t } = useI18n();
   return (
@@ -100,6 +106,24 @@ export const CreateFileHeader: React.FC<CreateFileHeaderProps> = ({
           aria-label={t('createTextFilenamePlaceholder')}
           autoComplete="off"
         />
+
+        <button
+          type="button"
+          onClick={handleGenerateAiFilename}
+          disabled={isGeneratingAiFilename || !canGenerateAiFilename}
+          className="flex-shrink-0 flex items-center justify-center h-9 px-2.5 sm:px-3 rounded-lg text-xs font-medium transition-colors bg-[var(--theme-bg-input)] text-[var(--theme-text-primary)] border border-[var(--theme-border-secondary)] hover:bg-[var(--theme-bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed gap-1.5"
+          title={isGeneratingAiFilename ? t('createTextAiNaming') : t('createTextAiNameButton')}
+          aria-label={t('createTextAiNameButton')}
+        >
+          {isGeneratingAiFilename ? (
+            <Loader2 size={15} className="animate-spin text-blue-600 dark:text-blue-400 flex-shrink-0" />
+          ) : (
+            <Sparkles size={15} className="text-blue-600 dark:text-blue-400 flex-shrink-0" />
+          )}
+          <span className="hidden sm:inline">
+            {isGeneratingAiFilename ? t('createTextAiNaming') : t('createTextAiNameButton')}
+          </span>
+        </button>
 
         <div className="relative flex-shrink-0">
           <select

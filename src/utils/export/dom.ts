@@ -2,6 +2,7 @@ import { logService } from '@/services/logService';
 import { sanitizeCssColorFunctionsForPngExport } from './cssColorSanitizer';
 import { isDarkThemeId } from '@/utils/themeMode';
 import { createStaticPreviewSnapshotContainer } from '@/utils/html-preview/previewDocument';
+import { blobToDataUrl } from '@/utils/file/fileEncoding';
 
 const DEFAULT_EXPORT_WIDTH = '800px';
 
@@ -84,19 +85,9 @@ const embedImagesInClone = async (clone: HTMLElement): Promise<void> => {
 
         const response = await fetch(img.src);
         const blob = await response.blob();
-        const reader = new FileReader();
-        await new Promise<void>((resolve) => {
-          reader.onloadend = () => {
-            if (typeof reader.result === 'string') {
-              img.src = reader.result;
-              img.removeAttribute('srcset');
-              img.removeAttribute('loading');
-            }
-            resolve();
-          };
-          reader.onerror = () => resolve();
-          reader.readAsDataURL(blob);
-        });
+        img.src = await blobToDataUrl(blob);
+        img.removeAttribute('srcset');
+        img.removeAttribute('loading');
       } catch (embedError) {
         logService.warn('Failed to embed image for export:', embedError);
       }
@@ -107,12 +98,12 @@ const embedImagesInClone = async (clone: HTMLElement): Promise<void> => {
 /**
  * Replaces sandboxed Live Artifact iframes with same-origin static snapshots.
  *
- * `cloneNode(true)` copies the `<iframe>` tag but not its rendered document, and
- * html2canvas cannot render cross-origin/sandboxed iframe content — so the
- * artifact would export as a blank box. Instead, we read the inert source HTML
- * stashed on the frame by `ArtifactFrame` and rebuild it as a same-origin
- * container via `createStaticPreviewSnapshotContainer`, preserving the measured
- * viewport height so the exported layout matches the on-screen bubble.
+ * Sandboxed iframes cannot load external vendor scripts (/vendor/echarts.min.js)
+ * or receive parent window Graphviz postMessage relays when exported as standalone
+ * HTML documents. In addition, html2canvas cannot render sandboxed iframe contents
+ * for PNG export. We replace each frame with a same-origin static preview container
+ * via `createStaticPreviewSnapshotContainer`, compiling ECharts and Graphviz diagrams
+ * into self-contained inline vector SVGs.
  */
 const replaceLiveArtifactIframes = async (
   clone: HTMLElement,
@@ -124,13 +115,10 @@ const replaceLiveArtifactIframes = async (
     const html = frame.getAttribute('data-artifact-source') ?? '';
     if (!html.trim()) continue;
 
-    const viewport = frame.querySelector<HTMLElement>('[data-live-artifact-viewport="true"]');
-    const measuredHeight = viewport?.style.height ?? null;
-
     const { container } = await createStaticPreviewSnapshotContainer(html, targetDocument, { themeId });
 
-    // The snapshot container is positioned off-screen by default; reset it so it
-    // flows inline within the exported transcript instead of being hidden.
+    // The snapshot container is positioned off-screen with white background by default;
+    // reset it so it flows inline within the exported transcript with theme transparency.
     Object.assign(container.style, {
       position: 'static',
       transform: 'none',
@@ -140,10 +128,10 @@ const replaceLiveArtifactIframes = async (
       maxWidth: '100%',
       pointerEvents: 'auto',
       zIndex: 'auto',
+      background: 'transparent',
+      overflow: 'visible',
+      height: 'auto',
     });
-    if (measuredHeight) {
-      container.style.height = measuredHeight;
-    }
 
     frame.replaceWith(container);
   }
@@ -259,7 +247,7 @@ export const prepareElementForExport = async (
   sourceElement: HTMLElement,
   options: { expandDetails?: boolean; forPng?: boolean; themeId?: string } = {},
 ): Promise<HTMLElement> => {
-  const { expandDetails = true, forPng = false, themeId } = options;
+  const { expandDetails = true, themeId } = options;
 
   const clone = sourceElement.cloneNode(true) as HTMLElement;
 
@@ -353,11 +341,10 @@ export const prepareElementForExport = async (
     });
   }
 
-  // Replace sandboxed artifact iframes with same-origin static snapshots for PNG export.
-  // HTML export preserves the iframe srcdoc so the artifact remains runnable when reopened.
-  if (forPng) {
-    await replaceLiveArtifactIframes(clone, sourceElement.ownerDocument, themeId);
-  }
+  // Replace sandboxed artifact iframes with same-origin static snapshots for both PNG and HTML export.
+  // Sandboxed iframes cannot load external vendor scripts (/vendor/echarts.min.js) or receive
+  // parent window Graphviz postMessage relays when exported as standalone HTML documents.
+  await replaceLiveArtifactIframes(clone, sourceElement.ownerDocument, themeId);
 
   // Embed blob and remote images before the clone leaves the live document.
   await embedImagesInClone(clone);

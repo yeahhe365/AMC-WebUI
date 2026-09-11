@@ -1,0 +1,34 @@
+---
+title: 内置模型矩阵 (Model Matrix)
+description: AMC WebUI 支持的 Google Gemini 原生系列模型详解、上下文规格与选型建议。
+---
+
+import { ModelBadgeList } from '@/components/ModelBadgeList';
+
+# 内置模型矩阵
+
+AMC WebUI 深度集成了 Google 官方最新的 Gemini 3.x、Robotics 具身智能及多模态生成专用端点。以下是应用内置支持的核心模型能力速览：
+
+<ModelBadgeList client:visible />
+
+---
+
+## 核心模型选型建议
+
+### 1. 主力通用模型：`gemini-3.8-flash`
+- **定位**：日常代码编写、长文阅读分析、普通闲聊与工具调用的**全能首选**。
+- **优势**：响应延迟低，首字吐出极快；支持完整的深度思考能力（Thinking Level: Low / Medium / High）；支持多模态文件解析与 Live Artifacts 生成。
+
+### 2. 超轻量低延迟：`gemini-3.5-flash-lite`
+- **定位**：高频简短查询、高吞吐批量处理，以及 AMC WebUI 内部的**思维链实时翻译代理引擎**。
+- **优势**：极低的调用成本与极致延迟，支持从 `Minimal` 开始的最轻量思维预算。
+
+### 3. 学术与高难推理：`gemini-3.1-pro-preview`
+- **定位**：涉及超长上下文（100 万 Token）、复杂数学证明、跨多源大型工程代码库重构分析。
+- **优势**：配备高达 32,768 Tokens 的完整思维预算，逻辑严密，抗幻觉能力顶尖。
+
+### 4. 具身与空间推理：`gemini-robotics-er-2-preview`
+- **定位**：三维空间关系推演、机器人操作规划、视觉空间几何测量。
+- **关键使用前置条件**：
+  - Google 官方强制要求：调用该模型的 API Key **必须已在 [Google AI Studio](https://aistudio.google.com/api-keys) 添加限制 (API Restriction)**（例如限制使用项目或来源），未设置限制的 Key 请求会直接被服务端拦截并返回 `403 Forbidden`。
+  - 建议将 `Thinking Level` 设为 `Medium` 以平衡空间几何解算的耗时与精度。

@@ -214,4 +214,32 @@ describe('ModelPicker behavior', () => {
     });
     expect(onSelect).not.toHaveBeenCalled();
   });
+
+  it('renders hover card with model details when opened and updates on hover', () => {
+    act(() => {
+      renderer.root.render(renderPicker({ models, selectedId: 'gemini-3-flash-preview' }));
+    });
+
+    act(() => {
+      renderer.container
+        .querySelector('[data-testid="model-picker-trigger"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const hovercard = renderer.container.querySelector('[data-testid="model-picker-detail-hovercard"]');
+    expect(hovercard).toBeTruthy();
+    expect(hovercard?.textContent).toContain('Gemini 3 Flash Preview');
+
+    const gemmaOption = Array.from(renderer.container.querySelectorAll('[role="option"]')).find((option) =>
+      option.textContent?.includes('Gemma 4 31B IT'),
+    );
+    expect(gemmaOption).toBeTruthy();
+
+    act(() => {
+      gemmaOption?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      gemmaOption?.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    });
+
+    expect(hovercard?.textContent).toContain('Gemma 4 31B IT');
+  });
 });

@@ -131,8 +131,48 @@ describe('ChatSuggestions rendering', () => {
       );
     });
 
+    expect(renderer.container.querySelector('[data-testid="image-nav-chip"]')).toBeNull();
     expect(renderer.container.querySelector('[data-testid="pdf-nav-chip"]')).not.toBeNull();
     expect(renderer.container.querySelector('[data-testid="video-nav-chip"]')).toBeNull();
     expect(renderer.container.querySelector('[data-testid="audio-nav-chip"]')).toBeNull();
+  });
+
+  it('renders image nav chip and hides legacy bbox/guide buttons when onToggleImageNav is provided', async () => {
+    const handleToggleImageNav = vi.fn();
+    await act(async () => {
+      renderer.root.render(
+        <ChatSuggestions
+          show
+          isFullscreen={false}
+          onSuggestionClick={vi.fn()}
+          onOrganizeInfoClick={vi.fn()}
+          onToggleBBox={vi.fn()}
+          isBBoxModeActive={false}
+          onToggleGuide={vi.fn()}
+          isGuideModeActive={false}
+          onToggleImageNav={handleToggleImageNav}
+        />,
+      );
+    });
+
+    const imageChip = renderer.container.querySelector('[data-testid="image-nav-chip"]');
+    expect(imageChip).not.toBeNull();
+    // Legacy bbox and guide buttons should not be rendered
+    expect(renderer.container.querySelector('button[aria-label*="BBox" i]')).toBeNull();
+    expect(renderer.container.querySelector('button[aria-label*="Guide" i]')).toBeNull();
+  });
+
+  it('renders organize chip as a standard suggestion action chip without toggle dot or aria-pressed', async () => {
+    await act(async () => {
+      renderer.root.render(
+        <ChatSuggestions show isFullscreen={false} onSuggestionClick={vi.fn()} onOrganizeInfoClick={vi.fn()} />,
+      );
+    });
+
+    const organizeChip = renderer.container.querySelector('[data-testid="organize-info-chip"]');
+    expect(organizeChip).not.toBeNull();
+    expect(organizeChip?.className).toContain(SUGGESTION_CHIP_CLASS);
+    expect(organizeChip?.hasAttribute('aria-pressed')).toBe(false);
+    expect(organizeChip?.querySelector('span.rounded-full.bg-current')).toBeNull();
   });
 });

@@ -71,4 +71,25 @@ describe('generateExportHtmlTemplate', () => {
     expect(html).not.toContain('https://evil/?leak');
     expect(html).not.toContain('red;}');
   });
+
+  it('includes graphviz overflow containment styles and interactive diagram viewer script', () => {
+    const html = generateExportHtmlTemplate({
+      title: 'Diagram Export',
+      date: '2026-04-26',
+      model: 'gemini-test',
+      contentHtml: '<div data-amc-graphviz="digraph { A -> B }"><svg></svg></div>',
+      styles: '',
+      themeId: 'pearl',
+      language: 'zh-CN',
+      rootBgColor: '#ffffff',
+      bodyClasses: '',
+    });
+
+    expect(html).toContain('[data-amc-graphviz]');
+    expect(html).toContain('overflow-x: auto !important');
+    expect(html).toContain('max-width: 100% !important');
+    expect(html).toContain('amc-diagram-modal-backdrop');
+    expect(html).toContain('amc-diagram-modal-canvas');
+    expect(html).toContain('openModal(svg)');
+  });
 });

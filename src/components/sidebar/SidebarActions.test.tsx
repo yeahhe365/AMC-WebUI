@@ -63,7 +63,7 @@ describe('SidebarActions', () => {
       .filter((value): value is string => Boolean(value));
     const folderIcon = container.querySelector('[data-testid="new-group-folder-icon"]');
 
-    expect(actionLabels.slice(0, 3)).toEqual(['New Chat', 'Search', 'New Group']);
+    expect(actionLabels.slice(0, 4)).toEqual(['New Chat', 'Library', 'Search', 'New Group']);
     expect(folderIcon).not.toBeNull();
     expect(folderIcon?.getAttribute('viewBox')).toBe('0 0 24 24');
     expect(folderIcon?.getAttribute('width')).toBe('18');

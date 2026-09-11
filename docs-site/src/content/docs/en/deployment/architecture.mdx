@@ -1,0 +1,50 @@
+---
+title: System Architecture & Local-First
+description: Deep dive into the React SPA frontend, IndexedDB persistence, Web Locks concurrency, and Node backend responsibilities.
+---
+
+# System Architecture & Local-First
+
+Understanding AMC WebUI's architecture and request pipelines is essential for self-hosting, customization, and enterprise deployment.
+
+---
+
+## Architectural Layers
+
+```text
+┌──────────────────────────────────────────────────────────┐
+│                   Browser Client Context                 │
+│  ┌─────────────────────────┐  ┌───────────────────────┐  │
+│  │   React 18 SPA (Vite)   │  │  IndexedDB Data Store │  │
+│  │  Zustand Stores / Views │  │ (Web Locks Mutex API) │  │
+│  └───────────┬─────────────┘  └───────────┬───────────┘  │
+│              │ (BYOK Direct or Proxy)     │              │
+└──────────────┼────────────────────────────┼──────────────┘
+               │                            │
+   ┌───────────▼────────────────────────────▼───────────┐
+   │       [Optional] Independent Node API Backend      │
+   │  • /api/gemini/*    -> Gemini proxy & key fallback │
+   │  • /api/openai/*    -> Third-party provider routing│
+   │  • /api/live (WS)   -> Live bidirectional WS proxy │
+   │  • /api/mcp/*       -> MCP Bridge (stdio/SSE/HTTP) │
+   └───────────┬────────────────────────────────────────┘
+               │
+   ┌───────────▼────────────────────────────────────────┐
+   │                  Cloud LLM Upstreams               │
+   │  • Google Gemini Official Endpoints (REST & WSS)   │
+   │  • OpenAI / DeepSeek / OpenRouter / Qwen           │
+   └────────────────────────────────────────────────────┘
+```
+
+---
+
+## Technical Highlights
+
+### 1. IndexedDB with Web Locks Mutex
+To enable safe multitasking across multiple browser tabs without database corruption, AMC WebUI guards write operations with `navigator.locks.request` and synchronizes UI state changes in real time via `BroadcastChannel`.
+
+### 2. Role of the Node API Backend
+The Node API backend (`server/`) serves as an optional trusted self-hosted gateway:
+- **BYOK Priority**: Browser keys take precedence by default. Server keys act strictly as fallbacks.
+- **WebSocket Gateway**: Bridges complex client WebSockets to Google Live endpoints.
+- For public-facing deployments, front the application with authentication gateways (e.g., Cloudflare Access, Authelia, or Nginx).

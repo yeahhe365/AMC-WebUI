@@ -76,7 +76,15 @@ describe('SettingsModal', () => {
 
     const tabLabels = Array.from(document.querySelectorAll('[role="tab"]')).map((tab) => tab.textContent?.trim());
 
-    expect(tabLabels).toEqual(['Models', 'API', 'MCP', 'Interface & Interaction', 'Data & App', 'Shortcuts', 'About']);
+    expect(tabLabels).toEqual([
+      'Providers & APIs',
+      'Models',
+      'MCP',
+      'Interface & Interaction',
+      'Data & App',
+      'Shortcuts',
+      'About',
+    ]);
     expect(document.body.textContent).not.toContain('Chat');
   });
 
@@ -88,8 +96,8 @@ describe('SettingsModal', () => {
     );
 
     expect(groupTabLabels).toEqual([
-      ['Models', 'API', 'MCP', 'Interface & Interaction', 'Data & App'],
-      ['Shortcuts'],
+      ['Providers & APIs', 'Models', 'MCP'],
+      ['Interface & Interaction', 'Data & App', 'Shortcuts'],
       ['About'],
     ]);
 
@@ -359,5 +367,18 @@ describe('SettingsModal', () => {
     });
 
     expect(useSettingsUiStore.getState().isAdvancedModeEnabled).toBe(true);
+  });
+
+  it('renders the providers section title and close button when activeTab is providers', async () => {
+    localStorage.setItem('chatSettingsLastTab', 'providers');
+    useSettingsUiStore.setState({ activeTab: 'providers' });
+    await ensureFeatureTranslations('settings');
+    await renderSettingsModal();
+
+    const scrollingDesktopTitle = document.querySelector('main > div h2');
+    expect(scrollingDesktopTitle?.textContent).toBe('Providers & APIs');
+
+    const closeButton = document.querySelector('main button[aria-label="Close"]');
+    expect(closeButton).not.toBeNull();
   });
 });

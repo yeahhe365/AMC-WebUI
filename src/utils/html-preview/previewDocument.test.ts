@@ -55,7 +55,7 @@ describe('htmlPreview utilities', () => {
     expect(srcDoc).toContain("default-src 'none'");
     expect(srcDoc).toContain("script-src 'unsafe-inline'");
     expect(srcDoc).toContain('img-src https: data: blob:');
-    expect(srcDoc).toContain('connect-src https: data: blob:');
+    expect(srcDoc).toContain('connect-src http: https: data: blob:');
     expect(srcDoc).toContain("frame-src 'none'");
     expect(srcDoc).toContain("object-src 'none'");
     expect(srcDoc).toContain("base-uri 'none'");
@@ -67,10 +67,10 @@ describe('htmlPreview utilities', () => {
       '<html><head><script type="module" src="https://cdn.example/app.js"></script><link rel="stylesheet" href="https://cdn.example/app.css"></head><body></body></html>',
     );
 
-    expect(srcDoc).toContain("script-src 'unsafe-inline' https: blob:");
+    expect(srcDoc).toContain("script-src 'unsafe-inline' http: https: blob:");
     expect(srcDoc).toContain("style-src 'unsafe-inline' https:");
     expect(srcDoc).toContain('font-src https: data:');
-    expect(srcDoc).toContain('connect-src https: data: blob:');
+    expect(srcDoc).toContain('connect-src http: https: data: blob:');
     expect(srcDoc).toContain('worker-src blob:');
   });
 
@@ -531,6 +531,35 @@ describe('htmlPreview utilities', () => {
       const bodyIndex = srcDoc.indexOf('<body>');
       expect(cspIndex).toBeGreaterThan(-1);
       expect(cspIndex).toBeLessThan(bodyIndex);
+    });
+  });
+
+  describe('echarts script injection', () => {
+    it('injects echarts vendor script when document contains data-amc-chart', () => {
+      const srcDoc = buildHtmlPreviewSrcDoc(
+        '<html><body><div data-amc-chart=\'{"type":"bar","x":["A"],"series":[{"y":[1]}]}\'></div></body></html>',
+      );
+
+      expect(srcDoc).toContain('<script data-amc-echarts-script="true" src="/vendor/echarts.min.js"></script>');
+    });
+
+    it('does not inject echarts vendor script when document has no chart nodes', () => {
+      const srcDoc = buildHtmlPreviewSrcDoc('<html><body><p>No charts here</p></body></html>');
+
+      expect(srcDoc).not.toContain('data-amc-echarts-script');
+      expect(srcDoc).not.toContain('/vendor/echarts.min.js');
+    });
+
+    it('injects echarts vendor script into streaming preview documents', () => {
+      const srcDoc = buildStreamingHtmlPreviewSrcDoc();
+
+      expect(srcDoc).toContain('/vendor/echarts.min.js');
+    });
+
+    it('injects echarts vendor script into unrestricted preview documents with charts', () => {
+      const srcDoc = buildUnrestrictedHtmlPreviewSrcDoc('<div><div data-amc-chart=\'{"type":"bar"}\'></div></div>');
+
+      expect(srcDoc).toContain('/vendor/echarts.min.js');
     });
   });
 });

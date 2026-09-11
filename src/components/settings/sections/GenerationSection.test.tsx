@@ -268,4 +268,57 @@ describe('GenerationSection', () => {
     expect(renderer.container.querySelector('#media-resolution-select')).toBeNull();
     expect(renderer.container.querySelector('[data-settings-item="models-raw-mode"]')).toBeNull();
   });
+
+  it('hides raw mode toggle for models that ban model turn prefill', async () => {
+    useSettingsUiStore.setState({ isAdvancedModeEnabled: true });
+
+    await act(async () => {
+      renderer.root.render(
+        <GenerationSection
+          isThirdPartyMode={false}
+          modelId="gemini-3.6-flash"
+          currentSettings={baseSettings}
+          onUpdateSetting={vi.fn()}
+        />,
+      );
+    });
+
+    expect(renderer.container.querySelector('[data-settings-item="models-raw-mode"]')).toBeNull();
+  });
+
+  it('hides thinking context toggles for models that do not support thinking level', async () => {
+    useSettingsUiStore.setState({ isAdvancedModeEnabled: true });
+
+    await act(async () => {
+      renderer.root.render(
+        <GenerationSection
+          isThirdPartyMode={false}
+          modelId="gemini-2.5-flash"
+          currentSettings={baseSettings}
+          onUpdateSetting={vi.fn()}
+        />,
+      );
+    });
+
+    expect(renderer.container.querySelector('[data-settings-item="models-hide-thinking"]')).toBeNull();
+    expect(renderer.container.querySelector('[data-settings-item="models-always-keep-thinking"]')).toBeNull();
+  });
+
+  it('shows thinking context toggles for models that support thinking level', async () => {
+    useSettingsUiStore.setState({ isAdvancedModeEnabled: true });
+
+    await act(async () => {
+      renderer.root.render(
+        <GenerationSection
+          isThirdPartyMode={false}
+          modelId="gemini-3-pro-preview"
+          currentSettings={baseSettings}
+          onUpdateSetting={vi.fn()}
+        />,
+      );
+    });
+
+    expect(renderer.container.querySelector('[data-settings-item="models-hide-thinking"]')).not.toBeNull();
+    expect(renderer.container.querySelector('[data-settings-item="models-always-keep-thinking"]')).not.toBeNull();
+  });
 });

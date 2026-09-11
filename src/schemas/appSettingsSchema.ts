@@ -258,6 +258,14 @@ export const migrateLegacyAutoOpenHtmlPreview = (value: unknown): Partial<AppSet
   return settings as Partial<AppSettings>;
 };
 
+const geoLocationCoordinatesSchema = z
+  .object({
+    latitude: z.number().finite().min(-90).max(90),
+    longitude: z.number().finite().min(-180).max(180),
+    name: z.string().max(100).optional(),
+  })
+  .optional();
+
 const appSettingsSchema: z.ZodType<AppSettings> = z.object({
   modelId: stringWithDefault(DEFAULT_APP_SETTINGS.modelId),
   providerId: optionalWithDefault(z.string().min(1), DEFAULT_APP_SETTINGS.providerId),
@@ -272,6 +280,7 @@ const appSettingsSchema: z.ZodType<AppSettings> = z.object({
   lockedApiKey: nullableStringWithDefault(DEFAULT_APP_SETTINGS.lockedApiKey ?? null),
   isGoogleSearchEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isGoogleSearchEnabled),
   isGoogleMapsEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isGoogleMapsEnabled),
+  googleMapsLocation: geoLocationCoordinatesSchema,
   isCodeExecutionEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isCodeExecutionEnabled),
   isLocalPythonEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isLocalPythonEnabled),
   isUrlContextEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isUrlContextEnabled),
@@ -323,6 +332,7 @@ const appSettingsSchema: z.ZodType<AppSettings> = z.object({
   isCompletionSoundBackgroundOnly: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isCompletionSoundBackgroundOnly),
   isLoggingEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isLoggingEnabled),
   isSuggestionsEnabled: booleanWithDefault(DEFAULT_APP_SETTINGS.isSuggestionsEnabled),
+  showMessageTokenStats: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.showMessageTokenStats),
   isAutoScrollOnSendEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isAutoScrollOnSendEnabled),
   isAutoSendOnSuggestionClick: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isAutoSendOnSuggestionClick),
   generateQuadImages: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.generateQuadImages),
@@ -344,6 +354,7 @@ const appSettingsSchema: z.ZodType<AppSettings> = z.object({
   isPasteAsTextFileEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isPasteAsTextFileEnabled),
   showInputPasteButton: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.showInputPasteButton),
   showInputClearButton: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.showInputClearButton),
+  showVoiceInputButton: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.showVoiceInputButton),
   isCopySelectionFormattingEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isCopySelectionFormattingEnabled),
   isSystemAudioRecordingEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isSystemAudioRecordingEnabled),
   mcpServers: z

@@ -7,6 +7,7 @@ import {
   createChatInputComposerStatusContextValue,
 } from '@/test/chat-input/contextFixtures';
 import { ChatInputActionsContext, ChatInputComposerStatusContext } from '@/components/chat/input/ChatInputContext';
+import { useChatStore } from '@/stores/chatStore';
 
 import { SendControls } from './SendControls';
 
@@ -116,5 +117,86 @@ describe('SendControls', () => {
     });
 
     expect(onCancelPendingUploadSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the check icon and save labels when editing in update mode', () => {
+    const providerValue = createChatAreaProviderValue();
+    act(() => {
+      useChatStore.setState({ editingMessageId: 'msg-1', editMode: 'update' });
+    });
+
+    try {
+      act(() => {
+        renderer.root.render(
+          <ChatRuntimeTestProvider value={providerValue}>
+            <ChatInputActionsContext.Provider value={createChatInputActionsContextValue()}>
+              <ChatInputComposerStatusContext.Provider
+                value={createChatInputComposerStatusContextValue({ hasTrimmedInput: true, canSend: true })}
+              >
+                <SendControls />
+              </ChatInputComposerStatusContext.Provider>
+            </ChatInputActionsContext.Provider>
+          </ChatRuntimeTestProvider>,
+        );
+      });
+
+      const saveButton = renderer.container.querySelector<HTMLButtonElement>(
+        'button[type="submit"][aria-label="Save"]',
+      );
+      expect(saveButton).not.toBeNull();
+      expect(saveButton?.title).toBe('Save');
+      // Verify lucide Check svg is rendered (has class lucide-check)
+      expect(saveButton?.querySelector('.lucide-check')).not.toBeNull();
+      expect(saveButton?.className).toContain('!rounded-full');
+      expect(saveButton?.className).toContain('bg-[#3964FE]');
+      expect(saveButton?.className).toContain('shadow-sm');
+      // Ensure cancel edit button is rendered as text and cancels edit on click
+      const cancelBtn = renderer.container.querySelector<HTMLButtonElement>('button[aria-label="Cancel editing"]');
+      expect(cancelBtn).not.toBeNull();
+      expect(cancelBtn?.textContent).toBe('Cancel');
+      expect((cancelBtn as HTMLElement)?.style.transform).toContain('translateY(-2px)');
+      act(() => {
+        cancelBtn?.click();
+      });
+      expect(useChatStore.getState().editingMessageId).toBeNull();
+    } finally {
+      act(() => {
+        useChatStore.setState({ editingMessageId: null, editMode: 'resend' });
+      });
+    }
+  });
+
+  it('renders the send icon and update labels when editing in resend mode', () => {
+    const providerValue = createChatAreaProviderValue();
+    act(() => {
+      useChatStore.setState({ editingMessageId: 'msg-1', editMode: 'resend' });
+    });
+
+    try {
+      act(() => {
+        renderer.root.render(
+          <ChatRuntimeTestProvider value={providerValue}>
+            <ChatInputActionsContext.Provider value={createChatInputActionsContextValue()}>
+              <ChatInputComposerStatusContext.Provider
+                value={createChatInputComposerStatusContextValue({ hasTrimmedInput: true, canSend: true })}
+              >
+                <SendControls />
+              </ChatInputComposerStatusContext.Provider>
+            </ChatInputActionsContext.Provider>
+          </ChatRuntimeTestProvider>,
+        );
+      });
+
+      const submitButton = renderer.container.querySelector<HTMLButtonElement>(
+        'button[type="submit"][aria-label="Update message"]',
+      );
+      expect(submitButton).not.toBeNull();
+      expect(submitButton?.title).toBe('Update & Send');
+      expect(submitButton?.querySelector('.lucide-save')).toBeNull();
+    } finally {
+      act(() => {
+        useChatStore.setState({ editingMessageId: null, editMode: 'resend' });
+      });
+    }
   });
 });

@@ -1,0 +1,45 @@
+---
+title: 环境变量与安全边界 (Env & Security)
+description: AMC WebUI 全量环境变量说明、服务端与公开配置边界及交互式 .env 配置文件生成器。
+---
+
+import { EnvConfigGenerator } from '@/components/EnvConfigGenerator';
+
+# 环境变量与安全边界 (Env & Security)
+
+在部署 AMC WebUI 时，区分**仅服务端可见的敏感配置**与**客户端公开运行时配置**至关重要。
+
+---
+
+## 交互式配置文件生成器
+
+使用下方工具勾选你的部署偏好，实时生成完整的 `.env` 环境变量文件：
+
+<EnvConfigGenerator client:load />
+
+---
+
+## 核心环境变量清单
+
+| 变量名 | 用途 | 适用端 | 默认值 |
+| :--- | :--- | :--- | :--- |
+| `WEB_PORT` | Docker 前端容器宿主机映射端口 | 宿主机 | `8080` |
+| `PORT` | Node API 后端监听端口 | 服务端 | `3001` |
+| `GEMINI_API_KEY` | 可选的服务端统一托管 Gemini Key | **仅服务端** | 空 |
+| `LIVE_GEMINI_API_KEY` | 专门用于 Live WebSocket 代理的服务端 Key | **仅服务端** | 空 |
+| `SERVER_KEY_PRIORITY` | `true`=服务端优先；`false`=浏览器 BYOK 优先 | 服务端 | `false` |
+| `ALLOWED_ORIGINS` | 跨域允许的 Origin 白名单（逗号分隔） | 服务端 | 空 |
+| `ENABLE_LIVE_WS_PROXY`| 是否启用 `/api/live` 的 WebSocket 全代理 | 服务端 | `true` |
+| `ENABLE_MCP_STDIO` | 允许执行本地 stdio 形式的 MCP 进程 | 服务端 | `false` |
+| `THIRD_PARTY_ROUTES` | 第三方服务商安全路由表 JSON | **仅服务端** | 空 |
+| `RUNTIME_API_PROXY_URL`| 前端 Gemini 默认代理地址 | 公开前端 | `/api/gemini` |
+| `RUNTIME_LIVE_API_BASE_URL`| 前端 Live API 连接地址（留空直连官方） | 公开前端 | `/api/live` |
+| `RUNTIME_THIRD_PARTY_PROXY_URL`| 前端第三方兼容代理地址（留空直连） | 公开前端 | `/api/openai` |
+
+---
+
+## ⚠️ 安全边界声明
+
+当前 `web + api` 方案定位为**可信自托管环境 (Trusted Self-Hosted)**：
+- 默认的 BYOK 模式使用浏览器填写的 Key 发送请求，该设计本身**不能作为公开互联网下无鉴权的商用 API 网关**。
+- 若需对公网未知多用户开放，请务必在前置代理（如 Nginx、Traefik）中增加强身份认证与访问频率限制。

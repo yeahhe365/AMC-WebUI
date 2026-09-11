@@ -1,0 +1,41 @@
+---
+title: PWA 与多端体验 (PWA & Desktop)
+description: 如何在桌面端/移动端将 AMC WebUI 安装为独立应用，以及画中画 (PiP) 模式使用指南。
+---
+
+# PWA 与多端体验
+
+AMC WebUI 提供了完整的 **PWA (Progressive Web App)** 支持，能够将其以接近原生桌面与移动端客户端的形态安装运行，摆脱浏览器标签页混乱的困扰。
+
+---
+
+## 安装为桌面端应用 (macOS / Windows / Linux)
+
+### Chrome / Edge 浏览器
+1. 访问 AMC WebUI 实例（无论是本地还是云端部署）。
+2. 在浏览器地址栏最右侧，点击 **「安装应用」图标**（或点击浏览器菜单中的「安装 AMC WebUI」）。
+3. 安装成功后，应用将独立出现在你的启动台、任务栏或桌面，具备独立的窗口外壳与快捷切换能力。
+
+### 移动端安装 (iOS Safari / Android Chrome)
+- **iOS Safari**：点击底部「分享」按钮 -> 选择「添加到主屏幕」。
+- **Android Chrome**：点击右上角菜单 -> 选择「添加到主屏幕」或「安装应用」。
+
+---
+
+## 离线 Shell 与 Service Worker 缓存策略
+
+AMC WebUI 内置了精心调优的 Workbox Service Worker：
+- **静态资源离线优先**：HTML、CSS、JS 主包与 UI 图标默认被预缓存，无网状态下依然可以瞬间秒开应用外壳并翻阅历史聊天记录。
+- **大包动态豁免**：用于本地 Python 沙箱的 Pyodide WASM 核心（体积较大）默认被排除在预缓存清单外，仅在用户首次点击开启「本地 Python」时才会按需加载并缓存，节约首次加载带宽。
+- **在线模型请求透传**：所有发往 Google / OpenAI 的 API 请求均保持网络优先（Network Only），保障对话流式输出的时效性。
+
+---
+
+## 画中画 (Picture-in-Picture) 模式
+
+为了方便边看视频/查阅文档边与 AI 交流，AMC WebUI 支持 **画中画浮窗模式**：
+
+- **快捷开启**：
+  - 点击聊天界面顶部的画中画按钮。
+  - 或在输入框输入斜杠命令：`/pip` 并回车。
+- **浮窗交互**：浏览器会调出原生 Document Picture-in-Picture 窗口，AI 生成的回答将保持实时滚动更新，置顶于其他任何桌面软件之上。

@@ -1,12 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { ChevronDown, ChevronUp, X, Terminal, AlertTriangle, FileOutput, RotateCcw } from 'lucide-react';
-import { type SideViewContent } from '@/types';
+import type { SideViewContent, UploadedFile } from '@/types';
 import { type OpenHtmlPreviewHandler } from '@/utils/html-preview/previewPrivilege';
 import { useCodeBlock } from '@/hooks/ui/useCodeBlock';
 import { usePyodide } from '@/features/local-python/usePyodide';
 import { CodeHeader } from './parts/CodeHeader';
 import { ArtifactFrame } from './ArtifactFrame';
 import { extractTextFromNode } from '@/utils/reactNodeText';
+import { selectCodeLines } from '@/utils/text-selection/codeLineSelection';
 import { isImageMimeType } from '@/utils/file/fileTypeClassification';
 import { createManagedObjectUrl, releaseManagedObjectUrl } from '@/services/objectUrlManager';
 import { FileDisplay } from '@/components/message/FileDisplay';
@@ -25,6 +26,9 @@ import {
 import { LiveArtifactInteractionFrame } from './LiveArtifactInteractionFrame';
 import { LiveArtifactInteractionDiagnostic } from './LiveArtifactInteractionDiagnostic';
 
+import { useChatStore } from '@/stores/chatStore';
+import { collectLocalPythonInputFiles } from '@/features/local-python/executionFiles';
+
 interface CodeBlockProps {
   children: React.ReactNode;
   cacheKey?: string;
@@ -40,6 +44,9 @@ interface CodeBlockProps {
   liveArtifactsMode?: boolean;
   /** Hides the local Pyodide run button — used for server-executed code blocks. */
   disableRun?: boolean;
+  files?: UploadedFile[];
+  messageId?: string;
+  onImageClick?: (file: UploadedFile) => void;
 }
 
 type GeneratedFileEntry = {
@@ -80,9 +87,14 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
     isExpanded,
     isOverflowing,
     isCopied,
+    isDownloaded,
+    isWrapped,
     sourceLanguage,
     finalLanguage,
+    fenceFilename,
+    lineCount,
     showPreview,
+    handleToggleWrap,
     handleToggleExpand,
     handleCopy,
     handleOpenSide,
@@ -109,7 +121,23 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
   );
 
   const handleRun = () => {
-    if (rawCode) runCode(rawCode);
+    if (!rawCode) return;
+
+    let executionFiles: UploadedFile[] = [];
+    if (props.messageId) {
+      const state = useChatStore.getState();
+      const currentSession = state.savedSessions.find((s) => s.id === state.activeSessionId);
+      if (currentSession?.messages) {
+        executionFiles = collectLocalPythonInputFiles(currentSession.messages, props.messageId);
+      }
+    }
+    if (executionFiles.length === 0 && props.files?.length) {
+      executionFiles = props.files.filter(
+        (f) => f.rawFile && (f.uploadState === undefined || f.uploadState === 'active') && !f.error,
+      );
+    }
+
+    runCode(rawCode, { files: executionFiles });
   };
 
   // Object URLs are external resources — create/release only in effects so Strict
@@ -150,7 +178,8 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
     };
   }, [image]);
 
-  const displayInlineImage = imageUrl && !generatedFiles.some((file) => isImageMimeType(file.type)) ? imageUrl : null;
+  const generatedImageFile = generatedFiles.find((file) => isImageMimeType(file.type));
+  const displayInlineImage = imageUrl || (generatedImageFile ? generatedImageFile.dataUrl : null);
   const isInteractive = props.showPreviewControls ?? true;
   const showPreviewControls = isInteractive && showPreview;
   const isInteractionFence = isLiveArtifactInteractionLanguage(sourceLanguage);
@@ -190,6 +219,71 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
     isLiveArtifactLanguage(sourceLanguage) &&
     previewMarkupType === 'html' &&
     (resolvedCodeText.trim().length > 0 || Boolean(props.isLoading));
+
+  const lastClickedLineRef = useRef<number | null>(null);
+  const isDraggingGutterRef = useRef(false);
+  const dragStartLineRef = useRef<number | null>(null);
+
+  const lineNumbers = useMemo(() => {
+    if (lineCount <= 0) return [];
+    return Array.from({ length: lineCount }, (_, i) => i + 1);
+  }, [lineCount]);
+
+  const getCodeContainer = useCallback((): HTMLElement | null => {
+    if (!preRef.current) return null;
+    return (preRef.current.querySelector('[data-code-content]') ||
+      preRef.current.querySelector('code') ||
+      preRef.current) as HTMLElement;
+  }, [preRef]);
+
+  const selectLines = useCallback(
+    (startLine: number, endLine: number) => {
+      const codeContainer = getCodeContainer();
+      if (!codeContainer) return;
+      selectCodeLines(codeContainer, startLine, endLine);
+    },
+    [getCodeContainer],
+  );
+
+  const handleLineMouseDown = useCallback(
+    (lineNumber: number, event: React.MouseEvent) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (event.shiftKey && lastClickedLineRef.current !== null) {
+        selectLines(lastClickedLineRef.current, lineNumber);
+        lastClickedLineRef.current = lineNumber;
+        return;
+      }
+
+      isDraggingGutterRef.current = true;
+      dragStartLineRef.current = lineNumber;
+      lastClickedLineRef.current = lineNumber;
+      selectLines(lineNumber, lineNumber);
+    },
+    [selectLines],
+  );
+
+  const handleLineMouseEnter = useCallback(
+    (lineNumber: number) => {
+      if (isDraggingGutterRef.current && dragStartLineRef.current !== null) {
+        selectLines(dragStartLineRef.current, lineNumber);
+      }
+    },
+    [selectLines],
+  );
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      isDraggingGutterRef.current = false;
+      dragStartLineRef.current = null;
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, []);
 
   // Streaming pending frame: partial JSON during streaming takes priority over diagnostic
   // (incomplete JSON will fail parse and produce errors, but we want the skeleton, not a diagnosis).
@@ -231,6 +325,7 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
         baseFontSize={props.liveArtifactFontSize}
         themeId={props.themeId}
         onFollowUp={props.onLiveArtifactFollowUp}
+        onImageClick={props.onImageClick}
         onOpenPreview={() =>
           props.onOpenHtmlPreview(resolvedCodeText, {
             privilege: 'sanitized',
@@ -242,14 +337,22 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
     );
   }
 
+  const bottomPaddingClass = isOverflowing ? (isExpanded ? '!pb-10' : '!pb-14') : '';
+  const bottomPaddingPlainClass = isOverflowing ? (isExpanded ? 'pb-10' : 'pb-14') : '';
+
   return (
     <div className="group relative my-3 rounded-lg border border-[var(--theme-border-primary)] bg-[var(--theme-bg-code-block)] shadow-sm">
       <CodeHeader
         language={finalLanguage}
+        filename={fenceFilename}
+        lineCount={lineCount}
         showPreview={showPreviewControls}
         isOverflowing={isOverflowing}
         isExpanded={isExpanded}
         isCopied={isCopied}
+        isDownloaded={isDownloaded}
+        isWrapped={isWrapped}
+        onToggleWrap={handleToggleWrap}
         onToggleExpand={handleToggleExpand}
         onCopy={handleCopy}
         onDownload={handleDownload}
@@ -263,38 +366,92 @@ export const CodeBlock: React.FC<CodeBlockProps> = (props) => {
       <div className="relative">
         <pre
           ref={preRef}
-          className={`${props.className} group !m-0 !p-0 !border-none !rounded-none !bg-transparent custom-scrollbar !overflow-x-auto`}
+          className={`${props.className || ''} group !m-0 !p-0 !border-none !rounded-none rounded-b-lg !bg-transparent custom-scrollbar ${
+            isWrapped ? '!whitespace-pre-wrap !break-all !overflow-x-hidden' : '!whitespace-pre !overflow-x-auto'
+          }`}
           style={{
             overflowY: isExpanded || !isOverflowing ? 'visible' : 'hidden',
             maxHeight: isExpanded || !isOverflowing ? 'none' : `${COLLAPSE_THRESHOLD_PX}px`,
           }}
         >
-          {codeElement ? (
+          {lineCount > 0 ? (
+            <div className={`flex ${isWrapped ? 'w-full' : 'min-w-full w-fit'}`}>
+              <div
+                data-code-gutter
+                aria-hidden="true"
+                className={`select-none !py-4 pl-2.5 pr-2.5 text-right font-mono text-[13px] sm:text-sm leading-relaxed text-[var(--theme-text-tertiary)]/40 border-r border-[var(--theme-border-secondary)]/30 shrink-0 sticky left-0 bg-[var(--theme-bg-code-block)] z-[1] ${bottomPaddingClass}`}
+              >
+                {lineNumbers.map((num) => (
+                  <span
+                    key={num}
+                    data-line-number={num}
+                    onMouseDown={(e) => handleLineMouseDown(num, e)}
+                    onMouseEnter={() => handleLineMouseEnter(num)}
+                    className="block cursor-pointer hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)]/60 rounded px-1 -mx-1 transition-colors"
+                    title={t('codeSelectLine').replace('{line}', String(num))}
+                  >
+                    {num}
+                  </span>
+                ))}
+              </div>
+              {codeElement ? (
+                React.cloneElement(codeElement as React.ReactElement, {
+                  'data-code-content': 'true',
+                  className: `${codeElement.props.className || ''} !py-4 !pl-3.5 !pr-4 ${bottomPaddingClass} ${
+                    isWrapped ? '!whitespace-pre-wrap !break-all min-w-0' : '!whitespace-pre'
+                  } !block font-mono text-[13px] sm:text-sm leading-relaxed !cursor-text flex-1 text-[var(--theme-text-primary)]`,
+                  onClick: undefined,
+                  title: undefined,
+                })
+              ) : (
+                <span
+                  data-code-content="true"
+                  className={`block !py-4 !pl-3.5 !pr-4 font-mono text-sm flex-1 text-[var(--theme-text-primary)] ${bottomPaddingPlainClass} ${
+                    isWrapped ? 'whitespace-pre-wrap break-all min-w-0' : 'whitespace-pre'
+                  }`}
+                >
+                  {props.children}
+                </span>
+              )}
+            </div>
+          ) : codeElement ? (
             React.cloneElement(codeElement as React.ReactElement, {
-              className: `${codeElement.props.className || ''} !p-4 ${isOverflowing ? '!pb-14' : ''} !block font-mono text-[13px] sm:text-sm leading-relaxed !cursor-text`,
+              className: `${codeElement.props.className || ''} !p-4 ${bottomPaddingClass} ${
+                isWrapped ? '!whitespace-pre-wrap !break-all' : '!whitespace-pre'
+              } !block font-mono text-[13px] sm:text-sm leading-relaxed !cursor-text text-[var(--theme-text-primary)]`,
               onClick: undefined,
               title: undefined,
             })
           ) : (
-            <span className={`block p-4 font-mono text-sm ${isOverflowing ? 'pb-14' : ''}`}>{props.children}</span>
+            <span
+              className={`block p-4 font-mono text-sm text-[var(--theme-text-primary)] ${bottomPaddingPlainClass} ${
+                isWrapped ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'
+              }`}
+            >
+              {props.children}
+            </span>
           )}
         </pre>
 
         {isOverflowing && !isExpanded && (
           <div
-            className="absolute bottom-0 left-0 right-0 h-20 select-none bg-gradient-to-t from-[var(--theme-bg-code-block)] to-transparent cursor-pointer flex items-end justify-center pb-2 group/expand code-block-expand-overlay"
+            className="absolute bottom-0 left-0 right-0 h-20 select-none bg-gradient-to-t from-[var(--theme-bg-code-block)] to-transparent cursor-pointer flex items-end justify-center pb-2 group/expand code-block-expand-overlay rounded-b-lg"
             onClick={handleToggleExpand}
           >
-            <span className="text-xs font-medium text-[var(--theme-text-tertiary)] group-hover/expand:text-[var(--theme-text-primary)] flex items-center gap-1 bg-[var(--theme-bg-primary)] px-3 py-1 rounded-full shadow-sm border border-[var(--theme-border-secondary)] transition-colors">
-              <ChevronDown size={12} /> {t('codeShowMore')}
+            <span
+              className="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 bg-[var(--theme-bg-primary)] hover:bg-[var(--theme-bg-tertiary)] border border-[var(--theme-border-secondary)] rounded-full text-xs font-medium text-[var(--theme-text-tertiary)] group-hover/expand:text-[var(--theme-text-primary)] shadow-sm transition-colors active:scale-95"
+              title={t('codeShowMore')}
+            >
+              <ChevronDown size={12} strokeWidth={2} />
+              <span>{t('codeShowMore')}</span>
             </span>
           </div>
         )}
         {isOverflowing && isExpanded && (
-          <div className="absolute bottom-4 left-0 right-0 flex select-none justify-center pointer-events-none z-10 code-block-expand-overlay">
+          <div className="absolute bottom-2 left-0 right-0 flex select-none justify-center pointer-events-none z-10 code-block-expand-overlay">
             <button
               onClick={handleToggleExpand}
-              className="pointer-events-auto flex items-center gap-1.5 px-3 py-1.5 bg-[var(--theme-bg-primary)] hover:bg-[var(--theme-bg-tertiary)] border border-[var(--theme-border-secondary)] rounded-full text-xs font-medium text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] shadow-sm transition-colors"
+              className="pointer-events-auto flex items-center gap-1.5 px-3 py-1 bg-[var(--theme-bg-primary)]/90 hover:bg-[var(--theme-bg-tertiary)] border border-[var(--theme-border-secondary)] rounded-full text-xs font-medium text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] shadow-sm transition-all active:scale-95"
               title={t('codeCollapseBlock')}
             >
               <ChevronUp size={12} strokeWidth={2} /> {t('codeShowLess')}

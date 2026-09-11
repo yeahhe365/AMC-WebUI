@@ -165,7 +165,7 @@ test('sidebar session menu still opens after a slight pointer move', async ({ pa
   await page.mouse.move(box.x + box.width / 2 + 6, box.y + box.height / 2 + 2);
   await page.mouse.up();
 
-  await expect(sessionRow.getByRole('button', { name: 'Edit', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: /^Edit/ })).toBeVisible();
 });
 
 test('collapsed recent chats popover stays open while traversing from button to panel', async ({ page }) => {

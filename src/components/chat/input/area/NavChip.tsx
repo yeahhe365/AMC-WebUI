@@ -12,17 +12,16 @@ interface NavChipProps {
   labelKey: string;
   /** i18n key of the hint shown when the session has no matching media. */
   missingHintKey: string;
-  /** 'pdf', 'video', or 'any' — which media kind this chip requires. */
-  mediaKind?: 'pdf' | 'video' | 'audio' | 'any';
+  /** 'pdf', 'video', 'audio', 'image', or 'any' — which media kind this chip requires. */
+  mediaKind?: 'pdf' | 'video' | 'audio' | 'image' | 'any';
   isEnabled: boolean;
   onToggle: () => void;
   testId: string;
 }
 
 /**
- * Preset-row toggle chip for one media navigation (PDF 导航 / 视频导航 / 媒体导航).
- * Same family as 目标框选 / 箭头标注: dimmed with a hint in the title while the
- * session has no matching media.
+ * Preset-row toggle chip for one media navigation (PDF 导航 / 视频导航 / 音频导航 / 图片导航).
+ * Dimmed with a hint in the title while the session has no matching media.
  */
 const NavChipComponent: React.FC<NavChipProps> = ({
   iconName,
@@ -35,10 +34,12 @@ const NavChipComponent: React.FC<NavChipProps> = ({
 }) => {
   const { t } = useI18n();
   const hasMedia = useChatStore((state) => {
-    const { pdfs, videos } = collectSessionMediaFiles(state.selectedFiles, state.activeMessages);
+    const { pdfs, videos, audios, images } = collectSessionMediaFiles(state.selectedFiles, state.activeMessages);
     if (mediaKind === 'pdf') return pdfs.length > 0;
     if (mediaKind === 'video') return videos.length > 0;
-    return pdfs.length > 0 || videos.length > 0;
+    if (mediaKind === 'audio') return audios.length > 0;
+    if (mediaKind === 'image') return images.length > 0;
+    return pdfs.length > 0 || videos.length > 0 || audios.length > 0 || images.length > 0;
   });
   const label = t(labelKey);
   const title = hasMedia ? label : `${label} · ${t(missingHintKey)}`;

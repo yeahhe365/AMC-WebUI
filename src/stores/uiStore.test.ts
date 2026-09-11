@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ACTIVE_CHAT_SESSION_ID_KEY } from '@/constants/storageKeys';
 
 const UI_PREFERENCES_STORAGE_KEY = 'all_model_chat_ui_preferences_v1';
 const LEGACY_HISTORY_SIDEBAR_STORAGE_KEY = 'all_model_chat_history_sidebar_v1';
@@ -90,5 +91,48 @@ describe('uiStore history sidebar preferences', () => {
     useUIStore.getState().syncHistorySidebarForViewport();
 
     expect(useUIStore.getState().isHistorySidebarOpen).toBe(true);
+  });
+});
+
+describe('uiStore activeView and route handling', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    window.history.replaceState({}, '', '/');
+  });
+
+  it('initializes activeView to library when pathname is /library', async () => {
+    window.history.replaceState({}, '', '/library');
+    const { useUIStore } = await importFreshUIStore();
+
+    expect(useUIStore.getState().activeView).toBe('library');
+  });
+
+  it('initializes activeView to chat when pathname is /', async () => {
+    window.history.replaceState({}, '', '/');
+    const { useUIStore } = await importFreshUIStore();
+
+    expect(useUIStore.getState().activeView).toBe('chat');
+  });
+
+  it('syncs route to /library when setActiveView("library") is called', async () => {
+    const { useUIStore } = await importFreshUIStore();
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    useUIStore.getState().setActiveView('library');
+
+    expect(useUIStore.getState().activeView).toBe('library');
+    expect(pushStateSpy).toHaveBeenCalledWith({ view: 'library' }, '', '/library');
+  });
+
+  it('syncs route back to active session when setActiveView("chat") is called', async () => {
+    sessionStorage.setItem(ACTIVE_CHAT_SESSION_ID_KEY, 'sess-100');
+    window.history.replaceState({}, '', '/library');
+    const { useUIStore } = await importFreshUIStore();
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    useUIStore.getState().setActiveView('chat');
+
+    expect(useUIStore.getState().activeView).toBe('chat');
+    expect(pushStateSpy).toHaveBeenCalledWith({ sessionId: 'sess-100' }, '', '/chat/sess-100');
   });
 });

@@ -99,6 +99,9 @@ export class PyodideService {
   private idleTimerVersion = 0;
   private disposed = false;
 
+  private consecutiveCrashCount = 0;
+  private static readonly MAX_CONSECUTIVE_CRASHES = 3;
+
   constructor({
     baseUri,
     createWorker,
@@ -150,7 +153,7 @@ export class PyodideService {
     }
   }
 
-  private terminateWorker() {
+  public terminateWorker() {
     if (!this.worker) {
       return;
     }
@@ -163,6 +166,7 @@ export class PyodideService {
   }
 
   private resetWorker(reason: unknown, options?: { skipRejectIds?: string[] }) {
+    this.consecutiveCrashCount += 1;
     const normalizedError = this.normalizeWorkerError(reason, 'Pyodide worker terminated unexpectedly.');
     const skipRejectIds = new Set(options?.skipRejectIds ?? []);
 
@@ -179,9 +183,14 @@ export class PyodideService {
     }
 
     // Abort/timeout/fatal-error all tear down the worker (Pyodide cannot be
-    // interrupted cleanly mid-C-extension). Immediately bring up a replacement
-    // and warm it up so the next request skips the multi-megabyte cold load.
-    this.warmupReplacement();
+    // interrupted cleanly mid-C-extension). Bring up a replacement if within limits.
+    if (this.consecutiveCrashCount < PyodideService.MAX_CONSECUTIVE_CRASHES) {
+      this.warmupReplacement();
+    } else {
+      logService.error('Pyodide Worker repeatedly crashed. Halting automatic restart.', {
+        consecutiveCrashCount: this.consecutiveCrashCount,
+      });
+    }
   }
 
   private warmupReplacement() {
@@ -226,6 +235,7 @@ export class PyodideService {
 
     // Warmup completions carry no request id and have no pending promise to settle.
     if (type === 'WARMUP_READY') {
+      this.consecutiveCrashCount = 0;
       return;
     }
 
@@ -238,6 +248,7 @@ export class PyodideService {
     this.completeRequest(id);
 
     if (status === 'success') {
+      this.consecutiveCrashCount = 0;
       promise.resolve({
         output,
         image: image ?? null,
@@ -246,7 +257,11 @@ export class PyodideService {
         status: 'success',
       });
     } else {
-      promise.reject(error);
+      const errorObj = this.normalizeWorkerError(error, 'Execution failed.');
+      if (output) {
+        Object.assign(errorObj, { output });
+      }
+      promise.reject(errorObj);
     }
   }
 
@@ -473,6 +488,7 @@ export class PyodideService {
   }
 
   public runPython(code: string, options: RunPythonOptions = {}): Promise<ExecutionResult> {
+    this.consecutiveCrashCount = 0;
     const id = this.createRequestId();
     const abortSignal = options.abortSignal;
 

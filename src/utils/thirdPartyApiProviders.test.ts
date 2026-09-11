@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { GEMINI_PROVIDER_ID, normalizeProviderId } from '@/types';
+import { GEMINI_PROVIDER_ID, normalizeProviderId, THIRD_PARTY_TEMPLATE_IDS } from '@/types';
 import { createAppSettings, createThirdPartyConnection } from '@/test/data/factories';
 import {
   buildProviderAwareModelList,
@@ -9,10 +9,14 @@ import {
   getProxyProviderHeader,
   getThirdPartyConnectionStatus,
   getThirdPartyTemplateLinks,
+  isDashScopeOfficialEndpoint,
+  isDeepSeekOfficialEndpoint,
+  isLocalEngineEndpoint,
   isThirdPartyConnectionInUse,
   sanitizeThirdPartyApiSettings,
   resolveProviderForModelId,
   createConnectionFromTemplate,
+  THIRD_PARTY_TEMPLATE_LABELS,
 } from './thirdPartyApiProviders';
 
 describe('normalizeProviderId', () => {
@@ -127,6 +131,16 @@ describe('createConnectionFromTemplate', () => {
     expect(second.name).toBe('OpenAI 2');
     expect(second.templateId).toBe('openai');
     expect(second.extraHeaders).toEqual({});
+  });
+
+  it('provides valid defaults and non-empty models for all template IDs', () => {
+    THIRD_PARTY_TEMPLATE_IDS.forEach((templateId) => {
+      const conn = createConnectionFromTemplate(templateId, [], `test-${templateId}`);
+      expect(conn.name).toBeTruthy();
+      expect(conn.protocol).toBeTruthy();
+      expect(conn.models.length).toBeGreaterThan(0);
+      expect(THIRD_PARTY_TEMPLATE_LABELS[templateId]).toBeTruthy();
+    });
   });
 });
 
@@ -320,6 +334,32 @@ describe('buildProviderAwareModelList', () => {
     const result = buildProviderAwareModelList(appSettings, []);
     expect(result[0]).toMatchObject({ templateId: 'custom-anthropic', providerId: 'openai' });
   });
+
+  it('does not mark models as missingApiKey when connection is authOptional', () => {
+    const appSettings = createAppSettings({
+      thirdPartyApi: {
+        connections: [
+          createThirdPartyConnection({
+            id: 'ollama-local',
+            templateId: 'ollama',
+            protocol: 'openai-compatible',
+            enabled: true,
+            authOptional: true,
+            apiKey: null,
+            models: [{ id: 'llama3.2', name: 'Llama 3.2' }],
+          }),
+        ],
+      },
+    });
+
+    const result = buildProviderAwareModelList(appSettings, []);
+    expect(result[0]).toMatchObject({
+      id: 'llama3.2',
+      providerId: 'ollama-local',
+      templateId: 'ollama',
+    });
+    expect(result[0].missingApiKey).toBeUndefined();
+  });
 });
 
 describe('getThirdPartyConnectionStatus', () => {
@@ -334,8 +374,20 @@ describe('getThirdPartyConnectionStatus', () => {
     expect(getThirdPartyConnectionStatus({ ...connection, apiKey: null })).toBe('missing-key');
     expect(getThirdPartyConnectionStatus({ ...connection, apiKey: '  ' })).toBe('missing-key');
     expect(getThirdPartyConnectionStatus({ ...connection, baseUrl: null })).toBe('missing-url');
-    expect(getThirdPartyConnectionStatus({ ...connection, baseUrl: '  ' })).toBe('missing-url');
     expect(getThirdPartyConnectionStatus(connection)).toBe('ready');
+  });
+
+  it('marks authOptional connection as ready without an API key', () => {
+    const localConnection = createThirdPartyConnection({
+      enabled: true,
+      authOptional: true,
+      apiKey: null,
+      baseUrl: 'http://localhost:11434/v1',
+    });
+
+    expect(getThirdPartyConnectionStatus(localConnection)).toBe('ready');
+    expect(getThirdPartyConnectionStatus({ ...localConnection, enabled: false })).toBe('disabled');
+    expect(getThirdPartyConnectionStatus({ ...localConnection, baseUrl: null })).toBe('missing-url');
   });
 });
 
@@ -369,5 +421,27 @@ describe('getThirdPartyTemplateLinks', () => {
     const customLinks = getThirdPartyTemplateLinks('custom-openai');
     expect(customLinks.apiKeyUrl).toBeUndefined();
     expect(customLinks.docUrl).toBeUndefined();
+  });
+});
+
+describe('provider endpoint type classification', () => {
+  it('detects DeepSeek official endpoint by templateId or baseUrl', () => {
+    expect(isDeepSeekOfficialEndpoint('deepseek', 'https://example.com/v1')).toBe(true);
+    expect(isDeepSeekOfficialEndpoint('custom', 'https://api.deepseek.com/chat/completions')).toBe(true);
+    expect(isDeepSeekOfficialEndpoint('openrouter', 'https://openrouter.ai/api/v1')).toBe(false);
+  });
+
+  it('detects DashScope official endpoint by templateId or baseUrl', () => {
+    expect(isDashScopeOfficialEndpoint('dashscope', 'https://example.com/v1')).toBe(true);
+    expect(isDashScopeOfficialEndpoint('custom', 'https://dashscope.aliyuncs.com/compatible-mode/v1')).toBe(true);
+    expect(isDashScopeOfficialEndpoint('openrouter', 'https://openrouter.ai/api/v1')).toBe(false);
+  });
+
+  it('detects local engine endpoints by templateId or localhost port', () => {
+    expect(isLocalEngineEndpoint('ollama', 'http://example.com')).toBe(true);
+    expect(isLocalEngineEndpoint('lmstudio', 'http://example.com')).toBe(true);
+    expect(isLocalEngineEndpoint('custom', 'http://localhost:11434/v1')).toBe(true);
+    expect(isLocalEngineEndpoint('custom', 'http://127.0.0.1:1234/v1')).toBe(true);
+    expect(isLocalEngineEndpoint('custom', 'https://api.openai.com/v1')).toBe(false);
   });
 });

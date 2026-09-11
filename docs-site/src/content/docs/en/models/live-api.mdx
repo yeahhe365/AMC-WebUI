@@ -1,0 +1,39 @@
+---
+title: Real-time Audio & Video (Live API)
+description: Low-latency bidirectional voice conversations, camera vision, screen sharing, and WebSocket proxy architecture.
+---
+
+# Real-time Audio & Video (Live API)
+
+Gemini Live API provides bidirectional streaming across audio and visual modalities. AMC WebUI delivers a rich UI client for real-time interaction.
+
+---
+
+## Core Interaction Modes
+
+### 1. Natural Voice Streaming
+- Leverages the browser's native **AudioWorklet API** to record 16kHz PCM audio and stream directly over WebSockets.
+- Supports instant interruption: speaking naturally interrupts model speech immediately.
+- Real-time frequency waveform visualizer for acoustic clarity.
+
+### 2. Camera Vision
+- Stream frames directly from your webcam.
+- The model continuously analyzes visual objects, diagrams, text, or hardware components in real time.
+
+### 3. Screen Sharing
+- Share application windows, Chrome tabs, or your full desktop.
+- Ideal for live coding reviews, troubleshooting system errors, or navigating software workflows.
+
+---
+
+## Communication Modes & Proxies
+
+| Deployment Mode | Live Connection | Best For | Details |
+| :--- | :--- | :--- | :--- |
+| **Docker Compose** | **Full WebSocket Proxy (`/api/live`)** | Self-hosting | Proxied via the backend Node server with automatic reconnection and idle recycling. |
+| **Cloudflare Pages** | **Browser Direct** | Static CDN | Browser connects directly to official Google endpoints using the locally configured API key. |
+
+> ⚙️ **Docker Environment Variables**:
+> - `ENABLE_LIVE_WS_PROXY=true`: Enables backend WebSocket proxy.
+> - `RUNTIME_LIVE_API_BASE_URL=/api/live`: Points client to proxy endpoint.
+> - `LIVE_WS_IDLE_TIMEOUT_MS=300000`: Automatically recycles connections idle for 5 minutes.

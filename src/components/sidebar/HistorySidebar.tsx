@@ -6,13 +6,14 @@ import { SidebarHeader } from './SidebarHeader';
 import { SidebarActions } from './SidebarActions';
 import type { SessionItemPassedProps } from './sidebarTypes';
 import { CollapsedRecentChatsButton } from './CollapsedRecentChatsButton';
-import { Search, Settings } from 'lucide-react';
+import { Search, Settings, Library } from 'lucide-react';
 import { IconNewChat, IconSidebarToggle } from '@/components/icons';
 import { useHistorySidebarLogic, type HistoryDisplayMode } from './useHistorySidebarLogic';
 import { SIDEBAR_CLICKABLE_ICON_BUTTON_CLASS, SIDEBAR_ICON_LINK_BUTTON_CLASS } from './sidebarStyles';
 import { LimitedSessionList } from './LimitedSessionList';
 import { DESKTOP_BREAKPOINT_PX } from '@/constants/layout';
 import { isDarkThemeId } from '@/utils/themeMode';
+import { useUIStore } from '@/stores/uiStore';
 import { isGroupDrag, isSessionDrag } from './sidebarDragTypes';
 import {
   closestCenter,
@@ -49,6 +50,7 @@ interface HistorySidebarProps {
   onClearGroup?: (groupId: string) => void;
   onRenameGroup: (groupId: string, newTitle: string) => void;
   onMoveSessionToGroup: (sessionId: string, groupId: string | null) => void;
+  onRegenerateTitleSession?: (sessionId: string) => void | Promise<void>;
   onToggleGroupExpansion: (groupId: string) => void;
   onNewChatInGroup: (groupId: string) => void;
   onReorderGroups?: (activeId: string, overId: string) => void;
@@ -61,6 +63,27 @@ interface HistorySidebarProps {
   displayMode?: HistoryDisplayMode;
   onDisplayModeChange?: (mode: HistoryDisplayMode) => void;
 }
+
+const DEFAULT_SIDEBAR_WIDTH = 259;
+const MIN_SIDEBAR_WIDTH = 220;
+const MAX_SIDEBAR_WIDTH = 520;
+const SIDEBAR_STORAGE_KEY = 'amc-history-sidebar-width';
+
+const getInitialSidebarWidth = (): number => {
+  if (typeof window === 'undefined') return DEFAULT_SIDEBAR_WIDTH;
+  try {
+    const saved = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    if (saved) {
+      const parsed = parseInt(saved, 10);
+      if (Number.isFinite(parsed) && parsed >= MIN_SIDEBAR_WIDTH && parsed <= MAX_SIDEBAR_WIDTH) {
+        return parsed;
+      }
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return DEFAULT_SIDEBAR_WIDTH;
+};
 
 const MiniSidebarButton = ({
   onClick,
@@ -131,6 +154,8 @@ const SessionListGroup = ({
 
 export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
   const { t } = useI18n();
+  const activeView = useUIStore((state) => state.activeView);
+  const setActiveView = useUIStore((state) => state.setActiveView);
   const {
     isOpen,
     onToggle,
@@ -157,6 +182,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
     onRenameGroup,
     onMoveSessionToGroup,
     onSelectSession,
+    onRegenerateTitleSession,
     newChatShortcut,
     searchChatsShortcut,
     brandHref = '/',
@@ -212,6 +238,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
     handleMiniSearchClick,
     handleEmptySpaceClick,
     handleSessionSelect,
+    handleRegenerateTitle,
   } = useHistorySidebarLogic({
     isOpen,
     onToggle,
@@ -224,6 +251,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
     onRenameGroup,
     onMoveSessionToGroup,
     onSelectSession,
+    onRegenerateTitleSession,
   });
 
   const groupIds = React.useMemo(() => sortedGroups.map((group) => `group:${group.id}`), [sortedGroups]);
@@ -315,6 +343,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
     onDuplicateSession,
     onOpenExportModal,
     onMoveSessionToGroup,
+    onRegenerateTitleSession: handleRegenerateTitle,
     handleStartEdit: (item: SavedChatSession) => handleStartEdit('session', item),
     handleRenameConfirm,
     handleRenameKeyDown,
@@ -333,37 +362,115 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
 
   const [listParentRef] = useAutoAnimate<HTMLDivElement>({ duration: 200 });
   const expandedPaneRef = React.useRef<HTMLDivElement>(null);
+  const collapsedRailRef = React.useRef<HTMLDivElement>(null);
   const searchTitle = t('historySearchButton') + (searchChatsShortcut ? ` (${searchChatsShortcut})` : '');
 
   // Cancel any pending edge-scroll rAF on unmount.
   React.useEffect(() => () => stopEdgeScroll(), []);
 
+  React.useLayoutEffect(() => {
+    if (!isOpen && expandedPaneRef.current?.contains(document.activeElement)) {
+      (document.activeElement as HTMLElement)?.blur?.();
+    } else if (isOpen && collapsedRailRef.current?.contains(document.activeElement)) {
+      (document.activeElement as HTMLElement)?.blur?.();
+    }
+  }, [isOpen]);
+
   React.useEffect(() => {
     const pane = expandedPaneRef.current as (HTMLDivElement & { inert?: boolean }) | null;
-    if (!pane) {
-      return;
+    const rail = collapsedRailRef.current as (HTMLDivElement & { inert?: boolean }) | null;
+
+    if (pane) {
+      if (isOpen) {
+        pane.inert = false;
+        pane.removeAttribute('inert');
+      } else {
+        pane.inert = true;
+        pane.setAttribute('inert', '');
+      }
     }
 
-    if (isOpen) {
-      pane.inert = false;
-      pane.removeAttribute('inert');
-      return;
+    if (rail) {
+      if (!isOpen) {
+        rail.inert = false;
+        rail.removeAttribute('inert');
+      } else {
+        rail.inert = true;
+        rail.setAttribute('inert', '');
+      }
     }
-
-    pane.inert = true;
-    pane.setAttribute('inert', '');
   }, [isOpen]);
+
+  const [sidebarWidth, setSidebarWidth] = React.useState<number>(getInitialSidebarWidth);
+  const [isResizingSidebar, setIsResizingSidebar] = React.useState(false);
+  const isResizingSidebarRef = React.useRef(false);
+
+  const startSidebarResize = React.useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizingSidebar(true);
+    isResizingSidebarRef.current = true;
+  }, []);
+
+  const stopSidebarResize = React.useCallback(() => {
+    setIsResizingSidebar(false);
+    isResizingSidebarRef.current = false;
+  }, []);
+
+  const handleSidebarResize = React.useCallback((e: MouseEvent) => {
+    if (!isResizingSidebarRef.current) return;
+    const newWidth = Math.min(
+      Math.max(e.clientX, MIN_SIDEBAR_WIDTH),
+      Math.min(MAX_SIDEBAR_WIDTH, window.innerWidth * 0.5),
+    );
+    setSidebarWidth(newWidth);
+    try {
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(Math.round(newWidth)));
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  const resetSidebarWidth = React.useCallback(() => {
+    setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
+    try {
+      localStorage.removeItem(SIDEBAR_STORAGE_KEY);
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (isResizingSidebar) {
+      window.addEventListener('mousemove', handleSidebarResize);
+      window.addEventListener('mouseup', stopSidebarResize);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    } else {
+      window.removeEventListener('mousemove', handleSidebarResize);
+      window.removeEventListener('mouseup', stopSidebarResize);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleSidebarResize);
+      window.removeEventListener('mouseup', stopSidebarResize);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingSidebar, handleSidebarResize, stopSidebarResize]);
 
   return (
     <aside
       data-history-sidebar-root="true"
       className={`h-full flex flex-col ${isDarkThemeId(themeId) ? 'bg-[var(--theme-bg-primary)]' : 'bg-[var(--theme-bg-secondary)]'} flex-shrink-0
-                 transition-transform duration-300 ease-[cubic-bezier(0.19,1,0.22,1)] md:transition-[width] transform-gpu
+                 transition-transform duration-300 ease-[cubic-bezier(0.19,1,0.22,1)] ${isResizingSidebar ? 'transition-none' : 'md:transition-[width]'} transform-gpu
                  absolute md:static top-0 left-0 z-50
                  overflow-hidden
                  ${isOpen ? 'w-64 md:w-[16.2rem] translate-x-0' : 'w-64 md:w-[52.2px] -translate-x-full md:translate-x-0'}
-                 
-                 border-r border-[var(--theme-border-primary)]`}
+                 border-r border-[var(--theme-border-primary)] relative`}
+      style={{
+        width: isOpen ? `${sidebarWidth}px` : undefined,
+      }}
       role="complementary"
       aria-label={t('historyTitle')}
     >
@@ -374,6 +481,10 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
         className={`w-64 md:w-[16.2rem] h-full flex flex-col shrink-0 min-w-[16rem] md:min-w-[16.2rem] md:absolute md:inset-0 transition-opacity duration-200 ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-100 pointer-events-none md:opacity-0'
         }`}
+        style={{
+          width: isOpen ? `${sidebarWidth}px` : undefined,
+          minWidth: isOpen ? `${sidebarWidth}px` : undefined,
+        }}
       >
         <SidebarHeader
           isOpen={isOpen}
@@ -537,6 +648,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
       </div>
 
       <div
+        ref={collapsedRailRef}
         aria-hidden={isOpen}
         className={`hidden md:flex absolute inset-0 flex-col items-center py-4 h-full gap-[0.56rem] w-full min-w-[52.2px] cursor-ew-resize hover:bg-[var(--theme-bg-tertiary)]/30 transition-colors transition-opacity duration-200 ${
           isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
@@ -558,6 +670,13 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
           icon={IconNewChat}
           title={t('newChat') + (newChatShortcut ? ` (${newChatShortcut})` : '')}
         />
+        <MiniSidebarButton
+          href="/library"
+          onClick={() => setActiveView('library')}
+          icon={Library}
+          title={t('libraryTitle')}
+          className={activeView === 'library' ? 'bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-primary)]' : ''}
+        />
         <MiniSidebarButton onClick={handleMiniSearchClick} icon={Search} title={searchTitle} />
         <CollapsedRecentChatsButton
           sessions={sessions}
@@ -569,6 +688,62 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
           <MiniSidebarButton onClick={onOpenSettingsModal} icon={Settings} title={t('settingsTitle')} />
         </div>
       </div>
+
+      {isOpen && (
+        <div
+          data-testid="sidebar-resize-handle"
+          role="separator"
+          aria-label={t('sidePanelDragResize')}
+          aria-orientation="vertical"
+          aria-valuenow={sidebarWidth}
+          aria-valuemin={MIN_SIDEBAR_WIDTH}
+          aria-valuemax={MAX_SIDEBAR_WIDTH}
+          tabIndex={0}
+          onMouseDown={startSidebarResize}
+          onDoubleClick={resetSidebarWidth}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowRight') {
+              e.preventDefault();
+              setSidebarWidth((w) => {
+                const next = Math.min(w + 10, MAX_SIDEBAR_WIDTH);
+                try {
+                  localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
+                } catch {
+                  // Ignore
+                }
+                return next;
+              });
+            } else if (e.key === 'ArrowLeft') {
+              e.preventDefault();
+              setSidebarWidth((w) => {
+                const next = Math.max(w - 10, MIN_SIDEBAR_WIDTH);
+                try {
+                  localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next));
+                } catch {
+                  // Ignore
+                }
+                return next;
+              });
+            } else if (e.key === 'Home') {
+              e.preventDefault();
+              resetSidebarWidth();
+            }
+          }}
+          title={t('sidePanelDragResize')}
+          className={`hidden md:flex absolute right-0 top-0 bottom-0 w-2 -mr-1 z-50 cursor-col-resize items-center justify-center group select-none transition-colors hover:bg-[var(--theme-bg-accent)]/20 active:bg-[var(--theme-bg-accent)]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] ${
+            isResizingSidebar ? 'bg-[var(--theme-bg-accent)]/30' : ''
+          }`}
+        >
+          <div className="z-10 h-8 w-1 rounded-full bg-[var(--theme-border-secondary)] transition-all group-hover:scale-y-110 group-hover:bg-[var(--theme-bg-accent)]" />
+        </div>
+      )}
+
+      {isResizingSidebar && (
+        <div
+          className="fixed inset-0 z-[9999] bg-transparent cursor-col-resize select-none"
+          style={{ touchAction: 'none' }}
+        />
+      )}
     </aside>
   );
 };

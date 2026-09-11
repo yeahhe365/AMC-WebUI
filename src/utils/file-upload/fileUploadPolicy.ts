@@ -15,10 +15,8 @@ import {
 } from '@/types';
 import { CODE_EXECUTION_TEXT_FILE_LIMIT_BYTES, isServerCodeExecutionMode } from '@/utils/codeExecution';
 import { isTextFile } from '@/utils/file/fileTypeClassification';
-import { getTranslator } from '@/i18n/translations';
+import { getTranslator, type Translator } from '@/i18n/translations';
 import { interpolate } from '@/i18n/interpolate';
-
-type Translator = ReturnType<typeof getTranslator>;
 
 const INLINE_MAX_REQUEST_PAYLOAD_BYTES = 100 * 1024 * 1024;
 const INLINE_MAX_PDF_PAYLOAD_BYTES = 50 * 1024 * 1024;
@@ -64,12 +62,11 @@ export const formatSpeed = (bytesPerSecond: number): string => {
 export const getEffectiveMimeType = (file: File): string => {
   const effectiveMimeType = file.type;
   const mappedMimeType = EXTENSION_TO_MIME[getFilenameExtension(file.name)];
-  const isGenericBrowserTextMimeType =
+  const isGenericBrowserMimeType =
     !effectiveMimeType ||
     effectiveMimeType === GENERIC_TEXT_MIME_TYPE ||
     effectiveMimeType === GENERIC_BINARY_MIME_TYPE;
-  const shouldPreferMappedTextMime = isTextFile(file) && !!mappedMimeType && isGenericBrowserTextMimeType;
-  const shouldUseExtensionMimeFallback = !effectiveMimeType && mappedMimeType;
+  const shouldPreferMappedTextMime = isTextFile(file) && !!mappedMimeType && isGenericBrowserMimeType;
 
   if (shouldPreferMappedTextMime) {
     return mappedMimeType;
@@ -79,12 +76,12 @@ export const getEffectiveMimeType = (file: File): string => {
     return effectiveMimeType;
   }
 
-  if (isTextFile(file)) {
-    return GENERIC_TEXT_MIME_TYPE;
+  if (isGenericBrowserMimeType && mappedMimeType && SUPPORTED_UPLOAD_MIME_TYPES.includes(mappedMimeType)) {
+    return mappedMimeType;
   }
 
-  if (shouldUseExtensionMimeFallback) {
-    return mappedMimeType;
+  if (isTextFile(file)) {
+    return GENERIC_TEXT_MIME_TYPE;
   }
 
   return effectiveMimeType || GENERIC_BINARY_MIME_TYPE;

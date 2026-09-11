@@ -1,160 +1,89 @@
-import { logService } from '@/services/logService';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import H5AudioPlayer, { RHAP_UI } from 'react-h5-audio-player';
+import 'react-h5-audio-player/lib/styles.css';
 import { Play, Pause, Download } from 'lucide-react';
 import { triggerDownload } from '@/utils/export/core';
-import { formatClockTime } from '@/utils/formatClockTime';
 import { useI18n } from '@/contexts/I18nContext';
 
 interface AudioPlayerProps {
   src: string;
   autoPlay?: boolean;
   className?: string;
+  audioClassName?: string;
 }
 
-export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, autoPlay = false, className = '' }) => {
+const PLAYBACK_SPEEDS = [1, 1.25, 1.5, 2];
+
+export const AudioPlayer: React.FC<AudioPlayerProps> = ({ src, autoPlay = false, className = '', audioClassName }) => {
   const { t } = useI18n();
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
+  const playerRef = useRef<H5AudioPlayer>(null);
   const [playbackRate, setPlaybackRate] = useState(1);
-  const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    if (autoPlay && audioRef.current) {
-      const playPromise = audioRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((error) => {
-          logService.warn('Auto-play prevented:', error);
-          setIsPlaying(false);
-        });
-      }
+    if (playerRef.current?.audio.current && audioClassName) {
+      playerRef.current.audio.current.className = audioClassName;
     }
-  }, [autoPlay, src]);
-
-  const togglePlay = () => {
-    if (!audioRef.current) return;
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
-    }
-    setIsPlaying(!isPlaying);
-  };
-
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (audioRef.current) {
-      setDuration(audioRef.current.duration);
-      setIsLoaded(true);
-    }
-  };
-
-  const handleEnded = () => {
-    setIsPlaying(false);
-    setCurrentTime(0);
-    if (audioRef.current) audioRef.current.currentTime = 0;
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const time = parseFloat(e.target.value);
-    if (audioRef.current) {
-      audioRef.current.currentTime = time;
-      setCurrentTime(time);
-    }
-  };
+  }, [audioClassName]);
 
   const toggleSpeed = () => {
-    const speeds = [1, 1.25, 1.5, 2];
-    const nextIndex = (speeds.indexOf(playbackRate) + 1) % speeds.length;
-    const newRate = speeds[nextIndex];
-    setPlaybackRate(newRate);
-    if (audioRef.current) audioRef.current.playbackRate = newRate;
+    const currentIndex = PLAYBACK_SPEEDS.indexOf(playbackRate);
+    const nextSpeed = PLAYBACK_SPEEDS[(currentIndex + 1) % PLAYBACK_SPEEDS.length];
+    setPlaybackRate(nextSpeed);
+    if (playerRef.current?.audio.current) {
+      playerRef.current.audio.current.playbackRate = nextSpeed;
+    }
   };
 
   const handleDownload = () => {
     triggerDownload(src, `audio-${Date.now()}.wav`);
   };
 
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const playLabel = t('audioPlayerPlay') || 'Play';
+  const pauseLabel = t('audioPlayerPause') || 'Pause';
 
   return (
-    <div
-      className={`flex flex-col w-full max-w-sm bg-[var(--theme-bg-input)] border border-[var(--theme-border-secondary)] rounded-xl overflow-hidden shadow-sm transition-all hover:shadow-md ${className}`}
-    >
-      <audio
-        ref={audioRef}
-        src={src}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-        onEnded={handleEnded}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-      />
-
-      <div className="flex items-center justify-between p-3 gap-3">
+    <H5AudioPlayer
+      ref={playerRef}
+      src={src}
+      autoPlay={autoPlay}
+      showJumpControls={true}
+      showSkipControls={false}
+      showDownloadProgress={true}
+      progressJumpSteps={{ backward: 5000, forward: 5000 }}
+      layout="stacked"
+      className={`amc-audio-player ${className}`}
+      customIcons={{
+        play: <Play size={18} fill="currentColor" className="ml-0.5" />,
+        pause: <Pause size={18} fill="currentColor" />,
+      }}
+      i18nAriaLabels={{
+        play: playLabel,
+        pause: pauseLabel,
+      }}
+      customProgressBarSection={[RHAP_UI.CURRENT_TIME, RHAP_UI.PROGRESS_BAR, RHAP_UI.DURATION]}
+      customControlsSection={[RHAP_UI.MAIN_CONTROLS, RHAP_UI.ADDITIONAL_CONTROLS, RHAP_UI.VOLUME_CONTROLS]}
+      customAdditionalControls={[
         <button
-          onClick={togglePlay}
-          className="flex items-center justify-center w-9 h-9 rounded-full bg-[var(--theme-bg-accent)] text-[var(--theme-text-accent)] hover:bg-[var(--theme-bg-accent-hover)] transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)] flex-shrink-0"
-          aria-label={isPlaying ? t('audioPlayerPause') : t('audioPlayerPlay')}
+          key="speed"
+          type="button"
+          onClick={toggleSpeed}
+          className="px-1.5 py-1 rounded text-xs font-bold text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)] transition-colors min-w-[2rem] focus:outline-none"
+          title={t('audioPlayerPlaybackSpeed')}
+          aria-label={t('audioPlayerPlaybackSpeed')}
         >
-          {isPlaying ? (
-            <Pause size={16} fill="currentColor" />
-          ) : (
-            <Play size={16} fill="currentColor" className="ml-0.5" />
-          )}
-        </button>
-
-        <div className="flex-grow flex flex-col justify-center gap-1 min-w-0">
-          <div className="relative w-full h-1 bg-[var(--theme-border-secondary)] rounded-full cursor-pointer group">
-            <div
-              className="absolute top-0 left-0 h-full bg-[var(--theme-text-link)] transition-all duration-100 ease-linear rounded-full"
-              style={{ width: `${progressPercent}%` }}
-            />
-            <div
-              className="absolute top-1/2 -mt-1.5 h-3 w-3 bg-[var(--theme-text-link)] rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none transform -translate-x-1/2"
-              style={{ left: `${progressPercent}%` }}
-            />
-            <input
-              type="range"
-              min="0"
-              max={duration || 100}
-              value={currentTime}
-              onChange={handleSeek}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              disabled={!isLoaded}
-            />
-          </div>
-
-          <div className="flex justify-between text-xs font-mono text-[var(--theme-text-tertiary)] tabular-nums select-none">
-            <span>{formatClockTime(currentTime)}</span>
-            <span>{formatClockTime(duration)}</span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            onClick={toggleSpeed}
-            className="px-1.5 py-1 rounded text-xs font-bold text-[var(--theme-text-secondary)] hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)] transition-colors min-w-[2rem]"
-            title={t('audioPlayerPlaybackSpeed')}
-          >
-            {playbackRate}x
-          </button>
-
-          <button
-            onClick={handleDownload}
-            className="p-1.5 rounded text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors"
-            title={t('audioPlayerDownload')}
-          >
-            <Download size={14} />
-          </button>
-        </div>
-      </div>
-    </div>
+          {playbackRate}x
+        </button>,
+        <button
+          key="download"
+          type="button"
+          onClick={handleDownload}
+          className="p-1.5 rounded text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors focus:outline-none"
+          title={t('audioPlayerDownload')}
+          aria-label={t('audioPlayerDownload')}
+        >
+          <Download size={14} />
+        </button>,
+      ]}
+    />
   );
 };

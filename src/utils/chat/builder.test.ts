@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Language, Outcome } from '@google/genai';
-import { buildContentParts, createChatHistoryForApi } from './builder';
+import { buildContentParts, createChatHistoryForApi, sanitizeChatHistoryForApi, appendTurnToHistory } from './builder';
 import { type UploadedFile, type ChatMessage, MediaResolution } from '@/types';
 
 vi.mock('@/utils/file/fileEncoding', () => ({
@@ -114,6 +114,17 @@ describe('buildContentParts', () => {
     });
     const { contentParts } = await buildContentParts('Describe this', [file]);
     expect(contentParts[0]).toEqual({ fileData: { fileUri: 'https://youtube.com/watch?v=abc' } });
+  });
+
+  it('normalizes non-canonical YouTube fileUri to canonical watch URL format', async () => {
+    const file = makeFile({
+      type: 'video/youtube-link',
+      fileUri: 'youtube.com/watch?v=MkaZ4OrbQn8&source_ve_path=OTY3MTQ&embeds_referring_euri=https%3A%2F%2Flinux.do%2F',
+    });
+    const { contentParts } = await buildContentParts('Summarize', [file]);
+    expect(contentParts[0]).toEqual({
+      fileData: { fileUri: 'https://www.youtube.com/watch?v=MkaZ4OrbQn8' },
+    });
   });
 
   it('preserves per-part media resolution for YouTube video parts on Gemini 3', async () => {
@@ -647,5 +658,104 @@ describe('createChatHistoryForApi', () => {
     // false when alwaysKeep=true; the builder trusts the caller's flag.
     const history = await createChatHistoryForApi(msgs, false, 'gemma-4-31b-it', false, true);
     expect(history[0].parts[0].text).toBe('<thinking>\ngemma reasoning\n</thinking>');
+  });
+});
+
+describe('sanitizeChatHistoryForApi', () => {
+  it('strips unanswered functionCall when followed by a normal user message', () => {
+    const items = [
+      { role: 'user' as const, parts: [{ text: 'Can you search?' }] },
+      {
+        role: 'model' as const,
+        parts: [{ functionCall: { id: 'call-1', name: 'search', args: { q: 'weather' } } }],
+      },
+      { role: 'user' as const, parts: [{ text: 'Never mind, do something else' }] },
+    ];
+
+    const sanitized = sanitizeChatHistoryForApi(items);
+    // The un-responded functionCall is stripped. The two consecutive user turns merge into one.
+    expect(sanitized).toHaveLength(1);
+    expect(sanitized[0].role).toBe('user');
+    expect(sanitized[0].parts).toEqual([{ text: 'Can you search?' }, { text: 'Never mind, do something else' }]);
+  });
+
+  it('preserves valid functionCall and functionResponse pairs between turns', () => {
+    const items = [
+      { role: 'user' as const, parts: [{ text: 'Search weather' }] },
+      {
+        role: 'model' as const,
+        parts: [{ functionCall: { id: 'call-1', name: 'search', args: { q: 'Tokyo' } } }],
+      },
+      {
+        role: 'user' as const,
+        parts: [{ functionResponse: { id: 'call-1', name: 'search', response: { temp: 20 } } }],
+      },
+      { role: 'model' as const, parts: [{ text: 'It is 20 degrees.' }] },
+    ];
+
+    const sanitized = sanitizeChatHistoryForApi(items);
+    expect(sanitized).toHaveLength(4);
+    expect(sanitized[1].parts[0].functionCall?.name).toBe('search');
+    expect(sanitized[2].parts[0].functionResponse?.name).toBe('search');
+    expect(sanitized[3].parts[0].text).toBe('It is 20 degrees.');
+  });
+
+  it('strips orphan functionResponse when preceded by a normal text model message', () => {
+    const items = [
+      { role: 'user' as const, parts: [{ text: 'Hello' }] },
+      { role: 'model' as const, parts: [{ text: 'Hi there' }] },
+      {
+        role: 'user' as const,
+        parts: [{ functionResponse: { id: 'call-orphan', name: 'search', response: {} } }],
+      },
+      { role: 'model' as const, parts: [{ text: 'Next answer' }] },
+    ];
+
+    const sanitized = sanitizeChatHistoryForApi(items);
+    // The orphan functionResponse is stripped. The two model messages merge.
+    expect(sanitized).toHaveLength(2);
+    expect(sanitized[0].role).toBe('user');
+    expect(sanitized[1].role).toBe('model');
+    expect(sanitized[1].parts).toEqual([{ text: 'Hi there' }, { text: 'Next answer' }]);
+  });
+
+  it('drops leading model messages when user messages exist in history', () => {
+    const items = [
+      { role: 'model' as const, parts: [{ text: 'Orphan model message' }] },
+      { role: 'user' as const, parts: [{ text: 'Real first user message' }] },
+      { role: 'model' as const, parts: [{ text: 'Assistant reply' }] },
+    ];
+
+    const sanitized = sanitizeChatHistoryForApi(items);
+    expect(sanitized).toHaveLength(2);
+    expect(sanitized[0].role).toBe('user');
+    expect(sanitized[0].parts[0].text).toBe('Real first user message');
+    expect(sanitized[1].role).toBe('model');
+  });
+});
+
+describe('appendTurnToHistory', () => {
+  it('merges new turn with last history item if both are user role', () => {
+    const history = [{ role: 'user' as const, parts: [{ text: 'First user prompt' }] }];
+    const appended = appendTurnToHistory(history, 'user', [{ text: 'Second user prompt' }]);
+    expect(appended).toHaveLength(1);
+    expect(appended[0].role).toBe('user');
+    expect(appended[0].parts).toEqual([{ text: 'First user prompt' }, { text: 'Second user prompt' }]);
+  });
+
+  it('strips trailing unclosed function call when appending a new user turn', () => {
+    const history = [
+      { role: 'user' as const, parts: [{ text: 'Run tool' }] },
+      {
+        role: 'model' as const,
+        parts: [{ functionCall: { id: 'c1', name: 'tool_a', args: {} } }],
+      },
+    ];
+
+    const appended = appendTurnToHistory(history, 'user', [{ text: 'New prompt after abort' }]);
+    // The un-responded call is stripped, and the user turns are merged safely
+    expect(appended).toHaveLength(1);
+    expect(appended[0].role).toBe('user');
+    expect(appended[0].parts).toEqual([{ text: 'Run tool' }, { text: 'New prompt after abort' }]);
   });
 });

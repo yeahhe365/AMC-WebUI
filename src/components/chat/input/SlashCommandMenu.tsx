@@ -4,6 +4,7 @@ import { CommandIcon } from '@/components/icons/CommandIcon';
 import type { SlashCommand as SlashMenuItem } from '@/types/slashCommands';
 import { useI18n } from '@/contexts/I18nContext';
 import { SETTINGS_KBD_KEY_CLASS, SETTINGS_NAV_ACTIVE_CLASS } from '@/constants/designTokens';
+import { isMacPlatform, getModifierKeySymbol } from '@/utils/platform';
 
 interface SlashCommandMenuProps {
   isOpen: boolean;
@@ -88,7 +89,7 @@ const SlashCommandMenuComponent: React.FC<SlashCommandMenuProps> = ({
       setIsAssistivePressed(false);
       return;
     }
-    const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+    const isMac = isMacPlatform();
     const check = (e: KeyboardEvent) => setIsAssistivePressed(isMac ? e.metaKey : e.ctrlKey);
     const clear = () => setIsAssistivePressed(false);
     window.addEventListener('keydown', check);
@@ -109,10 +110,7 @@ const SlashCommandMenuComponent: React.FC<SlashCommandMenuProps> = ({
   // the panel visually flush with the input shell instead of inset by padding.
   const defaultClasses = 'absolute bottom-full left-0 right-0 mb-2 z-30';
   const finalClassName = className || defaultClasses;
-  const isMac =
-    typeof navigator !== 'undefined' &&
-    (/Mac|iPhone|iPad|iPod/.test(navigator.platform) || /Mac/.test(navigator.userAgent));
-  const assistiveKey = isMac ? '⌘' : 'Ctrl';
+  const assistiveKey = getModifierKeySymbol();
 
   return (
     <div className={finalClassName} style={{ animation: 'fadeInUp 0.15s cubic-bezier(0.16, 1, 0.3, 1) both' }}>

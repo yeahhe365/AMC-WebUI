@@ -1,0 +1,55 @@
+---
+title: 第三方兼容模型 (OpenAI-Compatible)
+description: 如何接入 DeepSeek、Claude、OpenRouter 等 OpenAI 兼容格式服务商，以及配置隔离与安全说明。
+---
+
+# 第三方兼容模型 (OpenAI-Compatible)
+
+除了原生 Google Gemini 系列，AMC WebUI 提供了面向通用大模型生态的标准聊天路径，支持几乎所有兼容 OpenAI `/chat/completions` 标准协议的服务商。
+
+---
+
+## 严格的双路由配置隔离
+
+AMC WebUI 在设计之初就确立了**配置物理隔离**准则：
+- **独立 Base URL**：在 **设置 -> 服务商与 API -> OpenAI 兼容** 填写的端点，仅用于第三方请求。
+- **独立 API Key**：第三方 Key 单独保存在本地 IndexedDB 中，绝不会被带入 Gemini 原生请求，反之亦然。
+- **独立模型列表**：支持独立管理第三方模型名称（例如 `deepseek-chat`、`deepseek-reasoner`、`claude-3-5-sonnet` 等）。
+
+---
+
+## 典型服务商配置示例
+
+### 1. DeepSeek 官方
+- **服务商名称**：DeepSeek
+- **Base URL**：`https://api.deepseek.com/v1`
+- **常用模型**：`deepseek-chat`、`deepseek-reasoner`
+- **思考支持**：AMC WebUI 自动识别 `deepseek-reasoner`，并将其思维链内容折叠展示。
+
+### 2. OpenRouter (全球多模型聚合)
+- **Base URL**：`https://openrouter.ai/api/v1`
+- **常用模型**：`anthropic/claude-3.5-sonnet`、`meta-llama/llama-3.3-70b-instruct`
+
+### 3. Google AI Studio (OpenAI 兼容端点)
+Google 也提供了符合 OpenAI 协议的入口：
+- **Base URL**：`https://generativelanguage.googleapis.com/v1beta/openai`
+- **Key**：使用你的 `GEMINI_API_KEY`
+
+---
+
+## Docker 环境下的转发路由表 (`THIRD_PARTY_ROUTES`)
+
+若你在私有服务器部署了 Docker，并且希望由后端统一反代第三方请求，可在服务端环境变量配置 `THIRD_PARTY_ROUTES`：
+
+```json
+{
+  "deepseek": {
+    "baseUrl": "https://api.deepseek.com/v1",
+    "apiKey": "sk-your-server-deepseek-key"
+  }
+}
+```
+
+- 前端请求发往 `/api/openai/*`，并携带请求头 `x-third-party-provider: deepseek`。
+- 遵循「浏览器 Key 优先、缺失时回落服务端 Key」策略。
+- 仅允许转发到公共 HTTPS 域名，杜绝 SSRF 内部网络扫描隐患。

@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ClipboardList, Loader2, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { ClipboardList, Filter, Loader2, Plus, RefreshCw, Search, X } from 'lucide-react';
 import type { ModelOption } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
+import { useChatStore } from '@/stores/chatStore';
 import {
   SETTINGS_PRIMARY_ACTION_BUTTON_CLASS,
   SETTINGS_SECONDARY_ACTION_BUTTON_CLASS,
@@ -14,6 +15,21 @@ import {
   parsePastedOpenAICompatibleModelIds,
 } from './openaiCompatibleModelListState';
 import { interpolate } from '@/i18n/interpolate';
+
+const isNonChatModel = (id: string): boolean => {
+  const lower = id.toLowerCase();
+  return (
+    lower.includes('embed') ||
+    lower.includes('rerank') ||
+    lower.includes('whisper') ||
+    lower.includes('tts') ||
+    lower.includes('voice') ||
+    lower.includes('moderation') ||
+    lower.includes('flux') ||
+    lower.includes('dall-e') ||
+    lower.includes('stable-diffusion')
+  );
+};
 
 interface OpenAICompatibleModelImportPanelProps {
   rows: EditableOpenAICompatibleModelRow[];
@@ -44,21 +60,39 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
   const [batchModelText, setBatchModelText] = useState('');
   const [fetchedPreviewModels, setFetchedPreviewModels] = useState<ModelOption[]>([]);
   const [searchFilter, setSearchFilter] = useState('');
+  const [filterChatOnly, setFilterChatOnly] = useState(false);
   const [selectedFetchedModelIds, setSelectedFetchedModelIds] = useState<Set<string>>(() => new Set());
   const [managerMessage, setManagerMessage] = useState<string | null>(null);
   const [activeCategoryTab, setActiveCategoryTab] = useState<'all' | 'new' | 'existing' | 'missing'>('all');
   const handledFetchRequestIdRef = useRef(0);
 
+  const inUseModelIds = useMemo(() => {
+    const inUse = new Set<string>();
+    const state = useChatStore.getState();
+    const allSessions = state.savedSessions || [];
+    for (const session of allSessions) {
+      if (session.settings?.modelId) {
+        inUse.add(session.settings.modelId);
+      }
+    }
+    return inUse;
+  }, []);
+
   const fetchedModelIdSet = useMemo(() => new Set(fetchedPreviewModels.map((m) => m.id)), [fetchedPreviewModels]);
 
+  const filteredFetchedModels = useMemo(() => {
+    if (!filterChatOnly) return fetchedPreviewModels;
+    return fetchedPreviewModels.filter((m) => !isNonChatModel(m.id));
+  }, [fetchedPreviewModels, filterChatOnly]);
+
   const newModels = useMemo(
-    () => fetchedPreviewModels.filter((model) => !currentModelIds.has(model.id)),
-    [currentModelIds, fetchedPreviewModels],
+    () => filteredFetchedModels.filter((model) => !currentModelIds.has(model.id)),
+    [currentModelIds, filteredFetchedModels],
   );
 
   const existingModels = useMemo(
-    () => fetchedPreviewModels.filter((model) => currentModelIds.has(model.id)),
-    [currentModelIds, fetchedPreviewModels],
+    () => filteredFetchedModels.filter((model) => currentModelIds.has(model.id)),
+    [currentModelIds, filteredFetchedModels],
   );
 
   const missingModels = useMemo(() => {
@@ -67,21 +101,24 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
   }, [fetchedModelIdSet, fetchedPreviewModels.length, rows]);
 
   const displayedModels = useMemo(() => {
-    let list: Array<{ id: string; name: string; isMissing?: boolean }>;
+    let list: Array<{ id: string; name: string; isMissing?: boolean; isInUse?: boolean }>;
     if (activeCategoryTab === 'new') {
       list = newModels;
     } else if (activeCategoryTab === 'existing') {
       list = existingModels;
     } else if (activeCategoryTab === 'missing') {
-      list = missingModels.map((m) => ({ ...m, isMissing: true }));
+      list = missingModels.map((m) => ({ ...m, isMissing: true, isInUse: inUseModelIds.has(m.id) }));
     } else {
-      list = [...fetchedPreviewModels, ...missingModels.map((m) => ({ ...m, isMissing: true }))];
+      list = [
+        ...filteredFetchedModels,
+        ...missingModels.map((m) => ({ ...m, isMissing: true, isInUse: inUseModelIds.has(m.id) })),
+      ];
     }
 
     if (!searchFilter.trim()) return list;
     const query = searchFilter.toLowerCase().trim();
     return list.filter((m) => m.id.toLowerCase().includes(query) || m.name.toLowerCase().includes(query));
-  }, [activeCategoryTab, existingModels, fetchedPreviewModels, missingModels, newModels, searchFilter]);
+  }, [activeCategoryTab, existingModels, filteredFetchedModels, inUseModelIds, missingModels, newModels, searchFilter]);
 
   const importableFetchedModelIds = useMemo(() => newModels.map((model) => model.id), [newModels]);
 
@@ -172,12 +209,27 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
 
   const handlePruneMissingModels = () => {
     if (missingModels.length === 0) return;
-    const missingIdSet = new Set(missingModels.map((m) => m.id));
+    const prunableModels = missingModels.filter((m) => !inUseModelIds.has(m.id));
+    if (prunableModels.length === 0) {
+      setManagerMessage(t('settingsOpenAICompatiblePruneAllProtected'));
+      return;
+    }
+    const missingIdSet = new Set(prunableModels.map((m) => m.id));
     const remainingRows = rows.filter((r) => !missingIdSet.has(r.id));
     onCommitRows(remainingRows);
-    setManagerMessage(
-      interpolate(t('settingsOpenAICompatiblePruneMissingConfirm'), { count: String(missingModels.length) }),
-    );
+    const protectedCount = missingModels.length - prunableModels.length;
+    if (protectedCount > 0) {
+      setManagerMessage(
+        interpolate(t('settingsOpenAICompatiblePruneWithProtectedConfirm'), {
+          count: String(prunableModels.length),
+          protectedCount: String(protectedCount),
+        }),
+      );
+    } else {
+      setManagerMessage(
+        interpolate(t('settingsOpenAICompatiblePruneMissingConfirm'), { count: String(prunableModels.length) }),
+      );
+    }
   };
 
   return (
@@ -276,27 +328,42 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
               )}
             </div>
 
-            <div className="relative">
-              <Search
-                size={14}
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-secondary)]"
-              />
-              <input
-                type="text"
-                value={searchFilter}
-                onChange={(event) => setSearchFilter(event.target.value)}
-                placeholder={t('settingsOpenAICompatibleModelSearch')}
-                className="w-full rounded-md border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-input)] py-1.5 pl-8 pr-8 text-xs text-[var(--theme-text-primary)] outline-none placeholder:text-[var(--theme-text-tertiary)] focus:border-[var(--theme-border-focus)] focus:ring-1 focus:ring-[var(--theme-border-focus)]"
-              />
-              {searchFilter && (
-                <button
-                  type="button"
-                  onClick={() => setSearchFilter('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]"
-                >
-                  <X size={12} />
-                </button>
-              )}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search
+                  size={14}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-secondary)]"
+                />
+                <input
+                  type="text"
+                  value={searchFilter}
+                  onChange={(event) => setSearchFilter(event.target.value)}
+                  placeholder={t('settingsOpenAICompatibleModelSearch')}
+                  className="w-full rounded-md border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-input)] py-1.5 pl-8 pr-8 text-xs text-[var(--theme-text-primary)] outline-none placeholder:text-[var(--theme-text-tertiary)] focus:border-[var(--theme-border-focus)] focus:ring-1 focus:ring-[var(--theme-border-focus)]"
+                />
+                {searchFilter && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchFilter('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setFilterChatOnly((prev) => !prev)}
+                className={`px-2.5 py-1.5 rounded-md text-xs font-medium border transition-colors flex items-center gap-1.5 shrink-0 ${
+                  filterChatOnly
+                    ? 'border-[var(--theme-border-focus)] bg-[var(--theme-border-focus)]/15 text-[var(--theme-text-primary)] font-semibold'
+                    : 'border-[var(--theme-border-secondary)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)]'
+                }`}
+                title={t('settingsOpenAICompatibleFilterChatOnlyTitle')}
+              >
+                <Filter size={12} />
+                <span>{t('settingsOpenAICompatibleFilterChatOnly')}</span>
+              </button>
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -350,19 +417,26 @@ export const OpenAICompatibleModelImportPanel: React.FC<OpenAICompatibleModelImp
                     )}
                     <span className="min-w-0 flex-1 flex items-center justify-between gap-2">
                       <span className="truncate font-mono text-xs text-[var(--theme-text-primary)]">{model.id}</span>
-                      {isMissing ? (
-                        <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-500/15 text-amber-400 shrink-0">
-                          {t('settingsOpenAICompatibleTabMissing')}
-                        </span>
-                      ) : alreadyAdded ? (
-                        <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-sky-500/15 text-sky-400 shrink-0">
-                          {t('settingsOpenAICompatibleTabExisting')}
-                        </span>
-                      ) : (
-                        <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-emerald-500/15 text-emerald-400 shrink-0">
-                          {t('settingsOpenAICompatibleTabNew')}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {inUseModelIds.has(model.id) && (
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-indigo-500/20 text-indigo-300">
+                            {t('modelInUseBadge')}
+                          </span>
+                        )}
+                        {isMissing ? (
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-500/15 text-amber-400">
+                            {t('settingsOpenAICompatibleTabMissing')}
+                          </span>
+                        ) : alreadyAdded ? (
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-sky-500/15 text-sky-400">
+                            {t('settingsOpenAICompatibleTabExisting')}
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-emerald-500/15 text-emerald-400">
+                            {t('settingsOpenAICompatibleTabNew')}
+                          </span>
+                        )}
+                      </div>
                     </span>
                   </label>
                 );

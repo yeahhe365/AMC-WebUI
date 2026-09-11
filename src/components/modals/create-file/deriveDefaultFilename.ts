@@ -1,42 +1,27 @@
-const MAX_DERIVED_FILENAME_LENGTH = 60;
-const MARKDOWN_LINK_PATTERN = /\[([^\]]+)\]\([^)]*\)/g;
-const MARKDOWN_IMAGE_PATTERN = /!\[([^\]]*)\]\([^)]*\)/g;
-const MARKDOWN_EMPHASIS_PATTERN = /\*\*|__|\*|~~|`/g;
-const UNSAFE_FILENAME_CHAR_PATTERN = /[<>:"/\\|?*#]/g;
-
 /**
- * Derives a human-friendly default filename from editor content: the first
- * markdown heading wins, otherwise the first non-empty line. Returns null when
- * nothing usable can be extracted.
+ * Formats a Date object into a filesystem-safe, human-readable timestamp filename stem:
+ * YYYY-MM-DD_HH-mm-ss (e.g., 2026-09-10_20-15-30)
  */
-const cleanFilenameCandidate = (candidate: string): string | null => {
-  const cleaned = candidate
-    .replace(MARKDOWN_IMAGE_PATTERN, '$1')
-    .replace(MARKDOWN_LINK_PATTERN, '$1')
-    .replace(MARKDOWN_EMPHASIS_PATTERN, '')
-    .replace(UNSAFE_FILENAME_CHAR_PATTERN, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, MAX_DERIVED_FILENAME_LENGTH)
-    .trim();
-  return cleaned || null;
+export const formatTimestampFilename = (date: Date = new Date()): string => {
+  const targetDate = isNaN(date.getTime()) ? new Date() : date;
+  const pad = (num: number) => String(num).padStart(2, '0');
+  const year = targetDate.getFullYear();
+  const month = pad(targetDate.getMonth() + 1);
+  const day = pad(targetDate.getDate());
+  const hours = pad(targetDate.getHours());
+  const minutes = pad(targetDate.getMinutes());
+  const seconds = pad(targetDate.getSeconds());
+
+  return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
 };
 
-export const deriveDefaultFilename = (content: string): string | null => {
-  let firstNonEmptyLine: string | null = null;
-
-  for (const rawLine of content.split('\n')) {
-    const line = rawLine.trim();
-    if (!line) continue;
-
-    const headingMatch = line.match(/^#{1,6}\s+(.*)$/);
-    if (headingMatch) {
-      const heading = cleanFilenameCandidate(headingMatch[1]);
-      if (heading) return heading;
-      continue;
-    }
-    if (firstNonEmptyLine === null) firstNonEmptyLine = line;
+/**
+ * Standard default filename generator. Content-based title guessing is disabled
+ * in favor of consistent, conflict-free timestamp naming.
+ */
+export const deriveDefaultFilename = (dateOrContent?: Date | string): string => {
+  if (dateOrContent instanceof Date) {
+    return formatTimestampFilename(dateOrContent);
   }
-
-  return firstNonEmptyLine === null ? null : cleanFilenameCandidate(firstNonEmptyLine);
+  return formatTimestampFilename();
 };

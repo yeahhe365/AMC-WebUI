@@ -4,6 +4,13 @@ import {
   type AppLanguage as RegistryAppLanguage,
 } from '@/i18n/languageRegistry';
 
+export interface ModelCapabilities {
+  vision?: boolean;
+  thinking?: boolean;
+  tools?: boolean;
+  webSearch?: boolean;
+}
+
 export interface ModelOption {
   id: string;
   name: string;
@@ -19,6 +26,26 @@ export interface ModelOption {
   unavailable?: boolean;
   /** True when the connection is enabled but has no API key yet. */
   missingApiKey?: boolean;
+  /** Whether the model is shown in the chat model picker (defaults to true; false hides it). */
+  visibleInSelector?: boolean;
+  /** Whether reasoning/thinking is enabled for this model. */
+  enableThinking?: boolean;
+  /** Whether tool/function calling/MCP is enabled for this model. */
+  enableTools?: boolean;
+  /** Context window limit in tokens (e.g. 128000, 200000, 1048576). */
+  contextWindow?: number;
+  /** Maximum output tokens supported by model. */
+  maxOutputTokens?: number;
+  /** Intrinsic model capabilities. */
+  capabilities?: ModelCapabilities;
+  /** Creator or vendor who owns the model architecture. */
+  ownedBy?: string;
+  /** Custom model parameters overriding session defaults. */
+  parameters?: {
+    temperature?: number;
+    maxOutputTokens?: number;
+    topP?: number;
+  };
 }
 
 export enum HarmCategory {
@@ -26,6 +53,7 @@ export enum HarmCategory {
   HARM_CATEGORY_HATE_SPEECH = 'HARM_CATEGORY_HATE_SPEECH',
   HARM_CATEGORY_SEXUALLY_EXPLICIT = 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
   HARM_CATEGORY_DANGEROUS_CONTENT = 'HARM_CATEGORY_DANGEROUS_CONTENT',
+  HARM_CATEGORY_JAILBREAK = 'HARM_CATEGORY_JAILBREAK',
 }
 
 export enum HarmBlockThreshold {
@@ -45,9 +73,7 @@ export enum MediaResolution {
 }
 
 export type ImageOutputMode = 'IMAGE_TEXT' | 'IMAGE_ONLY';
-/** All valid API modes — used for both type checking and runtime validation. */
-export const API_MODES = ['gemini-native', 'third-party'] as const;
-export type ApiMode = (typeof API_MODES)[number];
+export type ApiMode = 'gemini-native' | 'third-party';
 
 /** The built-in Gemini provider id used in session routing. */
 export const GEMINI_PROVIDER_ID = 'gemini-native';
@@ -71,7 +97,7 @@ export const normalizeModelApiModeTag = (value: unknown): ApiMode | undefined =>
 export type { McpServerAuthType, McpServerConfig, McpServerTransport };
 
 /** Wire protocol supported by a third-party API provider. */
-export type ThirdPartyApiProtocol = 'openai-compatible' | 'anthropic';
+export type ThirdPartyApiProtocol = 'openai-compatible' | 'anthropic' | 'openai-responses';
 
 /** Legacy persisted provider map keys (pre-connection-list settings). */
 export const LEGACY_THIRD_PARTY_PROVIDER_IDS = [
@@ -97,9 +123,22 @@ export const THIRD_PARTY_TEMPLATE_IDS = [
   'qwen',
   'kimi',
   'glm',
+  'siliconflow',
+  'groq',
+  'together',
   'nvidia',
   'minimax',
   'grok',
+  'ollama',
+  'lmstudio',
+  'baichuan',
+  'stepfun',
+  'yi',
+  'doubao',
+  'mistral',
+  'perplexity',
+  'cerebras',
+  'fireworks',
   'atlascloud',
   'custom-openai',
   'custom-anthropic',
@@ -121,6 +160,7 @@ export interface ThirdPartyConnection {
   modelId: string;
   models: ModelOption[];
   enabled: boolean;
+  authOptional?: boolean;
 }
 
 /** Third-party connections. Sessions route by stored (providerId, modelId). */
@@ -129,7 +169,7 @@ export interface ThirdPartyApiSettings {
 }
 
 /** All valid thinking levels — used for both type checking and runtime validation. */
-export const THINKING_LEVELS = ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH'] as const;
+export const THINKING_LEVELS = ['NONE', 'MINIMAL', 'LOW', 'MEDIUM', 'HIGH', 'XHIGH', 'MAX'] as const;
 export type ThinkingLevel = (typeof THINKING_LEVELS)[number];
 /** All valid live artifacts prompt modes — used for both type checking and runtime validation. */
 export const LIVE_ARTIFACTS_PROMPT_MODES = ['inline'] as const;
@@ -165,6 +205,14 @@ export interface FilesApiConfig {
   text: boolean;
 }
 
+export interface GeoLocationCoordinates {
+  latitude: number;
+  longitude: number;
+  name?: string;
+}
+
+export type VisionPromptMode = 'bbox' | 'hdGuide' | null;
+
 export interface ChatSettings {
   modelId: string;
   /** Which provider this session's modelId belongs to. Absent = gemini-native. */
@@ -174,12 +222,16 @@ export interface ChatSettings {
   topK: number;
   showThoughts: boolean;
   systemInstruction: string;
+  isLiveArtifactsEnabled?: boolean;
+  visionPromptMode?: VisionPromptMode;
   ttsVoice: string;
   thinkingBudget: number;
   thinkingLevel?: ThinkingLevel;
   lockedApiKey?: string | null;
   isGoogleSearchEnabled?: boolean;
   isGoogleMapsEnabled?: boolean;
+  /** Optional location coordinates for Google Maps Grounding retrievalConfig. */
+  googleMapsLocation?: GeoLocationCoordinates;
   isCodeExecutionEnabled?: boolean;
   isLocalPythonEnabled?: boolean;
   isUrlContextEnabled?: boolean;
@@ -190,8 +242,8 @@ export interface ChatSettings {
   isVideoNavEnabled?: boolean;
   /** Audio navigation preset (AI timestamp-locate + side player). */
   isAudioNavEnabled?: boolean;
-  /** Unified media navigation preset (PDF + Video). */
-  isMediaNavEnabled?: boolean;
+  /** Image navigation preset (AI visual grounding, BBox & guide arrow). */
+  isImageNavEnabled?: boolean;
   /** Maximum output tokens to generate (optional; unset = model default). */
   maxOutputTokens?: number;
   /** Stop sequences to halt generation (optional). */
@@ -239,7 +291,7 @@ export const normalizeProviderId = (value: unknown): ChatProviderId | undefined 
 };
 
 export interface AppSettings extends ChatSettings {
-  themeId: 'system' | 'onyx' | 'graphite' | 'pearl';
+  themeId: 'system' | 'onyx' | 'graphite' | 'pearl' | 'sepia';
   baseFontSize: number;
   useCustomApiConfig: boolean;
   serverManagedApi?: boolean;
@@ -264,6 +316,7 @@ export interface AppSettings extends ChatSettings {
   isCompletionSoundBackgroundOnly?: boolean;
   isLoggingEnabled?: boolean;
   isSuggestionsEnabled: boolean;
+  showMessageTokenStats?: boolean;
   isAutoScrollOnSendEnabled?: boolean;
   isAutoSendOnSuggestionClick?: boolean;
   generateQuadImages?: boolean;
@@ -295,3 +348,23 @@ export interface AppSettings extends ChatSettings {
   liveApiKey?: string | null;
   thirdPartyApi: ThirdPartyApiSettings;
 }
+
+/** Subset of AppSettings consumed by chat message rendering components to isolate memoization. */
+export type MessageAppSettings = Pick<
+  AppSettings,
+  | 'baseFontSize'
+  | 'expandCodeBlocksByDefault'
+  | 'isMermaidRenderingEnabled'
+  | 'isGraphvizRenderingEnabled'
+  | 'unwrapMislabeledHtmlBlocks'
+  | 'liveArtifactsCustomFontSize'
+  | 'systemInstruction'
+  | 'isLiveArtifactsEnabled'
+  | 'liveArtifactsPromptMode'
+  | 'liveArtifactsSystemPrompt'
+  | 'liveArtifactsSystemPrompts'
+  | 'autoOpenHtmlPreview'
+  | 'hideThinkingInContext'
+  | 'thoughtTranslationTargetLanguage'
+  | 'thoughtTranslationModelId'
+>;

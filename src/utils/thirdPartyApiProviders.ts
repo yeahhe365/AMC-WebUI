@@ -32,16 +32,29 @@ export const THIRD_PARTY_TEMPLATE_LABELS: Record<ThirdPartyTemplateId, string> =
   qwen: 'Qwen',
   kimi: 'Kimi',
   glm: 'GLM',
+  siliconflow: 'SiliconFlow',
+  groq: 'Groq',
+  together: 'Together AI',
   nvidia: 'Nvidia',
   minimax: 'MiniMax',
   grok: 'Grok',
+  ollama: 'Ollama',
+  lmstudio: 'LM Studio',
+  baichuan: 'Baichuan (百川)',
+  stepfun: 'StepFun (阶跃星辰)',
+  yi: '01.AI (零一万物)',
+  doubao: 'Doubao (火山引擎)',
+  mistral: 'Mistral AI',
+  perplexity: 'Perplexity',
+  cerebras: 'Cerebras',
+  fireworks: 'Fireworks AI',
   atlascloud: 'Atlas Cloud',
   'custom-openai': 'Custom (OpenAI compatible)',
   'custom-anthropic': 'Custom (Anthropic)',
 };
 
 const isThirdPartyProtocol = (value: unknown): value is ThirdPartyApiProtocol =>
-  value === 'openai-compatible' || value === 'anthropic';
+  value === 'openai-compatible' || value === 'anthropic' || value === 'openai-responses';
 
 const isThirdPartyTemplateId = (value: unknown): value is ThirdPartyTemplateId =>
   typeof value === 'string' && (THIRD_PARTY_TEMPLATE_IDS as readonly string[]).includes(value);
@@ -56,6 +69,7 @@ interface ThirdPartyTemplateDefaults {
   protocol: ThirdPartyApiProtocol;
   apiKeyUrl?: string;
   docUrl?: string;
+  authOptional?: boolean;
 }
 
 const TEMPLATE_DEFAULTS: Record<ThirdPartyTemplateId, ThirdPartyTemplateDefaults> = {
@@ -133,6 +147,43 @@ const TEMPLATE_DEFAULTS: Record<ThirdPartyTemplateId, ThirdPartyTemplateDefaults
     apiKeyUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
     docUrl: 'https://open.bigmodel.cn/dev/api',
   },
+  siliconflow: {
+    name: 'SiliconFlow',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    modelId: 'deepseek-ai/DeepSeek-V3',
+    models: [
+      { id: 'deepseek-ai/DeepSeek-V3', name: 'DeepSeek V3', isPinned: true },
+      { id: 'deepseek-ai/DeepSeek-R1', name: 'DeepSeek R1', isPinned: true },
+      { id: 'Qwen/Qwen2.5-72B-Instruct', name: 'Qwen 2.5 72B Instruct' },
+    ],
+    protocol: 'openai-compatible',
+    apiKeyUrl: 'https://cloud.siliconflow.cn/account/ak',
+    docUrl: 'https://docs.siliconflow.cn',
+  },
+  groq: {
+    name: 'Groq',
+    baseUrl: 'https://api.groq.com/openai/v1',
+    modelId: 'llama-3.3-70b-versatile',
+    models: [
+      { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B Versatile', isPinned: true },
+      { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant' },
+    ],
+    protocol: 'openai-compatible',
+    apiKeyUrl: 'https://console.groq.com/keys',
+    docUrl: 'https://console.groq.com/docs',
+  },
+  together: {
+    name: 'Together AI',
+    baseUrl: 'https://api.together.xyz/v1',
+    modelId: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+    models: [
+      { id: 'meta-llama/Llama-3.3-70B-Instruct-Turbo', name: 'Llama 3.3 70B Instruct Turbo', isPinned: true },
+      { id: 'deepseek-ai/DeepSeek-R1', name: 'DeepSeek R1' },
+    ],
+    protocol: 'openai-compatible',
+    apiKeyUrl: 'https://api.together.ai/settings/api-keys',
+    docUrl: 'https://docs.together.ai',
+  },
   nvidia: {
     name: 'Nvidia',
     baseUrl: 'https://integrate.api.nvidia.com/v1',
@@ -168,6 +219,121 @@ const TEMPLATE_DEFAULTS: Record<ThirdPartyTemplateId, ThirdPartyTemplateDefaults
     protocol: 'openai-compatible',
     apiKeyUrl: 'https://console.x.ai',
     docUrl: 'https://docs.x.ai',
+  },
+  ollama: {
+    name: 'Ollama',
+    baseUrl: 'http://localhost:11434/v1',
+    modelId: 'llama3.2',
+    models: [{ id: 'llama3.2', name: 'Llama 3.2', isPinned: true }],
+    protocol: 'openai-compatible',
+    docUrl: 'https://ollama.com',
+    authOptional: true,
+  },
+  lmstudio: {
+    name: 'LM Studio',
+    baseUrl: 'http://localhost:1234/v1',
+    modelId: 'local-model',
+    models: [{ id: 'local-model', name: 'Local Model', isPinned: true }],
+    protocol: 'openai-compatible',
+    docUrl: 'https://lmstudio.ai',
+    authOptional: true,
+  },
+  baichuan: {
+    name: 'Baichuan',
+    baseUrl: 'https://api.baichuan-ai.com/v1',
+    modelId: 'Baichuan4',
+    models: [
+      { id: 'Baichuan4', name: 'Baichuan 4', isPinned: true },
+      { id: 'Baichuan3-Turbo', name: 'Baichuan 3 Turbo' },
+    ],
+    protocol: 'openai-compatible',
+    apiKeyUrl: 'https://platform.baichuan-ai.com/console/apikey',
+    docUrl: 'https://platform.baichuan-ai.com/docs/api',
+  },
+  stepfun: {
+    name: 'StepFun',
+    baseUrl: 'https://api.stepfun.com/v1',
+    modelId: 'step-2-16k',
+    models: [
+      { id: 'step-2-16k', name: 'Step 2 (16K)', isPinned: true },
+      { id: 'step-1-8k', name: 'Step 1 (8K)' },
+    ],
+    protocol: 'openai-compatible',
+    apiKeyUrl: 'https://platform.stepfun.com/interface-key',
+    docUrl: 'https://platform.stepfun.com/docs/llm/text',
+  },
+  yi: {
+    name: '01.AI',
+    baseUrl: 'https://api.lingyiwanwu.com/v1',
+    modelId: 'yi-lightning',
+    models: [
+      { id: 'yi-lightning', name: 'Yi Lightning', isPinned: true },
+      { id: 'yi-large', name: 'Yi Large' },
+    ],
+    protocol: 'openai-compatible',
+    apiKeyUrl: 'https://platform.lingyiwanwu.com/apikeys',
+    docUrl: 'https://platform.lingyiwanwu.com/docs',
+  },
+  doubao: {
+    name: 'Doubao',
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    modelId: 'doubao-pro-32k',
+    models: [
+      { id: 'doubao-pro-32k', name: 'Doubao Pro 32K', isPinned: true },
+      { id: 'doubao-lite-32k', name: 'Doubao Lite 32K' },
+    ],
+    protocol: 'openai-compatible',
+    apiKeyUrl: 'https://console.volcengine.com/ark',
+    docUrl: 'https://www.volcengine.com/docs/82379/1099470',
+  },
+  mistral: {
+    name: 'Mistral AI',
+    baseUrl: 'https://api.mistral.ai/v1',
+    modelId: 'mistral-large-latest',
+    models: [
+      { id: 'mistral-large-latest', name: 'Mistral Large', isPinned: true },
+      { id: 'codestral-latest', name: 'Codestral' },
+      { id: 'mistral-small-latest', name: 'Mistral Small' },
+    ],
+    protocol: 'openai-compatible',
+    apiKeyUrl: 'https://console.mistral.ai/api-keys/',
+    docUrl: 'https://docs.mistral.ai/',
+  },
+  perplexity: {
+    name: 'Perplexity',
+    baseUrl: 'https://api.perplexity.ai',
+    modelId: 'sonar-pro',
+    models: [
+      { id: 'sonar-pro', name: 'Sonar Pro', isPinned: true },
+      { id: 'sonar', name: 'Sonar' },
+    ],
+    protocol: 'openai-compatible',
+    apiKeyUrl: 'https://www.perplexity.ai/settings/api',
+    docUrl: 'https://docs.perplexity.ai/',
+  },
+  cerebras: {
+    name: 'Cerebras',
+    baseUrl: 'https://api.cerebras.ai/v1',
+    modelId: 'llama-3.3-70b',
+    models: [
+      { id: 'llama-3.3-70b', name: 'Llama 3.3 70B (Fast)', isPinned: true },
+      { id: 'llama3.1-8b', name: 'Llama 3.1 8B' },
+    ],
+    protocol: 'openai-compatible',
+    apiKeyUrl: 'https://cloud.cerebras.ai/',
+    docUrl: 'https://inference-docs.cerebras.ai/',
+  },
+  fireworks: {
+    name: 'Fireworks AI',
+    baseUrl: 'https://api.fireworks.ai/inference/v1',
+    modelId: 'accounts/fireworks/models/deepseek-r1',
+    models: [
+      { id: 'accounts/fireworks/models/deepseek-r1', name: 'DeepSeek R1', isPinned: true },
+      { id: 'accounts/fireworks/models/deepseek-v3', name: 'DeepSeek V3' },
+    ],
+    protocol: 'openai-compatible',
+    apiKeyUrl: 'https://fireworks.ai/api-keys',
+    docUrl: 'https://docs.fireworks.ai/',
   },
   atlascloud: {
     name: 'Atlas Cloud',
@@ -233,6 +399,12 @@ export const getThirdPartyTemplateLinks = (
 export const getConnectionDisplayTemplateId = (
   connection: Pick<ThirdPartyConnection, 'templateId' | 'protocol'>,
 ): ThirdPartyTemplateId => {
+  if (
+    connection.templateId === 'openai' &&
+    (connection.protocol === 'openai-compatible' || connection.protocol === 'openai-responses')
+  ) {
+    return 'openai';
+  }
   const defaultProtocol = TEMPLATE_DEFAULTS[connection.templateId]?.protocol;
   if (!defaultProtocol || connection.protocol === defaultProtocol) {
     return connection.templateId;
@@ -243,12 +415,12 @@ export const getConnectionDisplayTemplateId = (
 type ThirdPartyConnectionStatusKind = 'disabled' | 'missing-key' | 'missing-url' | 'ready';
 
 export const getThirdPartyConnectionStatus = (
-  connection: Pick<ThirdPartyConnection, 'enabled' | 'apiKey' | 'baseUrl'>,
+  connection: Pick<ThirdPartyConnection, 'enabled' | 'apiKey' | 'baseUrl'> & { authOptional?: boolean },
 ): ThirdPartyConnectionStatusKind => {
   if (!connection.enabled) {
     return 'disabled';
   }
-  if (!connection.apiKey?.trim()) {
+  if (!connection.authOptional && !connection.apiKey?.trim()) {
     return 'missing-key';
   }
   if (!connection.baseUrl?.trim()) {
@@ -307,7 +479,7 @@ const sanitizeExtraHeaders = (value: unknown): Record<string, string> => {
   return headers;
 };
 
-const sanitizeThirdPartyConnection = (
+export const sanitizeThirdPartyConnection = (
   value: Partial<ThirdPartyConnection> | undefined,
   fallbackTemplateId: ThirdPartyTemplateId = 'custom-openai',
 ): ThirdPartyConnection | null => {
@@ -336,6 +508,7 @@ const sanitizeThirdPartyConnection = (
     models,
     protocol: isThirdPartyProtocol(value?.protocol) ? value.protocol : defaults.protocol,
     enabled: value?.enabled === true,
+    authOptional: typeof value?.authOptional === 'boolean' ? value.authOptional : defaults.authOptional,
   };
 };
 
@@ -455,14 +628,21 @@ export const buildProviderAwareModelList = (
   session?: Pick<ChatSettings, 'modelId' | 'providerId'>,
 ): ModelOption[] => {
   const thirdPartyModels = getEnabledThirdPartyProviders(appSettings).flatMap(({ id, config }) =>
-    deduplicateModelsById(config.models).map((model) => ({
-      ...model,
-      apiMode: 'third-party' as const,
-      providerId: id,
-      templateId: getConnectionDisplayTemplateId(config),
-      connectionName: config.name,
-      ...(config.apiKey?.trim() ? {} : { missingApiKey: true as const }),
-    })),
+    deduplicateModelsById(config.models)
+      .filter((model) => {
+        if (model.visibleInSelector === false) {
+          return session?.providerId === id && session?.modelId === model.id;
+        }
+        return true;
+      })
+      .map((model) => ({
+        ...model,
+        apiMode: 'third-party' as const,
+        providerId: id,
+        templateId: getConnectionDisplayTemplateId(config),
+        connectionName: config.name,
+        ...(config.authOptional || config.apiKey?.trim() ? {} : { missingApiKey: true as const }),
+      })),
   );
 
   const models = [...deduplicateModelsById(baseModels), ...thirdPartyModels];
@@ -521,6 +701,7 @@ export const createConnectionFromTemplate = (
     modelId: defaults.modelId,
     models: defaults.models,
     enabled: true,
+    authOptional: defaults.authOptional,
   };
 };
 
@@ -553,3 +734,70 @@ export const removeThirdPartyConnection = (
 ): ThirdPartyApiSettings => ({
   connections: thirdPartyApi.connections.filter((connection) => connection.id !== connectionId),
 });
+
+export const isDeepSeekOfficialEndpoint = (templateId?: string | null, baseUrl?: string | null): boolean => {
+  if (templateId === 'deepseek') return true;
+  if (!baseUrl) return false;
+  return baseUrl.toLowerCase().includes('api.deepseek.com');
+};
+
+export const isDashScopeOfficialEndpoint = (templateId?: string | null, baseUrl?: string | null): boolean => {
+  if (templateId === 'dashscope') return true;
+  if (!baseUrl) return false;
+  return baseUrl.toLowerCase().includes('dashscope.aliyuncs.com');
+};
+
+export const isLocalEngineEndpoint = (templateId?: string | null, baseUrl?: string | null): boolean => {
+  if (templateId === 'ollama' || templateId === 'lmstudio') return true;
+  if (!baseUrl) return false;
+  const lower = baseUrl.toLowerCase();
+  return (
+    lower.includes('localhost:11434') ||
+    lower.includes('127.0.0.1:11434') ||
+    lower.includes('localhost:1234') ||
+    lower.includes('127.0.0.1:1234')
+  );
+};
+
+export const reorderThirdPartyConnections = (
+  thirdPartyApi: ThirdPartyApiSettings,
+  orderedIds: string[],
+): ThirdPartyApiSettings => {
+  const connectionMap = new Map(thirdPartyApi.connections.map((c) => [c.id, c]));
+  const reordered: ThirdPartyConnection[] = [];
+
+  orderedIds.forEach((id) => {
+    const conn = connectionMap.get(id);
+    if (conn) {
+      reordered.push(conn);
+      connectionMap.delete(id);
+    }
+  });
+
+  // Append any connections that weren't in orderedIds
+  connectionMap.forEach((conn) => {
+    reordered.push(conn);
+  });
+
+  return {
+    ...thirdPartyApi,
+    connections: reordered,
+  };
+};
+
+export function generateColorFromChar(text: string): string {
+  if (!text) return '#475569';
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = text.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash % 360);
+  return `hsl(${hue}, 65%, 38%)`;
+}
+
+export function getFirstCharacter(text: string): string {
+  if (!text) return '?';
+  const trimmed = text.trim();
+  if (!trimmed) return '?';
+  return trimmed.slice(0, 1).toUpperCase();
+}

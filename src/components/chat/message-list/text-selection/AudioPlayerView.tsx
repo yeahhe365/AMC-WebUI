@@ -1,8 +1,9 @@
-import React, { useState, type RefObject } from 'react';
+import React, { type RefObject } from 'react';
 import { GripVertical, X, Pause, Play } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import { GoogleSpinner } from '@/components/icons/GoogleSpinner';
 import { formatClockTime } from '@/utils/formatClockTime';
+import { useAudioPlayback } from '@/features/audio/useAudioPlayback';
 
 interface AudioPlayerViewProps {
   audioUrl: string | null;
@@ -26,33 +27,14 @@ export const AudioPlayerView: React.FC<AudioPlayerViewProps> = ({
   onClose,
 }) => {
   const { t } = useI18n();
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
   const showPlayer = Boolean(audioUrl) && !isLoading;
 
-  const progressPercent =
-    duration > 0 && Number.isFinite(duration) ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
-
-  const togglePlayback = () => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (audio.paused) {
-      void audio.play();
-    } else {
-      audio.pause();
-    }
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const nextTime = Number(e.target.value);
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    audio.currentTime = nextTime;
-    setCurrentTime(nextTime);
-  };
+  const { isPlaying, duration, currentTime, progressPercent, togglePlayback, handleSeek, audioProps } =
+    useAudioPlayback({
+      src: audioUrl,
+      autoPlay: Boolean(audioUrl),
+      audioRef: audioRef as RefObject<HTMLAudioElement | null>,
+    });
 
   return (
     <div
@@ -65,25 +47,7 @@ export const AudioPlayerView: React.FC<AudioPlayerViewProps> = ({
         src={audioUrl ?? undefined}
         autoPlay={Boolean(audioUrl)}
         className="hidden"
-        onLoadedMetadata={() => {
-          const audio = audioRef.current;
-          const nextDuration = audio?.duration ?? 0;
-          setDuration(Number.isFinite(nextDuration) ? nextDuration : 0);
-          if (audio && audioUrl) {
-            try {
-              void audio.play().catch(() => {});
-            } catch {
-              // Autoplay can be blocked until the user presses play.
-            }
-          }
-        }}
-        onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime || 0)}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-        onEnded={() => {
-          setIsPlaying(false);
-          setCurrentTime(0);
-        }}
+        {...audioProps}
       />
 
       {isLoading ? (

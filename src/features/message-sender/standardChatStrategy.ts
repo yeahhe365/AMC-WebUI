@@ -1,7 +1,7 @@
 import { logService } from '@/services/logService';
 import { buildContentParts } from '@/utils/chat/builder';
 import { isServerCodeExecutionMode } from '@/utils/codeExecution';
-import { getModelCapabilities } from '@/utils/model/modelCapabilities';
+import { getModelCapabilities, bansModelTurnPrefill } from '@/utils/model/modelCapabilities';
 import { resolveChatApiRoute } from '@/utils/chatApiRoute';
 import type { UploadedFile } from '@/types';
 import { runOptimisticMessagePipeline, type MessageLifecycleRunner } from './messagePipeline';
@@ -60,6 +60,11 @@ export const sendStandardMessage = async ({
   const settingsForPersistence = { ...currentChatSettings };
   const settingsForApi = { ...currentChatSettings };
 
+  if (!settingsForApi.systemInstruction?.trim() && appSettings.systemInstruction) {
+    settingsForApi.systemInstruction = appSettings.systemInstruction;
+    settingsForPersistence.systemInstruction = appSettings.systemInstruction;
+  }
+
   if (isFastMode) {
     const capabilities = getModelCapabilities(effectiveActiveModelId);
     // gemini-3.7-flash / gemini-3.8-flash rejects MINIMAL with an API error — fall back to LOW there.
@@ -88,15 +93,10 @@ export const sendStandardMessage = async ({
 
   // Gemini 3.6+ rejects prefilled model turns (HTTP 400). Raw mode ends the payload with a
   // model role `<thinking>` prefix, so it is unsafe for those models even if listed as raw-capable.
-  const modelIdLower = effectiveActiveModelId.toLowerCase();
-  const bansModelTurnPrefill =
-    /gemini-3\.[6-9]/.test(modelIdLower) ||
-    modelIdLower.includes('gemini-3.5-flash-lite') ||
-    /gemini-[4-9]/.test(modelIdLower);
   const isRawMode = Boolean(
     (settingsForApi.isRawModeEnabled ?? appSettings.isRawModeEnabled) &&
     !isContinueMode &&
-    !bansModelTurnPrefill &&
+    !bansModelTurnPrefill(effectiveActiveModelId) &&
     getModelCapabilities(effectiveActiveModelId).supportsRawReasoningPrefill,
   );
 
@@ -198,6 +198,7 @@ export const sendStandardMessage = async ({
             files: readyFiles,
             apiKey: keyToUse,
             abortSignal: newAbortController.signal,
+            allowDegrade: Boolean(effectiveEditingId),
           });
           if (!fileRefResult.ok) {
             return {

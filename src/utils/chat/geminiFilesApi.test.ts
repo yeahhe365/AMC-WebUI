@@ -197,7 +197,9 @@ describe('isFilesApiPermissionDeniedError', () => {
   });
 
   it('detects simple permission error on File', () => {
-    expect(isFilesApiPermissionDeniedError('You do not have permission to access the File abc or it may not exist.')).toBe(true);
+    expect(
+      isFilesApiPermissionDeniedError('You do not have permission to access the File abc or it may not exist.'),
+    ).toBe(true);
     expect(isFilesApiPermissionDeniedError('403 PERMISSION_DENIED: File not accessible')).toBe(true);
   });
 
@@ -321,5 +323,40 @@ describe('invalidateSessionFilesApiReferences', () => {
     const updated = invalidateSessionFilesApiReferences(session, new Error('Network timeout'));
     expect(updated).toBe(session);
   });
-});
 
+  it('replaces dead Files API parts in apiParts with unavailable system note when permission is denied', () => {
+    const session = {
+      id: 's1',
+      title: 'Test',
+      timestamp: 1,
+      settings: createChatSettings({ lockedApiKey: 'key-1' }),
+      messages: [
+        createChatMessage({
+          role: 'user',
+          content: 'analyze this',
+          apiParts: [
+            { text: 'analyze this' },
+            {
+              fileData: {
+                mimeType: 'application/pdf',
+                fileUri:
+                  'https://generativelanguage.googleapis.com/v1beta/files/fa786fe25ed31df578c059085db86bf4218a6561',
+              },
+            },
+          ],
+        }),
+      ],
+    };
+
+    const error =
+      'You do not have permission to access the File fa786fe25ed31df578c059085db86bf4218a6561 or it may not exist.';
+    const updated = invalidateSessionFilesApiReferences(session, error);
+
+    expect(updated.settings.lockedApiKey).toBeNull();
+    const parts = updated.messages[0].apiParts!;
+    expect(parts[0]).toEqual({ text: 'analyze this' });
+    expect(parts[1]).toEqual({
+      text: formatHistoryFileApiUnavailablePartText('File fa786fe25ed31df578c059085db86bf4218a6561'),
+    });
+  });
+});

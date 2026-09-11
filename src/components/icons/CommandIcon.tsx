@@ -17,7 +17,7 @@ import {
   Bookmark,
   Telescope,
   Zap,
-  MapPin,
+  MapPinned,
   Paperclip,
 } from 'lucide-react';
 import { IconStop, IconNewChat } from './groups/GeneralIcons';
@@ -40,7 +40,7 @@ export const CommandIcon: React.FC<{ icon: string }> = ({ icon }) => {
     case 'search':
       return <Globe {...iconProps} />;
     case 'maps':
-      return <MapPin {...iconProps} />;
+      return <MapPinned {...iconProps} />;
     case 'deep':
       return <Telescope {...iconProps} />;
     case 'code':

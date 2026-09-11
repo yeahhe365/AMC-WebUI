@@ -1,0 +1,28 @@
+---
+title: Slash Commands
+description: Complete reference and interactive finder for all slash commands in AMC WebUI.
+---
+
+import { SlashCommandFinder } from '@/components/SlashCommandFinder';
+
+# Slash Commands
+
+Type `/` in the chat input to invoke the command menu. Navigate using arrow keys and press Enter to execute commands without touching your mouse.
+
+<SlashCommandFinder client:load locale="en" />
+
+---
+
+## Power User Tips
+
+### 1. Fast Model Switching (`/model`)
+Type `/model` to expand the inline model search panel. Filter through configured endpoints and press Enter to switch models instantly.
+
+### 2. Instant Thinking Toggle (`/fast`)
+When you need a quick answer in a complex conversation, submit `/fast` to drop thinking depth to `Low` (or `Minimal`). Run `/fast` again to return to `High`.
+
+### 3. Immediate Tool Toggles
+- `/online`: Toggle Google search grounding.
+- `/maps`: Open Google Maps location search.
+- `/code`: Toggle Python execution runtime.
+- `/file`: Launch the attachment file picker immediately.

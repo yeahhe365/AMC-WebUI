@@ -12,6 +12,7 @@ import { SETTINGS_INPUT_CLASS } from '@/constants/formClasses';
 import { interpolate } from '@/i18n/interpolate';
 import { useMcpStatusStore } from '@/stores/mcpStatusStore';
 import type { McpServerAuthType, McpServerConfig, McpServerTransport } from '@/types';
+import { copyTextToClipboard } from '@/utils/clipboard';
 import { McpCapabilitiesTabs } from './McpCapabilitiesTabs';
 import {
   MCP_INPUT_BASE_CLASSES,
@@ -394,9 +395,11 @@ export const McpServerCard: React.FC<McpServerCardProps> = ({
                     data-testid={`mcp-copy-id-${index}`}
                     aria-label={t('settingsMcpCopyId')}
                     title={copiedId ? t('settingsMcpIdCopied') : t('settingsMcpCopyId')}
-                    onClick={() => {
-                      void navigator.clipboard?.writeText(server.id);
-                      setCopiedId(true);
+                    onClick={async () => {
+                      const ok = await copyTextToClipboard(server.id);
+                      if (ok) {
+                        setCopiedId(true);
+                      }
                     }}
                     className={SETTINGS_OUTLINE_BUTTON_CLASS}
                   >

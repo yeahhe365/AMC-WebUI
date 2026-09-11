@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { float32ToPCM16Base64 } from './audioProcessing';
+import { float32ToPCM16Base64, getInlineAudioFormat } from './audioProcessing';
 
 describe('float32ToPCM16Base64', () => {
   it('clamps full-scale +1.0 to 32767 instead of wrapping Int16 to -32768', () => {
@@ -12,5 +12,19 @@ describe('float32ToPCM16Base64', () => {
     expect(pcm[0]).toBe(32767);
     expect(pcm[1]).toBe(-32767);
     expect(pcm[2]).toBe(0);
+  });
+});
+
+describe('getInlineAudioFormat', () => {
+  it('extracts audio subtype from various MIME formats', () => {
+    expect(getInlineAudioFormat('audio/wav')).toBe('wav');
+    expect(getInlineAudioFormat('audio/mp3')).toBe('mp3');
+    expect(getInlineAudioFormat('audio/mpeg')).toBe('mpeg');
+    expect(getInlineAudioFormat('audio/ogg; codecs=opus')).toBe('ogg');
+  });
+
+  it('falls back to wav when mime subtype is absent or invalid', () => {
+    expect(getInlineAudioFormat('')).toBe('wav');
+    expect(getInlineAudioFormat('invalid')).toBe('wav');
   });
 });

@@ -45,6 +45,7 @@ describe('buildPendingChatInputSubmission', () => {
       kind: 'edit',
       messageId: 'message-1',
       content: 'Revised content',
+      files: [],
     });
   });
 });

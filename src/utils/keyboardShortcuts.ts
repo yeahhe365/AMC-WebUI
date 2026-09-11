@@ -1,8 +1,9 @@
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { type AppSettings } from '@/types';
 import { DEFAULT_SHORTCUTS } from '@/constants/shortcuts';
+import { isMacPlatform } from './platform';
 
-const isMac = typeof navigator !== 'undefined' && navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+const isMac = isMacPlatform();
 
 const KEY_DISPLAY_MAP: Record<string, string> = {
   mod: isMac ? '⌘' : 'Ctrl',

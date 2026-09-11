@@ -120,6 +120,13 @@ export const InterfaceToggles: React.FC<InterfaceTogglesProps> = ({ settings, on
           checked={settings.isAutoScrollOnSendEnabled ?? true}
           onChange={(enabled) => onUpdate('isAutoScrollOnSendEnabled', enabled)}
         />
+        <SearchableToggle
+          itemId="interface-token-stats"
+          label={t('settingsShowMessageTokenStatsLabel')}
+          checked={settings.showMessageTokenStats ?? true}
+          onChange={(enabled) => onUpdate('showMessageTokenStats', enabled)}
+          tooltip={t('settingsShowMessageTokenStatsTooltip')}
+        />
       </ToggleGroup>
 
       <ToggleGroup title={t('settingsClipboardInput')} groupId="interface-clipboard">

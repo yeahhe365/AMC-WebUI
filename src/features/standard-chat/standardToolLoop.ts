@@ -248,11 +248,15 @@ export const runStandardToolLoop = async ({
 
     // Cap reached: keep everything completed so far and stop without executing
     // this turn's calls (every earlier round was a real, finished API turn).
+    // Pending calls are NOT executed, so strip functionCall parts from turn.parts
+    // to prevent un-responded function calls from corrupting the chat history.
     if (rounds >= maxRounds) {
+      const nonCallParts = turn.parts.filter((part) => !part.functionCall);
       return {
         finalTurn: {
           ...turn,
-          parts: [...turn.parts, { text: TOOL_LOOP_CAP_NOTICE }],
+          parts: [...nonCallParts, { text: TOOL_LOOP_CAP_NOTICE }],
+          functionCalls: [],
           usage: aggregatedUsage,
           grounding: mergeGroundingForFinalTurn(turn.grounding, groundingCarryover),
           urlContext: aggregatedUrlContext,

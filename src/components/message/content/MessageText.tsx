@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { type ChatMessage, type UploadedFile, type AppSettings, type SideViewContent } from '@/types';
+import { type ChatMessage, type UploadedFile, type MessageAppSettings, type SideViewContent } from '@/types';
 import type { OpenHtmlPreviewHandler } from '@/utils/html-preview/previewPrivilege';
 import { useI18n } from '@/contexts/I18nContext';
 import { LazyMarkdownRenderer } from '@/components/message/LazyMarkdownRenderer';
 import { isCodeExecutionPendingInContent } from '@/features/chat-streaming/messageStreamParts';
 import { GroundedResponse } from '@/components/message/GroundedResponse';
-import { GoogleSpinner } from '@/components/icons/GoogleSpinner';
 import { extractAutoPreviewableBlock, normalizePreviewableMarkdownContent } from '@/utils/previewableMarkdown';
 import { useSmoothStreaming } from '@/hooks/ui/useSmoothStreaming';
 import { useMessageStream } from '@/hooks/ui/useMessageStream';
@@ -22,13 +21,16 @@ import {
 import { resolveLiveArtifactsFontSize } from '@/utils/live-artifacts/liveArtifactsFontSize';
 import { isLiveArtifactsModeFromSettings } from '@/utils/live-artifacts/liveArtifactsMode';
 import { parseLocateMarkers } from '@/utils/media-nav/locateMarker';
-import { LocateChips } from '@/components/media-nav/LocateChips';
 import { useChatStore } from '@/stores/chatStore';
+import { linkifyTimestamps } from '@/utils/media-nav/timestampLinks';
+import { linkifyPdfLocates } from '@/utils/media-nav/pdfLinks';
+import { linkifyImageLocates } from '@/utils/media-nav/imageLinks';
+import { collectSessionMediaFiles } from '@/utils/media-nav/sessionMediaFiles';
 
 interface MessageTextProps {
   message: ChatMessage;
   showThoughts: boolean;
-  appSettings: AppSettings;
+  appSettings: MessageAppSettings;
   themeId: string;
   baseFontSize: number;
   onImageClick: (file: UploadedFile) => void;
@@ -74,10 +76,44 @@ export const MessageText: React.FC<MessageTextProps> = ({
     () =>
       message.role === 'model'
         ? parseLocateMarkers(rawThinkingExtraction.content)
-        : { cleanContent: rawThinkingExtraction.content, pdfLocates: [], videoLocates: [], audioLocates: [] },
+        : {
+            cleanContent: rawThinkingExtraction.content,
+            pdfLocates: [],
+            videoLocates: [],
+            audioLocates: [],
+            imageLocates: [],
+          },
     [rawThinkingExtraction.content, message.role],
   );
-  const effectiveContent = locateExtraction.cleanContent;
+  const hasMediaInSession = useMemo(() => {
+    if (message.role !== 'model') return false;
+    if (
+      locateExtraction.videoLocates.length > 0 ||
+      locateExtraction.audioLocates.length > 0 ||
+      locateExtraction.pdfLocates.length > 0 ||
+      locateExtraction.imageLocates.length > 0
+    ) {
+      return true;
+    }
+    const { selectedFiles, activeMessages } = useChatStore.getState();
+    const { videos, audios, pdfs, images } = collectSessionMediaFiles(selectedFiles, activeMessages);
+    return videos.length > 0 || audios.length > 0 || pdfs.length > 0 || images.length > 0;
+  }, [
+    locateExtraction.videoLocates.length,
+    locateExtraction.audioLocates.length,
+    locateExtraction.pdfLocates.length,
+    locateExtraction.imageLocates.length,
+    message.role,
+  ]);
+
+  const effectiveContent = useMemo(() => {
+    if (!hasMediaInSession) {
+      return locateExtraction.cleanContent;
+    }
+    const withPdfLinks = linkifyPdfLocates(rawThinkingExtraction.content);
+    const withImageLinks = linkifyImageLocates(withPdfLinks);
+    return linkifyTimestamps(withImageLinks);
+  }, [hasMediaInSession, locateExtraction.cleanContent, rawThinkingExtraction.content]);
   const effectiveThoughts = useMemo(
     () => [thoughts, streamThoughts, rawThinkingExtraction.thoughts].filter(Boolean).join('\n\n'),
     [thoughts, streamThoughts, rawThinkingExtraction.thoughts],
@@ -111,7 +147,11 @@ export const MessageText: React.FC<MessageTextProps> = ({
   const isUserMessageCollapsed = shouldOfferUserMessageCollapse && !isUserMessageExpanded;
   const userMessageCollapseRegionId = `${message.id}-message-text`;
   const collapsedMaxHeight = baseFontSize * USER_MESSAGE_COLLAPSED_LINE_HEIGHT * USER_MESSAGE_COLLAPSE_LINE_THRESHOLD;
-  const liveArtifactFontSize = useMemo(() => resolveLiveArtifactsFontSize(appSettings), [appSettings]);
+  const liveArtifactsCustomFontSize = appSettings.liveArtifactsCustomFontSize;
+  const liveArtifactFontSize = useMemo(
+    () => resolveLiveArtifactsFontSize({ liveArtifactsCustomFontSize }),
+    [liveArtifactsCustomFontSize],
+  );
   // LA mode must match the header button, which tracks the ACTIVE session's
   // systemInstruction (currentChatSettings), not the global default. The
   // message list only renders the active session's messages, so reading the
@@ -126,19 +166,25 @@ export const MessageText: React.FC<MessageTextProps> = ({
   // object identity is stable across unrelated store updates.
   const savedSessions = useChatStore((state) => state.savedSessions);
   const activeSessionId = useChatStore((state) => state.activeSessionId);
+  const activeSession = useMemo(
+    () => savedSessions.find((session) => session.id === activeSessionId),
+    [activeSessionId, savedSessions],
+  );
   const currentChatSettingsSystemInstruction = useMemo(() => {
-    const activeSession = savedSessions.find((session) => session.id === activeSessionId);
     return activeSession?.settings.systemInstruction ?? appSettings.systemInstruction;
-  }, [activeSessionId, appSettings.systemInstruction, savedSessions]);
+  }, [activeSession, appSettings.systemInstruction]);
   const liveArtifactsMode = useMemo(
     () =>
       isLiveArtifactsModeFromSettings({
+        isLiveArtifactsEnabled: activeSession?.settings.isLiveArtifactsEnabled ?? appSettings.isLiveArtifactsEnabled,
         systemInstruction: currentChatSettingsSystemInstruction,
         promptMode: appSettings.liveArtifactsPromptMode,
         liveArtifactsSystemPrompt: appSettings.liveArtifactsSystemPrompt,
         liveArtifactsSystemPrompts: appSettings.liveArtifactsSystemPrompts,
       }),
     [
+      activeSession?.settings.isLiveArtifactsEnabled,
+      appSettings.isLiveArtifactsEnabled,
       appSettings.liveArtifactsPromptMode,
       appSettings.liveArtifactsSystemPrompt,
       appSettings.liveArtifactsSystemPrompts,
@@ -185,9 +231,6 @@ export const MessageText: React.FC<MessageTextProps> = ({
     <>
       {showPrimaryThinkingIndicator && (
         <div className="flex items-center text-sm text-[var(--theme-bg-model-message-text)] py-1 px-1 opacity-80 animate-pulse">
-          <div className="mr-2.5 flex-shrink-0">
-            <GoogleSpinner size={14} />
-          </div>
           <span className="font-medium">{t('thinkingText')}</span>
         </div>
       )}
@@ -263,15 +306,6 @@ export const MessageText: React.FC<MessageTextProps> = ({
           )}
         </div>
       ) : null}
-
-      {message.role === 'model' && (
-        <LocateChips
-          messageId={message.id}
-          pdfLocates={locateExtraction.pdfLocates}
-          videoLocates={locateExtraction.videoLocates}
-          audioLocates={locateExtraction.audioLocates}
-        />
-      )}
     </>
   );
 };

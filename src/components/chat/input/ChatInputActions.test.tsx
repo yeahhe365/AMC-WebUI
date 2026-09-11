@@ -267,6 +267,19 @@ describe('ChatInputActions', () => {
     expect(renderer.container.querySelector('[data-testid="mcp-picker-button"]')).toBeNull();
   });
 
+  it('hides MCP picker and Live controls on third-party provider routes', () => {
+    renderActions({ providerId: 'openai' });
+    expect(renderer.container.querySelector('[data-testid="mcp-picker-button"]')).toBeNull();
+
+    mockCapabilities.value = {
+      ...mockCapabilities.value,
+      isNativeAudioModel: true,
+    };
+    renderActions({ providerId: 'openai', isNativeAudioModel: true });
+    expect(renderer.container.querySelector('[data-testid="live-controls"]')).toBeNull();
+    expect(renderer.container.querySelector('[data-testid="web-search-toggle"]')).toBeNull();
+  });
+
   it('forwards Live disconnect and video controls into the live controls', () => {
     mockCapabilities.value = {
       ...mockCapabilities.value,

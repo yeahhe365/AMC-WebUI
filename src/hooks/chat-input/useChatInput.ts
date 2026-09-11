@@ -184,6 +184,7 @@ export const useChatInput = () => {
       isAddingById: inputState.isAddingById,
       showCreateTextFileEditor: modalsState.showCreateTextFileEditor,
       showRecorder: modalsState.showRecorder,
+      showLibraryPicker: modalsState.showLibraryPicker,
       justInitiatedFileOpRef: inputState.justInitiatedFileOpRef,
       textareaRef: inputState.textareaRef,
       setInputText: inputState.setInputText,

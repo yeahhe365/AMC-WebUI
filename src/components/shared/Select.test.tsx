@@ -56,4 +56,34 @@ describe('Select', () => {
     expect(trigger?.getAttribute('aria-controls')).toBe(listbox?.id);
     expect(selectedOption?.textContent).toContain('Voice A');
   });
+
+  it('selects option on mouse click', () => {
+    const onChange = vi.fn();
+
+    act(() => {
+      renderer.root.render(
+        <Select id="theme-select" label="Theme" value="onyx" onChange={onChange}>
+          <option value="onyx">Dark</option>
+          <option value="sepia">Sepia</option>
+        </Select>,
+      );
+    });
+
+    const trigger = renderer.container.querySelector<HTMLButtonElement>('#theme-select');
+    act(() => {
+      trigger?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const sepiaOption = Array.from(renderer.container.querySelectorAll('[role="option"]')).find((el) =>
+      el.textContent?.includes('Sepia'),
+    );
+    expect(sepiaOption).not.toBeNull();
+
+    act(() => {
+      sepiaOption?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'mouse' }));
+      sepiaOption?.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'mouse' }));
+    });
+
+    expect(onChange).toHaveBeenCalledWith({ target: { value: 'sepia' } });
+  });
 });

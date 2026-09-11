@@ -657,6 +657,7 @@ describe('useMessageSender', () => {
       'image/png',
       'reference.png',
       expect.any(AbortSignal),
+      expect.any(Function),
     );
     expect(mockSendStandardMessage).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -937,6 +938,128 @@ describe('useMessageSender', () => {
             }),
           ],
         }),
+      }),
+    );
+    unmount();
+  });
+
+  it('excludes the edited message and subsequent messages from history file checks when resending an edit', async () => {
+    mockGetFileMetadataApi.mockRejectedValue(new Error('403 PERMISSION_DENIED: caller lacks access'));
+    mockUploadFileApi.mockRejectedValue(new Error('socket hang up'));
+
+    const brokenFile = createUploadedFile({
+      id: 'file-broken',
+      name: 'broken.mp4',
+      type: 'video/mp4',
+      fileApiName: 'files/broken',
+      fileUri: 'https://files/broken',
+      uploadState: 'active',
+      transferStrategy: 'files-api',
+      fileApiKeyFingerprint: 'outdated-key-fingerprint',
+    });
+
+    const { result, unmount } = renderMessageSender({
+      currentChatSettings: {
+        ...createChatSettings(),
+        modelId: 'gemini-3.1-pro-preview',
+      },
+      messages: [
+        createChatMessage({
+          id: 'user-prior',
+          content: 'prior question',
+        }),
+        createChatMessage({
+          id: 'user-target-to-edit',
+          content: 'analyze this broken video',
+          files: [brokenFile],
+          apiParts: [{ fileData: { mimeType: 'video/mp4', fileUri: 'https://files/broken' } }],
+        }),
+        createChatMessage({
+          id: 'model-reply',
+          role: 'model',
+          content: 'failed or partial response',
+        }),
+      ],
+    });
+
+    await act(async () => {
+      await result.current.handleSendMessage({
+        text: 'new question without the broken file',
+        files: [],
+        editingId: 'user-target-to-edit',
+      });
+    });
+
+    // It should not attempt to upload the broken file from the edited message
+    expect(mockUploadFileApi).not.toHaveBeenCalled();
+    expect(mockSendStandardMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'new question without the broken file',
+        editingMessageId: 'user-target-to-edit',
+        props: expect.objectContaining({
+          messages: [
+            expect.objectContaining({
+              id: 'user-prior',
+              content: 'prior question',
+            }),
+          ],
+        }),
+      }),
+    );
+    unmount();
+  });
+
+  it('allows standard chat sends to proceed when Files API returns PROCESSING state', async () => {
+    mockGetModelCapabilities.mockReturnValue({
+      isTtsModel: false,
+      isGemini3ImageModel: false,
+    });
+    mockGetFileMetadataApi.mockResolvedValueOnce({
+      name: 'files/processing-video',
+      state: 'PROCESSING',
+      uri: 'https://files/processing-video',
+    });
+
+    const setAppFileError = vi.fn();
+    const processingFile = createUploadedFile({
+      id: 'file-processing',
+      name: 'video.mp4',
+      type: 'video/mp4',
+      fileApiName: 'files/processing-video',
+      fileUri: 'https://files/processing-video',
+      uploadState: 'active',
+      transferStrategy: 'files-api',
+      fileApiKeyFingerprint: 'outdated-fingerprint',
+    });
+
+    const { result, unmount } = renderMessageSender({
+      currentChatSettings: {
+        ...createChatSettings(),
+        modelId: 'gemini-2.5-flash',
+      },
+      setAppFileError,
+    });
+
+    await act(async () => {
+      await result.current.handleSendMessage({
+        text: 'analyze this video',
+        files: [processingFile],
+        editingId: 'user-retry-id',
+      });
+    });
+
+    expect(setAppFileError).not.toHaveBeenCalledWith(expect.stringContaining('请等待'));
+    expect(mockSendStandardMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'analyze this video',
+        editingMessageId: 'user-retry-id',
+        files: [
+          expect.objectContaining({
+            id: 'file-processing',
+            uploadState: 'processing_api',
+            isProcessing: true,
+          }),
+        ],
       }),
     );
     unmount();

@@ -366,4 +366,132 @@ describe('useMessageActions', () => {
 
     unmount();
   });
+
+  it('searches backwards to find the nearest preceding user message on retry', async () => {
+    const handleSendMessage = vi.fn();
+    const messages: ChatMessage[] = [
+      {
+        id: 'user-original',
+        role: 'user',
+        content: 'prompt with error',
+        files: [
+          {
+            id: 'f1',
+            name: 'test.pdf',
+            type: 'application/pdf',
+            uploadState: 'failed',
+            error: 'Upload failed',
+            size: 10,
+          },
+        ],
+        timestamp: new Date('2026-05-01T00:00:00.000Z'),
+      },
+      {
+        id: 'error-prev',
+        role: 'error',
+        content: '[403 error: file not found]',
+        timestamp: new Date('2026-05-01T00:00:01.000Z'),
+      },
+      {
+        id: 'error-target',
+        role: 'error',
+        content: '[403 error: file permission denied]',
+        timestamp: new Date('2026-05-01T00:00:02.000Z'),
+      },
+    ];
+
+    useChatStore.setState({
+      activeSessionId: 'session-current',
+      activeMessages: messages,
+    });
+
+    const { result, unmount } = renderHook(() => useMessageActions(createStoreWiredOptions({ handleSendMessage })));
+
+    await act(async () => {
+      await result.current.handleRetryMessage('error-target');
+    });
+
+    expect(handleSendMessage).toHaveBeenCalledWith({
+      text: 'prompt with error',
+      files: [
+        expect.objectContaining({
+          id: 'f1',
+          name: 'test.pdf',
+        }),
+      ],
+      editingId: 'user-original',
+    });
+
+    unmount();
+  });
+
+  it('rehydrates file from dataUrl, clears error and marks for re-upload on retry', async () => {
+    const handleSendMessage = vi.fn();
+    const mockBlob = new Blob(['video-bytes'], { type: 'video/mp4' });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => mockBlob,
+    } as unknown as Response);
+
+    try {
+      const messages: ChatMessage[] = [
+        {
+          id: 'user-turn',
+          role: 'user',
+          content: 'analyze this video',
+          files: [
+            {
+              id: 'file-video-1',
+              name: 'video.mp4',
+              type: 'video/mp4',
+              rawFile: undefined,
+              dataUrl: 'blob:http://localhost:8082/sample-video',
+              uploadState: 'failed',
+              error: '403 Forbidden: file fa786fe25ed31df578c059085db86bf4218a6561 permission denied',
+              fileApiKeyFingerprint: 'invalidated',
+              size: 5000,
+            },
+          ],
+          timestamp: new Date('2026-05-01T00:00:00.000Z'),
+        },
+        {
+          id: 'error-msg',
+          role: 'error',
+          content: '[403 Forbidden]',
+          timestamp: new Date('2026-05-01T00:00:01.000Z'),
+        },
+      ];
+
+      useChatStore.setState({
+        activeSessionId: 'session-video',
+        activeMessages: messages,
+      });
+
+      const { result, unmount } = renderHook(() => useMessageActions(createStoreWiredOptions({ handleSendMessage })));
+
+      await act(async () => {
+        await result.current.handleRetryMessage('error-msg');
+      });
+
+      expect(handleSendMessage).toHaveBeenCalledWith({
+        text: 'analyze this video',
+        files: [
+          expect.objectContaining({
+            id: 'file-video-1',
+            name: 'video.mp4',
+            rawFile: expect.any(File),
+            error: undefined,
+            uploadState: 'active',
+            fileApiKeyFingerprint: 'invalidated',
+          }),
+        ],
+        editingId: 'user-turn',
+      });
+
+      unmount();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

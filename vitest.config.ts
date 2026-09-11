@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve('./src'),
       'pdfjs-dist': path.resolve('./node_modules/pdfjs-dist/build/pdf.mjs'),
+      '@panzoom/panzoom': path.resolve('./node_modules/@panzoom/panzoom/dist/panzoom.es.js'),
     },
   },
   test: {

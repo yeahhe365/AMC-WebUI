@@ -12,10 +12,6 @@ const LazyFilePreviewModal = lazyNamedComponent(
   () => import('@/components/modals/FilePreviewModal'),
   'FilePreviewModal',
 );
-const LazyMarkdownPreviewModal = lazyNamedComponent(
-  () => import('@/components/modals/MarkdownPreviewModal'),
-  'MarkdownPreviewModal',
-);
 const LazyFileConfigModal = lazyNamedComponent(() => import('@/components/modals/FileConfigModal'), 'FileConfigModal');
 
 interface MessageListConfiguringFile {
@@ -24,8 +20,9 @@ interface MessageListConfiguringFile {
 }
 
 interface MessageListModalsProps {
-  genericPreviewFile: UploadedFile | null;
-  markdownPreviewFile: UploadedFile | null;
+  previewFile?: UploadedFile | null;
+  genericPreviewFile?: UploadedFile | null;
+  markdownPreviewFile?: UploadedFile | null;
   closeFilePreviewModal: () => void;
   handlePrevImage: () => void;
   handleNextImage: () => void;
@@ -42,9 +39,11 @@ interface MessageListModalsProps {
     updates: { videoMetadata?: VideoMetadata; mediaResolution?: MediaResolution },
   ) => void;
   isGemini3: boolean;
+  onImageClick?: (file: UploadedFile) => void;
 }
 
 export const MessageListModals: React.FC<MessageListModalsProps> = ({
+  previewFile,
   genericPreviewFile,
   markdownPreviewFile,
   closeFilePreviewModal,
@@ -60,52 +59,52 @@ export const MessageListModals: React.FC<MessageListModalsProps> = ({
   setConfiguringFile,
   handleSaveFileConfig,
   isGemini3,
-}) => (
-  <>
-    {genericPreviewFile && (
-      <Suspense fallback={null}>
-        <LazyFilePreviewModal
-          file={genericPreviewFile}
-          onClose={closeFilePreviewModal}
-          onPrev={handlePrevImage}
-          onNext={handleNextImage}
-          hasPrev={currentImageIndex > 0}
-          hasNext={currentImageIndex !== -1 && currentImageIndex < imageCount - 1}
-        />
-      </Suspense>
-    )}
+  onImageClick,
+}) => {
+  const activePreviewFile = previewFile ?? genericPreviewFile ?? markdownPreviewFile ?? null;
 
-    {markdownPreviewFile && (
-      <Suspense fallback={null}>
-        <LazyMarkdownPreviewModal file={markdownPreviewFile} onClose={closeFilePreviewModal} />
-      </Suspense>
-    )}
+  return (
+    <>
+      {activePreviewFile && (
+        <Suspense fallback={null}>
+          <LazyFilePreviewModal
+            file={activePreviewFile}
+            onClose={closeFilePreviewModal}
+            onPrev={handlePrevImage}
+            onNext={handleNextImage}
+            hasPrev={currentImageIndex > 0}
+            hasNext={currentImageIndex !== -1 && currentImageIndex < imageCount - 1}
+          />
+        </Suspense>
+      )}
 
-    {isHtmlPreviewModalOpen && htmlPreview !== null && (
-      <Suspense fallback={null}>
-        <LazyHtmlPreviewModal
-          isOpen={isHtmlPreviewModalOpen}
-          onClose={handleCloseHtmlPreview}
-          htmlContent={htmlPreview.html}
-          initialTrueFullscreenRequest={htmlPreview.initialTrueFullscreen}
-          privilege={htmlPreview.privilege}
-          themeId={htmlPreview.themeId}
-          baseFontSize={htmlPreview.baseFontSize}
-          onLiveArtifactFollowUp={htmlPreview.privilege === 'sanitized' ? handleLiveArtifactFollowUp : undefined}
-        />
-      </Suspense>
-    )}
+      {isHtmlPreviewModalOpen && htmlPreview !== null && (
+        <Suspense fallback={null}>
+          <LazyHtmlPreviewModal
+            isOpen={isHtmlPreviewModalOpen}
+            onClose={handleCloseHtmlPreview}
+            htmlContent={htmlPreview.html}
+            initialTrueFullscreenRequest={htmlPreview.initialTrueFullscreen}
+            privilege={htmlPreview.privilege}
+            themeId={htmlPreview.themeId}
+            baseFontSize={htmlPreview.baseFontSize}
+            onLiveArtifactFollowUp={htmlPreview.privilege === 'sanitized' ? handleLiveArtifactFollowUp : undefined}
+            onImageClick={onImageClick}
+          />
+        </Suspense>
+      )}
 
-    {configuringFile && (
-      <Suspense fallback={null}>
-        <LazyFileConfigModal
-          isOpen={!!configuringFile}
-          onClose={() => setConfiguringFile(null)}
-          file={configuringFile.file}
-          onSave={handleSaveFileConfig}
-          isGemini3={isGemini3}
-        />
-      </Suspense>
-    )}
-  </>
-);
+      {configuringFile && (
+        <Suspense fallback={null}>
+          <LazyFileConfigModal
+            isOpen={!!configuringFile}
+            onClose={() => setConfiguringFile(null)}
+            file={configuringFile.file}
+            onSave={handleSaveFileConfig}
+            isGemini3={isGemini3}
+          />
+        </Suspense>
+      )}
+    </>
+  );
+};

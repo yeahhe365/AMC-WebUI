@@ -40,6 +40,7 @@ vi.mock('@/services/api/geminiApiBaseUrl', () => ({
 
 vi.mock('@/utils/chat/builder', () => ({
   createChatHistoryForApi: mockCreateChatHistoryForApi,
+  appendTurnToHistory: vi.fn((history, role, parts) => [...(history || []), { role, parts }]),
 }));
 
 vi.mock('@/services/api/generationConfig', () => ({
@@ -478,6 +479,25 @@ describe('useStreamResume', () => {
     };
     expect(streamResume.jobId).toBe(GENERATION_ID);
     expect(streamResume.lastSeq).toBe(0);
+  });
+
+  it('disables local python for the resumed request (no tool declarations on resume)', async () => {
+    // Resume replays a buffered stream without function declarations. Injecting
+    // the local-python system prompt while the tool is absent would instruct
+    // the model to call a tool that does not exist in this request.
+    recordJob();
+    const { result } = renderResume();
+
+    await act(async () => {
+      await result.current.resumePendingStream({
+        sessionId: SESSION_ID,
+        generationId: GENERATION_ID,
+        modelId: MODEL_ID,
+        startedAt: STARTED_AT,
+      });
+    });
+
+    expect(mockBuildGenerationConfig).toHaveBeenCalledWith(expect.objectContaining({ isLocalPythonEnabled: false }));
   });
 
   it('clears the pending record after a successful resume', async () => {

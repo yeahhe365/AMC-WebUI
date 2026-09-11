@@ -7,6 +7,8 @@ import {
   isMarkdownFile,
   isTextFile,
   isVideoMimeType,
+  normalizeMimeType,
+  resolveFileCategory,
 } from './fileTypeClassification';
 
 describe('fileTypeClassification', () => {
@@ -40,6 +42,12 @@ describe('fileTypeClassification', () => {
       isPdf: false,
       isInlineData: true,
     });
+
+    const nonStandardSvgFlags = getFileKindFlags({ name: 'icon.svg', type: 'text/xml' });
+    expect(nonStandardSvgFlags.isImage).toBe(true);
+
+    const emptyMimeSvgFlags = getFileKindFlags({ name: 'vector.svg', type: '' });
+    expect(emptyMimeSvgFlags.isImage).toBe(true);
   });
 
   it('keeps getFileTypeCategory compatible with existing UI categories', () => {
@@ -71,5 +79,22 @@ describe('fileTypeClassification', () => {
     expect(isTextFile({ name: 'Gemini 3.8 Flash 专项核验', type: 'application/octet-stream' })).toBe(true);
     expect(isTextFile({ name: 'notes.md', type: '' })).toBe(true);
     expect(isTextFile({ name: 'report.pdf', type: '' })).toBe(false);
+  });
+
+  it('normalizes mime types by trimming, lowercasing, and stripping parameters', () => {
+    expect(normalizeMimeType(' AUDIO/WAV; codecs="1" ')).toBe('audio/wav');
+    expect(normalizeMimeType('text/plain; charset=UTF-8')).toBe('text/plain');
+    expect(normalizeMimeType(undefined)).toBe('');
+  });
+
+  it('resolves rich file categories even when MIME type is absent or generic', () => {
+    expect(resolveFileCategory({ name: 'analysis.py', type: '' })).toBe('code');
+    expect(resolveFileCategory({ name: 'App.tsx', type: 'application/octet-stream' })).toBe('code');
+    expect(resolveFileCategory({ name: 'data.json', type: 'application/json' })).toBe('code');
+    expect(resolveFileCategory({ name: 'budget.xlsx', type: '' })).toBe('spreadsheet');
+    expect(resolveFileCategory({ name: 'contract.docx', type: '' })).toBe('doc');
+    expect(resolveFileCategory({ name: 'deck.pptx', type: '' })).toBe('presentation');
+    expect(resolveFileCategory({ name: 'bundle.zip', type: '' })).toBe('archive');
+    expect(resolveFileCategory({ name: 'manual.pdf', type: '' })).toBe('pdf');
   });
 });

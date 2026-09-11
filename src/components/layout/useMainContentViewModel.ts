@@ -52,8 +52,12 @@ export const useMainContentViewModel = ({ app }: UseMainContentViewModelOptions)
     setIsHistorySidebarOpen(false);
   }, [setIsHistorySidebarOpen]);
 
+  const activeView = useUIStore((state) => state.activeView);
+  const setActiveView = useUIStore((state) => state.setActiveView);
+
   const selectSession = useCallback(
     (id: string) => {
+      useUIStore.getState().setActiveView('chat');
       return loadChatSession(id);
     },
     [loadChatSession],
@@ -81,6 +85,12 @@ export const useMainContentViewModel = ({ app }: UseMainContentViewModelOptions)
     }
   }, [chatState.activeSessionId, chatState.currentChatSettings]);
 
+  const { startNewChat } = chatState;
+  const handleNewChat = useCallback(() => {
+    useUIStore.getState().setActiveView('chat');
+    startNewChat();
+  }, [startNewChat]);
+
   const sidebarProps = useMemo(
     () => ({
       isOpen: uiState.isHistorySidebarOpen,
@@ -92,7 +102,7 @@ export const useMainContentViewModel = ({ app }: UseMainContentViewModelOptions)
       loadingSessionIds: chatState.loadingSessionIds,
       generatingTitleSessionIds: chatState.generatingTitleSessionIds,
       onSelectSession: selectSession,
-      onNewChat: chatState.startNewChat,
+      onNewChat: handleNewChat,
       onDeleteSession: chatState.handleDeleteChatHistorySession,
       onRenameSession: chatState.handleRenameSession,
       onTogglePinSession: chatState.handleTogglePinSession,
@@ -134,7 +144,7 @@ export const useMainContentViewModel = ({ app }: UseMainContentViewModelOptions)
       chatState.loadingSessionIds,
       chatState.savedGroups,
       chatState.savedSessions,
-      chatState.startNewChat,
+      handleNewChat,
       currentTheme.id,
       historyDisplayMode,
       openExportModal,
@@ -220,5 +230,7 @@ export const useMainContentViewModel = ({ app }: UseMainContentViewModelOptions)
     overlayVisible: uiState.isHistorySidebarOpen,
     currentThemeId: currentTheme.id,
     closeHistorySidebar,
+    activeView,
+    setActiveView,
   };
 };

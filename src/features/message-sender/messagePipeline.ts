@@ -146,11 +146,21 @@ const startOptimisticMessageTurn = ({
     const title = shouldSetTitle && userMessage ? generateSessionTitle([userMessage, modelMessage]) : undefined;
     if (!userMessage) return prev;
 
+    const effectiveSystemInstruction =
+      currentChatSettings.systemInstruction?.trim() ||
+      appSettings.systemInstruction ||
+      DEFAULT_CHAT_SETTINGS.systemInstruction;
+
     return performOptimisticSessionUpdate(prev, {
       activeSessionId,
       newSessionId: finalSessionId,
       newMessages: [userMessage, modelMessage],
-      settings: { ...DEFAULT_CHAT_SETTINGS, ...appSettings, ...currentChatSettings },
+      settings: {
+        ...DEFAULT_CHAT_SETTINGS,
+        ...appSettings,
+        ...currentChatSettings,
+        systemInstruction: effectiveSystemInstruction,
+      },
       editingMessageId,
       title,
       shouldLockKey,

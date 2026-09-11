@@ -1,5 +1,6 @@
 import { createManagedObjectUrl, releaseManagedObjectUrl } from '@/services/objectUrlManager';
 import { SUPPORTED_AUDIO_MIME_TYPES } from '@/constants/fileTypeSupport';
+import { normalizeMimeType } from '@/utils/file/fileTypeClassification';
 import { convertAudioBlobToWavFile, float32ToWavFile } from './audioProcessing';
 import { audioCompressionWorkerCode } from './audioCompressionWorkerCode';
 
@@ -11,10 +12,8 @@ const MP3_TARGET_SAMPLE_RATE = 16_000;
 const MP3_TARGET_CHANNELS = 1;
 const MP3_TARGET_KBPS = 64;
 
-const normalizeAudioMimeType = (mimeType: string): string => mimeType.trim().toLowerCase().split(';')[0];
-
 const isGeminiSupportedAudioMimeType = (file: File | Blob): boolean =>
-  SUPPORTED_AUDIO_MIME_TYPES.includes(normalizeAudioMimeType(file.type || ''));
+  SUPPORTED_AUDIO_MIME_TYPES.includes(normalizeMimeType(file.type || ''));
 
 const canKeepOriginalAudio = (file: File | Blob): file is File =>
   file instanceof File && isGeminiSupportedAudioMimeType(file);

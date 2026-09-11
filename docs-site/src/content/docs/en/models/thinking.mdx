@@ -1,0 +1,44 @@
+---
+title: Deep Reasoning (Thinking Mode)
+description: Visualizing Gemini 3.x chain of thought, token budgets, thinking levels, and automated thought translation.
+---
+
+# Deep Reasoning (Thinking Mode)
+
+Google Gemini 3 models feature built-in reasoning mechanisms (Chain of Thought). AMC WebUI provides granular controls and real-time visualization for this process.
+
+---
+
+## Control Dimensions
+
+Under **Settings -> Generation Settings**:
+
+### 1. Thinking Level
+Select between 4 reasoning depths:
+- **Minimal**: Basic internal consistency check (`gemini-3.5-flash-lite` and `gemini-3.6-flash`; 3.7 and 3.8 Flash do not support Minimal per API constraints).
+- **Low**: Light reasoning, suitable for straightforward queries.
+- **Medium**: Balanced exploration for general problem solving.
+- **High**: Full-power deep reasoning for complex architecture, logic, and mathematics.
+
+> 💡 **Quick Toggle**: Type `/fast` in the chat input to toggle between Low and High thinking levels.
+
+### 2. Thinking Token Budget
+- Adjust the slider from `128` to `32,768` tokens.
+- Set to `-1` for automatic allocation determined by the model based on question difficulty.
+
+---
+
+## Chain of Thought Visualization
+
+In conversation view:
+- **Streaming Steps**: Watch the model examine hypotheses and self-correct before producing final answers.
+- **Metrics**: View elapsed reasoning time and token consumption upon completion.
+- **Thought Signatures**: Preserves internal thought tokens across turns to sustain context continuity.
+
+---
+
+## Automated Thought Translation
+
+Gemini models frequently formulate internal reasoning in English. AMC WebUI includes an automatic translation engine:
+1. Turn on "Translate Thought Process" in settings.
+2. Lightweight `gemini-3.5-flash-lite` translates English thoughts into your chosen UI language in the background without delaying the primary streaming response.

@@ -7,6 +7,7 @@ import {
   HTML_PREVIEW_SANDBOX,
   type HtmlPreviewPrivilege,
 } from '@/utils/html-preview/previewPrivilege';
+import type { HtmlPreviewDeviceMode } from '@/hooks/ui/useHtmlPreviewModal';
 
 interface HtmlPreviewContentProps {
   iframeRef: RefObject<HTMLIFrameElement>;
@@ -16,6 +17,7 @@ interface HtmlPreviewContentProps {
   privilege?: HtmlPreviewPrivilege;
   themeId?: string;
   baseFontSize?: number;
+  deviceMode?: HtmlPreviewDeviceMode;
 }
 
 export const HtmlPreviewContent: React.FC<HtmlPreviewContentProps> = ({
@@ -26,6 +28,7 @@ export const HtmlPreviewContent: React.FC<HtmlPreviewContentProps> = ({
   privilege = DEFAULT_HTML_PREVIEW_PRIVILEGE,
   themeId,
   baseFontSize,
+  deviceMode = 'desktop',
 }) => {
   const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -48,10 +51,33 @@ export const HtmlPreviewContent: React.FC<HtmlPreviewContentProps> = ({
   };
 
   const isUnrestricted = privilege === 'unrestricted';
+  const isDeviceFramed = deviceMode === 'tablet' || deviceMode === 'mobile';
+
+  const frameInner = (
+    <iframe
+      ref={iframeRef}
+      srcDoc={buildHtmlPreviewSrcDoc(htmlContent, { privilege, themeId, baseFontSize })}
+      title={t('htmlPreviewIframeTitle')}
+      className={`border-none shadow-sm origin-top-left flex-1 w-full ${isUnrestricted ? 'bg-white' : 'bg-[var(--theme-bg-primary)]'}`}
+      style={{
+        width: `${100 / scale}%`,
+        height: iframeHeight,
+        transform: `scale(${scale})`,
+      }}
+      sandbox={HTML_PREVIEW_SANDBOX[privilege]}
+      allow={privilege === 'sanitized' ? 'clipboard-write' : undefined}
+      onError={handleIframeError}
+    />
+  );
 
   return (
-    <div ref={containerRef} className="flex-grow relative overflow-auto custom-scrollbar bg-[var(--theme-bg-tertiary)]">
-      {isUnrestricted && (
+    <div
+      ref={containerRef}
+      className={`flex-grow relative overflow-auto custom-scrollbar bg-[var(--theme-bg-tertiary)] ${
+        isDeviceFramed ? 'flex items-center justify-center p-3 sm:p-6' : ''
+      }`}
+    >
+      {isUnrestricted && !isDeviceFramed && (
         <div
           className="absolute inset-0 pointer-events-none opacity-[0.05]"
           style={{
@@ -61,20 +87,30 @@ export const HtmlPreviewContent: React.FC<HtmlPreviewContentProps> = ({
         />
       )}
 
-      <iframe
-        ref={iframeRef}
-        srcDoc={buildHtmlPreviewSrcDoc(htmlContent, { privilege, themeId, baseFontSize })}
-        title={t('htmlPreviewIframeTitle')}
-        className={`border-none shadow-sm origin-top-left ${isUnrestricted ? 'bg-white' : 'bg-[var(--theme-bg-primary)]'}`}
-        style={{
-          width: `${100 / scale}%`,
-          height: iframeHeight,
-          transform: `scale(${scale})`,
-        }}
-        sandbox={HTML_PREVIEW_SANDBOX[privilege]}
-        allow={privilege === 'sanitized' ? 'clipboard-write' : undefined}
-        onError={handleIframeError}
-      />
+      {deviceMode === 'mobile' ? (
+        <div
+          data-device-frame="mobile"
+          className="w-full max-w-[375px] h-[calc(100%-1rem)] min-h-[580px] rounded-[36px] shadow-2xl border-4 border-neutral-700 dark:border-neutral-600 bg-[var(--theme-bg-primary)] overflow-hidden relative transition-all duration-300 ring-1 ring-black/20 flex flex-col shrink-0"
+        >
+          <div className="h-4 w-full bg-neutral-800 shrink-0 flex items-center justify-center">
+            <div className="w-12 h-1 rounded-full bg-neutral-600/70" />
+          </div>
+          <div className="flex-1 min-h-0 w-full relative flex flex-col overflow-auto custom-scrollbar">
+            {frameInner}
+          </div>
+        </div>
+      ) : deviceMode === 'tablet' ? (
+        <div
+          data-device-frame="tablet"
+          className="w-full max-w-[768px] h-[calc(100%-1rem)] min-h-[500px] rounded-2xl shadow-2xl border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] overflow-hidden relative transition-all duration-300 ring-1 ring-black/10 flex flex-col shrink-0"
+        >
+          <div className="flex-1 min-h-0 w-full relative flex flex-col overflow-auto custom-scrollbar">
+            {frameInner}
+          </div>
+        </div>
+      ) : (
+        frameInner
+      )}
     </div>
   );
 };

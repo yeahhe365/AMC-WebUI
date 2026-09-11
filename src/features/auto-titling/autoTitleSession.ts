@@ -1,4 +1,4 @@
-import { type AppSettings, type ChatMessage, type SavedChatSession } from '@/types';
+import { type AppSettings, type ChatMessage, type SavedChatSession, type SessionsUpdater } from '@/types';
 import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import { getGeminiKeyForRequest } from '@/utils/apiKeySelection';
 import { generateTitleApi } from '@/services/api/generation/textApi';
@@ -6,11 +6,6 @@ import { generateSessionTitle } from '@/utils/chat/session';
 import { getVisibleChatMessages } from '@/utils/chat/visibility';
 import { dbService } from '@/services/db/dbService';
 import { logService } from '@/services/logService';
-
-type AutoTitleSessionsUpdater = (
-  updater: (prev: SavedChatSession[]) => SavedChatSession[],
-  options?: { persist?: boolean },
-) => void | Promise<void>;
 
 const TITLE_SOURCE_MAX_CHARS = 2000;
 const clampForTitle = (text: string) =>
@@ -56,6 +51,42 @@ const findFirstCompletedExchange = (session: SavedChatSession): AutoTitleExchang
   }
 
   return null;
+};
+
+/**
+ * Find the most informative completed exchange in the session.
+ * For manual regenerations, if later exchanges have substantial content, prefer them over a generic greeting.
+ */
+const findBestCompletedExchange = (session: SavedChatSession): AutoTitleExchange | null => {
+  const messages = getVisibleChatMessages(session.messages);
+  let bestExchange: AutoTitleExchange | null = null;
+
+  for (let index = 0; index < messages.length - 1; index += 1) {
+    const userMessage = messages[index];
+    const modelMessage = messages[index + 1];
+
+    if (userMessage.role !== 'user' || modelMessage.role !== 'model') {
+      continue;
+    }
+    if (modelMessage.stoppedByUser) {
+      continue;
+    }
+    if (modelMessage.isLoading && modelMessage.content.length < TITLE_SOURCE_MAX_CHARS) {
+      continue;
+    }
+
+    const exchange: AutoTitleExchange = {
+      userContent: userMessage.content,
+      modelContent: modelMessage.content,
+      isIncomplete: Boolean(modelMessage.isLoading),
+    };
+
+    if (!bestExchange || userMessage.content.trim().length >= 10) {
+      bestExchange = exchange;
+    }
+  }
+
+  return bestExchange;
 };
 
 /**
@@ -105,12 +136,13 @@ export const hasNonOverridableTitle = (session: SavedChatSession): boolean => {
 export const isSessionAutoTitleEligible = (session: SavedChatSession): boolean =>
   !hasNonOverridableTitle(session) && findFirstCompletedExchange(session) !== null;
 
-interface AutoTitleSessionOptions {
+export interface AutoTitleSessionOptions {
   session: SavedChatSession;
   appSettings: AppSettings;
   language: SupportedLanguage;
   stickyKey?: string;
-  updateAndPersistSessions: AutoTitleSessionsUpdater;
+  updateAndPersistSessions: SessionsUpdater;
+  force?: boolean;
 }
 
 export const autoTitleSession = async ({
@@ -119,9 +151,12 @@ export const autoTitleSession = async ({
   language,
   stickyKey,
   updateAndPersistSessions,
+  force = false,
 }: AutoTitleSessionOptions): Promise<boolean> => {
   const sessionId = session.id;
-  const exchange = findFirstCompletedExchange(session);
+  const exchange = force
+    ? (findBestCompletedExchange(session) ?? findFirstCompletedExchange(session))
+    : findFirstCompletedExchange(session);
 
   if (!exchange) {
     return false;
@@ -155,7 +190,7 @@ export const autoTitleSession = async ({
     return false;
   }
 
-  if (hasNonOverridableTitle(freshSession)) {
+  if (!force && hasNonOverridableTitle(freshSession)) {
     logService.info(`Session ${sessionId} already has a custom title; skipping title generation.`);
     return false;
   }
@@ -185,8 +220,10 @@ export const autoTitleSession = async ({
     // here, so the lightweight read suffices.
     const latest = await dbService.getSessionMetadataOnly(sessionId);
     if (!latest) return false;
-    if (latest.titleSource === 'manual' || latest.titleSource === 'auto') return false;
-    if (latest.title !== freshTitle) return false;
+    if (!force) {
+      if (latest.titleSource === 'manual' || latest.titleSource === 'auto') return false;
+      if (latest.title !== freshTitle) return false;
+    }
 
     logService.info(`Generated new title for session ${sessionId}: "${newTitle}"`);
     updateAndPersistSessions((prev) =>

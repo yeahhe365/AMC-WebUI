@@ -1,6 +1,6 @@
 import { translations } from '@/i18n/coreTranslations';
 import { SETTINGS_SEARCH_CATALOG, type SettingsSearchEntry } from '@/constants/settingsSearchCatalog';
-import { SETTINGS_TAB_IDS, SETTINGS_TAB_LABEL_KEYS } from '@/constants/settingsTabs';
+import { SETTINGS_TABS, SETTINGS_TAB_LABEL_KEYS } from '@/constants/settingsTabs';
 import type { SettingsTab } from '@/stores/settingsUiStore';
 
 const normalizeQuery = (value: string): string => value.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -104,7 +104,7 @@ interface SettingsSearchResultGroup {
 
 export const groupSettingsSearchResults = (
   results: SettingsSearchResult[],
-  tabOrder: SettingsTab[] = SETTINGS_TAB_IDS,
+  tabOrder: SettingsTab[] = SETTINGS_TABS,
 ): SettingsSearchResultGroup[] => {
   if (results.length <= SETTINGS_SEARCH_GROUP_THRESHOLD) {
     return []; // empty array = flat mode

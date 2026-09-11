@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { ChevronDown, GripVertical, MoreHorizontal } from 'lucide-react';
 import { type ChatGroup, type SavedChatSession } from '@/types';
 import { GroupItemMenu } from './GroupItemMenu';
+import { DropdownMenu, DropdownMenuTrigger } from '@/components/shared/DropdownMenu';
 import { InlineRenameInput } from './InlineRenameInput';
 import { LimitedSessionList } from './LimitedSessionList';
 import { GROUP_DRAG_TYPE, isGroupDrag, isSessionDrag } from './sidebarDragTypes';
@@ -114,6 +115,7 @@ export const GroupItem: React.FC<GroupItemProps> = (props) => {
     onDuplicateSession: sessionItemProps.onDuplicateSession,
     onOpenExportModal: sessionItemProps.onOpenExportModal,
     onMoveSessionToGroup: sessionItemProps.onMoveSessionToGroup,
+    onRegenerateTitleSession: sessionItemProps.onRegenerateTitleSession,
     groups: sessionItemProps.groups,
     handleStartEdit: sessionItemProps.handleStartEdit,
     handleRenameConfirm,
@@ -295,39 +297,46 @@ export const GroupItem: React.FC<GroupItemProps> = (props) => {
               </>
             )}
           </div>
-          <button
-            onClick={(e) => toggleMenu(e, group.id)}
-            className="p-1 rounded-full text-[var(--theme-text-primary)] opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus:opacity-100 focus:pointer-events-auto transition-opacity"
-          >
-            <MoreHorizontal size={16} strokeWidth={2.2} />
-          </button>
+          <DropdownMenu open={activeMenu === group.id} onOpenChange={(open) => setActiveMenu(open ? group.id : null)}>
+            <DropdownMenuTrigger asChild>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleMenu(e, group.id);
+                }}
+                className="p-1 rounded-full text-[var(--theme-text-primary)] opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus:opacity-100 focus:pointer-events-auto transition-opacity"
+              >
+                <MoreHorizontal size={16} strokeWidth={2.2} />
+              </button>
+            </DropdownMenuTrigger>
+            {activeMenu === group.id && (
+              <GroupItemMenu
+                menuRef={menuRef}
+                onNewChat={() => {
+                  onNewChatInGroup(group.id);
+                  setActiveMenu(null);
+                }}
+                onStartEdit={() => {
+                  handleGroupStartEdit(group);
+                  setActiveMenu(null);
+                }}
+                onClear={
+                  onClearGroup
+                    ? () => {
+                        onClearGroup(group.id);
+                        setActiveMenu(null);
+                      }
+                    : undefined
+                }
+                hasSessions={sessions.length > 0}
+                onDelete={() => {
+                  onDeleteGroup(group.id);
+                  setActiveMenu(null);
+                }}
+              />
+            )}
+          </DropdownMenu>
         </summary>
-        {activeMenu === group.id && (
-          <GroupItemMenu
-            menuRef={menuRef}
-            onNewChat={() => {
-              onNewChatInGroup(group.id);
-              setActiveMenu(null);
-            }}
-            onStartEdit={() => {
-              handleGroupStartEdit(group);
-              setActiveMenu(null);
-            }}
-            onClear={
-              onClearGroup
-                ? () => {
-                    onClearGroup(group.id);
-                    setActiveMenu(null);
-                  }
-                : undefined
-            }
-            hasSessions={sessions.length > 0}
-            onDelete={() => {
-              onDeleteGroup(group.id);
-              setActiveMenu(null);
-            }}
-          />
-        )}
         <LimitedSessionList
           sessions={sessions ?? []}
           sessionItemProps={childSessionItemProps}

@@ -24,12 +24,6 @@ vi.mock('@/components/modals/FilePreviewModal', async () => {
   return createFilePreviewModalMock();
 });
 
-vi.mock('@/components/modals/MarkdownPreviewModal', async () => {
-  const { createMarkdownPreviewModalMock } = await import('@/test/message-list/doubles');
-
-  return createMarkdownPreviewModalMock();
-});
-
 vi.mock('./hooks/useMessageListScroll', async () => {
   const { createMessageListScrollMock } = await import('@/test/message-list/doubles');
 
@@ -113,10 +107,9 @@ describe('MessageList image preview', () => {
     });
 
     expect(document.querySelector('[data-testid="file-preview-modal"]')).toBeInTheDocument();
-    expect(document.querySelector('[data-testid="markdown-preview-modal"]')).not.toBeInTheDocument();
   });
 
-  it('opens markdown files in the dedicated markdown preview modal', async () => {
+  it('opens markdown files in the file preview modal', async () => {
     const markdownFile: UploadedFile = {
       id: 'markdown-1',
       name: 'notes.md',
@@ -137,8 +130,7 @@ describe('MessageList image preview', () => {
       await Promise.resolve();
     });
 
-    expect(document.querySelector('[data-testid="markdown-preview-modal"]')).toBeInTheDocument();
-    expect(document.querySelector('[data-testid="file-preview-modal"]')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-testid="file-preview-modal"]')).toBeInTheDocument();
   });
 
   it('does not pass global display settings through MessageList to Message', () => {

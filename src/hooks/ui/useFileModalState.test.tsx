@@ -51,4 +51,43 @@ describe('useFileModalState', () => {
 
     unmount();
   });
+
+  it('supports universal navigation across mixed file types (PDF, text, image)', () => {
+    const pdf = createUploadedFile({ id: 'f-pdf', name: 'doc.pdf', type: 'application/pdf' });
+    const img = createUploadedFile({ id: 'f-img', name: 'pic.png', type: 'image/png' });
+    const txt = createUploadedFile({ id: 'f-txt', name: 'notes.md', type: 'text/markdown' });
+
+    const { result, unmount } = renderHook(() => useFileModalState<string>([pdf, img, txt]));
+
+    act(() => {
+      result.current.openPreview(pdf);
+    });
+
+    expect(result.current.previewFile).toBe(pdf);
+    expect(result.current.currentImageIndex).toBe(0);
+    expect(result.current.allImages).toHaveLength(3);
+
+    act(() => {
+      result.current.handleNextImage();
+    });
+
+    expect(result.current.previewFile).toBe(img);
+    expect(result.current.currentImageIndex).toBe(1);
+
+    act(() => {
+      result.current.handleNextImage();
+    });
+
+    expect(result.current.previewFile).toBe(txt);
+    expect(result.current.currentImageIndex).toBe(2);
+
+    act(() => {
+      result.current.handlePrevImage();
+    });
+
+    expect(result.current.previewFile).toBe(img);
+    expect(result.current.currentImageIndex).toBe(1);
+
+    unmount();
+  });
 });

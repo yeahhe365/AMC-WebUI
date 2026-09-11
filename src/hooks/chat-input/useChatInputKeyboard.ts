@@ -180,7 +180,12 @@ export const useChatInputKeyboard = ({
         }
       }
 
-      if (isShortcutPressed(event, 'input.editLast', appSettings) && !isLoading && inputText.length === 0) {
+      if (
+        isShortcutPressed(event, 'input.editLast', appSettings) &&
+        !isLoading &&
+        !isEditing &&
+        inputText.length === 0
+      ) {
         event.preventDefault();
         onEditLastUserMessage();
         return;

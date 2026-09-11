@@ -282,25 +282,21 @@ describe('naming and structure optimization guardrails', () => {
     expect(utilsSource).toContain('export const dedupeOpenAICompatibleModelOptions');
   });
 
-  it('keeps third-party API settings in the API config subcomponent', () => {
+  it('keeps third-party API settings isolated in dedicated provider section', () => {
     const apiConfigSource = readProjectFile('src/components/settings/sections/ApiConfigSection.tsx');
-    const thirdPartySettingsSource = readProjectFile(
-      'src/components/settings/sections/api-config/ThirdPartyApiSettingsPanel.tsx',
+    const providerSettingsSource = readProjectFile(
+      'src/components/settings/sections/providers/ProviderSettingsSection.tsx',
     );
 
     expect(
-      fs.existsSync(
-        path.join(projectRoot, 'src/components/settings/sections/api-config/ThirdPartyApiSettingsPanel.tsx'),
-      ),
+      fs.existsSync(path.join(projectRoot, 'src/components/settings/sections/providers/ProviderSettingsSection.tsx')),
     ).toBe(true);
-    expect(apiConfigSource).toContain("from './api-config/ThirdPartyApiSettingsPanel'");
-    expect(apiConfigSource).toContain('<ThirdPartyApiSettingsPanel');
+    expect(providerSettingsSource).toContain('ProviderList');
+    expect(providerSettingsSource).toContain('ProviderDetail');
     expect(apiConfigSource).not.toContain('buildOpenAICompatibleChatCompletionsUrl');
     expect(apiConfigSource).not.toContain('getOpenAICompatibleBaseUrlWarning');
     expect(apiConfigSource).not.toContain('DEFAULT_OPENAI_COMPATIBLE_BASE_URL');
     expect(apiConfigSource).not.toContain('settingsOpenAICompatibleRequestUrlPreview');
-    expect(thirdPartySettingsSource).toContain('THIRD_PARTY_TEMPLATE_IDS');
-    expect(thirdPartySettingsSource).toContain('updateThirdPartyConnection');
   });
 
   it('keeps user message collapse state outside the markdown renderer component', () => {

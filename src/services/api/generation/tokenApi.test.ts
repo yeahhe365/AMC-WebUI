@@ -27,7 +27,7 @@ describe('countTokensApi', () => {
     mockCountTokens.mockResolvedValue({ totalTokens: 42 });
   });
 
-  it('uses v1alpha and preserves mediaResolution when counting tokens for per-part media inputs', async () => {
+  it('preserves mediaResolution without overriding apiVersion when counting tokens for per-part media inputs', async () => {
     await countTokensApi('key', 'gemini-3.1-pro-preview', [
       {
         inlineData: {
@@ -39,9 +39,7 @@ describe('countTokensApi', () => {
       } as unknown as Part,
     ]);
 
-    expect(mockGetConfiguredApiClient).toHaveBeenCalledWith('key', {
-      apiVersion: 'v1alpha',
-    });
+    expect(mockGetConfiguredApiClient).toHaveBeenCalledWith('key', undefined);
 
     expect(mockCountTokens).toHaveBeenCalledWith({
       model: 'gemini-3.1-pro-preview',

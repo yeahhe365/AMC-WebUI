@@ -1,22 +1,9 @@
+import { blobToDataUrl } from '@/utils/file/fileEncoding';
 import { isImageMimeType } from '@/utils/file/fileTypeClassification';
 
 const FALLBACK_IMAGE_WIDTH = 1200;
 const FALLBACK_IMAGE_HEIGHT = 675;
 const IMAGE_SIZE_TIMEOUT_MS = 3000;
-
-const blobToDataUrl = (blob: Blob): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === 'string') {
-        resolve(reader.result);
-      } else {
-        reject(new Error('Image could not be converted for PDF export.'));
-      }
-    };
-    reader.onerror = () => reject(new Error('Image could not be read for PDF export.'));
-    reader.readAsDataURL(blob);
-  });
 
 const fetchImageSourceAsDataUrl = async (src: string): Promise<string | null> => {
   try {

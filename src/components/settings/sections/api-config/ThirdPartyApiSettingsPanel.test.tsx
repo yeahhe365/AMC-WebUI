@@ -1,5 +1,5 @@
 import { act, type ComponentProps, useState } from 'react';
-import { waitFor } from '@testing-library/react';
+import { fireEvent, waitFor } from '@testing-library/react';
 import { setupProviderTestRenderer as setupTestRenderer } from '@/test/render/providerRenderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setupStoreStateReset } from '@/test/stores/reset';
@@ -176,5 +176,105 @@ describe('ThirdPartyApiSettingsPanel', () => {
       findButton('Delete')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
     expect(onUpdateSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders quick test button and test all button when connections exist', () => {
+    const settings: AppSettings = {
+      ...useSettingsStore.getState().appSettings,
+      thirdPartyApi: {
+        connections: [
+          createThirdPartyConnection({
+            id: 'openai',
+            enabled: true,
+            apiKey: 'sk',
+            baseUrl: 'https://api.openai.com/v1',
+          }),
+        ],
+      },
+    };
+
+    act(() => {
+      renderer.root.render(<ThirdPartyApiSettingsPanel {...createPanelProps({ settings })} />);
+    });
+
+    expect(queryDoc('[data-testid="third-party-test-all-btn"]')).not.toBeNull();
+    expect(queryDoc('[data-testid="quick-test-openai-btn"]')).not.toBeNull();
+  });
+
+  it('filters connections with search input in master list', () => {
+    const settings: AppSettings = {
+      ...useSettingsStore.getState().appSettings,
+      thirdPartyApi: {
+        connections: [
+          createThirdPartyConnection({ id: 'openai', name: 'OpenAI', enabled: true }),
+          createThirdPartyConnection({ id: 'deepseek', name: 'DeepSeek', enabled: true }),
+        ],
+      },
+    };
+
+    act(() => {
+      renderer.root.render(<ThirdPartyApiSettingsPanel {...createPanelProps({ settings })} />);
+    });
+
+    expect(queryDoc('[data-testid="connection-openai-card"]')).not.toBeNull();
+    expect(queryDoc('[data-testid="connection-deepseek-card"]')).not.toBeNull();
+
+    const searchInput = queryDoc('[data-testid="third-party-search-input"]') as HTMLInputElement;
+    expect(searchInput).not.toBeNull();
+
+    act(() => {
+      fireEvent.change(searchInput, { target: { value: 'deep' } });
+    });
+
+    expect(queryDoc('[data-testid="connection-deepseek-card"]')).not.toBeNull();
+    expect(queryDoc('[data-testid="connection-openai-card"]')).toBeNull();
+
+    act(() => {
+      fireEvent.change(searchInput, { target: { value: 'nonexistent' } });
+    });
+
+    expect(renderer.container.textContent).toContain('No connections match your search');
+  });
+
+  it('switches between connections and navigates back using back button', () => {
+    const settings: AppSettings = {
+      ...useSettingsStore.getState().appSettings,
+      thirdPartyApi: {
+        connections: [
+          createThirdPartyConnection({ id: 'conn-1', name: 'Vendor One', apiKey: 'key-1' }),
+          createThirdPartyConnection({ id: 'conn-2', name: 'Vendor Two', apiKey: 'key-2' }),
+        ],
+      },
+    };
+
+    act(() => {
+      renderer.root.render(<ThirdPartyApiSettingsPanel {...createPanelProps({ settings })} />);
+    });
+
+    // Initially placeholder is shown, neither editor is mounted
+    expect(queryDoc('#connection-conn-1-api-key-input')).toBeNull();
+    expect(queryDoc('#connection-conn-2-api-key-input')).toBeNull();
+    expect(renderer.container.textContent).toContain('Select a connection from the list');
+
+    // Click Vendor One
+    act(() => {
+      findButton('Vendor One')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(queryDoc('#connection-conn-1-api-key-input')).not.toBeNull();
+    expect(queryDoc('#connection-conn-2-api-key-input')).toBeNull();
+
+    // Switch to Vendor Two
+    act(() => {
+      findButton('Vendor Two')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(queryDoc('#connection-conn-1-api-key-input')).toBeNull();
+    expect(queryDoc('#connection-conn-2-api-key-input')).not.toBeNull();
+
+    // Click Back to connections
+    act(() => {
+      findButton('Back to connections')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(queryDoc('#connection-conn-2-api-key-input')).toBeNull();
+    expect(renderer.container.textContent).toContain('Select a connection from the list');
   });
 });

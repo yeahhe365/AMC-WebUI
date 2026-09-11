@@ -690,6 +690,95 @@ describe('buildGenerationConfig', () => {
     expect(hasGoogleMaps).toBeFalsy();
   });
 
+  it('combines googleSearch and googleMaps for Gemini 3 models', async () => {
+    const config = await buildGenerationConfigFromSettings({
+      settings: {
+        ...DEFAULT_CHAT_SETTINGS,
+        modelId: 'gemini-3.8-flash',
+        isGoogleSearchEnabled: true,
+        isGoogleMapsEnabled: true,
+      },
+    });
+
+    const hasGoogleSearch = config.tools?.some((tool) => 'googleSearch' in tool);
+    const hasGoogleMaps = config.tools?.some((tool) => 'googleMaps' in tool);
+    expect(hasGoogleSearch).toBe(true);
+    expect(hasGoogleMaps).toBe(true);
+  });
+
+  it('skips googleMaps when combined with googleSearch on non-Gemini-3 models to prevent API 400', async () => {
+    const config = await buildGenerationConfigFromSettings({
+      settings: {
+        ...DEFAULT_CHAT_SETTINGS,
+        modelId: 'gemini-2.5-flash',
+        isGoogleSearchEnabled: true,
+        isGoogleMapsEnabled: true,
+      },
+    });
+
+    const hasGoogleSearch = config.tools?.some((tool) => 'googleSearch' in tool);
+    const hasGoogleMaps = config.tools?.some((tool) => 'googleMaps' in tool);
+    expect(hasGoogleSearch).toBe(true);
+    expect(hasGoogleMaps).toBeFalsy();
+  });
+
+  it('attaches retrievalConfig.latLng when googleMapsLocation is provided and valid', async () => {
+    const config = await buildGenerationConfigFromSettings({
+      settings: {
+        ...DEFAULT_CHAT_SETTINGS,
+        modelId: 'gemini-3.8-flash',
+        isGoogleMapsEnabled: true,
+        googleMapsLocation: {
+          latitude: 34.050481,
+          longitude: -118.248526,
+          name: 'Los Angeles',
+        },
+      },
+    });
+
+    expect(config.toolConfig?.retrievalConfig?.latLng).toEqual({
+      latitude: 34.050481,
+      longitude: -118.248526,
+    });
+  });
+
+  it('omits retrievalConfig.latLng when googleMapsLocation is invalid or out-of-bounds', async () => {
+    const config = await buildGenerationConfigFromSettings({
+      settings: {
+        ...DEFAULT_CHAT_SETTINGS,
+        modelId: 'gemini-3.8-flash',
+        isGoogleMapsEnabled: true,
+        googleMapsLocation: {
+          latitude: 95,
+          longitude: 200,
+        },
+      },
+    });
+
+    expect(config.toolConfig?.retrievalConfig?.latLng).toBeUndefined();
+  });
+
+  it('preserves retrievalConfig.latLng when combined with appendFunctionDeclarationsToTools', async () => {
+    const base = await buildGenerationConfigFromSettings({
+      settings: {
+        ...DEFAULT_CHAT_SETTINGS,
+        modelId: 'gemini-3.8-flash',
+        isGoogleMapsEnabled: true,
+        googleMapsLocation: {
+          latitude: 39.9042,
+          longitude: 116.4074,
+        },
+      },
+    });
+
+    const combined = appendFunctionDeclarationsToTools('gemini-3.8-flash', base, []);
+    expect(combined.toolConfig?.retrievalConfig?.latLng).toEqual({
+      latitude: 39.9042,
+      longitude: 116.4074,
+    });
+    expect(combined.toolConfig?.includeServerSideToolInvocations).toBe(true);
+  });
+
   it('sets systemInstruction to undefined when empty', async () => {
     const config = await buildGenerationConfig('gemini-3-flash-preview', '', baseConfig, false, 0);
     expect(config.systemInstruction).toBeUndefined();

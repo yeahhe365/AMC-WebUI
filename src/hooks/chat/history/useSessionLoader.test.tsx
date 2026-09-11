@@ -9,6 +9,9 @@ const {
   mockGetSession,
   mockRehydrateSessionFiles,
   mockResolveSupportedModelId,
+  mockSaveDraftFiles,
+  mockGetDraftFiles,
+  mockDeleteDraftFiles,
 } = vi.hoisted(() => ({
   mockCreateNewSession: vi.fn((..._args: unknown[]) => ({
     id: 'new-session',
@@ -22,12 +25,20 @@ const {
   mockGetSession: vi.fn(),
   mockRehydrateSessionFiles: vi.fn((session: SavedChatSession) => session),
   mockResolveSupportedModelId: vi.fn((modelId: string | undefined, fallback: string) => modelId ?? fallback),
+  mockSaveDraftFiles: vi.fn<(...args: any[]) => Promise<any>>(async () => undefined),
+  mockGetDraftFiles: vi.fn<(...args: any[]) => Promise<any>>(async () => []),
+  mockDeleteDraftFiles: vi.fn<(...args: any[]) => Promise<any>>(async () => undefined),
 }));
 
 vi.mock('@/services/db/dbService', async () => {
   const { createDbServiceMockModule } = await import('@/test/doubles/moduleMocks');
 
-  return createDbServiceMockModule({ getSession: mockGetSession });
+  return createDbServiceMockModule({
+    getSession: mockGetSession,
+    saveDraftFiles: mockSaveDraftFiles,
+    getDraftFiles: mockGetDraftFiles,
+    deleteDraftFiles: mockDeleteDraftFiles,
+  });
 });
 
 vi.mock('@/utils/chat/session', () => ({
@@ -520,6 +531,45 @@ describe('useSessionLoader', () => {
     expect(updatedSessions[0].id).toBe('session-empty');
     expect(updatedSessions[0].groupId).toBe('group-9');
 
+    unmount();
+  });
+
+  it('persists outgoing session draft files when switching sessions', async () => {
+    const draftFiles = [{ id: 'f-1', name: 'img.png', type: 'image/png', size: 100 }];
+    const sessionNext = createSession('session-next', 'Next Session');
+    mockGetSession.mockResolvedValue(sessionNext);
+
+    const { result, unmount } = renderSessionLoader({
+      activeSessionId: 'session-out',
+      selectedFiles: draftFiles as never,
+    });
+
+    await act(async () => {
+      await result.current.loadChatSession('session-next');
+    });
+
+    expect(mockSaveDraftFiles).toHaveBeenCalledWith('session-out', draftFiles);
+    unmount();
+  });
+
+  it('restores draft files from IndexedDB when loading a session without memory draft', async () => {
+    const draftFiles = [{ id: 'f-persisted', name: 'doc.pdf', type: 'application/pdf', size: 200 }];
+    const sessionToLoad = createSession('session-persisted', 'Persisted Session');
+    mockGetSession.mockResolvedValue(sessionToLoad);
+    mockGetDraftFiles.mockResolvedValue(draftFiles);
+
+    const setSelectedFiles = vi.fn();
+
+    const { result, unmount } = renderSessionLoader({
+      setSelectedFiles,
+      fileDraftsRef: { current: {} },
+    });
+
+    await act(async () => {
+      await result.current.loadChatSession('session-persisted');
+    });
+
+    expect(setSelectedFiles).toHaveBeenCalledWith(draftFiles);
     unmount();
   });
 });

@@ -1,19 +1,6 @@
 import { logService } from '@/services/logService';
 import React, { useState, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
-import {
-  X,
-  Check,
-  Download,
-  ClipboardCopy,
-  Loader2,
-  FileText,
-  ImageIcon,
-  FileVideo,
-  FileAudio,
-  FileCode2,
-  Save,
-  Edit3,
-} from 'lucide-react';
+import { X, Check, Download, ClipboardCopy, Loader2, Save, Edit3 } from 'lucide-react';
 import { type UploadedFile } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
 import { toastError } from '@/stores/toastStore';
@@ -22,7 +9,9 @@ import { triggerDownload } from '@/utils/export/core';
 import { copyFileToClipboard } from '@/utils/file/fileClipboard';
 import { formatFileSize } from '@/utils/file/fileSize';
 import { getFileKindFlags } from '@/utils/file/fileTypeClassification';
-import { FloatingToolbar, ToolbarButton, ToolbarDivider } from './FloatingToolbar';
+import { getFileDisplayMeta } from '@/utils/file/fileDisplayStyles';
+import { ToolbarButton, ToolbarDivider } from './FloatingToolbar';
+import { Tooltip } from '@/components/shared/Tooltip';
 
 interface FilePreviewHeaderProps {
   file: UploadedFile;
@@ -32,6 +21,7 @@ interface FilePreviewHeaderProps {
   onSave?: () => void;
   editedName?: string;
   onNameChange?: (name: string) => void;
+  className?: string;
 }
 
 export interface FilePreviewHeaderHandle {
@@ -39,16 +29,17 @@ export interface FilePreviewHeaderHandle {
 }
 
 export const FilePreviewHeader = React.forwardRef<FilePreviewHeaderHandle, FilePreviewHeaderProps>(
-  ({ file, onClose, isEditable = false, onToggleEdit, onSave, editedName, onNameChange }, ref) => {
+  ({ file, onClose, isEditable = false, onToggleEdit, onSave, editedName, onNameChange, className = '' }, ref) => {
     const { t } = useI18n();
     const [isDownloading, setIsDownloading] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
     const copyFeedbackTimeoutRef = useRef<number | null>(null);
 
-    const { isImage, isPdf, isVideo, isAudio, isTextFallback: isText } = getFileKindFlags(file);
+    const { isTextFallback: isText, isAudio, isVideo, isYoutube } = getFileKindFlags(file);
     const isMermaidDiagram = file.type === 'image/svg+xml';
-
-    const FileIcon = isImage ? ImageIcon : isPdf ? FileText : isVideo ? FileVideo : isAudio ? FileAudio : FileCode2;
+    const isCopyable =
+      !isAudio && !isVideo && !isYoutube && (isText || file.type?.startsWith('image/') || isMermaidDiagram);
+    const { Icon: FileIcon, colorClass, bgClass } = getFileDisplayMeta(file);
 
     const showCopyFeedback = useCallback(() => {
       setIsCopied(true);
@@ -115,90 +106,131 @@ export const FilePreviewHeader = React.forwardRef<FilePreviewHeaderHandle, FileP
     }, [file, isDownloading, isMermaidDiagram]);
 
     return (
-      <div className="absolute top-0 left-0 right-0 p-4 sm:p-6 flex flex-row items-start justify-between gap-3 z-50 pointer-events-none">
-        <FloatingToolbar className="pointer-events-auto pl-2 pr-4 py-1.5 max-w-[calc(100%-140px)] sm:max-w-md group/info">
-          <div className="bg-white/10 p-1.5 rounded-full text-white/90 group-hover/info:bg-white/20 transition-colors flex-shrink-0">
-            <FileIcon size={16} strokeWidth={1.5} />
+      <header
+        className={`flex-shrink-0 w-full h-13 sm:h-14 bg-[#101113] border-b border-white/10 px-3 sm:px-5 flex items-center justify-between gap-3 z-40 select-none ${className}`}
+      >
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 max-w-[calc(100%-160px)] sm:max-w-xl md:max-w-2xl">
+          <div
+            className={`p-1.5 sm:p-2 rounded-lg ${bgClass} ${colorClass} transition-colors flex-shrink-0 flex items-center justify-center shadow-xs`}
+          >
+            <FileIcon size={18} strokeWidth={1.75} />
           </div>
-          <div className="min-w-0 flex flex-col justify-center ml-2">
+          <div className="min-w-0 flex flex-col justify-center">
             {isEditable && onNameChange ? (
               <input
                 type="text"
                 value={editedName}
                 onChange={(e) => onNameChange(e.target.value)}
-                className="bg-transparent border-b border-white/20 text-xs sm:text-sm font-medium text-white/90 focus:border-white/50 outline-none w-full"
+                className="bg-white/10 border border-white/20 rounded px-2 py-0.5 text-xs sm:text-sm font-medium text-white/95 focus:border-white/50 focus:bg-white/15 outline-none w-full"
                 placeholder={t('filePreviewFilenamePlaceholder')}
                 autoFocus
               />
             ) : (
-              <span className="text-xs sm:text-sm font-medium text-white/90 truncate leading-tight" title={file.name}>
-                {file.name}
-              </span>
+              <Tooltip text={file.name} side="bottom" align="start" asChild>
+                <span
+                  className="text-xs sm:text-sm font-medium text-white/95 truncate leading-snug tracking-tight cursor-default"
+                  title={file.name}
+                >
+                  {file.name}
+                </span>
+              </Tooltip>
             )}
 
             {!isEditable && (
-              <div className="flex items-center gap-1.5 text-xs font-mono text-white/50 leading-none mt-0.5">
-                <span className="truncate max-w-[60px]">{file.type.split('/').pop()?.toUpperCase()}</span>
+              <div className="flex items-center gap-1.5 text-[11px] font-mono text-white/55 leading-none mt-0.5">
+                <span className="truncate max-w-[90px] uppercase font-semibold text-white/70">
+                  {file.type.split('/').pop()?.toUpperCase() || 'FILE'}
+                </span>
                 <span className="w-0.5 h-0.5 rounded-full bg-white/30 flex-shrink-0"></span>
                 <span className="whitespace-nowrap">{formatFileSize(file.size)}</span>
               </div>
             )}
           </div>
-        </FloatingToolbar>
+        </div>
 
-        <FloatingToolbar className="pointer-events-auto p-1">
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0">
           {isEditable ? (
-            <ToolbarButton
-              onClick={onSave}
-              className="!text-green-400 hover:!bg-green-500/20"
-              title={t('filePreviewSaveChanges')}
-            >
-              <Save size={18} strokeWidth={2} />
-            </ToolbarButton>
+            <Tooltip text={t('filePreviewSaveChanges')} side="bottom" asChild>
+              <ToolbarButton
+                onClick={onSave}
+                className="!text-emerald-400 hover:!bg-emerald-500/20 active:scale-95"
+                title={t('filePreviewSaveChanges')}
+                aria-label={t('filePreviewSaveChanges')}
+              >
+                <Save size={18} strokeWidth={2} />
+              </ToolbarButton>
+            </Tooltip>
           ) : (
             <>
               {isText && onToggleEdit && (
-                <ToolbarButton onClick={onToggleEdit} title={t('filePreviewEditFile')}>
-                  <Edit3 size={18} strokeWidth={1.5} />
-                </ToolbarButton>
+                <Tooltip text={t('filePreviewEditFile')} side="bottom" asChild>
+                  <ToolbarButton
+                    onClick={onToggleEdit}
+                    title={t('filePreviewEditFile')}
+                    aria-label={t('filePreviewEditFile')}
+                  >
+                    <Edit3 size={18} strokeWidth={1.5} />
+                  </ToolbarButton>
+                </Tooltip>
               )}
-              <ToolbarButton
-                onClick={handleCopy}
-                disabled={isCopied}
-                title={isCopied ? t('copiedButtonTitle') : t('filePreviewCopyContent')}
+              {isCopyable && (
+                <Tooltip text={isCopied ? t('copiedButtonTitle') : t('filePreviewCopyContent')} side="bottom" asChild>
+                  <ToolbarButton
+                    onClick={handleCopy}
+                    disabled={isCopied}
+                    data-testid="file-preview-copy-button"
+                    data-copied={isCopied ? 'true' : 'false'}
+                    title={isCopied ? t('copiedButtonTitle') : t('filePreviewCopyContent')}
+                    aria-label={isCopied ? t('copiedButtonTitle') : t('filePreviewCopyContent')}
+                  >
+                    {isCopied ? (
+                      <Check size={18} className="text-emerald-400" strokeWidth={2} />
+                    ) : (
+                      <ClipboardCopy size={18} strokeWidth={1.5} />
+                    )}
+                  </ToolbarButton>
+                </Tooltip>
+              )}
+              <Tooltip
+                text={isMermaidDiagram ? t('filePreviewDownloadSvg') : t('filePreviewDownloadFile')}
+                side="bottom"
+                asChild
               >
-                {isCopied ? (
-                  <Check size={18} className="text-green-400" strokeWidth={2} />
-                ) : (
-                  <ClipboardCopy size={18} strokeWidth={1.5} />
-                )}
-              </ToolbarButton>
-              <ToolbarButton
-                onClick={handleDownload}
-                disabled={isDownloading}
-                title={isMermaidDiagram ? t('filePreviewDownloadSvg') : t('filePreviewDownloadFile')}
-              >
-                {isDownloading ? (
-                  <Loader2 size={18} className="animate-spin" strokeWidth={1.5} />
-                ) : (
-                  <Download size={18} strokeWidth={1.5} />
-                )}
-              </ToolbarButton>
+                <ToolbarButton
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  title={isMermaidDiagram ? t('filePreviewDownloadSvg') : t('filePreviewDownloadFile')}
+                  aria-label={isMermaidDiagram ? t('filePreviewDownloadSvg') : t('filePreviewDownloadFile')}
+                >
+                  {isDownloading ? (
+                    <Loader2 size={18} className="animate-spin" strokeWidth={1.5} />
+                  ) : (
+                    <Download size={18} strokeWidth={1.5} />
+                  )}
+                </ToolbarButton>
+              </Tooltip>
             </>
           )}
 
           <ToolbarDivider />
 
-          <ToolbarButton
-            onClick={isEditable && onToggleEdit ? onToggleEdit : onClose}
-            danger
-            aria-label={isEditable ? t('filePreviewCancelEdit') : t('imageZoomCloseAria')}
-            title={isEditable ? t('filePreviewCancelEdit') : t('imageZoomCloseTitle')}
+          <Tooltip
+            text={isEditable ? t('filePreviewCancelEdit') : `${t('imageZoomCloseTitle')} (Esc)`}
+            side="bottom"
+            asChild
           >
-            <X size={18} strokeWidth={1.5} />
-          </ToolbarButton>
-        </FloatingToolbar>
-      </div>
+            <ToolbarButton
+              onClick={isEditable && onToggleEdit ? onToggleEdit : onClose}
+              danger
+              className="!text-white/90 hover:!bg-red-500/30 hover:!text-red-200"
+              aria-label={isEditable ? t('filePreviewCancelEdit') : t('imageZoomCloseAria')}
+              title={isEditable ? t('filePreviewCancelEdit') : `${t('imageZoomCloseTitle')} (Esc)`}
+            >
+              <X size={18} strokeWidth={2} />
+            </ToolbarButton>
+          </Tooltip>
+        </div>
+      </header>
     );
   },
 );

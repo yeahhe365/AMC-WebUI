@@ -1,0 +1,40 @@
+---
+title: Network & Proxy Troubleshooting
+description: Debugging WebSocket disconnects, CORS errors, and reverse proxy timeouts.
+---
+
+# Network & Proxy Troubleshooting
+
+Diagnosing network handshakes and proxy headers when self-hosting AMC WebUI.
+
+---
+
+## 1. Live API WebSocket Immediately Closes
+
+### Checklist
+- **Docker Environment**: Confirm `ENABLE_LIVE_WS_PROXY=true` is set.
+- **Nginx Reverse Proxy**: If running behind Nginx, you must pass WebSocket upgrade headers:
+  ```nginx
+  location /api/live {
+      proxy_pass http://127.0.0.1:3001;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "Upgrade";
+      proxy_read_timeout 86400s;
+  }
+  ```
+- **Idle Recycles**: Sessions idle for >5 minutes disconnect automatically per `LIVE_WS_IDLE_TIMEOUT_MS`. Toggle the microphone button to reconnect.
+
+---
+
+## 2. CORS Errors (`Access-Control-Allow-Origin`)
+
+### Symptom
+Console errors when frontend (`https://my-app.pages.dev`) queries backend (`https://api.domain.com`).
+
+### Resolution
+Add your frontend origin to `ALLOWED_ORIGINS` in your backend `.env`:
+```bash
+ALLOWED_ORIGINS=https://my-app.pages.dev
+```
+Separate multiple origins with commas, then restart the Node service.

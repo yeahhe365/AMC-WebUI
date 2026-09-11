@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, type RefObject } from 'react';
 import { useWindowContext } from '@/contexts/WindowContext';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 import { sanitizeFilename, triggerDownload } from '@/utils/export/core';
+import { repairIncompleteSvg } from '@/utils/codeSnippet';
 import { useFullscreen } from './useFullscreen';
 import { useHtmlPreviewGraphvizRelay } from './useHtmlPreviewGraphvizRelay';
 import {
@@ -18,6 +19,9 @@ import { LIVE_ARTIFACT_CLEAR_SELECTION_EVENT } from '@/utils/text-selection/live
 import { useHtmlPreviewBridge } from './useHtmlPreviewBridge';
 import { formatI18nErrorMessage } from '@/i18n/interpolate';
 
+import { type UploadedFile } from '@/types';
+import { svgToUploadedFile } from '@/utils/export/svgToUploadedFile';
+
 const ZOOM_STEP = 0.1;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 3.0;
@@ -32,11 +36,25 @@ interface UseHtmlPreviewModalProps {
   themeId?: string;
   iframeRef: RefObject<HTMLIFrameElement>;
   onLiveArtifactFollowUp?: (payload: LiveArtifactFollowupPayload) => void;
+  onImageClick?: (file: UploadedFile) => void;
 }
 
 type DocumentWithWebkitFullscreen = Document & {
   webkitFullscreenElement?: Element | null;
 };
+
+export type HtmlPreviewViewMode = 'preview' | 'code';
+export type HtmlPreviewDeviceMode = 'desktop' | 'tablet' | 'mobile';
+
+export interface HtmlPreviewDiagnostic {
+  type: string;
+  message?: string;
+  source?: string;
+  line?: number;
+  column?: number;
+  url?: string;
+  tagName?: string;
+}
 
 const MAX_PREVIEW_CONTENT_HEIGHT = 200_000;
 
@@ -49,6 +67,7 @@ export const useHtmlPreviewModal = ({
   themeId,
   iframeRef,
   onLiveArtifactFollowUp,
+  onImageClick,
 }: UseHtmlPreviewModalProps) => {
   const { t } = useI18n();
   const [isTrueFullscreen, setIsTrueFullscreen] = useState(false);
@@ -59,6 +78,9 @@ export const useHtmlPreviewModal = ({
 
   const [isDirectFullscreenLaunch, setIsDirectFullscreenLaunch] = useState(initialTrueFullscreenRequest);
   const [contentHeight, setContentHeight] = useState(0);
+  const [viewMode, setViewMode] = useState<HtmlPreviewViewMode>('preview');
+  const [deviceMode, setDeviceMode] = useState<HtmlPreviewDeviceMode>('desktop');
+  const [diagnostics, setDiagnostics] = useState<HtmlPreviewDiagnostic[]>([]);
   // Bumped by handleRefresh to remount the iframe (via a key), re-running the
   // preview script from scratch without the hook fighting React's srcDoc prop.
   const [iframeRefreshKey, setIframeRefreshKey] = useState(0);
@@ -88,6 +110,9 @@ export const useHtmlPreviewModal = ({
       setContentHeight(0);
       setIsPreviewReady(false);
       setIsDirectFullscreenLaunch(initialTrueFullscreenRequest);
+      setDiagnostics([]);
+      setViewMode('preview');
+      setDeviceMode('desktop');
     } else {
       const timer = setTimeout(() => setIsActuallyOpen(false), MODAL_EXIT_DELAY_MS);
       return () => clearTimeout(timer);
@@ -160,6 +185,29 @@ export const useHtmlPreviewModal = ({
     }
   }, [isTrueFullscreen, onClose]);
 
+  const handleBridgeDiagnostic = useCallback((payload: unknown) => {
+    if (!payload || typeof payload !== 'object') return;
+    setDiagnostics((previous) => [...previous, payload as HtmlPreviewDiagnostic]);
+  }, []);
+
+  const clearDiagnostics = useCallback(() => {
+    setDiagnostics([]);
+  }, []);
+
+  const handleBridgeDiagramClick = useCallback(
+    ({ svg, title }: { svg: string; title?: string }) => {
+      if (!onImageClick || !svg) return;
+      onClose();
+      const diagramId = `artifact-diagram-${Math.random().toString(36).substring(2, 9)}`;
+      const file = svgToUploadedFile(svg, {
+        id: diagramId,
+        name: title ? `${title}.svg` : 'diagram.svg',
+      });
+      onImageClick(file);
+    },
+    [onClose, onImageClick],
+  );
+
   useHtmlPreviewBridge({
     iframeRef,
     targetWindow,
@@ -171,6 +219,8 @@ export const useHtmlPreviewModal = ({
       onResize: handleBridgeResize,
       onEscape: handleBridgeEscape,
       onFollowUp: onLiveArtifactFollowUp,
+      onDiagnostic: handleBridgeDiagnostic,
+      onDiagramClick: handleBridgeDiagramClick,
     },
   });
 
@@ -220,9 +270,17 @@ export const useHtmlPreviewModal = ({
 
   const handleDownload = useCallback(() => {
     if (!htmlContent) return;
+    const isSvg = htmlContent.trim().startsWith('<svg');
     const title = getPreviewTitle();
-    const filename = `${sanitizeFilename(title)}.html`;
-    const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+    const ext = isSvg ? 'svg' : 'html';
+    const filename = `${sanitizeFilename(title)}.${ext}`;
+
+    let codeToDownload = htmlContent;
+    if (isSvg) {
+      codeToDownload = repairIncompleteSvg(codeToDownload);
+    }
+    const mimeType = isSvg ? 'image/svg+xml;charset=utf-8' : 'text/html;charset=utf-8';
+    const blob = new Blob([codeToDownload], { type: mimeType });
     const url = createManagedObjectUrl(blob);
     triggerDownload(url, filename);
   }, [htmlContent, getPreviewTitle]);
@@ -287,6 +345,7 @@ export const useHtmlPreviewModal = ({
   const handleRefresh = useCallback(() => {
     if (iframeRef.current && htmlContent) {
       setIsPreviewReady(false);
+      setDiagnostics([]);
       // Remount the iframe by bumping the key. The old imperative srcdoc write
       // desynced from React's srcDoc prop (the refresh relied on the prop being
       // unchanged). A remount restarts the preview script cleanly.
@@ -302,6 +361,12 @@ export const useHtmlPreviewModal = ({
     isPreviewReady,
     contentHeight,
     isScreenshotting,
+    viewMode,
+    setViewMode,
+    deviceMode,
+    setDeviceMode,
+    diagnostics,
+    clearDiagnostics,
     handleZoomIn,
     handleZoomOut,
     handleDownload,

@@ -8,7 +8,7 @@ interface FloatingToolbarProps {
 export const FloatingToolbar: React.FC<FloatingToolbarProps> = ({ children, className = '' }) => {
   return (
     <div
-      className={`bg-[#101113] border border-white/15 shadow-xl transition-all duration-200 rounded-full p-1.5 flex items-center gap-1 ${className}`}
+      className={`bg-[#121316] border border-white/15 shadow-2xl shadow-black/60 transition-all duration-200 rounded-full p-1.5 flex items-center gap-1 ${className}`}
     >
       {children}
     </div>
@@ -20,35 +20,26 @@ interface ToolbarButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   danger?: boolean;
 }
 
-export const ToolbarButton: React.FC<ToolbarButtonProps> = ({
-  children,
-  className = '',
-  active,
-  danger,
-  disabled,
-  ...props
-}) => {
-  const baseClass =
-    'p-1.5 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center';
+export const ToolbarButton = React.forwardRef<HTMLButtonElement, ToolbarButtonProps>(
+  ({ children, className = '', active, danger, disabled, ...props }, ref) => {
+    const baseClass =
+      'p-1.5 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-white/20 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center';
 
-  let colorClass = 'text-white/80 hover:text-white hover:bg-white/10';
+    let colorClass = 'text-white/80 hover:text-white hover:bg-white/15 active:scale-95';
 
-  if (active) {
-    colorClass = 'bg-white/20 text-white';
-  } else if (danger) {
-    colorClass = 'text-white/80 hover:bg-red-500/20 hover:text-red-400';
-  }
+    if (active) {
+      colorClass = 'bg-white/20 text-white';
+    } else if (danger) {
+      colorClass = 'text-white/80 hover:bg-red-500/25 hover:text-red-300 active:scale-95';
+    }
 
-  return (
-    <button className={`${baseClass} ${colorClass} ${className}`} disabled={disabled} {...props}>
-      {children}
-    </button>
-  );
-};
+    return (
+      <button ref={ref} className={`${baseClass} ${colorClass} ${className}`} disabled={disabled} {...props}>
+        {children}
+      </button>
+    );
+  },
+);
+ToolbarButton.displayName = 'ToolbarButton';
 
 export const ToolbarDivider: React.FC = () => <div className="w-px h-5 bg-white/10 mx-1"></div>;
-
-export const ToolbarLabel: React.FC<{ children: React.ReactNode; className?: string }> = ({
-  children,
-  className = '',
-}) => <div className={`px-2 font-mono text-xs font-medium text-white/90 select-none ${className}`}>{children}</div>;

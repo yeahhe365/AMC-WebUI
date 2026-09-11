@@ -1,6 +1,19 @@
-export const getErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+export const getErrorMessage = (error: unknown, fallbackMessage?: string): string => {
+  if (error instanceof Error) {
+    return error.message || fallbackMessage || '';
+  }
+  if (error === undefined || error === null) {
+    return fallbackMessage ?? '';
+  }
+  const str = String(error);
+  return str || (fallbackMessage ?? '');
+};
 
-export const toError = (error: unknown): Error => (error instanceof Error ? error : new Error(String(error)));
+export const toError = (error: unknown, fallbackMessage?: string): Error => {
+  if (error instanceof Error) return error;
+  const str = error === undefined || error === null ? '' : String(error);
+  return new Error(str || fallbackMessage || 'Unknown error');
+};
 
 /**
  * Reads an error message from an HTTP response body. Tries `{ error: { message } }`

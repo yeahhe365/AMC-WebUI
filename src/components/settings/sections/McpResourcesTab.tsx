@@ -5,6 +5,8 @@ import {
   type McpResourceDefinition,
   type McpResourceTemplateDefinition,
 } from '@/services/api/mcpApi';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { getErrorMessage } from '@/utils/errorMessage';
 import type { McpServerConfig } from '@/types';
 
 const MAX_PREVIEW_LENGTH = 4000;
@@ -46,7 +48,7 @@ export const McpResourcesTab: React.FC<McpResourcesTabProps> = ({ server, resour
   const [loadingUri, setLoadingUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewText, setPreviewText] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+  const { isCopied: copied, copyToClipboard } = useCopyToClipboard(2000);
 
   if (!all.length) {
     return <div className="p-4 text-sm text-[var(--theme-text-secondary)]">{t('settingsMcpEmptyResources')}</div>;
@@ -68,7 +70,7 @@ export const McpResourcesTab: React.FC<McpResourcesTabProps> = ({ server, resour
         setPreviewText(text.length > MAX_PREVIEW_LENGTH ? `${text.slice(0, MAX_PREVIEW_LENGTH)}…` : text);
       }
     } catch (resourceFetchError) {
-      setError(resourceFetchError instanceof Error ? resourceFetchError.message : String(resourceFetchError));
+      setError(getErrorMessage(resourceFetchError));
     } finally {
       setLoadingUri(null);
     }
@@ -128,10 +130,8 @@ export const McpResourcesTab: React.FC<McpResourcesTabProps> = ({ server, resour
                     </pre>
                     <button
                       type="button"
-                      onClick={async () => {
-                        await navigator.clipboard.writeText(previewText);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000);
+                      onClick={() => {
+                        if (previewText) void copyToClipboard(previewText);
                       }}
                       className="mt-1 flex items-center gap-1 text-[11px]"
                     >

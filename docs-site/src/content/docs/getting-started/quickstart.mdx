@@ -1,0 +1,80 @@
+---
+title: 快速启动 (Quickstart)
+description: 3 分钟跑起 AMC WebUI，体验本地开发、在线试用或 Docker 容器部署。
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+# 快速启动 AMC WebUI
+
+根据你的使用习惯，你可以选择直接在线体验、本地启动开发环境，或者使用 Docker 快速部署专属私有实例。
+
+---
+
+## 方式一：直接在线体验
+
+如果你暂时不想在本地安装环境，可以直接访问部署在 Cloudflare Pages 的官方 Demo：
+👉 **[在线演示站点 (Live Demo)](https://all-model-chat.pages.dev/)**
+
+在打开的页面中：
+1. 点击右上角的 **设置 (Settings)** 图标。
+2. 在 **服务商与 API** 面板填入你的 Google Gemini API Key。
+3. 即可立即开启对话！数据均保存在你的当前浏览器本地。
+
+---
+
+## 方式二：本地标准开发模式
+
+### 前置环境要求
+- **Node.js**：推荐使用 **Node.js 26**（项目根目录提供 `.nvmrc`），最低支持 Node.js 24。
+- **包管理器**：**pnpm 11+**（项目配置了严谨的 `engine-strict` 校验）。
+
+### 启动步骤
+
+<Tabs>
+  <TabItem label="Git 克隆与启动">
+```bash
+# 1. 克隆代码仓库
+git clone https://github.com/yeahhe365/AMC-WebUI.git
+cd AMC-WebUI
+
+# 2. 切换推荐的 Node 版本（如使用 nvm）
+nvm use
+
+# 3. 安装依赖
+pnpm install
+
+# 4. 启动本地开发服务
+pnpm dev
+```
+  </TabItem>
+  <TabItem label="环境变量预置 (可选)">
+本地开发模式下，你可以在项目根目录创建 `.env.local` 预置默认密钥，避免每次清空缓存后手动输入：
+
+```bash
+# 仅本地开发模式生效 (前端 Vite 环境变量)
+VITE_GEMINI_API_KEY=AIzaSyYourGeminiApiKey
+VITE_OPENAI_API_KEY=sk-YourOpenAiKey
+```
+  </TabItem>
+</Tabs>
+
+开发服务器启动后，浏览器访问 `http://localhost:5175` 即可开始使用。
+
+---
+
+## 方式三：Docker Compose 一键部署 (自用推荐)
+
+Docker 部署提供前后端双容器联动，能够完整激活 Live API 的 WebSocket 全代理以及 MCP 本地服务调用能力。
+
+```bash
+# 1. 构建前后端镜像产物
+pnpm run build:docker
+
+# 2. 启动容器编排
+docker compose up -d --build
+```
+
+- 默认访问端口为 **`http://localhost:8080`**。
+- 停止运行请执行 `docker compose down`。
+- 更多环境变量（如服务端统一密钥托管、Live 代理超时等），请参阅 [Docker Compose 部署指南](/deployment/docker/)。

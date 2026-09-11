@@ -11,12 +11,27 @@ import { isLiveArtifactsSystemInstruction } from '@/features/prompts/promptRegis
  * override-prompt comparisons on top of that shared baseline.
  */
 export function isLiveArtifactsModeFromSettings(args: {
+  isLiveArtifactsEnabled?: boolean | null;
   systemInstruction?: string | null;
   promptMode?: LiveArtifactsPromptMode | null;
   liveArtifactsSystemPrompt?: string | null;
   liveArtifactsSystemPrompts?: Partial<Record<LiveArtifactsPromptMode, string>> | null;
 }): boolean {
-  const { systemInstruction, promptMode, liveArtifactsSystemPrompt, liveArtifactsSystemPrompts } = args;
+  const {
+    isLiveArtifactsEnabled,
+    systemInstruction,
+    promptMode,
+    liveArtifactsSystemPrompt,
+    liveArtifactsSystemPrompts,
+  } = args;
+
+  if (isLiveArtifactsEnabled === true) {
+    return true;
+  }
+
+  if (isLiveArtifactsEnabled === false) {
+    return false;
+  }
 
   if (!systemInstruction) return false;
 

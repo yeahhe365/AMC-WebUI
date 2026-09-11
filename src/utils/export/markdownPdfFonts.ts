@@ -1,3 +1,5 @@
+import { arrayBufferToBase64 } from '@/utils/file/fileEncoding';
+
 export const CJK_FONT_NAME = 'NotoSansCJKsc';
 export const CJK_FONT_FILE = 'NotoSansCJKsc-VF.ttf';
 export const CJK_TEXT_PATTERN = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-\ufaff]/;
@@ -5,19 +7,6 @@ export const CJK_TEXT_PATTERN = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uf900-
 const CJK_FONT_PART_URLS = [`/fonts/${CJK_FONT_FILE}.part-00`, `/fonts/${CJK_FONT_FILE}.part-01`];
 
 let cjkFontBase64Promise: Promise<string | null> | null = null;
-
-const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
-  const bytes = new Uint8Array(buffer);
-  const chunkSize = 0x8000;
-  let binary = '';
-
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    const chunk = bytes.subarray(index, index + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-
-  return btoa(binary);
-};
 
 const concatenateArrayBuffers = (buffers: ArrayBuffer[]): ArrayBuffer => {
   const totalLength = buffers.reduce((sum, buffer) => sum + buffer.byteLength, 0);

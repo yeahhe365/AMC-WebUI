@@ -15,6 +15,7 @@ export type PendingChatInputSubmission =
       kind: 'edit';
       messageId: string;
       content: string;
+      files: UploadedFile[];
     };
 
 interface BuildPendingChatInputSubmissionParams {
@@ -26,6 +27,7 @@ interface BuildPendingChatInputSubmissionParams {
   editMode: 'update' | 'resend';
   editingMessageId: string | null;
   isFastMode: boolean;
+  files?: UploadedFile[];
 }
 
 interface BuildQueuedChatInputSubmissionParams {
@@ -53,12 +55,14 @@ export const buildPendingChatInputSubmission = ({
   editMode,
   editingMessageId,
   isFastMode,
+  files = [],
 }: BuildPendingChatInputSubmissionParams): PendingChatInputSubmission => {
   if (isEditing && editMode === 'update' && editingMessageId) {
     return {
       kind: 'edit',
       messageId: editingMessageId,
       content: inputText,
+      files,
     };
   }
 

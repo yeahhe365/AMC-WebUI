@@ -3,6 +3,7 @@ import type { ThinkingLevel } from '@/types';
 
 export interface OpenAICompatibleChatConfig {
   baseUrl?: string | null;
+  templateId?: string | null;
   systemInstruction?: string;
   temperature?: number;
   topP?: number;
@@ -13,6 +14,7 @@ export interface OpenAICompatibleChatConfig {
   frequencyPenalty?: number;
   seed?: number;
   thinkingLevel?: ThinkingLevel;
+  thinkingBudget?: number;
   extraHeaders?: Record<string, string> | null;
 }
 

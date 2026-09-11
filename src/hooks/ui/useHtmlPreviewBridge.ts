@@ -29,6 +29,10 @@ export interface HtmlPreviewBridgeHandlers {
   onCopy?: (text: string) => void;
   /** A valid Live Artifact follow-up instruction arrived from the iframe. */
   onFollowUp?: (payload: LiveArtifactFollowupPayload) => void;
+  /** A diagnostic, runtime error, or resource error arrived from the iframe. */
+  onDiagnostic?: (payload: unknown) => void;
+  /** A rendered diagram in the preview iframe was clicked for fullscreen inspection. */
+  onDiagramClick?: (payload: { svg: string; title?: string }) => void;
 }
 
 interface UseHtmlPreviewBridgeOptions {
@@ -67,7 +71,7 @@ export const useHtmlPreviewBridge = ({
 }: UseHtmlPreviewBridgeOptions) => {
   // Destructure so effect re-subscription tracks the individual handler
   // identities rather than the (usually fresh-per-render) container object.
-  const { onReady, onResize, onEscape, onCopy, onFollowUp } = handlers;
+  const { onReady, onResize, onEscape, onCopy, onFollowUp, onDiagnostic, onDiagramClick } = handlers;
 
   useEffect(() => {
     if (!enabled) {
@@ -127,6 +131,13 @@ export const useHtmlPreviewBridge = ({
 
       if (resolved.kind === 'diagnostic') {
         logService.warn('Live Artifact preview diagnostic:', resolved.payload);
+        onDiagnostic?.(resolved.payload);
+        return;
+      }
+
+      if (resolved.kind === 'diagram-click') {
+        onDiagramClick?.({ svg: resolved.svg, title: resolved.title });
+        return;
       }
     };
 
@@ -134,5 +145,18 @@ export const useHtmlPreviewBridge = ({
     return () => {
       targetWindow.removeEventListener('message', handleMessage);
     };
-  }, [enabled, iframeRef, onCopy, onEscape, onFollowUp, onReady, onResize, privilege, selectionScale, targetWindow]);
+  }, [
+    enabled,
+    iframeRef,
+    onCopy,
+    onDiagnostic,
+    onDiagramClick,
+    onEscape,
+    onFollowUp,
+    onReady,
+    onResize,
+    privilege,
+    selectionScale,
+    targetWindow,
+  ]);
 };

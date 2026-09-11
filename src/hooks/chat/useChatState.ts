@@ -8,6 +8,7 @@ export const useChatState = (appSettings: AppSettings) => {
   const activeMessages = useChatStore((state) => state.activeMessages);
 
   const pendingLockedApiKey = useChatStore((state) => state.pendingLockedApiKey);
+  const pendingChatSettings = useChatStore((state) => state.pendingChatSettings);
 
   const activeChat = useMemo(() => {
     const metadata = savedSessions.find((session) => session.id === activeSessionId);
@@ -18,12 +19,18 @@ export const useChatState = (appSettings: AppSettings) => {
   }, [savedSessions, activeSessionId, activeMessages]);
 
   const currentChatSettings = useMemo(() => {
-    const baseSettings = activeChat?.settings || appSettings;
-    if (activeChat || !pendingLockedApiKey) {
+    if (activeChat) {
+      return activeChat.settings;
+    }
+    const baseSettings = {
+      ...appSettings,
+      ...(pendingChatSettings ?? {}),
+    };
+    if (!pendingLockedApiKey) {
       return baseSettings;
     }
     return { ...baseSettings, lockedApiKey: pendingLockedApiKey };
-  }, [activeChat, appSettings, pendingLockedApiKey]);
+  }, [activeChat, appSettings, pendingChatSettings, pendingLockedApiKey]);
 
   const loadingSessionIds = useChatStore((state) => state.loadingSessionIds);
   const isLoading = useMemo(() => loadingSessionIds.has(activeSessionId ?? ''), [loadingSessionIds, activeSessionId]);

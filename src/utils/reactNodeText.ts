@@ -1,4 +1,9 @@
-import { isValidElement, type ReactNode } from 'react';
+import { Children, isValidElement, type ReactElement, type ReactNode } from 'react';
+
+export interface CodeElementProps {
+  className?: string;
+  children?: ReactNode;
+}
 
 export const extractTextFromNode = (node: ReactNode): string => {
   if (!node) return '';
@@ -8,4 +13,12 @@ export const extractTextFromNode = (node: ReactNode): string => {
     return extractTextFromNode(node.props.children);
   }
   return '';
+};
+
+export const findCodeElement = (children: ReactNode): ReactElement<CodeElementProps> | undefined => {
+  return Children.toArray(children).find(
+    (child): child is ReactElement<CodeElementProps> =>
+      isValidElement<CodeElementProps>(child) &&
+      (child.type === 'code' || Boolean(child.props.className?.includes('language-'))),
+  );
 };

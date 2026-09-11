@@ -498,16 +498,21 @@ describe('promptRegistry', () => {
 
     expect(zhPrompt).toContain('data-amc-chart');
     expect(zhPrompt).toContain('禁止手写 SVG 图表');
-    expect(zhPrompt).toContain('grouped-bar');
-    expect(zhPrompt).toContain('stacked-bar');
-    expect(zhPrompt).toContain('slices');
-    expect(zhPrompt).toContain('x 与 y 长度必须一致');
+    expect(zhPrompt).toContain('tooltip');
+    expect(zhPrompt).toContain('xAxis');
+    expect(zhPrompt).toContain('yAxis');
+    expect(zhPrompt).toContain('series');
+    expect(zhPrompt).toContain('跨数量级');
+    expect(zhPrompt).toContain('指标卡');
+
     expect(enPrompt).toContain('data-amc-chart');
     expect(enPrompt).toContain('never hand-write SVG charts');
-    expect(enPrompt).toContain('grouped-bar');
-    expect(enPrompt).toContain('stacked-bar');
-    expect(enPrompt).toContain('slices');
-    expect(enPrompt).toContain('x and y lengths must match');
+    expect(enPrompt).toContain('tooltip');
+    expect(enPrompt).toContain('xAxis');
+    expect(enPrompt).toContain('yAxis');
+    expect(enPrompt).toContain('series');
+    expect(enPrompt).toContain('orders of magnitude');
+    expect(enPrompt).toContain('Metric cards');
   });
 
   it('includes chart DSL coverage in the pre-output checklist', async () => {

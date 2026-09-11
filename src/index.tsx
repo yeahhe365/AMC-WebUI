@@ -1,6 +1,17 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { toast, toastSuccess, toastError, toastInfo, toastWarning } from './stores/toastStore';
+
+if (typeof window !== 'undefined') {
+  Object.assign(window, {
+    toast,
+    toastSuccess,
+    toastError,
+    toastInfo,
+    toastWarning,
+  });
+}
 
 import './styles/main.css';
 import './styles/animations.css';

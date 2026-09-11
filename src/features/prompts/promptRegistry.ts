@@ -3,10 +3,9 @@ import type { LiveArtifactsPromptMode } from '@/types';
 
 import type { SupportedLanguage } from '@/i18n/languageRegistry';
 
-type PromptLanguage = SupportedLanguage;
 type LiveArtifactsPromptModule = typeof import('./liveArtifacts');
 
-const LIVE_ARTIFACTS_PROMPT_MARKERS = [
+export const LIVE_ARTIFACTS_PROMPT_MARKERS = [
   '[Live Artifacts Inline Protocol - zh]',
   '[Live Artifacts Inline Protocol - en]',
   // Legacy Live Artifacts markers are recognized so old saved settings can still be toggled off.
@@ -25,8 +24,8 @@ const LIVE_ARTIFACTS_PROMPT_MARKERS = [
   '<title>Canvas 助手：响应式视觉指南</title>',
   '<title>Canvas Assistant: Responsive Visual Guide</title>',
 ];
-const BBOX_PROMPT_MARKER = '**任务：** 请作为一位计算机视觉专家';
-const HD_GUIDE_PROMPT_MARKER = '### 系统提示词：高清引导标注专家';
+export const BBOX_PROMPT_MARKER = '**任务：** 请作为一位计算机视觉专家';
+export const HD_GUIDE_PROMPT_MARKER = '### 系统提示词：高清引导标注专家';
 
 export const isLiveArtifactsSystemInstruction = (instruction?: string | null) =>
   !!instruction && LIVE_ARTIFACTS_PROMPT_MARKERS.some((marker) => instruction.includes(marker));
@@ -41,7 +40,7 @@ export const isHdGuideSystemInstruction = (instruction?: string | null) =>
 // fall back to the EN prompt via the `?? .en` lookup below, hence Partial.
 const LIVE_ARTIFACT_PROMPT_EXPORT_BY_MODE: Record<
   LiveArtifactsPromptMode,
-  { en: keyof LiveArtifactsPromptModule } & Partial<Record<PromptLanguage, keyof LiveArtifactsPromptModule>>
+  { en: keyof LiveArtifactsPromptModule } & Partial<Record<SupportedLanguage, keyof LiveArtifactsPromptModule>>
 > = {
   inline: {
     en: 'LIVE_ARTIFACTS_INLINE_SYSTEM_PROMPT_EN',
@@ -50,7 +49,7 @@ const LIVE_ARTIFACT_PROMPT_EXPORT_BY_MODE: Record<
 };
 
 export const loadLiveArtifactsSystemPrompt = async (
-  language: PromptLanguage = 'zh',
+  language: SupportedLanguage = 'zh',
   mode: LiveArtifactsPromptMode = 'inline',
 ) => {
   const prompts = await import('./liveArtifacts');

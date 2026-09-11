@@ -174,7 +174,14 @@ export const useStreamResume = ({
           target.modelId,
           await createChatHistoryForApi([], false, target.modelId),
           [],
-          await buildGenerationConfig({ settings: sessionSettings, modelId: target.modelId }),
+          await buildGenerationConfig({
+            settings: sessionSettings,
+            modelId: target.modelId,
+            // Resume replays a buffered stream without function declarations, so
+            // the local-python system prompt must not be injected either — the
+            // model would otherwise be told to call a tool absent from this request.
+            isLocalPythonEnabled: false,
+          }),
           controller.signal,
           handlers.streamOnPart,
           handlers.onThoughtChunk,

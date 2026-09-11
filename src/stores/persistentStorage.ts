@@ -1,7 +1,7 @@
 import type { StateStorage } from 'zustand/middleware';
 import { broadcastSyncMessage, getChatSyncChannel, CHAT_SYNC_CHANNEL_NAME } from './chatSyncChannel';
 
-type StorageArea = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
+export type StorageArea = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 interface CreatePersistedStateStorageOptions {
   debounceMs?: number;
@@ -30,6 +30,21 @@ export const readPersistentStorageItem = (key: string, storageArea = getDefaultS
   }
 };
 
+export const writePersistentStorageItem = (
+  key: string,
+  value: string,
+  storageArea = getDefaultStorageArea(),
+): boolean => {
+  try {
+    if (!storageArea) return false;
+    storageArea.setItem(key, value);
+    return true;
+  } catch {
+    // Ignore storage failures in restricted browser contexts.
+    return false;
+  }
+};
+
 export const removePersistentStorageItem = (key: string, storageArea = getDefaultStorageArea()) => {
   try {
     storageArea?.removeItem(key);
@@ -47,7 +62,7 @@ const notifyPersistedStateUpdate = (storageKey: string) => {
 };
 
 // Re-export for syncedPersist reuse (single origin + single channel)
-export { broadcastSyncMessage, getChatSyncChannel, CHAT_SYNC_CHANNEL_NAME };
+export { getChatSyncChannel, CHAT_SYNC_CHANNEL_NAME };
 
 // --- Centralized flush registry (fixes leak per factory) -----------------
 const globalFlushRegistry = new Set<() => void>();

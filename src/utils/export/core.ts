@@ -20,7 +20,9 @@ export const triggerDownload = (href: string, filename: string, revokeBlob: bool
   link.click();
   document.body.removeChild(link);
   if (revokeBlob && href.startsWith('blob:')) {
-    releaseManagedObjectUrl(href);
+    setTimeout(() => {
+      releaseManagedObjectUrl(href);
+    }, 1000);
   }
 };
 

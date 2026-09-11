@@ -359,6 +359,45 @@
   animation-delay: -0.16s;
 }
 
+/* Radix Dialog & AlertDialog smooth transitions */
+.radix-dialog-overlay[data-state='open'],
+.radix-alert-dialog-overlay[data-state='open'] {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.radix-dialog-overlay[data-state='closed'],
+.radix-alert-dialog-overlay[data-state='closed'] {
+  animation: fadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1) reverse both;
+}
+
+.radix-dialog-content[data-state='open'],
+.radix-alert-dialog-content[data-state='open'] {
+  animation: modalEnter 0.25s var(--ease-spring) both;
+}
+.radix-dialog-content[data-state='closed'],
+.radix-alert-dialog-content[data-state='closed'] {
+  animation: modalExit 0.15s ease-in both;
+}
+
+/* Media Navigation Reticle & Bounding Box entrance focus pulse */
+@keyframes reticleFocusPulse {
+  0% {
+    transform: scale(0.86);
+    opacity: 0.15;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-reticle-pulse {
+  animation: reticleFocusPulse 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

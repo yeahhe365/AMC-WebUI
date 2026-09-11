@@ -1,15 +1,21 @@
-import { createChatHistoryForApi } from '@/utils/chat/builder';
+import { createChatHistoryForApi, appendTurnToHistory } from '@/utils/chat/builder';
 import {
   buildAudioLocateDirective,
+  buildImageLocateDirective,
   buildPdfLocateDirective,
   buildVideoLocateDirective,
 } from '@/utils/media-nav/locateMarker';
+import { isLiveArtifactsModeFromSettings } from '@/utils/live-artifacts/liveArtifactsMode';
+import { getLiveArtifactsSystemPromptOverride } from '@/utils/live-artifacts/liveArtifactsPromptSettings';
+import { composeSystemInstruction } from '@/features/prompts/promptCompositor';
 import {
   collectSessionMediaFiles,
   isAudioFile,
+  isImageFile,
   isPdfFile,
-  isVideoFile,
+  isNavigableVideoFile,
   partsContainAudio,
+  partsContainImage,
   partsContainPdf,
   partsContainVideo,
 } from '@/utils/media-nav/sessionMediaFiles';
@@ -18,6 +24,7 @@ import { createMessage } from '@/utils/chat/session';
 import { isServerCodeExecutionMode } from '@/utils/codeExecution';
 import {
   isGemini3Model,
+  isGemmaModel,
   isImageGenerationModel,
   shouldStripThinkingFromContext,
 } from '@/utils/model/modelCapabilities';
@@ -31,6 +38,7 @@ import {
   sendOpenAICompatibleMessageNonStream,
   sendOpenAICompatibleMessageStream,
 } from '@/services/api/openaiCompatibleApi';
+import { sendOpenAIResponsesNonStream, sendOpenAIResponsesStream } from '@/services/api/openaiResponsesApi';
 import { sendAnthropicMessageNonStream, sendAnthropicMessageStream } from '@/services/api/anthropicApi';
 import { createMcpClientFunctions } from '@/features/mcp/mcpClientFunctions';
 import { requestToolApproval } from '@/stores/mcpApprovalStore';
@@ -65,13 +73,21 @@ import type { resolveStandardChatTurn } from './standardChatTurn';
 import { resolveChatApiRoute, isUnavailableThirdPartyRoute } from '@/utils/chatApiRoute';
 import { getProxyProviderHeader } from '@/utils/thirdPartyApiProviders';
 import { useChatStore } from '@/stores/chatStore';
-import { ensureHistoryFilesApiReferences } from './fileApiReference';
+import { ensureHistoryFilesApiReferences, resolveUploadableFile } from './fileApiReference';
+import { uploadFileApi } from '@/services/api/fileApi';
+import { getUploadLifecycleForGeminiState } from '@/utils/file-upload/fileUploadPolicy';
 import {
+  extractFilesApiIdentifierFromError,
+  formatHistoryFileApiUnavailablePartText,
+  getApiKeyFingerprint,
+  getGeminiFilesApiNameFromUri,
   invalidateSessionFilesApiReferences,
   isFilesApiPermissionDeniedError,
+  toFileApiExpirationTime,
 } from '@/utils/chat/geminiFilesApi';
 import { getGeminiKeyForRequest } from '@/utils/apiKeySelection';
 import { getTranslator } from '@/i18n/translations';
+import { resolveAppLanguage } from '@/i18n/languageRegistry';
 import { logService } from '@/services/logService';
 
 interface StandardChatApiCallContext {
@@ -196,14 +212,18 @@ export const performStandardChatApiCall = async ({
     partsContainPdf(finalParts) ||
     baseMessagesForApi.some((message) => message.files?.some(isPdfFile));
   const hasVideoMedia =
-    enrichedFiles.some(isVideoFile) ||
+    enrichedFiles.some(isNavigableVideoFile) ||
     partsContainVideo(finalParts) ||
-    baseMessagesForApi.some((message) => message.files?.some(isVideoFile));
+    baseMessagesForApi.some((message) => message.files?.some(isNavigableVideoFile));
   const hasAudioMedia =
     enrichedFiles.some(isAudioFile) ||
     partsContainAudio(finalParts) ||
     baseMessagesForApi.some((message) => message.files?.some(isAudioFile));
-  const { pdfs, videos, audios } = collectSessionMediaFiles(enrichedFiles, baseMessagesForApi);
+  const hasImageMedia =
+    enrichedFiles.some(isImageFile) ||
+    partsContainImage(finalParts) ||
+    baseMessagesForApi.some((message) => message.files?.some(isImageFile));
+  const { pdfs, videos, audios, images } = collectSessionMediaFiles(enrichedFiles, baseMessagesForApi);
   const locateDirectives = [
     sessionToUpdate.isPdfNavEnabled && hasPdfMedia ? buildPdfLocateDirective(pdfs.map((file) => file.name)) : '',
     sessionToUpdate.isVideoNavEnabled && hasVideoMedia
@@ -212,13 +232,29 @@ export const performStandardChatApiCall = async ({
     sessionToUpdate.isAudioNavEnabled && hasAudioMedia
       ? buildAudioLocateDirective(audios.map((file) => file.name))
       : '',
+    sessionToUpdate.isImageNavEnabled && hasImageMedia
+      ? buildImageLocateDirective(images.map((file) => file.name))
+      : '',
   ].filter(Boolean);
-  const effectiveSystemInstruction =
-    locateDirectives.length > 0
-      ? sessionToUpdate.systemInstruction
-        ? `${sessionToUpdate.systemInstruction}\n\n${locateDirectives.join('\n\n')}`
-        : locateDirectives.join('\n\n')
-      : sessionToUpdate.systemInstruction;
+  const isLiveArtifactsActive = isLiveArtifactsModeFromSettings({
+    isLiveArtifactsEnabled: sessionToUpdate.isLiveArtifactsEnabled,
+    systemInstruction: sessionToUpdate.systemInstruction,
+    promptMode: appSettings.liveArtifactsPromptMode,
+    liveArtifactsSystemPrompt: appSettings.liveArtifactsSystemPrompt,
+    liveArtifactsSystemPrompts: appSettings.liveArtifactsSystemPrompts,
+  });
+  const effectiveSystemInstruction = await composeSystemInstruction({
+    userInstruction: sessionToUpdate.systemInstruction,
+    isLiveArtifactsEnabled: isLiveArtifactsActive,
+    liveArtifactsPromptMode: appSettings.liveArtifactsPromptMode,
+    customLiveArtifactsPrompt: getLiveArtifactsSystemPromptOverride(appSettings, appSettings.liveArtifactsPromptMode),
+    visionPromptMode: sessionToUpdate.visionPromptMode,
+    isDeepSearchEnabled: !activeProvider && Boolean(sessionToUpdate.isDeepSearchEnabled),
+    isLocalPythonEnabled: !activeProvider && Boolean(sessionToUpdate.isLocalPythonEnabled),
+    isGemmaModel: isGemmaModel(apiModelId),
+    locateDirectives,
+    language: resolveAppLanguage(appSettings.language),
+  });
 
   const { streamOnError, streamOnComplete, streamOnPart, onThoughtChunk } = getStreamHandlers(
     finalSessionId,
@@ -251,22 +287,25 @@ export const performStandardChatApiCall = async ({
   });
 
   if (activeProvider) {
+    const activeModel = activeProvider.models?.find((m) => m.id === apiModelId);
     const providerConfig = {
       baseUrl: activeProvider.baseUrl,
+      templateId: activeProvider.templateId,
       systemInstruction: effectiveSystemInstruction,
-      temperature: sessionToUpdate.temperature,
-      topP: sessionToUpdate.topP,
+      temperature: activeModel?.parameters?.temperature ?? sessionToUpdate.temperature,
+      topP: activeModel?.parameters?.topP ?? sessionToUpdate.topP,
       topK: sessionToUpdate.topK,
-      maxOutputTokens: sessionToUpdate.maxOutputTokens,
+      maxOutputTokens: activeModel?.parameters?.maxOutputTokens ?? sessionToUpdate.maxOutputTokens,
       stopSequences: sessionToUpdate.stopSequences,
       presencePenalty: sessionToUpdate.presencePenalty,
       frequencyPenalty: sessionToUpdate.frequencyPenalty,
       seed: sessionToUpdate.seed,
-      thinkingLevel: sessionToUpdate.thinkingLevel,
+      thinkingLevel: activeModel?.enableThinking === false ? ('NONE' as const) : sessionToUpdate.thinkingLevel,
       thinkingBudget: sessionToUpdate.thinkingBudget,
       extraHeaders: activeProvider.extraHeaders,
     };
     const isAnthropic = activeProvider.protocol === 'anthropic';
+    const isOpenAIResponses = activeProvider.protocol === 'openai-responses';
     // Docker THIRD_PARTY_ROUTES is keyed by template, not connection UUID.
     const providerId = getProxyProviderHeader(activeProvider.templateId);
 
@@ -293,20 +332,35 @@ export const performStandardChatApiCall = async ({
                 finalRole,
                 providerId,
               )
-            : sendOpenAICompatibleMessageStream(
-                keyToUse,
-                apiModelId,
-                historyForChat,
-                finalParts,
-                providerConfig,
-                newAbortController.signal,
-                thirdPartyOnPart,
-                thirdPartyOnThoughtChunk,
-                streamOnError,
-                streamOnComplete,
-                finalRole,
-                providerId,
-              ),
+            : isOpenAIResponses
+              ? sendOpenAIResponsesStream(
+                  keyToUse,
+                  apiModelId,
+                  historyForChat,
+                  finalParts,
+                  providerConfig,
+                  newAbortController.signal,
+                  thirdPartyOnPart,
+                  thirdPartyOnThoughtChunk,
+                  streamOnError,
+                  streamOnComplete,
+                  finalRole,
+                  providerId,
+                )
+              : sendOpenAICompatibleMessageStream(
+                  keyToUse,
+                  apiModelId,
+                  historyForChat,
+                  finalParts,
+                  providerConfig,
+                  newAbortController.signal,
+                  thirdPartyOnPart,
+                  thirdPartyOnThoughtChunk,
+                  streamOnError,
+                  streamOnComplete,
+                  finalRole,
+                  providerId,
+                ),
         streamOnError,
       );
       return;
@@ -327,18 +381,31 @@ export const performStandardChatApiCall = async ({
               finalRole,
               providerId,
             )
-          : sendOpenAICompatibleMessageNonStream(
-              keyToUse,
-              apiModelId,
-              historyForChat,
-              finalParts,
-              providerConfig,
-              newAbortController.signal,
-              streamOnError,
-              nonStreamOnComplete,
-              finalRole,
-              providerId,
-            ),
+          : isOpenAIResponses
+            ? sendOpenAIResponsesNonStream(
+                keyToUse,
+                apiModelId,
+                historyForChat,
+                finalParts,
+                providerConfig,
+                newAbortController.signal,
+                streamOnError,
+                nonStreamOnComplete,
+                finalRole,
+                providerId,
+              )
+            : sendOpenAICompatibleMessageNonStream(
+                keyToUse,
+                apiModelId,
+                historyForChat,
+                finalParts,
+                providerConfig,
+                newAbortController.signal,
+                streamOnError,
+                nonStreamOnComplete,
+                finalRole,
+                providerId,
+              ),
       streamOnError,
     );
     return;
@@ -466,11 +533,7 @@ export const performStandardChatApiCall = async ({
   let autoRetryAttempted = false;
 
   const handleStreamErrorWithAutoRetry = async (error: Error): Promise<void> => {
-    if (
-      !autoRetryAttempted &&
-      !newAbortController.signal.aborted &&
-      isFilesApiPermissionDeniedError(error)
-    ) {
+    if (!autoRetryAttempted && !newAbortController.signal.aborted && isFilesApiPermissionDeniedError(error)) {
       autoRetryAttempted = true;
       logService.warn('Files API permission error detected during generation. Attempting silent auto-retry.', {
         sessionId: finalSessionId,
@@ -482,13 +545,11 @@ export const performStandardChatApiCall = async ({
         const currentSession = state.savedSessions.find((s) => s.id === finalSessionId);
         if (currentSession) {
           const invalidatedSession = invalidateSessionFilesApiReferences(currentSession, error);
-          updateAndPersistSessions((prev) =>
-            updateSessionById(prev, finalSessionId, () => invalidatedSession),
-          );
+          updateAndPersistSessions((prev) => updateSessionById(prev, finalSessionId, () => invalidatedSession));
 
           const freshKeyResult = getGeminiKeyForRequest(appSettings, sessionToUpdate);
           const freshKey = 'key' in freshKeyResult ? freshKeyResult.key : keyToUse;
-          const t = getTranslator(appSettings.language);
+          const t = getTranslator(resolveAppLanguage(appSettings.language));
 
           const historyRefResult = await ensureHistoryFilesApiReferences({
             messages: invalidatedSession.messages,
@@ -497,7 +558,12 @@ export const performStandardChatApiCall = async ({
             translate: t,
           });
 
-          if (historyRefResult.ok && historyRefResult.changed && !newAbortController.signal.aborted) {
+          const sessionWasInvalidated = invalidatedSession !== currentSession;
+          if (
+            historyRefResult.ok &&
+            (historyRefResult.changed || sessionWasInvalidated) &&
+            !newAbortController.signal.aborted
+          ) {
             updateAndPersistSessions((prev) =>
               updateSessionById(prev, finalSessionId, (s) => ({
                 ...s,
@@ -505,7 +571,7 @@ export const performStandardChatApiCall = async ({
               })),
             );
 
-            const { baseMessagesForApi: nextBaseMessages } = resolveTurn({
+            const { baseMessagesForApi: nextBaseMessages, finalParts: turnFinalParts } = resolveTurn({
               messages: historyRefResult.messages,
               promptParts,
               textToUse,
@@ -514,6 +580,92 @@ export const performStandardChatApiCall = async ({
               isContinueMode,
               isRawMode,
               apiModelId,
+            });
+
+            const targetIdentifier = extractFilesApiIdentifierFromError(error);
+            const reuploadedFilesMap = new Map<string, UploadedFile>();
+
+            for (const file of enrichedFiles) {
+              const isTarget =
+                !targetIdentifier ||
+                (file.fileUri && file.fileUri.includes(targetIdentifier)) ||
+                (file.fileApiName && file.fileApiName.includes(targetIdentifier));
+
+              if (isTarget) {
+                const uploadable = await resolveUploadableFile(file);
+                if (uploadable) {
+                  try {
+                    const uploaded = await uploadFileApi(
+                      freshKey,
+                      uploadable,
+                      file.type || uploadable.type || 'application/octet-stream',
+                      file.name,
+                      newAbortController.signal,
+                    );
+                    const patch = {
+                      ...getUploadLifecycleForGeminiState(uploaded.state),
+                      fileUri: uploaded.uri,
+                      fileApiName: uploaded.name,
+                      rawFile: uploadable,
+                      fileApiExpirationTime: toFileApiExpirationTime(
+                        (uploaded as { expirationTime?: unknown }).expirationTime,
+                      ),
+                      fileApiKeyFingerprint: getApiKeyFingerprint(freshKey),
+                    };
+                    reuploadedFilesMap.set(file.fileUri || file.id, { ...file, ...patch });
+                  } catch (reuploadErr) {
+                    logService.warn('Auto-retry re-upload failed, will degrade file reference', { error: reuploadErr });
+                  }
+                }
+              }
+            }
+
+            if (reuploadedFilesMap.size > 0) {
+              updateAndPersistSessions((prev) =>
+                updateSessionById(prev, finalSessionId, (s) => ({
+                  ...s,
+                  messages: s.messages.map((m) =>
+                    m.files
+                      ? {
+                          ...m,
+                          files: m.files.map((f) => reuploadedFilesMap.get(f.fileUri || f.id) || f),
+                        }
+                      : m,
+                  ),
+                })),
+              );
+            }
+
+            const retryFinalParts = turnFinalParts.map((part) => {
+              const fileUri = part.fileData?.fileUri;
+              if (!fileUri) return part;
+              const isTarget =
+                !targetIdentifier ||
+                fileUri.includes(targetIdentifier) ||
+                Boolean(getGeminiFilesApiNameFromUri(fileUri)?.includes(targetIdentifier));
+              if (isTarget) {
+                const reuploaded =
+                  reuploadedFilesMap.get(fileUri) ||
+                  Array.from(reuploadedFilesMap.values()).find(
+                    (f) => f.fileUri === fileUri || (targetIdentifier && f.fileApiName?.includes(targetIdentifier)),
+                  );
+                if (reuploaded?.fileUri) {
+                  return { fileData: { mimeType: reuploaded.type, fileUri: reuploaded.fileUri } };
+                }
+
+                const fileName =
+                  enrichedFiles.find(
+                    (f) =>
+                      f.fileUri === fileUri ||
+                      Boolean(
+                        targetIdentifier &&
+                        ((f.fileApiName && f.fileApiName.includes(targetIdentifier)) ||
+                          (f.fileUri && f.fileUri.includes(targetIdentifier))),
+                      ),
+                  )?.name || (targetIdentifier ? `File ${targetIdentifier}` : 'file');
+                return { text: formatHistoryFileApiUnavailablePartText(fileName) };
+              }
+              return part;
             });
 
             const retryHistoryForChat = await createChatHistoryForApi(
@@ -527,7 +679,7 @@ export const performStandardChatApiCall = async ({
             if (hasFunctionDeclarationsInRequest) {
               try {
                 const toolLoopResult = await runStandardToolLoop({
-                  initialContents: [...retryHistoryForChat, { role: finalRole, parts: finalParts }],
+                  initialContents: appendTurnToHistory(retryHistoryForChat, finalRole, retryFinalParts),
                   clientFunctions: combinedClientFunctions,
                   abortSignal: newAbortController.signal,
                   onToolCallsStarted: (modelContent) => {
@@ -577,7 +729,7 @@ export const performStandardChatApiCall = async ({
                     freshKey,
                     apiModelId,
                     retryHistoryForChat,
-                    finalParts,
+                    retryFinalParts,
                     requestConfig,
                     newAbortController.signal,
                     streamOnPart,
@@ -599,7 +751,7 @@ export const performStandardChatApiCall = async ({
                   freshKey,
                   apiModelId,
                   retryHistoryForChat,
-                  finalParts,
+                  retryFinalParts,
                   requestConfig,
                   newAbortController.signal,
                   streamOnError,
@@ -622,7 +774,7 @@ export const performStandardChatApiCall = async ({
   if (hasFunctionDeclarationsInRequest) {
     try {
       const toolLoopResult = await runStandardToolLoop({
-        initialContents: [...historyForChat, { role: finalRole, parts: finalParts }],
+        initialContents: appendTurnToHistory(historyForChat, finalRole, finalParts),
         clientFunctions: combinedClientFunctions,
         abortSignal: newAbortController.signal,
         onToolCallsStarted: (modelContent) => {

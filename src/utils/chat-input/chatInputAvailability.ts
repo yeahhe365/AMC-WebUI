@@ -16,6 +16,7 @@ interface ChatInputModalState {
   showRecorder: boolean;
   showTtsContextEditor: boolean;
   isHelpModalOpen: boolean;
+  showLibraryPicker?: boolean;
 }
 
 type ChatInputCapabilities = Pick<ModelCapabilities, 'isNativeAudioModel' | 'permissions'>;
@@ -64,7 +65,8 @@ export const getChatInputAvailability = ({
     !!localFileState.configuringFile ||
     !!localFileState.previewFile ||
     localFileState.showTokenModal ||
-    modalsState.showTtsContextEditor;
+    modalsState.showTtsContextEditor ||
+    !!modalsState.showLibraryPicker;
 
   const hasSendableContent = hasSendableChatInputContent({
     inputText: inputState.inputText,

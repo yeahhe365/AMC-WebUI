@@ -158,51 +158,6 @@ body {
   display: none;
 }
 
-/* Tooltip Styles — refined with glass effect */
-.tooltip-container {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.tooltip-text {
-  visibility: hidden;
-  width: max-content;
-  max-width: 240px;
-  background-color: var(--theme-bg-tertiary);
-  color: var(--theme-text-primary);
-  text-align: center;
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  position: absolute;
-  z-index: 50;
-  bottom: calc(100% + 0.5rem);
-  left: 0;
-  opacity: 0;
-  transition:
-    opacity 0.18s var(--ease-out-expo) 0.12s,
-    visibility 0s linear 0.3s;
-  border: 1px solid var(--theme-border-secondary);
-  box-shadow:
-    0 8px 24px -4px rgba(0, 0, 0, 0.18),
-    0 2px 8px -2px rgba(0, 0, 0, 0.1);
-  font-size: 0.75rem;
-  font-weight: 500;
-  white-space: normal;
-  pointer-events: none;
-  line-height: 1.4;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-.tooltip-container:hover .tooltip-text {
-  visibility: visible;
-  opacity: 1;
-  transition:
-    opacity 0.18s var(--ease-out-expo) 0.12s,
-    visibility 0s linear 0s;
-}
-
 /*
    EXPORT STYLES
    Target specific elements to hide during PNG export
@@ -301,4 +256,108 @@ body,
   box-shadow:
     0 1px 3px 0 rgba(0, 0, 0, 0.3),
     0 1px 2px -1px rgba(0, 0, 0, 0.2);
+}
+
+/* React H5 Audio Player Theme Integration */
+.amc-audio-player.rhap_container {
+  background-color: var(--theme-bg-input);
+  border: 1px solid var(--theme-border-secondary);
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  padding: 8px 12px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.amc-audio-player.rhap_container:hover {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.amc-audio-player .rhap_time {
+  color: var(--theme-text-tertiary);
+  font-size: 0.75rem;
+  font-family: var(--app-font-mono, monospace);
+  font-variant-numeric: tabular-nums;
+}
+
+.amc-audio-player .rhap_progress-container {
+  margin: 0 8px;
+}
+
+.amc-audio-player .rhap_progress-bar {
+  background-color: var(--theme-border-secondary);
+  height: 4px;
+  border-radius: 9999px;
+}
+
+.amc-audio-player .rhap_progress-filled {
+  background-color: var(--theme-text-link);
+  border-radius: 9999px;
+}
+
+.amc-audio-player .rhap_progress-indicator {
+  background-color: var(--theme-text-link);
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  top: -3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.amc-audio-player .rhap_download-progress {
+  background-color: var(--theme-border-secondary);
+  opacity: 0.5;
+  border-radius: 9999px;
+}
+
+.amc-audio-player .rhap_main-controls {
+  margin-right: 4px;
+}
+
+.amc-audio-player .rhap_play-pause-button {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background-color: var(--theme-bg-accent);
+  color: var(--theme-text-accent);
+  transition: background-color 0.15s ease;
+}
+
+.amc-audio-player .rhap_play-pause-button:hover {
+  background-color: var(--theme-bg-accent-hover);
+}
+
+.amc-audio-player .rhap_volume-controls {
+  justify-content: flex-end;
+}
+
+.amc-audio-player .rhap_volume-button {
+  color: var(--theme-text-secondary);
+  margin-right: 4px;
+}
+
+.amc-audio-player .rhap_volume-bar {
+  background-color: var(--theme-border-secondary);
+  height: 4px;
+  border-radius: 9999px;
+}
+
+.amc-audio-player .rhap_volume-indicator {
+  background-color: var(--theme-text-link);
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  top: -2px;
+}
+
+.amc-audio-player .rhap_additional-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 4px;
 }

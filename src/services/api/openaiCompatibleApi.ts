@@ -21,9 +21,12 @@ import {
   fetchProviderModelOptions,
 } from './requestFactory';
 
-const openAiCompatibleAuthHeaders = (apiKey: string): Record<string, string> => ({
-  authorization: `Bearer ${apiKey}`,
-});
+const openAiCompatibleAuthHeaders = (apiKey: string): Record<string, string> =>
+  apiKey && apiKey !== 'auth-optional'
+    ? {
+        authorization: `Bearer ${apiKey}`,
+      }
+    : {};
 
 const TRUNCATION_NOTICE = '\n\n[Output truncated: the response hit max_tokens (finish_reason: length).]';
 

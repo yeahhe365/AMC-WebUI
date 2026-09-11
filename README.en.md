@@ -14,6 +14,9 @@
     <a href="https://all-model-chat.pages.dev/" target="_blank">
       <img src="https://img.shields.io/badge/Live_Demo-Cloudflare_Pages-6366f1?style=for-the-badge&logo=cloudflare&logoColor=white" alt="Live Demo">
     </a>
+    <a href="https://all-model-chat-docs.pages.dev/" target="_blank">
+      <img src="https://img.shields.io/badge/Documentation-Official-8b5cf6?style=for-the-badge&logo=astro&logoColor=white" alt="Documentation">
+    </a>
     <a href="https://github.com/yeahhe365/AMC-WebUI/actions/workflows/ci.yml" target="_blank">
       <img src="https://img.shields.io/github/actions/workflow/status/yeahhe365/AMC-WebUI/ci.yml?branch=main&style=for-the-badge&label=CI" alt="CI">
     </a>
@@ -27,7 +30,7 @@
     <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React">
     <img src="https://img.shields.io/badge/TypeScript-5.5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
     <img src="https://img.shields.io/badge/Tailwind-4.2-38BDF8?style=flat-square&logo=tailwind-css&logoColor=white" alt="Tailwind">
-    <img src="https://img.shields.io/badge/Gemini_SDK-1.50%2B-8E75B2?style=flat-square&logo=google&logoColor=white" alt="Gemini SDK">
+    <img src="https://img.shields.io/badge/Gemini_SDK-2.20%2B-8E75B2?style=flat-square&logo=google&logoColor=white" alt="Gemini SDK">
     <img src="https://img.shields.io/badge/PWA-Supported-5A0FC8?style=flat-square&logo=pwa&logoColor=white" alt="PWA">
   </p>
 
@@ -38,7 +41,7 @@
 ## Preview
 
 <p align="center">
-  <img src="./docs/screenshots/app-desktop-20260426.png" alt="AMC WebUI desktop preview" width="100%">
+  <img src="./docs/screenshots/app-desktop-20260909.png" alt="AMC WebUI desktop preview" width="100%">
 </p>
 
 ## Overview
@@ -118,6 +121,14 @@ The project currently focuses on one main application shape: a **Vite + React SP
 - Speech transcription through the Gemini 3.5 Transcribe model.
 - Gemini native image generation (Nano Banana) with aspect ratio, size, and quad-image options.
 
+### Model Context Protocol (MCP)
+
+- Full standard Model Context Protocol (MCP) support bridged through Node API endpoints (`/api/mcp/*`).
+- Supports **stdio**, **SSE**, and **Streamable HTTP** transports (HTTP/SSE connections adhere to the `ENABLE_MCP_PRIVATE_HTTP` private-network security policy).
+- Human-in-the-loop tool execution approval dialogs before invoking external MCP tools.
+- Complete browsing and management of MCP tools, Prompts, and Resources.
+- Real-time connection status monitoring and developer logging.
+
 ### API Management
 
 - Dual API modes: switch between Gemini Native and OpenAI Compatible request paths.
@@ -156,13 +167,13 @@ The project currently focuses on one main application shape: a **Vite + React SP
 
 ### Safety Settings
 
-- Four safety filter categories: harassment, hate speech, sexual content, and dangerous content.
+- Five safety filter categories: harassment, hate speech, sexual content, dangerous content, and jailbreak protection.
 - Each category can be independently configured with levels: Off / Block None / Block Few / Block Some / Block Most.
-- All four default to Off, matching the Gemini API default for 2.5 and 3 models.
+- All five default to Off, matching the Gemini API default for 2.5 and 3 models.
 
 ### Theme System
 
-- Built-in Onyx (dark), Graphite (gray), and Pearl (light) themes.
+- Built-in Onyx (dark), Graphite (gray), Pearl (light, default), and Sepia (warm beige) themes.
 - Supports automatic switching to follow the system theme.
 
 ### Data Management
@@ -178,39 +189,40 @@ The project currently focuses on one main application shape: a **Vite + React SP
 
 ### Option 1: Standard Development
 
-Node.js 26 is recommended for local development. The repository includes `.nvmrc`, and the main CI flow uses the same major version. Node.js 24 is the minimum supported version, and the Docker images are built on `node:24-slim`. The repository enables `engine-strict`, so `npm install` fails on Node 27+ or Node 23 and older; run `nvm use` first when you want the recommended version.
+Node.js 26 is recommended for local development. The repository includes `.nvmrc`, and the main CI flow uses the same major version. Node.js 24 is the minimum supported version, and the Docker images are built on `node:24-slim`. The repository uses pnpm for dependency management (specified in `packageManager` and locked with `pnpm-lock.yaml`), and enables `engine-strict`, so installation fails on Node 27+ or Node 23 and older; run `nvm use` first when you want the recommended version.
 
 ```bash
 git clone https://github.com/yeahhe365/AMC-WebUI.git
 cd AMC-WebUI
 
-npm ci
-npm run dev
+# Install dependencies (pnpm recommended, npm ci supported)
+pnpm install
+pnpm dev
 ```
 
 To inspect production bundle size, run:
 
 ```bash
-npm run build:analyze
+pnpm run build:analyze
 ```
 
 The command writes `dist/bundle-stats.html` for reviewing the main bundle, lazy chunks, and PWA precache boundaries.
 
-Open `http://localhost:5175`, then add your Gemini API key in **Settings -> API Configuration**.
+Open `http://localhost:5175`, then add your Gemini API key in **Settings -> Providers & APIs**.
 
 For local frontend development, you can also create `.env.local` in the repository root:
 
 ```bash
-GEMINI_API_KEY=your_api_key_here
+VITE_GEMINI_API_KEY=your_api_key_here
 VITE_OPENAI_API_KEY=your_openai_compatible_key_here
 ```
 
-To use OpenAI Compatible mode:
+To configure third-party providers (OpenAI compatible and more):
 
-1. Open **Settings -> API Configuration** and switch the API mode to **OpenAI Compatible**.
-2. Enter an OpenAI-compatible API key, or preload `VITE_OPENAI_API_KEY` in `.env.local`.
-3. Set the OpenAI-compatible Base URL, for example `https://api.openai.com/v1`.
-4. Open **Settings -> Models** and choose or edit the dedicated model list for this mode.
+1. Open **Settings -> Providers & APIs**, select an existing provider (OpenAI, DeepSeek, Anthropic, OpenRouter, etc.) or click to add a new provider.
+2. Enter the provider API key, or preload `VITE_OPENAI_API_KEY` in `.env.local`.
+3. Set the provider Base URL (for example `https://api.openai.com/v1`), and test connectivity and latency.
+4. Open **Settings -> Models** or synchronize the model catalog in the provider detail view to select or edit models.
 
 Example Base URLs:
 
@@ -223,10 +235,10 @@ Example Base URLs:
 The Docker deployment contains two services:
 
 - `web`: lightweight Node server serves the frontend and proxies `/api/*` to the API service.
-- `api`: Node service for `/api/gemini/*`.
+- `api`: Node service providing Gemini proxy (`/api/gemini/*`), third-party compatible forwarding (`/api/openai/*`), Live API WebSocket proxy (`/api/live`), clipboard image reading, and MCP bridge.
 
 ```bash
-npm run build:docker
+pnpm run build:docker
 docker compose up -d --build
 ```
 
@@ -238,9 +250,9 @@ docker compose down
 
 Notes:
 
-- Docker defaults to BYOK for personal deployments. After startup, enter your Gemini API key in **Settings -> API Configuration** to use both regular chat and Live API. You do not need to set `GEMINI_API_KEY` in `.env` or `docker-compose.yml`.
+- Docker defaults to BYOK for personal deployments. After startup, enter your Gemini API key in **Settings -> Providers & APIs** to use both regular chat, Live API, and third-party compatible endpoints. You do not need to set `GEMINI_API_KEY` or `THIRD_PARTY_ROUTES` in `.env` or `docker-compose.yml`.
 - The `web` image packages the already built local `dist/` directory.
-- After frontend or backend API changes, run `npm run build:docker` before rebuilding the Docker services.
+- After frontend or backend API changes, run `pnpm run build:docker` before rebuilding the Docker services.
 
 > Security note
 >
@@ -251,7 +263,9 @@ Notes:
 | Variable                        | Purpose                                                                                               | Public                | Docker default                              |
 | :------------------------------ | :---------------------------------------------------------------------------------------------------- | :-------------------- | :------------------------------------------ |
 | `GEMINI_API_KEY`                | Optional server-managed Gemini API key; the browser BYOK key wins, and this key is used as a fallback | Server only           | Empty                                       |
+| `LIVE_GEMINI_API_KEY`           | Optional dedicated server-managed Gemini API key for Live API; takes priority over `GEMINI_API_KEY`   | Server only           | Empty                                       |
 | `PORT`                          | Port used by the API service                                                                          | Server only           | `3001`                                      |
+| `WEB_PORT`                      | Host port mapped to the `web` frontend service                                                        | Host only             | `8080`                                      |
 | `GEMINI_API_BASE`               | Upstream Gemini API base URL                                                                          | Server only           | `https://generativelanguage.googleapis.com` |
 | `ALLOWED_ORIGINS`               | Comma-separated CORS allowlist for cross-origin deployments                                           | Server only           | Empty                                       |
 | `ENABLE_MCP_STDIO`              | Enables `stdio` MCP server calls                                                                      | Server only           | `false`                                     |
@@ -274,7 +288,7 @@ MCP `stdio` and private/local HTTP access are disabled by default. Enable `ENABL
 
 Pyodide assets are copied to `dist/pyodide/` during production builds and load from same-origin `/pyodide/` by default. To use a CDN or a separate static host, set `RUNTIME_PYODIDE_BASE_URL` to a full directory URL such as `https://cdn.jsdelivr.net/pyodide/v0.27.7/full/`. The PWA precache excludes large `pyodide/` assets by default, so local Python loads them on demand the first time it runs.
 
-Docker defaults to BYOK: after you enter an API key in Settings, regular Gemini proxy requests use the browser-provided key, and Live API goes through the `/api/live` WebSocket full proxy, which the `api` container bridges to the official `wss://generativelanguage…/BidiGenerateContent` endpoint. A browser key is forwarded when present (BYOK fallback); otherwise the server-managed `GEMINI_API_KEY` is used.
+Docker defaults to BYOK: after you enter an API key in Settings, regular Gemini proxy requests use the browser-provided key, and Live API goes through the `/api/live` WebSocket full proxy, which the `api` container bridges to the official `wss://generativelanguage…/BidiGenerateContent` endpoint. A browser key is forwarded when present (BYOK fallback); otherwise the server-managed `LIVE_GEMINI_API_KEY` or `GEMINI_API_KEY` is used.
 
 If you want server-managed credentials for regular Gemini requests, set `GEMINI_API_KEY` and `RUNTIME_SERVER_MANAGED_API=true`. Live API and third-party requests follow the same rule: the browser key wins, falling back to the server key (unless `SERVER_KEY_PRIORITY=true`). A browser-local key is suitable for personal or trusted deployments, but it is not a server secret: scripts running in the same browser context, extensions, XSS, or device compromise may still read it.
 
@@ -287,14 +301,14 @@ You can deploy the frontend to Cloudflare Pages and run `server/` as a separate 
 1. Build and publish the frontend `dist` directory:
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 2. Build and start the standalone API service:
 
 ```bash
-npm run build:api
-npm run start:api
+pnpm run build:api
+pnpm run start:api
 ```
 
 3. Point the frontend runtime config to your public API URL:
@@ -303,7 +317,7 @@ npm run start:api
 RUNTIME_API_PROXY_URL=https://your-api.example.com/api/gemini
 ```
 
-4. Set `GEMINI_API_KEY` in the backend environment if you want server-managed credentials for regular Gemini requests. For BYOK, you can omit it. For cross-origin deployments, optionally set `ALLOWED_ORIGINS=https://your-pages-domain.pages.dev`. Live API does not use a standalone API token endpoint; it connects directly from the browser.
+4. Set `GEMINI_API_KEY` in the backend environment if you want server-managed credentials for regular Gemini requests. For BYOK, you can omit it. For cross-origin deployments, optionally set `ALLOWED_ORIGINS=https://your-pages-domain.pages.dev`. In static deployments, Live API connects directly from the browser to the official service.
 
 Additional notes:
 
@@ -320,35 +334,35 @@ Example:
 RUNTIME_API_PROXY_URL=https://your-aistudio-to-api.example.com/v1beta
 ```
 
-You can also open **Settings -> API Configuration**, enable custom API configuration and API proxy, then enter the AIStudioToAPI Gemini-compatible Base URL, such as `http://localhost:7860/v1beta`. The API key entered in AMC WebUI should match one of the `API_KEYS` configured for the AIStudioToAPI deployment.
+You can also open **Settings -> Providers & APIs** (or API Configuration), enable custom API configuration and API proxy, then enter the AIStudioToAPI Gemini-compatible Base URL, such as `http://localhost:7860/v1beta`. The API key entered in AMC WebUI should match one of the `API_KEYS` configured for the AIStudioToAPI deployment.
 
-Note: AIStudioToAPI is a third-party project, so review its account login, authentication, rate limiting, and public exposure risks before use. It can replace the regular Gemini API proxy source. AMC WebUI's Live API currently connects directly from the browser to the official Live service and no longer depends on an AMC backend token endpoint.
+Note: AIStudioToAPI is a third-party project, so review its account login, authentication, rate limiting, and public exposure risks before use. It can replace the regular Gemini API proxy source. AMC WebUI's Live API in static deployments connects directly from the browser to the official Live service.
 
 ### Build and Preview
 
 ```bash
-npm run build
-npm run preview
+pnpm run build
+pnpm run preview
 ```
 
 ### Quality Checks
 
 ```bash
-npm run typecheck
-npm run lint
-npm run test
-npm run knip
-npm run build
-npm run build:api
+pnpm run typecheck
+pnpm run lint
+pnpm run test
+pnpm run knip
+pnpm run build
+pnpm run build:api
 
 # Or run the full verification pipeline
-npm run verify
+pnpm run verify
 ```
 
 To verify Gemini Code Execution related behavior:
 
 ```bash
-npm run test:code-execution
+pnpm run test:code-execution
 ```
 
 This covers:
@@ -361,7 +375,7 @@ This covers:
 For a manual API integration check with a real Gemini key:
 
 ```bash
-GEMINI_API_KEY=your_key_here npm run verify:code-execution:api
+GEMINI_API_KEY=your_key_here pnpm run verify:code-execution:api
 ```
 
 Optional variable:
@@ -374,10 +388,10 @@ Optional variable:
 
 | Layer          | Stack                                                                                                     |
 | :------------- | :-------------------------------------------------------------------------------------------------------- |
-| Core framework | React 18 + TypeScript 5.5 + Vite 7                                                                        |
+| Core framework | React 18 + TypeScript 5.5 + Vite 7 + pnpm                                                                 |
 | Styling        | Tailwind CSS 4 + CSS variable based theme system                                                          |
 | Persistence    | Native IndexedDB wrapper with Web Locks for cross-tab write safety                                        |
-| Gemini SDK     | `@google/genai` 1.50+ for streaming, non-streaming, file upload, image generation, TTS, and transcription |
+| Gemini SDK     | `@google/genai` 2.20+ for streaming, non-streaming, file upload, image generation, TTS, and transcription |
 | Audio          | AudioWorklet API plus browser Worker based audio preprocessing and compression                            |
 | Rendering      | React-Markdown + KaTeX + Highlight.js + Mermaid + Graphviz                                                |
 | Python sandbox | Pyodide (WASM) in a Web Worker, with common packages preloaded and extra packages installed on demand     |
@@ -420,6 +434,7 @@ Chat and message directory boundaries:
 ```text
 AMC-WebUI/
 ├── src/                        # Frontend source code (Vite SPA)
+│   ├── assets/                 # Model icons and static assets (model-icons etc.)
 │   ├── components/             # UI for chat, message, layout, settings, modals, audio, and more
 │   ├── features/               # Local Python (src/features/local-python/), message sending, scenarios, audio, and standard chat features
 │   ├── hooks/                  # App, chat, input, data management, live API, and UI hooks
@@ -437,21 +452,29 @@ AMC-WebUI/
 │   ├── styles/                 # Global styles, animations, and Markdown styles
 │   ├── App.tsx                 # App root component
 │   └── index.tsx               # React mount entry
-├── server/                     # Standalone Node API for /api/gemini/*
+├── server/                     # Standalone Node API (Gemini/OpenAI proxy, Live WS, MCP, etc.)
+│   ├── src/
+│   └── tsconfig.json
 ├── shared/                     # Shared web/API pure logic (image proxy, MCP, private network)
 ├── vite/                       # Vite plugins and chunk config
 ├── scripts/                    # Test and verification helper scripts
 ├── public/                     # Static assets and runtime-config.js template
 ├── e2e/                        # Playwright tests
 ├── docs/                       # Screenshots and model-logos (runtime icons live in src/assets/model-icons/)
+├── docs-site/                  # Astro Starlight official documentation site source
 ├── docker/                     # Deployment helper scripts (for example web-server.js)
+├── Dockerfile.api              # Node API container image build config
+├── Dockerfile.web              # Web frontend container image build config
+├── docker-compose.yml          # web + api deployment entry
+├── .env.example                # Environment variables template
+├── .nvmrc                      # Node.js recommended version declaration (v26)
+├── pnpm-lock.yaml              # pnpm lockfile
 ├── vite.config.ts              # Vite config
 ├── playwright.config.ts        # E2E config
 ├── vitest.config.ts            # Unit and integration test config
 ├── eslint.config.js            # ESLint config
 ├── knip.json                   # Unused file/export analysis config
-├── package.json                # Dependencies and scripts
-└── docker-compose.yml          # web + api deployment entry
+└── package.json                # Dependencies and scripts
 ```
 
 ---
@@ -462,13 +485,14 @@ AMC-WebUI/
 
 OpenAI Compatible mode uses a separate model list that you can manage manually or fetch from a compatible endpoint. The table below lists the built-in Gemini Native defaults.
 
-| Type             | Models                                                                                                                                      |
-| :--------------- | :------------------------------------------------------------------------------------------------------------------------------------------ |
-| Gemini 3.x       | `gemini-3.8-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-live-preview`, `gemini-3.5-live-translate-preview`, `gemini-3.1-pro-preview` |
-| Robotics         | `gemini-robotics-er-2-preview`                                                                                                              |
-| Gemma 4          | `gemma-4-31b-it`, `gemma-4-26b-a4b-it`                                                                                                      |
-| Image generation | `gemini-3-pro-image-preview`, `gemini-3.1-flash-image-preview`, `gemini-3.1-flash-lite-image`                                               |
-| TTS              | `gemini-3.1-flash-tts-preview` with 30 voices                                                                                               |
+| Type             | Models                                                                                                                                                          |
+| :--------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gemini 3.x       | `gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-live-preview`, `gemini-3.5-live-translate-preview`, `gemini-3.1-pro-preview` |
+| Robotics         | `gemini-robotics-er-2-preview`                                                                                                                                  |
+| Gemma 4          | `gemma-4-31b-it`, `gemma-4-26b-a4b-it`                                                                                                                          |
+| Image generation | `gemini-3-pro-image`, `gemini-3.1-flash-image`, `gemini-3.1-flash-lite-image`                                                                                   |
+| TTS              | `gemini-3.1-flash-tts-preview` with 30 voices                                                                                                                   |
+| Transcription    | `gemini-3.5-transcribe`, `gemini-3.5-transcribe-live`                                                                                                           |
 
 ---
 

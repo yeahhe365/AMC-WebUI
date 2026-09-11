@@ -1,7 +1,10 @@
 import { DEFAULT_CHAT_SETTINGS } from '@/constants/settingsDefaults';
 import { sanitizeSessionModel as sanitizeSessionModelWithFallback, sortSessionsInPlace } from '@/stores/sessionModels';
+import type { SetActiveSessionOptions } from '@/stores/chatStore';
 import type { LastActiveSessionSnapshot } from '@/utils/chat/lastActiveSession';
 import type { AppSettings, ChatSettings, SavedChatSession } from '@/types';
+
+export type SessionLoaderHistoryOptions = Pick<SetActiveSessionOptions, 'history'>;
 
 export const sortSessionsByPinnedAndTimestamp = (sessions: SavedChatSession[]) => sortSessionsInPlace([...sessions]);
 
@@ -49,6 +52,12 @@ export const createSettingsForNewChat = ({
     ...sanitizedTemplateSettings,
     // systemInstruction 属于会话内容（如场景提示词），沿用全局默认，保持现有语义。
     systemInstruction: baseSettings.systemInstruction,
+    isLiveArtifactsEnabled: explicitTemplateSession
+      ? (sanitizedTemplateSettings.isLiveArtifactsEnabled ?? baseSettings.isLiveArtifactsEnabled ?? false)
+      : (baseSettings.isLiveArtifactsEnabled ?? false),
+    visionPromptMode: explicitTemplateSession
+      ? (sanitizedTemplateSettings.visionPromptMode ?? baseSettings.visionPromptMode ?? null)
+      : (baseSettings.visionPromptMode ?? null),
     // 锁定 API Key 始终重置，新聊天重新轮换。
     lockedApiKey: null,
   };

@@ -102,10 +102,11 @@ describe('usePreloadedScenarios', () => {
       sessions = updater(sessions);
     });
 
+    const setAppSettings = vi.fn();
     const { result, unmount } = renderHook(() =>
       usePreloadedScenarios({
         appSettings: DEFAULT_APP_SETTINGS,
-        setAppSettings: vi.fn(),
+        setAppSettings,
         updateAndPersistSessions,
         setActiveSessionId: vi.fn(),
       }),
@@ -121,10 +122,12 @@ describe('usePreloadedScenarios', () => {
         id: 'scenario-1',
         title: 'Scenario',
         messages: [{ id: 'seed-1', role: 'user', content: 'Scenario prompt' }],
+        systemInstruction: 'Scenario specific instruction',
       });
     });
 
     expect(sessions.map((session) => session.id)).toEqual(['scenario-session', 'existing-session']);
+    expect(setAppSettings).not.toHaveBeenCalled();
 
     unmount();
   });

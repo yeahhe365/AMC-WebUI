@@ -3,12 +3,12 @@ import { Info, Type } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import { type AppSettings } from '@/types';
 import {
-  SETTINGS_RANGE_SLIDER_CLASS,
   SETTINGS_SECTION_CARD_CLASS,
   SETTINGS_SECTION_LABEL_CLASS,
   SETTINGS_VALUE_BADGE_CLASS,
 } from '@/constants/designTokens';
 import { Tooltip } from '@/components/shared/Tooltip';
+import { Slider } from '@/components/shared/Slider';
 
 interface FontSizeControlProps {
   settings: AppSettings;
@@ -21,7 +21,7 @@ export const FontSizeControl: React.FC<FontSizeControlProps> = ({ settings, onUp
     <div className={`${SETTINGS_SECTION_CARD_CLASS} space-y-4`} data-settings-item="interface-font-size">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <label className={`${SETTINGS_SECTION_LABEL_CLASS} flex items-center gap-2`}>
+          <label htmlFor="base-font-size-slider" className={`${SETTINGS_SECTION_LABEL_CLASS} flex items-center gap-2`}>
             <Type size={14} strokeWidth={1.5} /> {t('settingsFontSize')}
           </label>
           <Tooltip text={t('settingsFontSizeTooltip')}>
@@ -30,14 +30,14 @@ export const FontSizeControl: React.FC<FontSizeControlProps> = ({ settings, onUp
         </div>
         <span className={SETTINGS_VALUE_BADGE_CLASS}>{settings.baseFontSize}px</span>
       </div>
-      <input
-        type="range"
-        min="12"
-        max="24"
-        step="1"
+      <Slider
+        id="base-font-size-slider"
+        min={12}
+        max={24}
+        step={1}
         value={settings.baseFontSize}
-        onChange={(e) => onUpdate('baseFontSize', parseInt(e.target.value, 10))}
-        className={SETTINGS_RANGE_SLIDER_CLASS}
+        onChange={(val) => onUpdate('baseFontSize', Math.round(val))}
+        ariaLabel={t('settingsFontSize')}
       />
       <div className="flex justify-between text-xs text-[var(--theme-text-secondary)] font-mono px-1 tabular-nums">
         <span>12px</span>

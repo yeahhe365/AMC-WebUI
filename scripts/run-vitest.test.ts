@@ -23,6 +23,12 @@ describe('buildVitestNodeArgs', () => {
     expect(args).toEqual(['./node_modules/vitest/vitest.mjs', 'run', 'src/example.test.ts']);
   });
 
+  it('strips bare double-dash separators forwarded by package managers', () => {
+    const args = buildVitestNodeArgs({ has: () => false }, ['run', '--', '--shard=1/3']);
+
+    expect(args).toEqual(['./node_modules/vitest/vitest.mjs', 'run', '--shard=1/3']);
+  });
+
   it('adds the webstorage opt-out flag to NODE_OPTIONS so Vitest workers inherit it', () => {
     const nodeOptions = buildVitestNodeOptions(
       { has: (value: string) => value === '--no-experimental-webstorage' },

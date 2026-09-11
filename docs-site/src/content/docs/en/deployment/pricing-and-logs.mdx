@@ -1,0 +1,27 @@
+---
+title: Cost Tracking & Developer Logs
+description: Exact token pricing estimation logic, usage analytics, and developer debugging logs in AMC WebUI.
+---
+
+# Cost Tracking & Developer Logs
+
+To assist developers in auditing API expenditures, AMC WebUI includes a strict-precision pricing tracker.
+
+---
+
+## 1. Strict Precision Cost Model
+
+- **No Crude Estimations**: Avoids misleading fixed token rates that fail on multimodal inputs or long-context discount brackets.
+- **Evidence-Backed Display**: Specific dollar costs are shown only when recorded metadata matches Google's official pricing formulas:
+  - Distinguishes between prompt tokens, cached tokens, and reasoning/output tokens.
+  - Accounts for modal pricing (text vs audio vs image).
+  - Queries lacking precise metadata cleanly show `—` instead of inaccurate approximations.
+
+---
+
+## 2. Developer Logs Panel
+
+Open the **Logs Panel** from the sidebar footer:
+- **Real-time API Tracing**: Captures HTTP status codes, network latency, and time-to-first-token (TTFT).
+- **Token Analytics**: Visual waterfall breakdown of input and output token counts per turn.
+- **Error Diagnostics**: View full JSON payload responses from upstream providers when encountering 4xx/5xx status codes.

@@ -1,6 +1,6 @@
 import { logService } from '@/services/logService';
 import React, { useMemo, useState } from 'react';
-import { type ChatMessage, type AppSettings, type SideViewContent, type UploadedFile } from '@/types';
+import { type ChatMessage, type MessageAppSettings, type SideViewContent, type UploadedFile } from '@/types';
 import type { OpenHtmlPreviewHandler } from '@/utils/html-preview/previewPrivilege';
 import { getGeminiKeyForRequest } from '@/utils/apiKeySelection';
 import { getThinkingStreamTail, parseThinkingSections } from '@/utils/chat/parsing';
@@ -15,11 +15,12 @@ import { ThinkingActions } from './thoughts/ThinkingActions';
 import { ThoughtContent } from './thoughts/ThoughtContent';
 import { useMessageStream } from '@/hooks/ui/useMessageStream';
 import { extractRawThinkingBlocks } from '@/utils/chat/reasoning';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 interface MessageThoughtsProps {
   message: ChatMessage;
   showThoughts: boolean;
-  appSettings: AppSettings;
+  appSettings: MessageAppSettings;
   themeId: string;
   onImageClick: (file: UploadedFile) => void;
   onOpenHtmlPreview: OpenHtmlPreviewHandler;
@@ -107,8 +108,9 @@ export const MessageThoughts: React.FC<MessageThoughtsProps> = ({
 
     setIsTranslatingThoughts(true);
     try {
-      const tempSettings = { ...DEFAULT_CHAT_SETTINGS, ...appSettings };
-      const keyResult = getGeminiKeyForRequest(appSettings, tempSettings, { skipIncrement: true });
+      const currentAppSettings = useSettingsStore.getState().appSettings;
+      const tempSettings = { ...DEFAULT_CHAT_SETTINGS, ...currentAppSettings };
+      const keyResult = getGeminiKeyForRequest(currentAppSettings, tempSettings, { skipIncrement: true });
       if ('error' in keyResult) {
         logService.error('API Key error for translation:', keyResult.error);
         return;

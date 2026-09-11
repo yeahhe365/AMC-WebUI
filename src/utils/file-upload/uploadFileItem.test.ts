@@ -133,4 +133,34 @@ describe('uploadFileItem', () => {
     );
     expect(selectedFiles[0].error).toBeUndefined();
   });
+
+  it('accepts zip files for inline upload without error', async () => {
+    const file = new File(['PK...'], 'archive.zip', { type: 'application/zip' });
+    let selectedFiles: UploadedFile[] = [];
+    const setSelectedFiles = (updater: UploadedFile[] | ((prev: UploadedFile[]) => UploadedFile[])) => {
+      selectedFiles = typeof updater === 'function' ? updater(selectedFiles) : updater;
+    };
+
+    await uploadFileItem({
+      file,
+      keyToUse: null,
+      defaultResolution: undefined,
+      appSettings: DEFAULT_APP_SETTINGS,
+      setSelectedFiles,
+      uploadStatsRef: {
+        current: new Map<string, { lastLoaded: number; lastTime: number }>(),
+      },
+    });
+
+    expect(uploadFileMock).not.toHaveBeenCalled();
+    expect(selectedFiles[0]).toEqual(
+      expect.objectContaining({
+        name: 'archive.zip',
+        type: 'application/zip',
+        uploadState: 'active',
+        transferStrategy: 'inline',
+      }),
+    );
+    expect(selectedFiles[0].error).toBeUndefined();
+  });
 });

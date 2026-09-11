@@ -21,16 +21,21 @@ import type {
   ModelOption,
   UploadedFile,
   VideoMetadata,
+  LibraryItem,
+  SetSelectedFiles,
 } from '@/types';
+import type { File as GeminiFile } from '@google/genai';
 import type { ChatToolToggleStates } from '@/types/chatTools';
 import type { SlashCommand } from '@/types/slashCommands';
-import type { ChatInputBooleanUpdate, ChatInputMachineState } from '@/utils/chat-input/chatInputStateMachine';
+import type {
+  ChatInputBooleanUpdate,
+  ChatInputMachineState,
+  ChatInputMode,
+} from '@/utils/chat-input/chatInputStateMachine';
 import type { QueuedChatInputSubmission } from '@/utils/chat-input/pendingSubmission';
 import type { ModelCapabilities } from '@/utils/model/modelCapabilities';
 
 type ChatEditMode = 'update' | 'resend';
-type ChatInputMode = 'idle' | 'editing' | 'queuing' | 'live' | 'processing';
-type SetSelectedFiles = Dispatch<SetStateAction<UploadedFile[]>>;
 
 export interface ChatInputRuntimeState {
   appSettings: AppSettings;
@@ -51,6 +56,7 @@ export interface ChatInputRuntimeState {
   onCancelEdit: () => void;
   onProcessFiles: (files: FileList | File[]) => Promise<void>;
   onAddFileById: (fileId: string) => Promise<void>;
+  onAddFilesFromCloud?: (files: GeminiFile[]) => void;
   onCancelUpload: (fileId: string) => void;
   onTranscribeAudio: (file: File) => Promise<string | null>;
   isProcessingFile: boolean;
@@ -59,6 +65,7 @@ export interface ChatInputRuntimeState {
   onNewChat: () => void;
   onOpenSettings: () => void;
   onToggleLiveArtifactsPrompt: () => void;
+  onDeactivateLiveArtifactsPrompt?: () => void;
   onSelectModel: (modelId: string) => void;
   availableModels: ModelOption[];
   onTogglePinCurrentSession: () => void;
@@ -78,6 +85,7 @@ export interface ChatInputRuntimeState {
   isBBoxModeActive: boolean;
   onToggleGuide: () => void;
   isGuideModeActive: boolean;
+  isLiveArtifactsPromptActive?: boolean;
   onToggleQuadImages: () => void;
   themeId: string;
 }
@@ -148,12 +156,21 @@ export interface ChatInputModalsState {
   setShowRecorder: Dispatch<SetStateAction<boolean>>;
   showAddByIdInput: boolean;
   setShowAddByIdInput: Dispatch<SetStateAction<boolean>>;
+  showCloudFilesModal: boolean;
+  setShowCloudFilesModal: Dispatch<SetStateAction<boolean>>;
   showAddByUrlInput: boolean;
   setShowAddByUrlInput: Dispatch<SetStateAction<boolean>>;
   isHelpModalOpen: boolean;
   setIsHelpModalOpen: Dispatch<SetStateAction<boolean>>;
   showTtsContextEditor: boolean;
   setShowTtsContextEditor: Dispatch<SetStateAction<boolean>>;
+  showLibraryPicker: boolean;
+  setShowLibraryPicker: Dispatch<SetStateAction<boolean>>;
+  handleImportFromLibrary: (items: LibraryItem[]) => Promise<void>;
+  showFolderZipModal: boolean;
+  setShowFolderZipModal: Dispatch<SetStateAction<boolean>>;
+  handleSelectFolderImport: () => void;
+  handleSelectZipImport: () => void;
   fileInputRef: RefObject<HTMLInputElement>;
   imageInputRef: RefObject<HTMLInputElement>;
   folderInputRef: RefObject<HTMLInputElement>;
@@ -184,6 +201,7 @@ export interface ChatInputLocalFileState {
   handleNextImage: () => void;
   inputImages: UploadedFile[];
   currentImageIndex: number;
+  handleConvertZipToContext: (contextFile: File) => Promise<void>;
 }
 
 export interface ChatInputVoiceState {

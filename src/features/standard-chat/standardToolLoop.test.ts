@@ -637,7 +637,7 @@ describe('runStandardToolLoop round cap', () => {
       role: 'model' as const,
       parts: [{ functionCall: { id: `call-${round}`, name: 'tick', args: { round } } }],
     },
-    parts: [] as Part[],
+    parts: [{ functionCall: { id: `call-${round}`, name: 'tick', args: { round } } }],
     thoughts: undefined,
     functionCalls: [{ id: `call-${round}`, name: 'tick', args: { round } }],
     usage: undefined,
@@ -672,6 +672,10 @@ describe('runStandardToolLoop round cap', () => {
     expect(runTurn).toHaveBeenCalledTimes(3);
     expect(handler).toHaveBeenCalledTimes(2);
     expect(result.toolMessages).toHaveLength(2);
+
+    // Unexecuted function calls from the capped turn must be stripped from finalTurn.parts
+    expect(result.finalTurn.parts.some((part) => Boolean(part.functionCall))).toBe(false);
+    expect(result.finalTurn.functionCalls).toEqual([]);
 
     const noticeParts = result.finalTurn.parts.filter(
       (part) => typeof part.text === 'string' && part.text.includes('tool'),

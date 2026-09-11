@@ -1,7 +1,9 @@
 import type { GenerateContentResponse, Part, UsageMetadata } from '@google/genai';
 import { type ChatHistoryItem, type StreamMessageSender, type NonStreamMessageSender } from '@/types';
+import { appendTurnToHistory } from '@/utils/chat/builder';
 import { logService } from '@/services/logService';
 import { executeConfiguredApiRequest } from './apiExecutor';
+import { toError } from '@/utils/errorMessage';
 import { adaptGenAiResponse, mergeGroundingMetadata, type MetadataWithCitations } from './chatResponseAdapter';
 import { getHttpOptionsForContents, withHttpOptionHeaders } from './geminiApiVersion';
 import { createStreamIdleTimeoutError, hasStreamIdleTimeoutElapsed } from './streamIdleTimeout';
@@ -145,7 +147,7 @@ export const sendStatelessMessageStreamApi: StreamMessageSender = async (
   let finalUsageMetadata: UsageMetadata | undefined = undefined;
   let finalGroundingMetadata: MetadataWithCitations | null = null;
   let finalUrlContextMetadata: unknown = null;
-  const contents = [...history, { role, parts }];
+  const contents = appendTurnToHistory(history, role, parts);
   // Set when the stream ended in a failure (watchdog timeout or upstream
   // error). The run callback can return normally after a timeout (the fetch was
   // aborted, not thrown), so this flag is what prevents a spurious onComplete.
@@ -304,7 +306,7 @@ export const sendStatelessMessageStreamApi: StreamMessageSender = async (
       },
     });
   } catch (error) {
-    onError(error instanceof Error ? error : new Error(String(error) || 'Unknown error during streaming.'));
+    onError(toError(error, 'Unknown error during streaming.'));
     return;
   } finally {
     logService.info('Streaming complete.', { usage: finalUsageMetadata, hasGrounding: !!finalGroundingMetadata });
@@ -328,7 +330,7 @@ export const sendStatelessMessageNonStreamApi: NonStreamMessageSender = async (
   _providerId,
 ) => {
   logService.info(`Sending message via stateless generateContent (non-stream) for model ${modelId}`);
-  const contents = [...history, { role, parts }];
+  const contents = appendTurnToHistory(history, role, parts);
 
   try {
     await executeConfiguredApiRequest({
@@ -365,8 +367,6 @@ export const sendStatelessMessageNonStreamApi: NonStreamMessageSender = async (
       },
     });
   } catch (error) {
-    onError(
-      error instanceof Error ? error : new Error(String(error) || 'Unknown error during stateless non-streaming call.'),
-    );
+    onError(toError(error, 'Unknown error during stateless non-streaming call.'));
   }
 };

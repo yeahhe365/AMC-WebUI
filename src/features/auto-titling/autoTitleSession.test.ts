@@ -277,4 +277,59 @@ describe('autoTitleSession', () => {
     expect(sessions[0].title).toBe('New Chat');
     expect(sessions[0].titleSource).toBeUndefined();
   });
+
+  it('allows regenerating title when force is true even if titleSource is manual', async () => {
+    const session = createSession({
+      title: 'Manual Title',
+      titleSource: 'manual',
+      messages: [makeUserMessage('Hello'), makeModelMessage('Hi there')],
+    });
+    sessions = [session];
+    generateTitleApiMock.mockResolvedValue('Forced New Title');
+
+    const result = await autoTitleSession({
+      session,
+      appSettings: DEFAULT_APP_SETTINGS,
+      language: 'en',
+      updateAndPersistSessions,
+      force: true,
+    });
+
+    expect(result).toBe(true);
+    expect(generateTitleApiMock).toHaveBeenCalled();
+    expect(sessions[0].title).toBe('Forced New Title');
+    expect(sessions[0].titleSource).toBe('auto');
+  });
+
+  it('prefers the best completed exchange over a short greeting when force is true', async () => {
+    const session = createSession({
+      title: 'Manual Title',
+      titleSource: 'manual',
+      messages: [
+        makeUserMessage('hi'),
+        makeModelMessage('hello'),
+        makeUserMessage('Please explain quantum computing in depth'),
+        makeModelMessage('Quantum computing uses qubits instead of classical bits.'),
+      ],
+    });
+    sessions = [session];
+    generateTitleApiMock.mockResolvedValue('Quantum Computing');
+
+    const result = await autoTitleSession({
+      session,
+      appSettings: DEFAULT_APP_SETTINGS,
+      language: 'en',
+      updateAndPersistSessions,
+      force: true,
+    });
+
+    expect(result).toBe(true);
+    expect(generateTitleApiMock).toHaveBeenCalledWith(
+      'gemini-key',
+      'Please explain quantum computing in depth',
+      'Quantum computing uses qubits instead of classical bits.',
+      'en',
+    );
+    expect(sessions[0].title).toBe('Quantum Computing');
+  });
 });

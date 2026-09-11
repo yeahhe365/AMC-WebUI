@@ -218,7 +218,8 @@ export const GroundedResponse: React.FC<GroundedResponseProps> = ({
 
       <ContextUrls metadata={urlContextMetadata} />
 
-      {mapsPlaces.length > 0 ? <MapsWidget places={mapsPlaces} /> : <SearchSources sources={sources} />}
+      {mapsPlaces.length > 0 && <MapsWidget places={mapsPlaces} />}
+      {sources.length > 0 && <SearchSources sources={sources} />}
     </div>
   );
 };

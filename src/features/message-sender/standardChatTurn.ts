@@ -1,6 +1,6 @@
 import type { ChatMessage, UploadedFile } from '@/types';
 import type { ContentPart } from '@/types/chat';
-import { isGemini3Model } from '@/utils/model/modelCapabilities';
+import { isGemini3Model, bansModelTurnPrefill } from '@/utils/model/modelCapabilities';
 
 interface ResolveStandardChatTurnParams {
   messages: ChatMessage[];
@@ -47,12 +47,7 @@ export const resolveStandardChatTurn = ({
     }
 
     // Gemini 3.6+ rejects non-empty prefilled model turns. Continue via a user nudge instead.
-    const modelIdLower = apiModelId.toLowerCase();
-    const bansModelTurnPrefill =
-      /gemini-3\.[6-9]/.test(modelIdLower) ||
-      modelIdLower.includes('gemini-3.5-flash-lite') ||
-      /gemini-[4-9]/.test(modelIdLower);
-    if (bansModelTurnPrefill) {
+    if (bansModelTurnPrefill(apiModelId)) {
       return {
         baseMessagesForApi,
         finalRole: 'user',

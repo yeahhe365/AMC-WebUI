@@ -76,4 +76,36 @@ describe('mediaNavStore', () => {
     useMediaNavStore.getState().setWidth(513.6);
     expect(useMediaNavStore.getState().width).toBe(514);
   });
+
+  it('updates currentPlayTime and resets on close or document switch', () => {
+    useMediaNavStore.getState().setCurrentPlayTime(42.5);
+    expect(useMediaNavStore.getState().currentPlayTime).toBe(42.5);
+
+    useMediaNavStore.getState().setActiveFile('next-file');
+    expect(useMediaNavStore.getState().currentPlayTime).toBeNull();
+
+    useMediaNavStore.getState().setCurrentPlayTime(18.2);
+    expect(useMediaNavStore.getState().currentPlayTime).toBe(18.2);
+
+    useMediaNavStore.getState().close();
+    expect(useMediaNavStore.getState().currentPlayTime).toBeNull();
+  });
+
+  it('manages multiple image highlights and active highlight index', () => {
+    const hl1 = { box2d: [100, 100, 200, 200] as [number, number, number, number], label: 'Item 1' };
+    const hl2 = { box2d: [300, 300, 400, 400] as [number, number, number, number], label: 'Item 2' };
+
+    useMediaNavStore.getState().setImageHighlights([hl1, hl2]);
+    expect(useMediaNavStore.getState().imageHighlights).toHaveLength(2);
+    expect(useMediaNavStore.getState().imageHighlight?.label).toBe('Item 1');
+
+    useMediaNavStore.getState().setActiveImageHighlightIndex(1);
+    expect(useMediaNavStore.getState().imageHighlight?.label).toBe('Item 2');
+    expect(useMediaNavStore.getState().imageHighlight?.isActive).toBe(true);
+    expect(useMediaNavStore.getState().imageHighlight?.focusToken).toBeDefined();
+
+    useMediaNavStore.getState().clearImageHighlight();
+    expect(useMediaNavStore.getState().imageHighlights).toHaveLength(0);
+    expect(useMediaNavStore.getState().imageHighlight).toBeNull();
+  });
 });

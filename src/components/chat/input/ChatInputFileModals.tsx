@@ -5,8 +5,10 @@ import {
   type ModelOption,
   type VideoMetadata,
   type MediaResolution,
+  type LibraryItem,
+  type ChatSettings,
 } from '@/types';
-import { isMarkdownFile } from '@/utils/file/fileTypeClassification';
+import type { File as GeminiFile } from '@google/genai';
 import { lazyNamedComponent } from '@/utils/lazyNamedComponent';
 
 const LazyFileConfigModal = lazyNamedComponent(() => import('@/components/modals/FileConfigModal'), 'FileConfigModal');
@@ -15,9 +17,17 @@ const LazyFilePreviewModal = lazyNamedComponent(
   () => import('@/components/modals/FilePreviewModal'),
   'FilePreviewModal',
 );
-const LazyMarkdownPreviewModal = lazyNamedComponent(
-  () => import('@/components/modals/MarkdownPreviewModal'),
-  'MarkdownPreviewModal',
+const LazyLibraryPickerModal = lazyNamedComponent(
+  () => import('@/components/modals/LibraryPickerModal'),
+  'LibraryPickerModal',
+);
+const LazyCloudFilesModal = lazyNamedComponent(
+  () => import('@/components/modals/cloud-files/CloudFilesModal'),
+  'CloudFilesModal',
+);
+const LazyFolderZipImportModal = lazyNamedComponent(
+  () => import('@/components/modals/FolderZipImportModal'),
+  'FolderZipImportModal',
 );
 
 interface ChatInputFileModalsProps {
@@ -25,6 +35,21 @@ interface ChatInputFileModalsProps {
   setConfiguringFile: (file: UploadedFile | null) => void;
   showTokenModal: boolean;
   setShowTokenModal: (show: boolean) => void;
+  showLibraryPicker?: boolean;
+  setShowLibraryPicker?: (show: boolean) => void;
+  onImportFromLibrary?: (items: LibraryItem[]) => Promise<void>;
+  showCloudFilesModal?: boolean;
+  setShowCloudFilesModal?: (show: boolean) => void;
+  onAddFilesFromCloud?: (files: GeminiFile[]) => void;
+  onAddFileById?: (fileId: string) => Promise<void>;
+  showFolderZipModal?: boolean;
+  setShowFolderZipModal?: (show: boolean) => void;
+  onSelectFolderImport?: () => void;
+  onSelectZipImport?: () => void;
+  rawAppSettings?: AppSettings;
+  currentChatSettings?: ChatSettings;
+  isImageGenerationModel?: boolean;
+  isTranscribeModel?: boolean;
   previewFile: UploadedFile | null;
   onClosePreview: () => void;
   inputText: string;
@@ -35,6 +60,7 @@ interface ChatInputFileModalsProps {
   isGemini3: boolean;
   isPreviewEditable?: boolean;
   onSaveTextFile?: (fileId: string, content: string, newName: string) => void;
+  onConvertToContext?: (contextFile: File) => void | Promise<void>;
   onSaveFileConfig: (
     fileId: string,
     updates: { videoMetadata?: VideoMetadata; mediaResolution?: MediaResolution },
@@ -52,6 +78,21 @@ export const ChatInputFileModals: React.FC<ChatInputFileModalsProps> = ({
   setConfiguringFile,
   showTokenModal,
   setShowTokenModal,
+  showLibraryPicker,
+  setShowLibraryPicker,
+  onImportFromLibrary,
+  showCloudFilesModal,
+  setShowCloudFilesModal,
+  onAddFilesFromCloud,
+  onAddFileById,
+  showFolderZipModal,
+  setShowFolderZipModal,
+  onSelectFolderImport,
+  onSelectZipImport,
+  rawAppSettings,
+  currentChatSettings,
+  isImageGenerationModel,
+  isTranscribeModel,
   previewFile,
   onClosePreview,
   inputText,
@@ -62,12 +103,10 @@ export const ChatInputFileModals: React.FC<ChatInputFileModalsProps> = ({
   isGemini3,
   isPreviewEditable,
   onSaveTextFile,
+  onConvertToContext,
   onSaveFileConfig,
   previewNavigation,
 }) => {
-  const markdownPreviewFile = previewFile && isMarkdownFile(previewFile) ? previewFile : null;
-  const genericPreviewFile = previewFile && !isMarkdownFile(previewFile) ? previewFile : null;
-
   return (
     <>
       {configuringFile && (
@@ -95,9 +134,44 @@ export const ChatInputFileModals: React.FC<ChatInputFileModalsProps> = ({
         />
       </Suspense>
 
+      {showLibraryPicker && setShowLibraryPicker && onImportFromLibrary && (
+        <Suspense fallback={null}>
+          <LazyLibraryPickerModal
+            isOpen={showLibraryPicker}
+            onClose={() => setShowLibraryPicker(false)}
+            onConfirm={onImportFromLibrary}
+            initialCategory={isTranscribeModel ? 'audio' : isImageGenerationModel ? 'image' : 'all'}
+          />
+        </Suspense>
+      )}
+
+      {showCloudFilesModal && setShowCloudFilesModal && (
+        <Suspense fallback={null}>
+          <LazyCloudFilesModal
+            isOpen={showCloudFilesModal}
+            onClose={() => setShowCloudFilesModal(false)}
+            onAddFiles={onAddFilesFromCloud}
+            onAddFileById={onAddFileById}
+            appSettings={rawAppSettings ?? appSettings}
+            currentChatSettings={currentChatSettings ?? ({} as ChatSettings)}
+          />
+        </Suspense>
+      )}
+
+      {showFolderZipModal && setShowFolderZipModal && onSelectFolderImport && onSelectZipImport && (
+        <Suspense fallback={null}>
+          <LazyFolderZipImportModal
+            isOpen={showFolderZipModal}
+            onClose={() => setShowFolderZipModal(false)}
+            onSelectFolder={onSelectFolderImport}
+            onSelectZip={onSelectZipImport}
+          />
+        </Suspense>
+      )}
+
       <Suspense fallback={null}>
         <LazyFilePreviewModal
-          file={genericPreviewFile}
+          file={previewFile}
           onClose={onClosePreview}
           onPrev={previewNavigation.handlePrevImage}
           onNext={previewNavigation.handleNextImage}
@@ -107,15 +181,7 @@ export const ChatInputFileModals: React.FC<ChatInputFileModalsProps> = ({
             previewNavigation.currentImageIndex < previewNavigation.inputImages.length - 1
           }
           onSaveText={onSaveTextFile}
-          initialEditMode={isPreviewEditable}
-        />
-      </Suspense>
-
-      <Suspense fallback={null}>
-        <LazyMarkdownPreviewModal
-          file={markdownPreviewFile}
-          onClose={onClosePreview}
-          onSaveText={onSaveTextFile}
+          onConvertToContext={onConvertToContext}
           initialEditMode={isPreviewEditable}
         />
       </Suspense>

@@ -255,4 +255,60 @@ describe('useMessageUpdates', () => {
 
     unmount();
   });
+
+  it('updates message content and attachments when handleUpdateMessageContent is called', () => {
+    const existingFile = createUploadedFile({ id: 'file-1', name: 'old.mp4' });
+    let sessions: SavedChatSession[] = [
+      createSavedChatSession({
+        id: 'session-1',
+        messages: [
+          {
+            id: 'message-1',
+            role: 'user',
+            content: 'Original prompt',
+            files: [existingFile],
+            timestamp: new Date('2026-05-01T00:00:00.000Z'),
+          },
+        ],
+      }),
+    ];
+
+    const updateAndPersistSessions = vi.fn(
+      (updater: typeof sessions | ((prev: typeof sessions) => typeof sessions)) => {
+        sessions =
+          typeof updater === 'function' ? (updater as (prev: typeof sessions) => typeof sessions)(sessions) : updater;
+        return sessions;
+      },
+    );
+
+    const { result, unmount } = renderHook(() =>
+      useMessageUpdates({
+        activeSessionId: 'session-1',
+        setActiveSessionId: vi.fn(),
+        appSettings: createAppSettings(),
+        currentChatSettings: createChatSettings(),
+        updateAndPersistSessions,
+        userScrolledUpRef: { current: false },
+      }),
+    );
+
+    // Updating with new files
+    const newFile = createUploadedFile({ id: 'file-2', name: 'new.png' });
+    act(() => {
+      result.current.handleUpdateMessageContent('message-1', 'Updated prompt', [newFile]);
+    });
+
+    expect(sessions[0].messages[0].content).toBe('Updated prompt');
+    expect(sessions[0].messages[0].files).toEqual([newFile]);
+
+    // Updating with empty files array (removes attachments)
+    act(() => {
+      result.current.handleUpdateMessageContent('message-1', 'Clean prompt without files', []);
+    });
+
+    expect(sessions[0].messages[0].content).toBe('Clean prompt without files');
+    expect(sessions[0].messages[0].files).toBeUndefined();
+
+    unmount();
+  });
 });

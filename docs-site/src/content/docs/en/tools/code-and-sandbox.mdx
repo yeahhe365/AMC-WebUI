@@ -1,0 +1,39 @@
+---
+title: Code Execution & Python Sandbox
+description: Comparing server-side Gemini Code Execution with browser-side Pyodide WASM scientific computing sandbox in AMC WebUI.
+---
+
+# Code Execution & Python Sandbox
+
+AMC WebUI provides **two distinct execution engines** for computation, data analysis, and mathematical verification.
+
+---
+
+## Engine Comparison
+
+| Feature | ☁️ Gemini Code Execution | 🐍 Local Pyodide WASM Sandbox |
+| :--- | :--- | :--- |
+| **Execution Host** | Google Cloud stateless container | Browser Web Worker (WebAssembly) |
+| **Data Privacy** | Sent to Google for processing | **100% Local**, zero network leaks |
+| **Package Loading** | Standard Google runtime | Dynamic on-import loading (numpy, pandas, matplotlib) |
+| **Package Expansion** | Fixed environment | **On-demand micropip installation** (scipy, scikit-learn) |
+| **File I/O** | Attachment analysis on server | Working directory mounting & output file export |
+| **Plot Rendering** | Text output or static images | **Automatic matplotlib plot interception** |
+
+---
+
+## 1. Server-Side Code Execution
+
+- **Toggle**: Select **Code Execution** in the tools menu, or type `/code`.
+- **Workflow**: The model writes and executes Python in Google's cloud runtime. Real stdout/stderr output is injected back into the conversation for self-correcting logic.
+
+---
+
+## 2. Browser-Side Local Python Sandbox (Pyodide)
+
+A standalone Python environment running entirely client-side:
+
+1. **Independent Worker**: Runs inside an isolated Web Worker to avoid blocking UI interactions.
+2. **On-Demand Package Loading**: Core runtime initializes with standard libraries and micropip. Packages like numpy, pandas, and matplotlib are automatically detected from `import` statements and fetched/cached on demand.
+3. **Matplotlib Visualizer**: Automatically catches `plt.show()` canvas outputs and embeds responsive graphs directly in the message flow.
+4. **Virtual File System**: Uploaded files mount directly into the execution working directory, enabling direct access via relative paths (e.g. `pandas.read_csv('filename.csv')` without absolute path prefixes). Generated output files can be downloaded directly from chat.

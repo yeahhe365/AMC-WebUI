@@ -29,7 +29,11 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ['1/3', '2/3', '3/3']
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
@@ -38,12 +42,11 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run test
+      - run: pnpm run test -- --shard=${{ matrix.shard }}
 
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [lint-and-typecheck, test]
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
@@ -65,7 +68,6 @@ jobs:
   node24-build-compatibility:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: [lint-and-typecheck, test]
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4

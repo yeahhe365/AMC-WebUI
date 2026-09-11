@@ -10,7 +10,7 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
-const getFocusableElements = (container: HTMLElement) =>
+export const getFocusableElements = (container: HTMLElement) =>
   Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter((element) => {
     const win = element.ownerDocument?.defaultView ?? window;
     const style = win.getComputedStyle(element);

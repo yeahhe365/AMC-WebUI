@@ -37,11 +37,12 @@ import { ChatInputToolbar } from './ChatInputToolbar';
 describe('ChatInputToolbar', () => {
   const renderer = setupTestRenderer();
 
-  const renderToolbar = () => {
+  const renderToolbar = (currentChatSettings?: Record<string, unknown>) => {
     act(() => {
       renderer.root.render(
         <ChatInputToolbarContext.Provider
           value={createChatInputToolbarContextValue({
+            ...(currentChatSettings ? { currentChatSettings: currentChatSettings as any } : {}),
             capabilities: {
               ...getModelCapabilities('gemini-3.1-flash-image-preview'),
               ...mockCapabilities.value,
@@ -85,6 +86,18 @@ describe('ChatInputToolbar', () => {
     expect(renderer.container.querySelector('[data-testid="image-settings-cluster"]')).not.toBeNull();
   });
 
+  it('hides image output mode selector in third-party provider mode', () => {
+    mockCapabilities.value = {
+      ...mockCapabilities.value,
+      isImageGenerationModel: true,
+    };
+
+    renderToolbar({ providerId: 'openai' });
+
+    expect(imageOutputModeSelectorMock).not.toHaveBeenCalled();
+    expect(renderer.container.querySelector('[data-testid="image-settings-cluster"]')).toBeNull();
+  });
+
   it('shows transcribe cluster for transcribe models', () => {
     mockCapabilities.value = {
       ...mockCapabilities.value,
@@ -94,5 +107,16 @@ describe('ChatInputToolbar', () => {
     renderToolbar();
 
     expect(renderer.container.querySelector('[data-testid="transcribe-settings-cluster"]')).not.toBeNull();
+  });
+
+  it('hides transcribe cluster in third-party provider mode', () => {
+    mockCapabilities.value = {
+      ...mockCapabilities.value,
+      isTranscribeModel: true,
+    };
+
+    renderToolbar({ providerId: 'openai' });
+
+    expect(renderer.container.querySelector('[data-testid="transcribe-settings-cluster"]')).toBeNull();
   });
 });

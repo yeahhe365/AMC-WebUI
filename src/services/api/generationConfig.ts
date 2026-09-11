@@ -9,6 +9,7 @@ import { loadDeepSearchSystemPrompt, loadLocalPythonSystemPrompt } from '@/featu
 import {
   MediaResolution,
   type ChatSettings,
+  type GeoLocationCoordinates,
   type ImageOutputMode,
   type SafetySetting,
   type ThinkingLevel,
@@ -32,10 +33,13 @@ import { isServerCodeExecutionMode } from '@/utils/codeExecution';
 const IMAGE_TEXT_MODALITIES = ['TEXT', 'IMAGE'];
 const IMAGE_ONLY_MODALITIES = ['IMAGE'];
 const THINKING_LEVEL_FOR_SDK = {
+  NONE: GenAIThinkingLevel.MINIMAL,
   MINIMAL: GenAIThinkingLevel.MINIMAL,
   LOW: GenAIThinkingLevel.LOW,
   MEDIUM: GenAIThinkingLevel.MEDIUM,
   HIGH: GenAIThinkingLevel.HIGH,
+  XHIGH: GenAIThinkingLevel.HIGH,
+  MAX: GenAIThinkingLevel.HIGH,
 } as const;
 
 type GenerationConfig = Omit<GenerateContentConfig, 'mediaResolution' | 'safetySettings'> & {
@@ -77,6 +81,7 @@ type GenerationConfigSettings = Pick<
   | 'thinkingLevel'
   | 'isDeepSearchEnabled'
   | 'isGoogleMapsEnabled'
+  | 'googleMapsLocation'
   | 'safetySettings'
   | 'mediaResolution'
   | 'isLocalPythonEnabled'
@@ -91,6 +96,7 @@ interface BuildGenerationConfigOptions {
   imageSize?: string;
   isLocalPythonEnabled?: boolean;
   imageOutputMode?: ImageOutputMode;
+  googleMapsLocation?: GeoLocationCoordinates;
 }
 
 type InternalBuildGenerationConfigOptions = {
@@ -101,6 +107,7 @@ type InternalBuildGenerationConfigOptions = {
   thinkingBudget: number;
   isGoogleSearchEnabled?: boolean;
   isGoogleMapsEnabled?: boolean;
+  googleMapsLocation?: GeoLocationCoordinates;
   isCodeExecutionEnabled?: boolean;
   isUrlContextEnabled?: boolean;
   thinkingLevel?: ThinkingLevel;
@@ -113,8 +120,9 @@ type InternalBuildGenerationConfigOptions = {
   imageOutputMode?: ImageOutputMode;
 };
 
-const buildGoogleSearchToolForModel = (modelId: string): Tool =>
-  normalizeModelId(modelId) === 'gemini-3.1-flash-image-preview'
+const buildGoogleSearchToolForModel = (modelId: string): Tool => {
+  const norm = normalizeModelId(modelId);
+  return norm === 'gemini-3.1-flash-image' || norm === 'gemini-3.1-flash-image-preview'
     ? {
         googleSearch: {
           searchTypes: {
@@ -124,6 +132,7 @@ const buildGoogleSearchToolForModel = (modelId: string): Tool =>
         },
       }
     : { googleSearch: {} };
+};
 
 const buildGoogleMapsTool = (): Tool => ({ googleMaps: {} });
 
@@ -155,6 +164,7 @@ const toInternalBuildGenerationConfigOptions = (
     thinkingBudget: settings.thinkingBudget,
     isGoogleSearchEnabled: settings.isGoogleSearchEnabled,
     isGoogleMapsEnabled: settings.isGoogleMapsEnabled,
+    googleMapsLocation: options.googleMapsLocation ?? settings.googleMapsLocation,
     isCodeExecutionEnabled: settings.isCodeExecutionEnabled,
     isUrlContextEnabled: settings.isUrlContextEnabled,
     thinkingLevel: settings.thinkingLevel,
@@ -176,6 +186,7 @@ async function buildGenerationConfigFromOptions({
   thinkingBudget,
   isGoogleSearchEnabled,
   isGoogleMapsEnabled,
+  googleMapsLocation,
   isCodeExecutionEnabled,
   isUrlContextEnabled,
   thinkingLevel,
@@ -191,10 +202,13 @@ async function buildGenerationConfigFromOptions({
   const normalizedImageSize = normalizeImageSizeForModel(modelId, imageSize);
   const googleSearchTool = buildGoogleSearchToolForModel(modelId);
 
+  const normModelId = normalizeModelId(modelId);
   if (
-    normalizeModelId(modelId) === 'gemini-3-pro-image-preview' ||
-    normalizeModelId(modelId) === 'gemini-3.1-flash-image-preview' ||
-    normalizeModelId(modelId) === 'gemini-3.1-flash-lite-image'
+    normModelId === 'gemini-3-pro-image' ||
+    normModelId === 'gemini-3-pro-image-preview' ||
+    normModelId === 'gemini-3.1-flash-image' ||
+    normModelId === 'gemini-3.1-flash-image-preview' ||
+    normModelId === 'gemini-3.1-flash-lite-image'
   ) {
     const imageConfig: NonNullable<GenerationConfig['imageConfig']> = {
       imageSize: normalizedImageSize || '1K',
@@ -209,8 +223,9 @@ async function buildGenerationConfigFromOptions({
     };
 
     if (
-      normalizeModelId(modelId) === 'gemini-3.1-flash-image-preview' ||
-      normalizeModelId(modelId) === 'gemini-3.1-flash-lite-image'
+      normModelId === 'gemini-3.1-flash-image' ||
+      normModelId === 'gemini-3.1-flash-image-preview' ||
+      normModelId === 'gemini-3.1-flash-lite-image'
     ) {
       generationConfig.thinkingConfig = {
         includeThoughts: true,
@@ -239,19 +254,29 @@ async function buildGenerationConfigFromOptions({
   // neither the tool (unsupported by the API) nor the round-trip, so skip both.
   if (isDeepSearchEnabled && !isGemma) {
     const deepSearchPrompt = await loadDeepSearchSystemPrompt();
-    finalSystemInstruction = finalSystemInstruction
-      ? `${finalSystemInstruction}\n\n${deepSearchPrompt}`
-      : deepSearchPrompt;
+    if (!finalSystemInstruction?.includes(deepSearchPrompt.trim())) {
+      finalSystemInstruction = finalSystemInstruction
+        ? `${finalSystemInstruction}\n\n${deepSearchPrompt}`
+        : deepSearchPrompt;
+    }
   }
 
   if (isLocalPythonEnabled) {
     const localPythonPrompt = await loadLocalPythonSystemPrompt();
-    finalSystemInstruction = finalSystemInstruction
-      ? `${finalSystemInstruction}\n\n${localPythonPrompt}`
-      : localPythonPrompt;
+    if (!finalSystemInstruction?.includes(localPythonPrompt.trim())) {
+      finalSystemInstruction = finalSystemInstruction
+        ? `${finalSystemInstruction}\n\n${localPythonPrompt}`
+        : localPythonPrompt;
+    }
   }
 
-  const gemmaThinkingLevel = isGemma ? (showThoughts ? 'HIGH' : 'MINIMAL') : undefined;
+  const gemmaThinkingLevel = isGemma
+    ? thinkingLevel === 'HIGH' || thinkingLevel === 'MINIMAL'
+      ? thinkingLevel
+      : showThoughts
+        ? 'HIGH'
+        : 'MINIMAL'
+    : undefined;
 
   const generationConfig: GenerationConfig = {
     ...config,
@@ -312,11 +337,44 @@ async function buildGenerationConfigFromOptions({
   }
 
   const tools: NonNullable<GenerationConfig['tools']> = [];
-  if (!isTranscribe && !isGemma && (isGoogleSearchEnabled || isDeepSearchEnabled)) {
+  const hasSearch = !isTranscribe && !isGemma && (isGoogleSearchEnabled || isDeepSearchEnabled);
+  const hasMaps = !isTranscribe && !isGemma && isGoogleMapsEnabled;
+  const canCombineSearchMaps = isGemini3 || isGeminiRoboticsModel(modelId);
+
+  if (hasSearch) {
     tools.push(googleSearchTool);
   }
-  if (!isTranscribe && !isGemma && isGoogleMapsEnabled) {
-    tools.push(buildGoogleMapsTool());
+  if (hasMaps) {
+    if (!hasSearch || canCombineSearchMaps) {
+      tools.push(buildGoogleMapsTool());
+      if (
+        googleMapsLocation &&
+        typeof googleMapsLocation.latitude === 'number' &&
+        typeof googleMapsLocation.longitude === 'number' &&
+        Number.isFinite(googleMapsLocation.latitude) &&
+        Number.isFinite(googleMapsLocation.longitude) &&
+        googleMapsLocation.latitude >= -90 &&
+        googleMapsLocation.latitude <= 90 &&
+        googleMapsLocation.longitude >= -180 &&
+        googleMapsLocation.longitude <= 180
+      ) {
+        generationConfig.toolConfig = {
+          ...(generationConfig.toolConfig ?? {}),
+          retrievalConfig: {
+            ...(generationConfig.toolConfig?.retrievalConfig ?? {}),
+            latLng: {
+              latitude: googleMapsLocation.latitude,
+              longitude: googleMapsLocation.longitude,
+            },
+          },
+        };
+      }
+    } else {
+      logService.warn(
+        'Skipping Google Maps tool because combining search grounding with maps grounding is only supported for Gemini 3.5+ models.',
+        { modelId },
+      );
+    }
   }
   if (!isTranscribe && !isGemma && isServerCodeExecutionMode({ isCodeExecutionEnabled, isLocalPythonEnabled })) {
     tools.push({ codeExecution: {} });

@@ -182,4 +182,36 @@ describe('useScenarioManager', () => {
     expect(result.current.actions).not.toHaveProperty('handleSaveAllAndClose');
     unmount();
   });
+
+  it('imports valid scenarios and shows a success toast', async () => {
+    const props = createHookProps();
+    const { result, unmount } = renderHook(() => useScenarioManager(props));
+
+    const importPayload = {
+      type: 'AllModelChat-Scenarios',
+      scenarios: [
+        {
+          id: 'imported-1',
+          title: 'Imported Scenario',
+          messages: [{ id: 'm1', role: 'user', content: 'Hi' }],
+        },
+      ],
+    };
+
+    const file = new File([JSON.stringify(importPayload)], 'scenarios.json', { type: 'application/json' });
+    const event = {
+      target: { files: [file], value: 'scenarios.json' },
+    } as unknown as React.ChangeEvent<HTMLInputElement>;
+
+    await act(async () => {
+      await result.current.actions.handleImportScenarios(event);
+    });
+
+    expect(props.onSaveAllScenarios).toHaveBeenCalledTimes(1);
+    expect(useToastStore.getState().toasts[0]).toMatchObject({
+      type: 'success',
+      message: 'scenariosFeedbackImported',
+    });
+    unmount();
+  });
 });

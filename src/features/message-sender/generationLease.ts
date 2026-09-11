@@ -1,4 +1,10 @@
 import { TAB_ID } from '@/stores/tabIdentity';
+import {
+  readPersistentStorageItem,
+  writePersistentStorageItem,
+  removePersistentStorageItem,
+} from '@/stores/persistentStorage';
+import { safeJsonParse } from '@/utils/safeJsonParse';
 
 export const GENERATION_LEASE_TTL_MS = 120_000;
 const GENERATION_LEASE_HEARTBEAT_MS = 30_000;
@@ -15,57 +21,45 @@ const heartbeatTimers = new Map<string, ReturnType<typeof setInterval>>();
 
 const leaseStorageKey = (sessionId: string) => `${LEASE_KEY_PREFIX}${sessionId}`;
 
-const getStorage = (): Storage | null => {
-  if (typeof localStorage === 'undefined') {
-    return null;
-  }
-  return localStorage;
-};
-
 export const isGenerationLeaseFresh = (lease: GenerationLease, now = Date.now()): boolean =>
   now - lease.ts < GENERATION_LEASE_TTL_MS;
 
 export const readGenerationLease = (sessionId: string): GenerationLease | null => {
-  const storage = getStorage();
-  if (!storage || !sessionId) {
+  if (!sessionId) {
     return null;
   }
-
-  try {
-    const raw = storage.getItem(leaseStorageKey(sessionId));
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw) as Partial<GenerationLease>;
-    if (typeof parsed.tabId !== 'string' || typeof parsed.generationId !== 'string' || typeof parsed.ts !== 'number') {
-      storage.removeItem(leaseStorageKey(sessionId));
-      return null;
-    }
-    const lease: GenerationLease = {
-      tabId: parsed.tabId,
-      generationId: parsed.generationId,
-      ts: parsed.ts,
-    };
-    if (!isGenerationLeaseFresh(lease)) {
-      storage.removeItem(leaseStorageKey(sessionId));
-      return null;
-    }
-    return lease;
-  } catch {
+  const key = leaseStorageKey(sessionId);
+  const raw = readPersistentStorageItem(key);
+  if (!raw) {
     return null;
   }
+  const parsed = safeJsonParse<Partial<GenerationLease> | null>(raw, null);
+  if (
+    !parsed ||
+    typeof parsed.tabId !== 'string' ||
+    typeof parsed.generationId !== 'string' ||
+    typeof parsed.ts !== 'number'
+  ) {
+    removePersistentStorageItem(key);
+    return null;
+  }
+  const lease: GenerationLease = {
+    tabId: parsed.tabId,
+    generationId: parsed.generationId,
+    ts: parsed.ts,
+  };
+  if (!isGenerationLeaseFresh(lease)) {
+    removePersistentStorageItem(key);
+    return null;
+  }
+  return lease;
 };
 
 const writeGenerationLease = (sessionId: string, lease: GenerationLease) => {
-  const storage = getStorage();
-  if (!storage || !sessionId) {
+  if (!sessionId) {
     return;
   }
-  try {
-    storage.setItem(leaseStorageKey(sessionId), JSON.stringify(lease));
-  } catch {
-    // Ignore storage failures in restricted browser contexts.
-  }
+  writePersistentStorageItem(leaseStorageKey(sessionId), JSON.stringify(lease));
 };
 
 export const isGenerationLeaseHeldByOther = (sessionId: string): boolean => {
@@ -123,27 +117,23 @@ export const renewGenerationLease = (sessionId: string, generationId: string): b
 };
 
 export const releaseGenerationLease = (sessionId: string, generationId?: string): void => {
-  const storage = getStorage();
-  if (!storage || !sessionId) {
+  stopGenerationLeaseHeartbeat(sessionId);
+  if (!sessionId) {
     return;
   }
 
-  try {
-    if (generationId) {
-      const existing = readGenerationLease(sessionId);
-      if (existing && (existing.tabId !== TAB_ID || existing.generationId !== generationId)) {
-        return;
-      }
-    } else {
-      const existing = readGenerationLease(sessionId);
-      if (existing && existing.tabId !== TAB_ID) {
-        return;
-      }
+  if (generationId) {
+    const existing = readGenerationLease(sessionId);
+    if (existing && (existing.tabId !== TAB_ID || existing.generationId !== generationId)) {
+      return;
     }
-    storage.removeItem(leaseStorageKey(sessionId));
-  } catch {
-    // Ignore storage failures.
+  } else {
+    const existing = readGenerationLease(sessionId);
+    if (existing && existing.tabId !== TAB_ID) {
+      return;
+    }
   }
+  removePersistentStorageItem(leaseStorageKey(sessionId));
 };
 
 export const startGenerationLeaseHeartbeat = (sessionId: string, generationId: string): void => {

@@ -1,3 +1,5 @@
+import { removePersistentStorageItem } from '@/stores/persistentStorage';
+
 const SESSION_LOCAL_STORAGE_KEY_PREFIXES = [
   'chatDraft_',
   'chatQuotes_',
@@ -11,7 +13,7 @@ const getSessionScopedLocalStorageKeys = (sessionId: string) => {
 
 export const removeSessionScopedLocalStorageEntries = (
   sessionIds: Iterable<string>,
-  storage: Pick<Storage, 'removeItem'> = localStorage,
+  storage?: Pick<Storage, 'removeItem'> | null,
 ) => {
   const uniqueSessionIds = new Set(sessionIds);
 
@@ -21,7 +23,15 @@ export const removeSessionScopedLocalStorageEntries = (
     }
 
     getSessionScopedLocalStorageKeys(sessionId).forEach((key) => {
-      storage.removeItem(key);
+      if (storage) {
+        try {
+          storage.removeItem(key);
+        } catch {
+          // Ignore storage failures
+        }
+      } else {
+        removePersistentStorageItem(key);
+      }
     });
   });
 };

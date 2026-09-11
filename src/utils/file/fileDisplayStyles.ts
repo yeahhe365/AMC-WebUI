@@ -1,8 +1,9 @@
 import type { ElementType } from 'react';
 import {
-  Archive,
   AlertTriangle,
+  FileArchive,
   FileAudio,
+  FileCode2,
   FileSpreadsheet,
   FileText,
   FileVideo,
@@ -10,8 +11,9 @@ import {
   Presentation,
   Youtube,
 } from 'lucide-react';
+import { PdfFileIcon, DocFileIcon } from '@/components/icons/FileFormatIcons';
 import { MediaResolution } from '@/types';
-import type { FileCategory } from './fileTypeClassification';
+import { resolveFileCategory, type FileCategory } from './fileTypeClassification';
 
 export const CATEGORY_STYLES: Record<FileCategory, { Icon: ElementType; colorClass: string; bgClass: string }> = {
   image: {
@@ -30,9 +32,9 @@ export const CATEGORY_STYLES: Record<FileCategory, { Icon: ElementType; colorCla
     bgClass: 'bg-pink-500/10 dark:bg-pink-400/10',
   },
   youtube: { Icon: Youtube, colorClass: 'text-red-600 dark:text-red-500', bgClass: 'bg-red-600/10 dark:bg-red-500/10' },
-  pdf: { Icon: FileText, colorClass: 'text-red-500 dark:text-red-400', bgClass: 'bg-red-500/10 dark:bg-red-400/10' },
+  pdf: { Icon: PdfFileIcon, colorClass: 'text-red-500 dark:text-red-400', bgClass: 'bg-red-500/10 dark:bg-red-400/10' },
   doc: {
-    Icon: FileText,
+    Icon: DocFileIcon,
     colorClass: 'text-blue-600 dark:text-blue-500',
     bgClass: 'bg-blue-600/10 dark:bg-blue-500/10',
   },
@@ -47,9 +49,14 @@ export const CATEGORY_STYLES: Record<FileCategory, { Icon: ElementType; colorCla
     bgClass: 'bg-emerald-600/10 dark:bg-emerald-500/10',
   },
   archive: {
-    Icon: Archive,
-    colorClass: 'text-yellow-600 dark:text-yellow-500',
-    bgClass: 'bg-yellow-600/10 dark:bg-yellow-500/10',
+    Icon: FileArchive,
+    colorClass: 'text-amber-500 dark:text-amber-400',
+    bgClass: 'bg-amber-500/10 dark:bg-amber-400/10',
+  },
+  code: {
+    Icon: FileCode2,
+    colorClass: 'text-cyan-600 dark:text-cyan-400',
+    bgClass: 'bg-cyan-500/10 dark:bg-cyan-400/10',
   },
   text: {
     Icon: FileText,
@@ -61,6 +68,15 @@ export const CATEGORY_STYLES: Record<FileCategory, { Icon: ElementType; colorCla
     colorClass: 'text-[var(--theme-text-danger)]',
     bgClass: 'bg-[var(--theme-bg-danger)]/10',
   },
+};
+
+export const getFileDisplayMeta = (file: { name?: string; type?: string; error?: string | null }) => {
+  const category = resolveFileCategory(file);
+  const styles = CATEGORY_STYLES[category] || CATEGORY_STYLES.text;
+  return {
+    category,
+    ...styles,
+  };
 };
 
 export const getResolutionColor = (resolution?: MediaResolution): string => {

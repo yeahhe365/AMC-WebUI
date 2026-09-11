@@ -7,6 +7,7 @@ import { float32ToPCM16Base64 } from '@/features/audio/audioProcessing';
 import { createManagedObjectUrl, releaseManagedObjectUrl } from '@/services/objectUrlManager';
 import { logService } from '@/services/logService';
 import type { AppSettings } from '@/types';
+import { toError } from '@/utils/errorMessage';
 import { useStateWithRef } from '@/hooks/useStateWithRef';
 
 export interface LiveTranscriptionOptions {
@@ -243,7 +244,7 @@ export const useLiveTranscription = ({ appSettings, apiKey, options }: UseLiveTr
             cleanupAudio();
           },
           onerror: (liveError) => {
-            const errObj = liveError instanceof Error ? liveError : new Error(String(liveError));
+            const errObj = toError(liveError);
             setError(errObj.message);
             options?.onError?.(errObj);
             setIsListening(false);
@@ -255,7 +256,7 @@ export const useLiveTranscription = ({ appSettings, apiKey, options }: UseLiveTr
       sessionRef.current = sessionPromise;
       return true;
     } catch (startError) {
-      const errObj = startError instanceof Error ? startError : new Error(String(startError));
+      const errObj = toError(startError);
       setError(errObj.message);
       options?.onError?.(errObj);
       cleanupAudio();

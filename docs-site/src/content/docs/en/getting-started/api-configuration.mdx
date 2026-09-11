@@ -1,0 +1,39 @@
+---
+title: API Configuration
+description: Detailed setup guide for native Gemini API keys, OpenAI-compatible providers, key rotation, and custom reverse proxies.
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+# API Configuration
+
+AMC WebUI adopts a strict **dual-route isolation architecture**. Before configuring, determine whether you are setting up the **Gemini Native Route** or an **OpenAI-Compatible Route**.
+
+---
+
+## 1. Gemini Native Route (BYOK Mode)
+
+The Gemini Native Route unlocks advanced capabilities exclusive to Gemini models (such as Thinking chain visualization, Live API bidirectional audio/video, Google Search/Maps Grounding, and local Python execution).
+
+<Steps>
+1. Generate your `GEMINI_API_KEY` at [Google AI Studio](https://aistudio.google.com/api-keys).
+2. Open AMC WebUI, navigate to **Settings -> Providers & API**.
+3. Enter your key in the **Gemini Native** configuration section.
+4. **Key Rotation**: If you have multiple free or paid Gemini keys, add each key on a new line. The application automatically load-balances requests across all provided keys to minimize 429 rate limit errors.
+</Steps>
+
+### Custom Gemini Proxy
+If your network cannot reach Google servers directly:
+- Enable the **Custom API Config / Proxy** toggle in settings.
+- Enter your reverse proxy base URL (such as a Cloudflare Worker or third-party proxy).
+- Supports endpoints like [AIStudioToAPI](https://github.com/iBUHub/AIStudioToAPI) converting Web sessions to `/v1beta/*` format.
+
+---
+
+## 2. OpenAI-Compatible Providers
+
+For third-party models (e.g. DeepSeek-R1, Claude 3.5 Sonnet, GPT-4o, Qwen):
+
+- **Base URL**: Enter the API root (e.g., `https://api.openai.com/v1` or `https://api.deepseek.com/v1`). The client automatically appends `/chat/completions`.
+- **Independent Key Storage**: Third-party keys are stored in a dedicated IndexedDB table, completely isolated from your Gemini keys.
+- **Model Synchronization**: Click "Test Connection & Fetch Models" to discover available models from the provider's `/models` endpoint, or manually enter custom model IDs.

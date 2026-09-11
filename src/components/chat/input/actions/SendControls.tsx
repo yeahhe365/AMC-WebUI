@@ -1,7 +1,8 @@
 import React from 'react';
-import { CornerDownLeft, X } from 'lucide-react';
+import { Check, CornerDownLeft } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import { CHAT_INPUT_BUTTON_CLASS } from '@/constants/buttonClasses';
+import { FOCUS_VISIBLE_RING_INPUT_OFFSET_CLASS } from '@/constants/focusClasses';
 import { useChatStore } from '@/stores/chatStore';
 import {
   useChatInputActionsContext,
@@ -16,15 +17,17 @@ export const SendControls: React.FC = () => {
   const { canSend, canQueueMessage, queuedCount, onQueueMessage, onCancelPendingUploadSend } =
     useChatInputComposerStatusContext();
   const isEditing = !!useChatStore((state) => state.editingMessageId);
+  const editMode = useChatStore((state) => state.editMode);
   const onStopGenerating = useChatStore((state) => state.stopGenerating);
   const onCancelEdit = useChatStore((state) => state.cancelEdit);
   const { t } = useI18n();
 
+  const isUpdate = isEditing && editMode === 'update';
   const isStop = isLoading || isWaitingForUpload;
   const isDisabled = !isStop && !canSend;
   const backgroundClass = isStop
-    ? 'bg-[var(--theme-bg-danger)] hover:bg-[var(--theme-bg-danger-hover)]'
-    : 'bg-[#3964FE] hover:bg-[#3358e0] dark:bg-[#679EFE] dark:hover:bg-[#5a8de0]';
+    ? 'bg-[var(--theme-bg-danger)] hover:bg-[var(--theme-bg-danger-hover)] text-white !rounded-full'
+    : 'bg-[#3964FE] hover:bg-[#3358e0] dark:bg-[#679EFE] dark:hover:bg-[#5a8de0] text-white !rounded-full shadow-sm';
 
   let label = t('sendMessageAria');
   let title = t('sendMessageTitle');
@@ -33,8 +36,13 @@ export const SendControls: React.FC = () => {
     label = isWaitingForUpload ? t('cancelPendingUploadSendAria') : t('stopGeneratingAria');
     title = isWaitingForUpload ? t('cancelPendingUploadSendTitle') : t('stopGeneratingTitle');
   } else if (isEditing) {
-    label = t('updateMessageAria');
-    title = t('updateMessageTitle');
+    if (isUpdate) {
+      label = t('save');
+      title = t('save');
+    } else {
+      label = t('updateMessageAria');
+      title = t('updateMessageTitle');
+    }
   }
 
   const handlePrimaryClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -85,11 +93,12 @@ export const SendControls: React.FC = () => {
             e.stopPropagation();
             onCancelEdit();
           }}
-          className={`${CHAT_INPUT_BUTTON_CLASS} bg-transparent hover:bg-[var(--theme-bg-tertiary)] text-[var(--theme-icon-settings)]`}
+          className={`h-8 px-2.5 mr-1.5 inline-flex items-center justify-center rounded-md text-xs font-medium text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors cursor-pointer border-0 ${FOCUS_VISIBLE_RING_INPUT_OFFSET_CLASS}`}
+          style={{ transform: 'translateY(-2px)' }}
           aria-label={t('cancelEditAria')}
           title={t('cancelEditTitle')}
         >
-          <X size={16} strokeWidth={2} />
+          {t('cancel')}
         </button>
       )}
 
@@ -97,7 +106,7 @@ export const SendControls: React.FC = () => {
         type={isStop ? 'button' : 'submit'}
         onClick={handlePrimaryClick}
         disabled={!isStop && isDisabled}
-        className={`${CHAT_INPUT_BUTTON_CLASS} ${SEND_BUTTON_SIZE_CLASS} !rounded-full ${backgroundClass} text-white disabled:opacity-40 grid place-items-center`}
+        className={`${CHAT_INPUT_BUTTON_CLASS} ${SEND_BUTTON_SIZE_CLASS} ${backgroundClass} disabled:opacity-40 grid place-items-center`}
         style={{ transform: 'translateY(-2px)', transition: 'background-color 100ms ease' }}
         aria-label={label}
         title={title}
@@ -106,6 +115,8 @@ export const SendControls: React.FC = () => {
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
             <rect x="3" y="3" width="10" height="10" rx="3" fill="currentColor" />
           </svg>
+        ) : isUpdate ? (
+          <Check size={18} strokeWidth={2.5} />
         ) : (
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
             <path

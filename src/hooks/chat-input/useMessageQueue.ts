@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { deferToNextTick } from '@/utils/deferToNextTick';
-import type { UploadedFile } from '@/types';
+import type { UploadedFile, SetSelectedFiles } from '@/types';
 import { useChatStore } from '@/stores/chatStore';
 import {
   MAX_QUEUED_SUBMISSIONS,
@@ -11,8 +11,6 @@ import {
   type QueuedChatInputSubmission,
   shouldFlushPendingSubmission,
 } from '@/utils/chat-input/pendingSubmission';
-
-type SetSelectedFiles = (files: UploadedFile[] | ((prevFiles: UploadedFile[]) => UploadedFile[])) => void;
 
 /** If a flushed send hasn't started its pipeline within this window, release the flush gate. */
 const FLUSH_RELEASE_TIMEOUT_MS = 5000;
@@ -34,7 +32,7 @@ interface UseMessageQueueParams {
   setSelectedFiles: SetSelectedFiles;
   setAppFileError: (error: string | null) => void;
   uploadFailureMessage: string;
-  completeEditSubmission: (messageId: string, content: string) => void;
+  completeEditSubmission: (messageId: string, content: string, files?: UploadedFile[]) => void;
   completeSendSubmission: (
     textToSend: string,
     isFastMode: boolean,
@@ -105,7 +103,7 @@ export const useMessageQueue = ({
       setWaitingForUpload(false);
 
       if (submission.kind === 'edit') {
-        completeEditSubmission(submission.messageId, submission.content);
+        completeEditSubmission(submission.messageId, submission.content, submission.files);
         return;
       }
 

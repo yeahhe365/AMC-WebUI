@@ -14,3 +14,4 @@ export const HTML_PREVIEW_DIAGNOSTIC_EVENT = 'diagnostic';
  */
 export const HTML_PREVIEW_GRAPHVIZ_RENDER_REQUEST_EVENT = 'graphviz-render-request';
 export const HTML_PREVIEW_GRAPHVIZ_RENDER_RESPONSE_EVENT = 'graphviz-render-response';
+export const HTML_PREVIEW_DIAGRAM_CLICK_EVENT = 'diagram-click';

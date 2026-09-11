@@ -6,21 +6,13 @@ import { ThinkingHeader } from './ThinkingHeader';
 describe('ThinkingHeader', () => {
   const renderer = setupTestRenderer();
 
-  it('renders the loading spinner without accent background chrome', async () => {
+  it('does not render the loading spinner when loading', async () => {
     await act(async () => {
       renderer.root.render(<ThinkingHeader isLoading isExpanded={false} />);
     });
 
     const spinner = renderer.container.querySelector('svg.google-spinner');
-    const spinnerWrapper = spinner?.parentElement;
-
-    expect(spinner).not.toBeNull();
-    expect(spinner?.getAttribute('width')).toBe('14');
-    expect(spinnerWrapper).not.toBeNull();
-    expect(spinnerWrapper?.className).not.toContain('rounded-lg');
-    expect(spinnerWrapper?.className).not.toContain('bg-[var(--theme-bg-accent)]/10');
-    expect(spinnerWrapper?.className).not.toContain('w-7');
-    expect(spinnerWrapper?.className).not.toContain('h-7');
+    expect(spinner).toBeNull();
   });
 
   it('shows the settled thinking time once loading finishes', async () => {

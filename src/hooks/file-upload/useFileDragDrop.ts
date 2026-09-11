@@ -1,5 +1,5 @@
 import { logService } from '@/services/logService';
-import { type DragEvent, useCallback, useEffect, useState } from 'react';
+import { type DragEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { type UploadedFile } from '@/types';
 import { generateUniqueId } from '@/utils/chat/ids';
 import { useI18n } from '@/contexts/I18nContext';
@@ -16,60 +16,113 @@ export const useFileDragDrop = ({ onFilesDropped, onAddTempFile, onRemoveTempFil
   const { t } = useI18n();
   const [isAppDraggingOver, setIsAppDraggingOver] = useState<boolean>(false);
   const [isProcessingDrop, setIsProcessingDrop] = useState<boolean>(false);
+  const dragCounterRef = useRef<number>(0);
 
-  // App 根容器统一处理 drop，window 监听仅作为兜底防止浏览器导航。
-  // 内部拖拽（文本选区等）不带 'Files' 类型，不受影响。
+  const isFileDrag = (event: globalThis.DragEvent | DragEvent<HTMLElement>): boolean => {
+    const types = event.dataTransfer?.types;
+    if (!types) return false;
+    for (let i = 0; i < types.length; i++) {
+      const type = types[i];
+      if (type === 'Files' || type.toLowerCase() === 'files') {
+        return true;
+      }
+    }
+    return false;
+  };
+
   useEffect(() => {
-    const cancelFileDropNavigation = (event: globalThis.DragEvent) => {
-      if (event.dataTransfer?.types.includes('Files')) {
-        event.preventDefault();
+    const onWindowDragEnter = (event: globalThis.DragEvent) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      dragCounterRef.current += 1;
+      setIsAppDraggingOver(true);
+    };
+
+    const onWindowDragOver = (event: globalThis.DragEvent) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'copy';
+      }
+      if (dragCounterRef.current <= 0) {
+        dragCounterRef.current = 1;
+      }
+      setIsAppDraggingOver(true);
+    };
+
+    const onWindowDragLeave = (event: globalThis.DragEvent) => {
+      if (!isFileDrag(event)) return;
+      event.preventDefault();
+      dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+      const isOutOfWindow =
+        event.clientX <= 0 ||
+        event.clientY <= 0 ||
+        event.clientX >= window.innerWidth ||
+        event.clientY >= window.innerHeight;
+      if (dragCounterRef.current === 0 || isOutOfWindow) {
+        dragCounterRef.current = 0;
+        setIsAppDraggingOver(false);
       }
     };
 
-    window.addEventListener('dragover', cancelFileDropNavigation);
-    window.addEventListener('drop', cancelFileDropNavigation);
+    const onWindowDrop = (event: globalThis.DragEvent) => {
+      if (isFileDrag(event)) {
+        event.preventDefault();
+      }
+      dragCounterRef.current = 0;
+      setIsAppDraggingOver(false);
+    };
+
+    const onWindowBlur = () => {
+      dragCounterRef.current = 0;
+      setIsAppDraggingOver(false);
+    };
+
+    window.addEventListener('dragenter', onWindowDragEnter);
+    window.addEventListener('dragover', onWindowDragOver);
+    window.addEventListener('dragleave', onWindowDragLeave);
+    window.addEventListener('drop', onWindowDrop);
+    window.addEventListener('blur', onWindowBlur);
+
     return () => {
-      window.removeEventListener('dragover', cancelFileDropNavigation);
-      window.removeEventListener('drop', cancelFileDropNavigation);
+      window.removeEventListener('dragenter', onWindowDragEnter);
+      window.removeEventListener('dragover', onWindowDragOver);
+      window.removeEventListener('dragleave', onWindowDragLeave);
+      window.removeEventListener('drop', onWindowDrop);
+      window.removeEventListener('blur', onWindowBlur);
     };
   }, []);
 
   const handleAppDragEnter = useCallback((e: DragEvent<HTMLDivElement>) => {
+    if (!isFileDrag(e)) return;
     e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer.types.includes('Files')) {
-      setIsAppDraggingOver(true);
-    }
+    dragCounterRef.current += 1;
+    setIsAppDraggingOver(true);
   }, []);
 
-  const handleAppDragOver = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.dataTransfer.types.includes('Files')) {
-        e.dataTransfer.dropEffect = 'copy';
-        if (!isAppDraggingOver) {
-          setIsAppDraggingOver(true);
-        }
-      } else {
-        e.dataTransfer.dropEffect = 'none';
-      }
-    },
-    [isAppDraggingOver],
-  );
+  const handleAppDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'copy';
+    }
+    setIsAppDraggingOver(true);
+  }, []);
 
   const handleAppDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
+    if (!isFileDrag(e)) return;
     e.preventDefault();
-    e.stopPropagation();
-    // Only reset if leaving the main container, not entering a child
-    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-    setIsAppDraggingOver(false);
+    dragCounterRef.current = Math.max(0, dragCounterRef.current - 1);
+    if (dragCounterRef.current === 0) {
+      setIsAppDraggingOver(false);
+    }
   }, []);
 
   const handleAppDrop = useCallback(
     async (e: DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       e.stopPropagation();
+      dragCounterRef.current = 0;
       setIsAppDraggingOver(false);
       setIsProcessingDrop(true);
 

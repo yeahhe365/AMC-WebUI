@@ -11,6 +11,7 @@ import { logService } from '@/services/logService';
 import { createNewSession, rehydrateSessionFiles } from '@/utils/chat/session';
 import { dbService } from '@/services/db/dbService';
 import { useChatStore, type SetActiveSessionOptions } from '@/stores/chatStore';
+import { useUIStore } from '@/stores/uiStore';
 import {
   cleanupSessionFilePreviews,
   clearSessionDraftFiles,
@@ -20,10 +21,12 @@ import {
   toSessionMetadata,
 } from './sessionLoaderDrafts';
 import { loadInitialSessionData } from './sessionInitialLoad';
-import { createSettingsForNewChat, sanitizeSessionModel } from './sessionLoaderSettings';
+import {
+  createSettingsForNewChat,
+  sanitizeSessionModel,
+  type SessionLoaderHistoryOptions,
+} from './sessionLoaderSettings';
 import { focusChatInput } from '@/utils/chat-input/focus';
-
-type SessionLoaderHistoryOptions = Pick<SetActiveSessionOptions, 'history'>;
 
 interface StartNewChatOptions extends SessionLoaderHistoryOptions {
   /** 新会话要归属的分组 id；不传保持原行为（未分组）。 */
@@ -120,6 +123,11 @@ export const useSessionLoader = ({
 
       retainOutgoingSessionRuntime();
       storeSessionDraftFiles(fileDraftsRef.current, activeSessionId, selectedFiles);
+      if (selectedFiles.length === 0) {
+        void dbService.deleteDraftFiles(activeSessionId);
+      } else {
+        void dbService.saveDraftFiles(activeSessionId, selectedFiles);
+      }
 
       cleanupSessionFilePreviews(activeChat);
     },
@@ -127,8 +135,33 @@ export const useSessionLoader = ({
   );
 
   const restoreDraftFiles = useCallback(
-    (sessionId: string) => {
-      setSelectedFiles(getSessionDraftFiles(fileDraftsRef.current, sessionId));
+    async (sessionId: string, initialFiles?: UploadedFile[]) => {
+      if (initialFiles) {
+        storeSessionDraftFiles(fileDraftsRef.current, sessionId, initialFiles);
+        setSelectedFiles(initialFiles);
+        return;
+      }
+
+      const memoryFiles = getSessionDraftFiles(fileDraftsRef.current, sessionId);
+      if (memoryFiles && memoryFiles.length > 0) {
+        setSelectedFiles(memoryFiles);
+        return;
+      }
+
+      try {
+        const persistedFiles = await dbService.getDraftFiles(sessionId);
+        if (persistedFiles.length > 0) {
+          storeSessionDraftFiles(fileDraftsRef.current, sessionId, persistedFiles);
+          if (useChatStore.getState().activeSessionId === sessionId) {
+            setSelectedFiles(persistedFiles);
+          }
+        } else {
+          setSelectedFiles([]);
+        }
+      } catch (error) {
+        logService.warn(`Failed to restore draft files for session ${sessionId}:`, error);
+        setSelectedFiles([]);
+      }
     },
     [fileDraftsRef, setSelectedFiles],
   );
@@ -180,6 +213,7 @@ export const useSessionLoader = ({
         setActiveMessages([]);
         if (activeSessionId) {
           clearSessionDraftFiles(fileDraftsRef.current, activeSessionId);
+          void dbService.deleteDraftFiles(activeSessionId);
           updateAndPersistSessions((prev) =>
             prev.map((session) =>
               session.id === activeSessionId
@@ -251,10 +285,19 @@ export const useSessionLoader = ({
       retainOutgoingSessionDraft({ skipSessionId: sessionId });
 
       try {
-        const sessionToLoad = await dbService.getSession(sessionId);
+        const [sessionToLoad, draftFiles] = await Promise.all([
+          dbService.getSession(sessionId),
+          !fileDraftsRef.current[sessionId]?.length
+            ? dbService.getDraftFiles(sessionId).catch(() => [])
+            : Promise.resolve(fileDraftsRef.current[sessionId]),
+        ]);
 
         if (requestId !== sessionViewRequestIdRef.current) {
           return;
+        }
+
+        if (draftFiles && draftFiles.length > 0) {
+          storeSessionDraftFiles(fileDraftsRef.current, sessionId, draftFiles);
         }
 
         if (sessionToLoad) {
@@ -271,7 +314,7 @@ export const useSessionLoader = ({
         startNewChat(undefined, { history });
       }
     },
-    [startNewChat, userScrolledUpRef, applyLoadedSession, retainOutgoingSessionDraft],
+    [startNewChat, userScrolledUpRef, fileDraftsRef, applyLoadedSession, retainOutgoingSessionDraft],
   );
 
   const loadInitialData = useCallback(async () => {
@@ -298,6 +341,13 @@ export const useSessionLoader = ({
 
   useEffect(() => {
     const handlePopState = () => {
+      if (window.location.pathname === '/library') {
+        useUIStore.getState().setActiveView('library', { history: 'none' });
+        return;
+      }
+
+      useUIStore.getState().setActiveView('chat', { history: 'none' });
+
       const match = window.location.pathname.match(/^\/chat\/([^/]+)$/);
       const sessionId = match ? match[1] : null;
 
@@ -311,6 +361,42 @@ export const useSessionLoader = ({
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [loadChatSession, startNewChat]);
+
+  useEffect(() => {
+    if (!activeSessionId) {
+      return;
+    }
+
+    const isEditing = Boolean(useChatStore.getState().editingMessageId);
+    if (isEditing) {
+      return;
+    }
+
+    storeSessionDraftFiles(fileDraftsRef.current, activeSessionId, selectedFiles);
+
+    if (selectedFiles.length === 0) {
+      void dbService.deleteDraftFiles(activeSessionId);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      void dbService.saveDraftFiles(activeSessionId, selectedFiles);
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [activeSessionId, selectedFiles, fileDraftsRef]);
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      const state = useChatStore.getState();
+      if (state.activeSessionId && !state.editingMessageId && state.selectedFiles.length > 0) {
+        void dbService.saveDraftFiles(state.activeSessionId, state.selectedFiles);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   return {
     startNewChat,

@@ -43,6 +43,7 @@ vi.mock('@/utils/model/modelSorting', () => ({
 }));
 
 import { useChatStore } from './chatStore';
+import { useChatDraftStore } from './chatDraftStore';
 import { dbService } from '@/services/db/dbService';
 import { type SavedChatSession, type ChatGroup } from '@/types';
 import { createChatSettings, createSavedChatSessionMetadata, createUploadedFile } from '@/test/data/factories';
@@ -296,6 +297,26 @@ describe('chatStore', () => {
       useChatStore.getState().setActiveSessionId('s1');
       await useChatStore.getState().refreshSessions();
       expect(useChatStore.getState().activeMessages).toHaveLength(1);
+    });
+
+    it('synchronizes active session messages between activeMessages and savedSessions upon refresh', async () => {
+      const freshMessage = { id: 'm1', role: 'user' as const, content: 'Fresh from DB', timestamp: new Date() };
+      const staleMessage = { id: 'm0', role: 'user' as const, content: 'Stale in memory', timestamp: new Date() };
+      const fullSession = makeSession({
+        id: 's1',
+        messages: [freshMessage],
+      });
+      vi.mocked(dbService.getAllSessionMetadata).mockResolvedValue([{ ...fullSession, messages: [] }]);
+      vi.mocked(dbService.getSession).mockResolvedValue(fullSession);
+
+      useChatStore.getState().setActiveSessionId('s1');
+      useChatStore.getState().setActiveMessages([staleMessage]);
+      useChatStore.getState().setSavedSessions([makeSession({ id: 's1', messages: [staleMessage] })]);
+
+      await useChatStore.getState().refreshSessions();
+
+      expect(useChatStore.getState().activeMessages).toEqual([freshMessage]);
+      expect(useChatStore.getState().savedSessions[0].messages).toEqual([freshMessage]);
     });
 
     it('does not overwrite active session runtime messages while that session is still loading', async () => {
@@ -691,6 +712,19 @@ describe('chatStore', () => {
       }));
       expect(dbService.saveSession).not.toHaveBeenCalled();
     });
+
+    it('stashes pendingChatSettings when there is no active session and clears them on session change', () => {
+      useChatStore.getState().setCurrentChatSettings((prev) => ({
+        ...prev,
+        systemInstruction: 'test-instruction',
+        modelId: 'custom-model',
+      }));
+      expect(useChatStore.getState().pendingChatSettings?.systemInstruction).toBe('test-instruction');
+      expect(useChatStore.getState().pendingChatSettings?.modelId).toBe('custom-model');
+
+      useChatStore.getState().setActiveSessionId('s1');
+      expect(useChatStore.getState().pendingChatSettings).toBeNull();
+    });
   });
 
   // ── stopGenerating ──
@@ -780,6 +814,30 @@ describe('chatStore', () => {
       expect(state.selectedFiles).toEqual([]);
       expect(state.appFileError).toBeNull();
       expect(state.commandedInput).toEqual({ text: '', id: expect.any(Number) });
+    });
+
+    it('restores draft from chatDraftStore for activeSessionId when cancelled', () => {
+      useChatStore.setState({ activeSessionId: 'sess-draft-test' });
+      useChatDraftStore.setState({
+        drafts: {
+          'sess-draft-test': {
+            inputText: 'Preserved user draft',
+            quotes: [],
+            ttsContext: '',
+          },
+        },
+      });
+
+      useChatStore.getState().setEditingMessageId('m2');
+      useChatStore.getState().setEditMode('update');
+
+      useChatStore.getState().cancelEdit();
+
+      const state = useChatStore.getState();
+      expect(state.editingMessageId).toBeNull();
+      expect(state.commandedInput).toEqual({ text: 'Preserved user draft', id: expect.any(Number) });
+
+      useChatDraftStore.setState({ drafts: {} });
     });
   });
 });

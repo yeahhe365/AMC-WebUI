@@ -7,6 +7,7 @@ import {
   HTML_PREVIEW_CLEAR_SELECTION_EVENT,
   HTML_PREVIEW_COPY_EVENT,
   HTML_PREVIEW_DIAGNOSTIC_EVENT,
+  HTML_PREVIEW_DIAGRAM_CLICK_EVENT,
   HTML_PREVIEW_GRAPHVIZ_RENDER_REQUEST_EVENT,
   HTML_PREVIEW_GRAPHVIZ_RENDER_RESPONSE_EVENT,
   HTML_PREVIEW_MESSAGE_CHANNEL,
@@ -609,5 +610,46 @@ describe('ArtifactFrame', () => {
 
     expect(renderDotToSvgCached).not.toHaveBeenCalled();
     expect(postMessage).not.toHaveBeenCalled();
+  });
+
+  it('relays diagram clicks to onImageClick with an UploadedFile', async () => {
+    const onImageClick = vi.fn();
+    const postMessage = vi.fn();
+    const iframeWindowStub = { postMessage } as unknown as Window;
+
+    act(() => {
+      renderer.root.render(<ArtifactFrame html="<section>Diagram</section>" onImageClick={onImageClick} />);
+    });
+
+    const iframe = renderer.container.querySelector('iframe');
+    Object.defineProperty(iframe!, 'contentWindow', {
+      configurable: true,
+      value: iframeWindowStub,
+    });
+
+    const svgString = '<svg xmlns="http://www.w3.org/2000/svg"><circle r="10"/></svg>';
+
+    await act(async () => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: {
+            channel: HTML_PREVIEW_MESSAGE_CHANNEL,
+            event: HTML_PREVIEW_DIAGRAM_CLICK_EVENT,
+            payload: { svg: svgString, title: 'Network Topology' },
+          },
+          source: iframeWindowStub,
+          origin: 'null',
+        }),
+      );
+    });
+
+    expect(onImageClick).toHaveBeenCalledTimes(1);
+    const uploadedFile = onImageClick.mock.calls[0][0];
+    expect(uploadedFile).toMatchObject({
+      name: 'Network Topology.svg',
+      type: 'image/svg+xml',
+      uploadState: 'active',
+    });
+    expect(uploadedFile.dataUrl).toContain('data:image/svg+xml;base64,');
   });
 });

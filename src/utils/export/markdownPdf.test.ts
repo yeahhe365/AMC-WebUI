@@ -128,8 +128,8 @@ describe('createMarkdownPdfBlob', () => {
     expect(addFileToVFSMock).toHaveBeenCalledWith('NotoSansCJKsc-VF.ttf', expect.any(String));
     expect(addFontMock).toHaveBeenCalledWith('NotoSansCJKsc-VF.ttf', 'NotoSansCJKsc', 'normal', 'Identity-H');
     expect(setFontMock).toHaveBeenCalledWith('NotoSansCJKsc', 'normal');
-    expectPdfBodyText('中文标题', 'fill');
-    expectPdfBodyText('你好，世界。', 'fill');
+    expectPdfBodyText('中文标题', 'fillThenStroke');
+    expectPdfBodyText('你好，世界。', 'fillThenStroke');
   });
 
   it('keeps an unreachable external image as link text instead of drawing an empty block', async () => {
@@ -361,7 +361,7 @@ describe('createMarkdownPdfBlob', () => {
     }
 
     expect(addFontMock).toHaveBeenCalledWith('NotoSansCJKsc-VF.ttf', 'NotoSansCJKsc', 'normal', 'Identity-H');
-    expectPdfBodyText('ひらがなとカタカナ', 'fill');
+    expectPdfBodyText('ひらがなとカタカナ', 'fillThenStroke');
   });
 
   it('renders markdown link labels without dumping the raw URL', async () => {
@@ -370,7 +370,7 @@ describe('createMarkdownPdfBlob', () => {
       themeId: 'pearl',
     });
 
-    expectPdfBodyText('Anthropic 自曝安全漏洞', 'fill');
+    expectPdfBodyText('Anthropic 自曝安全漏洞', 'fillThenStroke');
     expect(textMock.mock.calls.some(([text]) => String(text).includes('https://linux.do'))).toBe(false);
   });
 
@@ -491,5 +491,37 @@ describe('createMarkdownPdfBlob', () => {
       expect.any(Number),
       expect.any(Number),
     );
+  });
+
+  it('renders task list items with checkbox markers', async () => {
+    await createMarkdownPdfBlob('- [ ] todo task\n- [x] completed task', {
+      filename: 'tasks.pdf',
+      themeId: 'pearl',
+    });
+
+    expect(textMock.mock.calls.some(([text]) => String(text).includes('[ ] todo task'))).toBe(true);
+    expect(textMock.mock.calls.some(([text]) => String(text).includes('[x] completed task'))).toBe(true);
+  });
+
+  it('applies bold stroke width to CJK headings', async () => {
+    await createMarkdownPdfBlob('# 中文大标题\n\n正文段落。', {
+      filename: 'doc.pdf',
+      themeId: 'pearl',
+    });
+
+    // CJK bold heading should set lineWidth to 0.22
+    expect(setLineWidthMock).toHaveBeenCalledWith(0.22);
+    // CJK regular body text should set lineWidth to 0.07
+    expect(setLineWidthMock).toHaveBeenCalledWith(0.07);
+  });
+
+  it('normalizes copied Unicode bullets into separate list items', async () => {
+    await createMarkdownPdfBlob('• 第一条\n• 第二条', {
+      filename: 'doc.pdf',
+      themeId: 'pearl',
+    });
+
+    expectPdfBodyText('- 第一条', 'fillThenStroke');
+    expectPdfBodyText('- 第二条', 'fillThenStroke');
   });
 });

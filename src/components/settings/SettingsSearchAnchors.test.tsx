@@ -3,11 +3,11 @@ import { setupProviderTestRenderer as setupTestRenderer } from '@/test/render/pr
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_APP_SETTINGS } from '@/constants/settingsDefaults';
 import { SETTINGS_SEARCH_CATALOG } from '@/constants/settingsSearchCatalog';
-import { SETTINGS_TAB_IDS } from '@/constants/settingsTabs';
+import { SETTINGS_TABS } from '@/constants/settingsTabs';
 import { ensureFeatureTranslations } from '@/i18n/featureTranslations';
 import { setupStoreStateReset } from '@/test/stores/reset';
 import { useSettingsUiStore } from '@/stores/settingsUiStore';
-import type { McpServerConfig } from '@/types';
+import type { McpServerConfig, ThirdPartyConnection } from '@/types';
 import { SettingsModal } from './SettingsModal';
 
 // Every catalog entry promises "navigate + highlight" via its
@@ -24,17 +24,38 @@ const TEST_MCP_SERVER: McpServerConfig = {
   env: {},
 };
 
+const TEST_THIRD_PARTY_CONNECTION: ThirdPartyConnection = {
+  id: 'test-provider',
+  name: 'Test Provider',
+  templateId: 'openai',
+  protocol: 'openai-compatible',
+  apiKey: 'test-key',
+  baseUrl: 'https://api.openai.com/v1',
+  extraHeaders: {},
+  modelId: 'gpt-4o',
+  models: [{ id: 'gpt-4o', name: 'GPT-4o' }],
+  enabled: true,
+};
+
 describe('settings search anchors', () => {
   const renderer = setupTestRenderer({ providers: { language: 'en' } });
   setupStoreStateReset();
 
   const renderSettingsModal = async (lastTab: string) => {
     localStorage.setItem('chatSettingsLastTab', lastTab);
+    useSettingsUiStore.setState({ activeTab: lastTab as any });
     await act(async () => {
       const props: ComponentProps<typeof SettingsModal> = {
         isOpen: true,
         onClose: vi.fn(),
-        currentSettings: { ...DEFAULT_APP_SETTINGS, mcpServers: [TEST_MCP_SERVER] },
+        currentSettings: {
+          ...DEFAULT_APP_SETTINGS,
+          modelId: 'gemini-3-flash-preview',
+          mcpServers: [TEST_MCP_SERVER],
+          thirdPartyApi: {
+            connections: [TEST_THIRD_PARTY_CONNECTION],
+          },
+        },
         currentThemeId: 'pearl',
         availableModels: [],
         onSave: vi.fn(),
@@ -62,7 +83,7 @@ describe('settings search anchors', () => {
     localStorage.clear();
   });
 
-  it.each(SETTINGS_TAB_IDS)('resolves every %s catalog entry to a rendered anchor', async (tab) => {
+  it.each(SETTINGS_TABS)('resolves every %s catalog entry to a rendered anchor', async (tab) => {
     await renderSettingsModal(tab);
 
     const missing = SETTINGS_SEARCH_CATALOG.filter((entry) => entry.tab === tab)

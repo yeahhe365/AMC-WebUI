@@ -1,16 +1,15 @@
 import React from 'react';
-import { createPortal } from 'react-dom';
 import { useI18n } from '@/contexts/I18nContext';
 import { type SavedScenario } from '@/types';
 import { Download, Edit3, Trash2, Eye, Copy, MoreHorizontal } from 'lucide-react';
 import { SMALL_ICON_BUTTON_CLASS } from '@/constants/buttonClasses';
-import {
-  MENU_ITEM_BUTTON_CLASS,
-  MENU_ITEM_DEFAULT_STATE_CLASS,
-  MENU_ITEM_DANGER_STATE_CLASS,
-} from '@/constants/menuClasses';
 import { interpolate } from '@/i18n/interpolate';
-import { usePortaledMenu } from '@/hooks/ui/usePortaledMenu';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/shared/DropdownMenu';
 
 interface ScenarioItemProps {
   scenario: SavedScenario;
@@ -36,8 +35,6 @@ export const ScenarioItem: React.FC<ScenarioItemProps> = ({
   const { t } = useI18n();
   const messageCount = scenario.messages.length;
   const hasSystemPrompt = !!scenario.systemInstruction;
-  const { isOpen, menuPosition, containerRef, buttonRef, menuRef, targetWindow, closeMenu, toggleMenu } =
-    usePortaledMenu({ menuWidth: 176 });
 
   const previewText =
     scenario.description ||
@@ -127,53 +124,38 @@ export const ScenarioItem: React.FC<ScenarioItemProps> = ({
         </button>
       )}
 
-      <div className="relative" ref={containerRef}>
-        <button
-          ref={buttonRef}
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            toggleMenu();
-          }}
-          className={SMALL_ICON_BUTTON_CLASS}
-          title={t('scenariosMoreActions')}
-          aria-label={t('scenariosActionsAria')}
-          aria-haspopup="menu"
-          aria-expanded={isOpen}
-        >
-          <MoreHorizontal size={15} />
-        </button>
-        {isOpen &&
-          targetWindow &&
-          createPortal(
-            <div
-              ref={menuRef}
-              role="menu"
-              className="fixed z-[9999] w-44 rounded-lg border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] py-1"
-              style={menuPosition}
+      <div className="relative shrink-0">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className={`${SMALL_ICON_BUTTON_CLASS} p-1 text-[var(--theme-text-tertiary)] hover:bg-[var(--theme-bg-secondary)] hover:text-[var(--theme-text-primary)] data-[state=open]:bg-[var(--theme-bg-secondary)] data-[state=open]:text-[var(--theme-text-primary)]`}
+              title={t('scenariosMoreActions')}
+              aria-label={t('scenariosActionsAria')}
             >
-              {secondaryActions.map((action) => {
-                const ActionIcon = action.icon;
-                return (
-                  <button
-                    key={action.key}
-                    type="button"
-                    role="menuitem"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      closeMenu();
-                      action.onSelect();
-                    }}
-                    className={`${MENU_ITEM_BUTTON_CLASS} ${action.danger ? MENU_ITEM_DANGER_STATE_CLASS : MENU_ITEM_DEFAULT_STATE_CLASS}`}
-                  >
-                    <ActionIcon size={14} />
-                    <span>{action.label}</span>
-                  </button>
-                );
-              })}
-            </div>,
-            targetWindow.document.body,
-          )}
+              <MoreHorizontal size={15} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-44 py-1" side="bottom" align="end">
+            {secondaryActions.map((action) => {
+              const ActionIcon = action.icon;
+              return (
+                <DropdownMenuItem
+                  key={action.key}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    action.onSelect();
+                  }}
+                  variant={action.danger ? 'danger' : 'default'}
+                  className="gap-2.5 px-3 py-1.5 cursor-pointer text-xs"
+                >
+                  <ActionIcon size={14} />
+                  <span>{action.label}</span>
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </li>
   );

@@ -81,6 +81,41 @@ describe('buildAnthropicRequestBody', () => {
         }
       ).output_config,
     ).toEqual({ effort: 'low' });
+
+    expect(
+      (
+        buildAnthropicRequestBody('claude-sonnet-5', [], [{ text: 'hi' }], { thinkingLevel: 'MAX' }, 'user', false) as {
+          output_config: { effort: string };
+        }
+      ).output_config,
+    ).toEqual({ effort: 'max' });
+
+    expect(
+      (
+        buildAnthropicRequestBody(
+          'claude-sonnet-5',
+          [],
+          [{ text: 'hi' }],
+          { thinkingLevel: 'XHIGH' },
+          'user',
+          false,
+        ) as {
+          output_config: { effort: string };
+        }
+      ).output_config,
+    ).toEqual({ effort: 'max' });
+  });
+
+  it('maps thinkingLevel to budget_tokens for Claude 3.7 models', () => {
+    const body = buildAnthropicRequestBody(
+      'claude-3-7-sonnet-20250219',
+      [],
+      [{ text: 'hi' }],
+      { thinkingLevel: 'HIGH' },
+      'user',
+      false,
+    ) as { thinking: { type: string; budget_tokens: number } };
+    expect(body.thinking).toEqual({ type: 'enabled', budget_tokens: 16384 });
   });
 
   it('defaults effort to high for adaptive Claude models when thinkingLevel is omitted', () => {

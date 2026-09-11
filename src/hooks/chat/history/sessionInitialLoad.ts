@@ -5,17 +5,24 @@ import { dbService } from '@/services/db/dbService';
 import { logService } from '@/services/logService';
 import { readLastActiveSessionSnapshot } from '@/utils/chat/lastActiveSession';
 import type { SetActiveSessionOptions } from '@/stores/chatStore';
-import type { AppSettings, ChatGroup, ChatMessage, ChatSettings, SavedChatSession } from '@/types';
+import type {
+  AppSettings,
+  ChatGroup,
+  ChatMessage,
+  ChatSettings,
+  SavedChatSession,
+  SessionsUpdater,
+  UploadedFile,
+} from '@/types';
 import { rehydrateSessionFiles } from '@/utils/chat/session';
 import {
   createSettingsForNewChat,
   resolveNewTabTemplate,
   sanitizeSessionModel,
   sortSessionsByPinnedAndTimestamp,
+  type SessionLoaderHistoryOptions,
 } from './sessionLoaderSettings';
 import { TAB_ID } from '@/stores/tabIdentity';
-
-type SessionLoaderHistoryOptions = Pick<SetActiveSessionOptions, 'history'>;
 
 interface LoadInitialSessionDataOptions {
   appSettings: AppSettings;
@@ -23,11 +30,8 @@ interface LoadInitialSessionDataOptions {
   setSavedGroups: Dispatch<SetStateAction<ChatGroup[]>>;
   setActiveSessionId: (value: SetStateAction<string | null>, options?: SetActiveSessionOptions) => void;
   setActiveMessages: Dispatch<SetStateAction<ChatMessage[]>>;
-  restoreDraftFiles: (sessionId: string) => void;
-  updateAndPersistSessions: (
-    updater: (prev: SavedChatSession[]) => SavedChatSession[],
-    options?: { persist?: boolean },
-  ) => void | Promise<void>;
+  restoreDraftFiles: (sessionId: string, initialFiles?: UploadedFile[]) => Promise<void> | void;
+  updateAndPersistSessions: SessionsUpdater;
   startNewChat: (explicitTemplateSession?: SavedChatSession, options?: SessionLoaderHistoryOptions) => void;
 }
 
@@ -49,9 +53,15 @@ const inheritAppSystemInstructionForEmptySession = (
   const nextSettings: ChatSettings = {
     ...session.settings,
     systemInstruction: inheritedSettings.systemInstruction,
+    isLiveArtifactsEnabled: session.settings.isLiveArtifactsEnabled ?? inheritedSettings.isLiveArtifactsEnabled,
+    visionPromptMode: session.settings.visionPromptMode ?? inheritedSettings.visionPromptMode,
   };
 
-  if (nextSettings.systemInstruction === session.settings.systemInstruction) {
+  if (
+    nextSettings.systemInstruction === session.settings.systemInstruction &&
+    nextSettings.isLiveArtifactsEnabled === session.settings.isLiveArtifactsEnabled &&
+    nextSettings.visionPromptMode === session.settings.visionPromptMode
+  ) {
     return { session, settingsChanged: false };
   }
 
@@ -132,6 +142,8 @@ export const loadInitialSessionData = async ({
   startNewChat,
 }: LoadInitialSessionDataOptions) => {
   let initialActiveId: string | null = null;
+  const isLibraryRoute = typeof window !== 'undefined' && window.location.pathname === '/library';
+  const initialHistoryMode = isLibraryRoute ? 'none' : 'replace';
 
   try {
     logService.info('Attempting to load chat history metadata from IndexedDB.');
@@ -141,13 +153,16 @@ export const loadInitialSessionData = async ({
     initialActiveId = resolveInitialActiveSessionId(metadataList);
 
     if (initialActiveId) {
-      const fullActiveSession = await dbService.getSession(initialActiveId);
+      const [fullActiveSession, draftFiles] = await Promise.all([
+        dbService.getSession(initialActiveId),
+        Promise.resolve(dbService.getDraftFiles(initialActiveId)).catch(() => []),
+      ]);
       if (fullActiveSession) {
         logService.info(`Loaded full content for active session: ${initialActiveId}`);
         const rehydrated = rehydrateSessionFiles(sanitizeSessionModel(fullActiveSession));
         setActiveMessages(rehydrated.messages);
-        setActiveSessionId(initialActiveId, { history: 'replace' });
-        restoreDraftFiles(initialActiveId);
+        setActiveSessionId(initialActiveId, { history: initialHistoryMode });
+        await restoreDraftFiles(initialActiveId, draftFiles);
       } else {
         initialActiveId = null;
       }
@@ -180,7 +195,10 @@ export const loadInitialSessionData = async ({
 
       // 显式 ?from 时跳过空会话复用（用户意图明确：从来源会话开新会话）。
       if (mostRecent && !fromSessionId) {
-        const fullSession = await dbService.getSession(mostRecent.id);
+        const [fullSession, draftFiles] = await Promise.all([
+          dbService.getSession(mostRecent.id),
+          Promise.resolve(dbService.getDraftFiles(mostRecent.id)).catch(() => []),
+        ]);
         if (
           fullSession &&
           fullSession.messages.length === 0 &&
@@ -195,8 +213,8 @@ export const loadInitialSessionData = async ({
             sortedList,
           );
           setActiveMessages(rehydrated.messages);
-          setActiveSessionId(rehydrated.id, { history: 'replace' });
-          restoreDraftFiles(rehydrated.id);
+          setActiveSessionId(rehydrated.id, { history: initialHistoryMode });
+          await restoreDraftFiles(rehydrated.id, draftFiles);
           if (settingsChanged) {
             void updateAndPersistSessions((prev) =>
               prev.map((session) =>
@@ -219,7 +237,7 @@ export const loadInitialSessionData = async ({
             snapshot: readLastActiveSessionSnapshot(),
             sortedSessions: sortedList,
           }),
-          { history: 'replace' },
+          { history: initialHistoryMode },
         );
       }
     }
@@ -231,7 +249,7 @@ export const loadInitialSessionData = async ({
     logService.error('Error loading chat history:', error);
 
     if (!initialActiveId) {
-      startNewChat(undefined, { history: 'replace' });
+      startNewChat(undefined, { history: initialHistoryMode });
     }
   }
 };

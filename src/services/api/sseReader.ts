@@ -1,7 +1,56 @@
 import { appendSseChunk } from './sseBuffer';
 import { createStreamIdleTimeoutError, hasStreamIdleTimeoutElapsed } from './streamIdleTimeout';
 
-type SseStreamParser<T> = (buffer: string) => { events: T[]; rest: string };
+export type SseStreamParser<T> = (buffer: string) => { events: T[]; rest: string };
+
+/**
+ * Splits an SSE buffer by `\n\n` boundaries, extracts and concatenates `data:` lines
+ * for each event block, and returns the extracted raw data strings along with any
+ * trailing unparsed buffer.
+ */
+export const parseSseRawDataChunks = (buffer: string): { events: string[]; rest: string } => {
+  const events: string[] = [];
+  let searchStart = 0;
+  let boundaryIndex = buffer.indexOf('\n\n', searchStart);
+
+  while (boundaryIndex !== -1) {
+    const rawEvent = buffer.slice(searchStart, boundaryIndex);
+    const eventData = rawEvent
+      .split('\n')
+      .map((line) => line.trimEnd())
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trimStart())
+      .join('\n');
+
+    if (eventData) {
+      events.push(eventData);
+    }
+
+    searchStart = boundaryIndex + 2;
+    boundaryIndex = buffer.indexOf('\n\n', searchStart);
+  }
+
+  return { events, rest: buffer.slice(searchStart) };
+};
+
+/**
+ * Parses raw SSE data chunks as JSON, silently skipping malformed entries and `[DONE]` markers.
+ */
+export const parseSseJsonEvents = <T>(buffer: string): { events: T[]; rest: string } => {
+  const { events: rawChunks, rest } = parseSseRawDataChunks(buffer);
+  const events: T[] = [];
+
+  for (const chunk of rawChunks) {
+    if (chunk === '[DONE]') continue;
+    try {
+      events.push(JSON.parse(chunk) as T);
+    } catch {
+      // Skip malformed SSE lines
+    }
+  }
+
+  return { events, rest };
+};
 
 /**
  * Read a streaming SSE body to completion, parsing events with `parse` and

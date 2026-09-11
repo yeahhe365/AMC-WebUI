@@ -26,7 +26,7 @@ export interface ScenarioUiActions {
   resetScenarioUiState: () => void;
 }
 
-export const DEFAULT_SCENARIO_UI_STATE: ScenarioUiState = {
+const DEFAULT_SCENARIO_UI_STATE: ScenarioUiState = {
   ownerScope: 'builtin',
   activeCategory: 'all',
   searchQuery: '',

@@ -14,12 +14,18 @@ import {
   buildOpenAICompatibleChatCompletionsUrl,
   buildOpenAICompatibleUpstreamChatCompletionsUrl,
 } from '@/services/api/openaiCompatibleUrls';
+import { buildOpenAIResponsesUrl, buildOpenAIResponsesUpstreamUrl } from '@/services/api/openaiResponsesUrls';
 import { buildAnthropicMessagesUrl, buildAnthropicUpstreamMessagesUrl } from '@/services/api/anthropicUrls';
-import { sendAnthropicMessageNonStream } from '@/services/api/anthropicApi';
-import { fetchOpenAICompatibleModels, sendOpenAICompatibleMessageNonStream } from '@/services/api/openaiCompatibleApi';
+import { fetchOpenAICompatibleModels } from '@/services/api/openaiCompatibleApi';
+import { fetchOpenAIResponsesModels } from '@/services/api/openaiResponsesApi';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { parseApiKeys } from '@/utils/apiKeySelection';
 import { getProxyProviderHeader, getThirdPartyTemplateLinks } from '@/utils/thirdPartyApiProviders';
+import {
+  probeThirdPartyConnection,
+  type ConnectionHealthProbeResult,
+  type LatencyGrade,
+} from '@/utils/thirdPartyDiagnostics';
 import type { ThirdPartyApiProtocol, ThirdPartyConnection } from '@/types';
 import { ApiKeyInput } from './ApiKeyInput';
 import { ApiConnectionTester } from './ApiConnectionTester';
@@ -30,6 +36,8 @@ interface ThirdPartyConnectionEditorProps {
   onChange: (updates: Partial<ThirdPartyConnection>) => void;
   onRemove: () => void;
   isInUse?: boolean;
+  healthResult?: ConnectionHealthProbeResult | null;
+  onHealthResult?: (result: ConnectionHealthProbeResult) => void;
 }
 
 type HeaderRow = { rowId: string; name: string; value: string };
@@ -59,15 +67,32 @@ export const ThirdPartyConnectionEditor: React.FC<ThirdPartyConnectionEditorProp
   onChange,
   onRemove,
   isInUse = false,
+  healthResult = null,
+  onHealthResult,
 }) => {
   const { t } = useI18n();
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-  const [testMessage, setTestMessage] = useState<string | null>(null);
+  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>(
+    () => healthResult?.status ?? 'idle',
+  );
+  const [testMessage, setTestMessage] = useState<string | null>(() => healthResult?.errorMessage ?? null);
+  const [testLatencyMs, setTestLatencyMs] = useState<number | null>(() => healthResult?.latencyMs ?? null);
+  const [testGrade, setTestGrade] = useState<LatencyGrade | null>(() => healthResult?.grade ?? null);
+  const [diagnosticTip, setDiagnosticTip] = useState<string | null>(() => healthResult?.diagnosticTip ?? null);
   const [fetchStatus, setFetchStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [fetchMessage, setFetchMessage] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(Object.keys(connection.extraHeaders).length > 0);
   const [headerRows, setHeaderRows] = useState<HeaderRow[]>(() => toHeaderRows(connection.extraHeaders));
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+
+  useEffect(() => {
+    if (healthResult) {
+      setTestStatus(healthResult.status);
+      setTestMessage(healthResult.errorMessage ?? null);
+      setTestLatencyMs(healthResult.latencyMs);
+      setTestGrade(healthResult.grade);
+      setDiagnosticTip(healthResult.diagnosticTip ?? null);
+    }
+  }, [healthResult]);
 
   useEffect(() => {
     setHeaderRows(toHeaderRows(connection.extraHeaders));
@@ -82,6 +107,9 @@ export const ThirdPartyConnectionEditor: React.FC<ThirdPartyConnectionEditorProp
     onChange({ [key]: value });
     setTestStatus('idle');
     setTestMessage(null);
+    setTestLatencyMs(null);
+    setTestGrade(null);
+    setDiagnosticTip(null);
   };
 
   const commitHeaderRows = (nextRows: HeaderRow[]) => {
@@ -92,88 +120,47 @@ export const ThirdPartyConnectionEditor: React.FC<ThirdPartyConnectionEditorProp
   const browserRequestUrl =
     connection.protocol === 'anthropic'
       ? buildAnthropicMessagesUrl(connection.baseUrl)
-      : buildOpenAICompatibleChatCompletionsUrl(connection.baseUrl);
+      : connection.protocol === 'openai-responses'
+        ? buildOpenAIResponsesUrl(connection.baseUrl)
+        : buildOpenAICompatibleChatCompletionsUrl(connection.baseUrl);
   const hasBaseUrl = Boolean(connection.baseUrl?.trim());
   const upstreamRequestUrl = hasBaseUrl
     ? connection.protocol === 'anthropic'
       ? buildAnthropicUpstreamMessagesUrl(connection.baseUrl)
-      : buildOpenAICompatibleUpstreamChatCompletionsUrl(connection.baseUrl)
+      : connection.protocol === 'openai-responses'
+        ? buildOpenAIResponsesUpstreamUrl(connection.baseUrl)
+        : buildOpenAICompatibleUpstreamChatCompletionsUrl(connection.baseUrl)
     : null;
   const extraHeaderCount = Object.keys(connection.extraHeaders).length;
 
   const handleTestConnection = async () => {
-    const keyToTest = connection.apiKey;
-    if (!keyToTest) {
-      setTestStatus('error');
-      setTestMessage(t('apiConfigNoKeyAvailable'));
-      return;
-    }
-
-    const firstKey = parseApiKeys(keyToTest)[0];
-    if (!firstKey) {
-      setTestStatus('error');
-      setTestMessage(t('apiConfigInvalidKeyFormat'));
-      return;
-    }
-
     setTestStatus('testing');
     setTestMessage(null);
+    setDiagnosticTip(null);
+    setTestLatencyMs(null);
+    setTestGrade(null);
 
-    try {
-      const providerConfig = {
-        baseUrl: connection.baseUrl,
-        temperature: 0,
-        extraHeaders: connection.extraHeaders,
-      };
-      let providerError: Error | null = null;
-      const onError = (error: Error) => {
-        providerError = error;
-      };
-      const proxyProviderId = getProxyProviderHeader(connection.templateId);
+    const result = await probeThirdPartyConnection(connection, {
+      modelId: connection.modelId,
+    });
 
-      if (connection.protocol === 'anthropic') {
-        await sendAnthropicMessageNonStream(
-          firstKey,
-          connection.modelId,
-          [],
-          [{ text: 'Hello' }],
-          providerConfig,
-          new AbortController().signal,
-          onError,
-          () => undefined,
-          'user',
-          proxyProviderId,
-        );
-      } else {
-        await sendOpenAICompatibleMessageNonStream(
-          firstKey,
-          connection.modelId,
-          [],
-          [{ text: 'Hello' }],
-          providerConfig,
-          new AbortController().signal,
-          onError,
-          () => undefined,
-          'user',
-          proxyProviderId,
-        );
-      }
-
-      if (providerError) {
-        throw providerError;
-      }
-
-      setTestStatus('success');
-    } catch (error) {
-      setTestStatus('error');
-      setTestMessage(getErrorMessage(error));
+    setTestStatus(result.status);
+    setTestLatencyMs(result.latencyMs);
+    setTestGrade(result.grade);
+    if (result.status === 'error') {
+      setTestMessage(result.errorMessage ?? t('apiConfigTestFailed'));
+      setDiagnosticTip(result.diagnosticTip ?? null);
+    } else {
+      setTestMessage(null);
     }
+    onHealthResult?.(result);
   };
 
   const handleFetchModels = async () => {
-    const firstKey = parseApiKeys(connection.apiKey)[0];
-    if (!firstKey || !connection.baseUrl) {
-      const message = t('apiConfigNoKeyAvailable');
+    const parsedKey = parseApiKeys(connection.apiKey)[0];
+    const effectiveKey = parsedKey || (connection.authOptional ? 'auth-optional' : '');
+    if (!effectiveKey || !connection.baseUrl) {
+      const message = !connection.baseUrl ? t('thirdPartyApiUrlMissing') : t('apiConfigNoKeyAvailable');
       setFetchStatus('error');
       setFetchMessage(message);
       throw new Error(message);
@@ -182,8 +169,10 @@ export const ThirdPartyConnectionEditor: React.FC<ThirdPartyConnectionEditorProp
     setFetchStatus('idle');
     setFetchMessage(null);
     try {
-      const models = await fetchOpenAICompatibleModels(
-        firstKey,
+      const fetchModelsFn =
+        connection.protocol === 'openai-responses' ? fetchOpenAIResponsesModels : fetchOpenAICompatibleModels;
+      const models = await fetchModelsFn(
+        effectiveKey,
         connection.baseUrl,
         new AbortController().signal,
         getProxyProviderHeader(connection.templateId),
@@ -272,8 +261,10 @@ export const ThirdPartyConnectionEditor: React.FC<ThirdPartyConnectionEditorProp
         apiKey={connection.apiKey}
         setApiKey={(value) => updateField('apiKey', value)}
         label={t('thirdPartyApiKey')}
-        placeholder={t('apiConfigOpenaiKeyPlaceholder')}
-        helpText={t('thirdPartyApiKeyHelp')}
+        placeholder={
+          connection.authOptional ? t('thirdPartyApiKeyOptionalPlaceholder') : t('apiConfigOpenaiKeyPlaceholder')
+        }
+        helpText={connection.authOptional ? t('thirdPartyApiKeyOptionalHelp') : t('thirdPartyApiKeyHelp')}
       />
 
       <div className="space-y-2">
@@ -308,17 +299,47 @@ export const ThirdPartyConnectionEditor: React.FC<ThirdPartyConnectionEditorProp
             }
             return null;
           })()}
-        <p className="text-xs text-[var(--theme-text-secondary)]">{t('settingsOpenAICompatibleRequestUrlPreview')}</p>
-        <div className="space-y-1">
-          <p className="text-[11px] uppercase tracking-wide text-[var(--theme-text-secondary)]">
-            {t('settingsOpenAICompatibleBrowserRequestUrl')}
-          </p>
-          <p className="text-xs font-mono break-all text-[var(--theme-text-secondary)]">{browserRequestUrl}</p>
-          <p className="text-[11px] uppercase tracking-wide text-[var(--theme-text-secondary)]">
-            {t('settingsOpenAICompatibleUpstreamUrl')}
-          </p>
-          <p className="text-xs font-mono break-all text-[var(--theme-text-secondary)]">{upstreamRequestUrl ?? '—'}</p>
-        </div>
+        <details
+          className="group rounded-md border border-[var(--theme-border-secondary)]/40 bg-[var(--theme-bg-tertiary)]/20 p-2 text-xs transition-all"
+          open={Boolean(
+            connection.protocol === 'openai-compatible' && getOpenAICompatibleBaseUrlWarning(connection.baseUrl),
+          )}
+        >
+          <summary className="flex cursor-pointer items-center justify-between font-medium text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] select-none list-none [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-1.5">
+              <ChevronRight
+                size={13}
+                className="transition-transform duration-200 group-open:rotate-90 text-[var(--theme-text-secondary)] flex-shrink-0"
+              />
+              <span>{t('settingsOpenAICompatibleRequestUrlPreview')}</span>
+            </span>
+            <span className="text-[11px] font-mono text-[var(--theme-text-secondary)]/70 truncate max-w-[180px] sm:max-w-[260px]">
+              {connection.protocol === 'anthropic'
+                ? '/v1/messages'
+                : connection.protocol === 'openai-responses'
+                  ? '/v1/responses'
+                  : '/v1/chat/completions'}
+            </span>
+          </summary>
+          <div className="space-y-2 pt-2 mt-1.5 border-t border-[var(--theme-border-secondary)]/30">
+            <div>
+              <p className="text-[10px] uppercase tracking-wide font-medium text-[var(--theme-text-secondary)]">
+                {t('settingsOpenAICompatibleBrowserRequestUrl')}
+              </p>
+              <p className="text-xs font-mono break-all text-[var(--theme-text-secondary)] bg-[var(--theme-bg-primary)]/40 p-1.5 rounded mt-0.5 border border-[var(--theme-border-secondary)]/20">
+                {browserRequestUrl}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide font-medium text-[var(--theme-text-secondary)]">
+                {t('settingsOpenAICompatibleUpstreamUrl')}
+              </p>
+              <p className="text-xs font-mono break-all text-[var(--theme-text-secondary)] bg-[var(--theme-bg-primary)]/40 p-1.5 rounded mt-0.5 border border-[var(--theme-border-secondary)]/20">
+                {upstreamRequestUrl ?? '—'}
+              </p>
+            </div>
+          </div>
+        </details>
       </div>
 
       <Select
@@ -328,6 +349,7 @@ export const ThirdPartyConnectionEditor: React.FC<ThirdPartyConnectionEditorProp
         onChange={(event) => updateField('protocol', event.target.value as ThirdPartyApiProtocol)}
       >
         <option value="openai-compatible">{t('thirdPartyProtocolOpenAI')}</option>
+        <option value="openai-responses">{t('thirdPartyProtocolOpenAIResponses')}</option>
         <option value="anthropic">{t('thirdPartyProtocolAnthropic')}</option>
       </Select>
 
@@ -336,8 +358,8 @@ export const ThirdPartyConnectionEditor: React.FC<ThirdPartyConnectionEditorProp
         selectedModelId={connection.modelId}
         onModelsChange={(models) => updateField('models', models)}
         onSelectedModelChange={(modelId) => updateField('modelId', modelId)}
-        onFetchModelsForImportPreview={connection.protocol === 'openai-compatible' ? handleFetchModels : undefined}
-        isFetchModelsDisabled={!connection.apiKey || !connection.baseUrl}
+        onFetchModelsForImportPreview={connection.protocol !== 'anthropic' ? handleFetchModels : undefined}
+        isFetchModelsDisabled={(!connection.authOptional && !connection.apiKey) || !connection.baseUrl}
         fetchModelsStatus={fetchStatus}
         fetchModelsMessage={fetchMessage}
       />
@@ -433,38 +455,52 @@ export const ThirdPartyConnectionEditor: React.FC<ThirdPartyConnectionEditorProp
         onTest={handleTestConnection}
         testStatus={testStatus}
         testMessage={testMessage}
-        isTestDisabled={testStatus === 'testing' || !connection.apiKey || !connection.baseUrl}
+        latencyMs={testLatencyMs}
+        latencyGrade={testGrade}
+        diagnosticTip={diagnosticTip}
+        isTestDisabled={
+          testStatus === 'testing' || (!connection.authOptional && !connection.apiKey) || !connection.baseUrl
+        }
         availableModels={connection.models}
         testModelId={connection.modelId}
         onModelChange={(modelId) => updateField('modelId', modelId)}
         testModelSelectId={`connection-${connection.id}-api-test-model`}
       />
 
-      {confirmingRemove ? (
-        <div className="space-y-2 rounded-lg border border-[var(--theme-text-danger)]/25 bg-[var(--theme-bg-danger)]/5 p-2.5">
-          <p className="text-sm text-[var(--theme-text-primary)]">{t('thirdPartyRemoveConnectionConfirm')}</p>
-          {isInUse && (
-            <p className="text-xs text-[var(--theme-text-secondary)]">{t('thirdPartyRemoveConnectionInUse')}</p>
-          )}
-          <div className="flex items-center gap-2">
-            <button type="button" className={SETTINGS_DANGER_OUTLINE_BUTTON_CLASS} onClick={onRemove}>
-              {t('delete')}
-            </button>
-            <button
-              type="button"
-              className={SETTINGS_SECONDARY_ACTION_BUTTON_CLASS}
-              onClick={() => setConfirmingRemove(false)}
-            >
-              {t('cancel')}
-            </button>
+      <div className="pt-2 border-t border-[var(--theme-border-secondary)]/30 flex items-center justify-end">
+        {confirmingRemove ? (
+          <div className="w-full space-y-2 rounded-lg border border-[var(--theme-text-danger)]/25 bg-[var(--theme-bg-danger)]/5 p-2.5">
+            <p className="text-sm font-medium text-[var(--theme-text-primary)]">
+              {t('thirdPartyRemoveConnectionConfirm')}
+            </p>
+            {isInUse && (
+              <p className="text-xs text-[var(--theme-text-secondary)]">{t('thirdPartyRemoveConnectionInUse')}</p>
+            )}
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                className={SETTINGS_SECONDARY_ACTION_BUTTON_CLASS}
+                onClick={() => setConfirmingRemove(false)}
+              >
+                {t('cancel')}
+              </button>
+              <button type="button" className={SETTINGS_DANGER_OUTLINE_BUTTON_CLASS} onClick={onRemove}>
+                <Trash2 size={13} />
+                <span>{t('delete')}</span>
+              </button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <button type="button" className={SMALL_ICON_DANGER_BUTTON_CLASS} onClick={() => setConfirmingRemove(true)}>
-          <Trash2 size={14} />
-          {t('thirdPartyRemoveConnection')}
-        </button>
-      )}
+        ) : (
+          <button
+            type="button"
+            className={SETTINGS_DANGER_OUTLINE_BUTTON_CLASS}
+            onClick={() => setConfirmingRemove(true)}
+          >
+            <Trash2 size={13} />
+            <span>{t('thirdPartyRemoveConnection')}</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 };

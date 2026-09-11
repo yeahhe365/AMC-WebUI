@@ -127,7 +127,7 @@ describe('PreloadedMessagesModal', () => {
 
     expect(onClose).not.toHaveBeenCalled();
 
-    const discardButton = Array.from(renderer.container.querySelectorAll('button')).find((button) =>
+    const discardButton = Array.from(document.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('Discard and close'),
     );
 

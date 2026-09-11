@@ -82,7 +82,7 @@ describe('ChatTextArea', () => {
     expect(textarea?.value).toBe('ni');
   });
 
-  it('keeps a single entered line stable while nudging the text away from the top edge', () => {
+  it('renders autosize textarea with proper padding nudging text away from the top edge', () => {
     const textareaRef = { current: null } as React.RefObject<HTMLTextAreaElement>;
 
     act(() => {
@@ -105,15 +105,48 @@ describe('ChatTextArea', () => {
       );
     });
 
-    const shadowTextarea = renderer.container.querySelector<HTMLTextAreaElement>('textarea[aria-hidden="true"]');
     const visibleTextarea = renderer.container.querySelector<HTMLTextAreaElement>(
       'textarea[data-chat-input-textarea="true"]',
     );
 
-    expect(shadowTextarea?.style.padding).toBe('2px 2.25rem 0px 0.25rem');
-    expect(visibleTextarea?.style.height).toBe('26px');
+    expect(visibleTextarea).not.toBeNull();
+    expect(visibleTextarea?.value).toBe('A single line');
     expect(visibleTextarea?.className).toContain('pt-0.5');
     expect(visibleTextarea?.className).toContain('pb-0');
+    expect(visibleTextarea?.className).toContain('px-1');
+    expect(visibleTextarea?.className).toContain('pr-9');
+  });
+
+  it('renders expanded textarea in fullscreen or custom height mode', () => {
+    const textareaRef = { current: null } as React.RefObject<HTMLTextAreaElement>;
+
+    act(() => {
+      renderer.root.render(
+        <ChatTextArea
+          textareaRef={textareaRef}
+          value="Expanded content"
+          onChange={() => {}}
+          onKeyDown={() => {}}
+          onPaste={() => {}}
+          onCompositionStart={() => {}}
+          onCompositionEnd={() => {}}
+          placeholder="Ask anything"
+          disabled={false}
+          isFullscreen={true}
+          isMobile={false}
+          initialTextareaHeight={24}
+          isConverting={false}
+        />,
+      );
+    });
+
+    const visibleTextarea = renderer.container.querySelector<HTMLTextAreaElement>(
+      'textarea[data-chat-input-textarea="true"]',
+    );
+
+    expect(visibleTextarea).not.toBeNull();
+    expect(visibleTextarea?.className).toContain('h-full');
+    expect(visibleTextarea?.className).toContain('overflow-y-auto');
   });
 
   it('preserves the caret when the parent writes a matching longer value back into the textarea', () => {

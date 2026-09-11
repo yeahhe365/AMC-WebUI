@@ -123,6 +123,45 @@ describe('FileDisplay', () => {
     expect(onFileClick).toHaveBeenCalledTimes(1);
   });
 
+  it('allows clicking YouTube link cards to open preview', () => {
+    const onFileClick = vi.fn();
+
+    act(() => {
+      renderer.root.render(
+        <FileDisplay
+          file={createUploadedFile({
+            id: 'youtube-1',
+            name: 'youtube.com/watch?v=MkaZ4OrbQn8',
+            type: 'video/youtube-link',
+            fileUri: 'https://www.youtube.com/watch?v=MkaZ4OrbQn8',
+            transferStrategy: 'remote-file-id',
+          })}
+          onFileClick={onFileClick}
+          isFromMessageList
+        />,
+      );
+    });
+
+    const card = renderer.container.querySelector('.cursor-pointer');
+    expect(card).not.toBeNull();
+    expect(renderer.container.querySelector('[data-thumbnail-kind="youtube"]')).not.toBeNull();
+    expect(renderer.container.querySelector('img[src*="img.youtube.com/vi/MkaZ4OrbQn8"]')).not.toBeNull();
+    expect(renderer.container.textContent).toContain('YOUTUBE');
+    expect(renderer.container.textContent).not.toContain('YOUTUBE-');
+
+    act(() => {
+      card!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(onFileClick).toHaveBeenCalledTimes(1);
+    expect(onFileClick).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'video/youtube-link',
+        fileUri: 'https://www.youtube.com/watch?v=MkaZ4OrbQn8',
+      }),
+    );
+  });
+
   it('renders upload progress and speed for an uploading file card in message', () => {
     act(() => {
       renderer.root.render(

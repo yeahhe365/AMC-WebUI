@@ -3,6 +3,7 @@ import { PhoneOff, AudioWaveform, Mic, MicOff, MonitorUp, Video, VideoOff } from
 import { CHAT_INPUT_BUTTON_CLASS } from '@/constants/buttonClasses';
 import { useChatInputActionsContext } from '@/components/chat/input/ChatInputContext';
 import { useI18n } from '@/contexts/I18nContext';
+import { useIsMobile } from '@/hooks/useDevice';
 
 export const LiveControls: React.FC = () => {
   const {
@@ -22,6 +23,7 @@ export const LiveControls: React.FC = () => {
     isTranscribing,
   } = useChatInputActionsContext();
   const { t } = useI18n();
+  const isMobile = useIsMobile();
   const micIconSize = 20;
   const handleSessionClick = isLiveConnected ? onDisconnectLiveSession : onStartLiveSession;
   const cameraLabel = t('liveStartCamera');
@@ -50,7 +52,7 @@ export const LiveControls: React.FC = () => {
         </button>
       )}
 
-      {supportsLiveVideo && onStartLiveScreenShare && (
+      {!isMobile && supportsLiveVideo && onStartLiveScreenShare && (
         <button
           type="button"
           onClick={onStartLiveScreenShare}

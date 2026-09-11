@@ -53,6 +53,15 @@ export const chatTranslations = {
     fr: 'Échec',
     de: 'Fehlgeschlagen',
   },
+  mcpToolExecutionFailed: {
+    en: 'Execution Error',
+    zh: '执行异常',
+    ja: '実行エラー',
+    ko: '실행 오류',
+    es: 'Error de ejecución',
+    fr: "Erreur d'exécution",
+    de: 'Ausführungsfehler',
+  },
   mcpToolStatusCancelled: {
     en: 'Cancelled',
     zh: '已取消',

@@ -1,0 +1,42 @@
+---
+title: 代码执行与本地沙箱 (Code & Python Sandbox)
+description: Gemini 云端代码执行 (Code Execution) 与基于 Pyodide WASM 的前端本地 Python 科学计算沙箱对比与使用。
+---
+
+# 代码执行与本地沙箱
+
+AMC WebUI 为数据分析与算法验证提供了**双代码运行引擎**：云端 Gemini 原生代码执行与浏览器端 Pyodide WASM 本地 Python 沙箱。
+
+---
+
+## 引擎对比概览
+
+| 特性维度 | ☁️ Gemini 云端代码执行 | 🐍 本地 Pyodide WASM 沙箱 |
+| :--- | :--- | :--- |
+| **运行宿主** | Google 云端无状态容器 | 当前浏览器 Web Worker (WASM) |
+| **数据隐私** | 代码与数据传输至 Google | **100% 留在本地**，绝不离网 |
+| **依赖管理** | Google 预设环境 | 自动按 import 探测加载 numpy, pandas, matplotlib |
+| **动态包扩展** | 不支持自定义 pip | **支持按需动态安装** scipy, scikit-learn 等 |
+| **文件交互** | 支持读取附件并在云端计算 | 自动挂载至工作目录并支持生成文件下载 |
+| **图表渲染** | 返回静态图片或打印数据 | **自动捕获 matplotlib 图表** 并直接在界面展示 |
+
+---
+
+## 1. 开启云端代码执行 (Code Execution)
+
+- **开启方式**：工具菜单勾选 **代码执行 (Code Execution)** 或输入 `/code`。
+- **特性**：模型在回答数学运算、字符串统计或复杂逻辑题时，会自行编写 Python 代码在 Google 云端容器运行，并将真实的终端输出（`codeExecutionResult.output`）注入下一轮思考。
+
+---
+
+## 2. 浏览器端 Pyodide 本地科学计算沙箱
+
+这是 AMC WebUI 的特色极客功能，完全将 Python 解释器移植到了浏览器内部：
+
+1. **一键开启**：工具菜单开启 **本地 Python (Local Python)**。
+2. **免服务端依赖**：Pyodide WASM 核心运行在独立的后台 Worker 中，计算密集型任务不会造成网页主线程卡顿。
+3. **按需依赖装载**：沙箱初始化仅预载标准库与 `micropip`，执行时通过 `loadPackagesFromImports` 自动解析代码中的 `import` 语句并按需快速装载科学计算包（如 numpy、pandas、matplotlib 等）。
+4. **matplotlib 图表自动捕获**：
+   - 当模型运行包含 `plt.show()` 或画图逻辑的代码时，沙箱会自动截获 canvas 绘图产物并在会话中渲染为高清图片。
+5. **虚拟工作目录交互 (Virtual FS)**：
+   - 用户上传或会话拖入的文件会自动挂载到当前执行目录，Python 脚本可直接通过相对文件名读取（如 `pandas.read_csv('data.csv')`，无需前缀绝对路径），运行产生的衍生文件也会被沙箱自动收集并支持一键下载。

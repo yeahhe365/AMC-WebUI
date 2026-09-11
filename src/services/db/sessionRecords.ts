@@ -4,8 +4,10 @@ import {
   extractPersistedSessionFileRecords,
   stripSessionFilePayloads,
 } from '@/utils/chat/session';
-import { FILES_STORE, SESSIONS_STORE } from './dbSchema';
+import { FILES_STORE, KEY_VALUE_STORE, SESSIONS_STORE } from './dbSchema';
 import { getAll, getDb, getItem, transactionToPromise, withWriteLock } from './indexedDbAccess';
+import { getDraftFilesKey } from './draftFileRecords';
+import { releaseManagedObjectUrlsByOwner } from '@/services/objectUrlManager';
 
 const getSessionFileRecords = async (sessionId: string): Promise<PersistedSessionFileRecord[]> => {
   const db = await getDb();
@@ -74,13 +76,16 @@ export const setAllSessions = async (sessions: SavedChatSession[]): Promise<void
 
 export const deleteSession = async (id: string): Promise<void> => {
   return withWriteLock(async () => {
+    releaseManagedObjectUrlsByOwner(`draft:${id}`);
     const db = await getDb();
-    const tx = db.transaction([SESSIONS_STORE, FILES_STORE], 'readwrite');
+    const tx = db.transaction([SESSIONS_STORE, FILES_STORE, KEY_VALUE_STORE], 'readwrite');
     const sessionStore = tx.objectStore(SESSIONS_STORE);
     const fileStore = tx.objectStore(FILES_STORE);
+    const kvStore = tx.objectStore(KEY_VALUE_STORE);
     const fileIndex = fileStore.index('sessionId');
 
     sessionStore.delete(id);
+    kvStore.delete(getDraftFilesKey(id));
 
     const cleanupRequest = fileIndex.openCursor(IDBKeyRange.only(id));
     cleanupRequest.onsuccess = () => {

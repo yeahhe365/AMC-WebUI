@@ -7,10 +7,9 @@ import {
   PERSISTED_STATE_ORIGIN_ID,
   getDefaultStorageArea,
   getChatSyncChannel,
-  broadcastSyncMessage,
   CHAT_SYNC_CHANNEL_NAME,
+  type StorageArea,
 } from './persistentStorage';
-import { _resetSyncChannelForTests } from './chatSyncChannel';
 
 // Re-export single origin/channel for consumers; keep legacy name alias for compatibility
 export { PERSISTED_STATE_ORIGIN_ID };
@@ -18,22 +17,6 @@ export const SYNCED_PERSIST_CHANNEL_NAME = CHAT_SYNC_CHANNEL_NAME;
 
 // Singleton channel reuse - single channel via chatSyncChannel
 export const getSingletonChannel = getChatSyncChannel;
-
-void broadcastSyncMessage;
-
-export const _resetSingletonChannelForTests = (): void => {
-  try {
-    _resetSyncChannelForTests();
-  } catch {
-    try {
-      getChatSyncChannel().close();
-    } catch {
-      // ignore
-    }
-  }
-};
-
-type StorageArea = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 export type PersistedStoreApi<T = unknown> = {
   persist: {

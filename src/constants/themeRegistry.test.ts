@@ -13,15 +13,22 @@ const expectNearNeutralGray = (hex: string, maxSpread = 4) => {
 };
 
 describe('themeRegistry', () => {
-  it('registers the graphite theme between dark and light', () => {
-    expect(AVAILABLE_THEMES.map((theme) => theme.id)).toEqual(['onyx', 'graphite', 'pearl']);
+  it('registers all available themes including sepia', () => {
+    expect(AVAILABLE_THEMES.map((theme) => theme.id)).toEqual(['onyx', 'graphite', 'pearl', 'sepia']);
 
     const graphite = AVAILABLE_THEMES.find((theme) => theme.id === 'graphite');
-
     expect(graphite?.name).toBe('Graphite (Gray)');
     expect(graphite?.colors.bgPrimary).toBe('#2b2b2e');
     expect(graphite?.colors.bgSecondary).toBe('#1f1f22');
     expect(graphite?.colors.textPrimary).toBe('#f2f2f4');
+
+    const sepia = AVAILABLE_THEMES.find((theme) => theme.id === 'sepia');
+    expect(sepia).toBeDefined();
+    expect(sepia?.name).toBe('Sepia (Warm)');
+    expect(sepia?.isDark).toBe(false);
+    expect(sepia?.colors.bgPrimary).toBe('#fbf5ea');
+    expect(sepia?.colors.textPrimary).toBe('#2c251f');
+    expect(sepia?.colors.textSecondary).toBe('#685a4e');
   });
 
   it('provides a strong warning surface for solid warning buttons in every theme', () => {

@@ -21,6 +21,13 @@ const makeVideo = (id: string): UploadedFile => ({
   size: 10,
 });
 
+const makeImage = (id: string): UploadedFile => ({
+  id,
+  name: `${id}.png`,
+  type: 'image/png',
+  size: 10,
+});
+
 const resetStores = () => {
   useMediaNavStore.setState({
     isOpen: false,
@@ -30,6 +37,7 @@ const resetStores = () => {
     currentPage: 1,
     highlight: null,
     videoTarget: null,
+    imageHighlight: null,
   });
   useChatStore.setState({ selectedFiles: [], activeMessages: [] });
 };
@@ -41,7 +49,7 @@ describe('NavChip', () => {
   const renderChip = (props: {
     labelKey: string;
     missingHintKey: string;
-    mediaKind: 'pdf' | 'video';
+    mediaKind: 'pdf' | 'video' | 'audio' | 'image';
     testId: string;
     isEnabled: boolean;
     onToggle?: () => void;
@@ -145,6 +153,73 @@ describe('NavChip', () => {
     expect(chip?.getAttribute('title')).toContain('No video in this chat yet');
 
     useChatStore.setState({ selectedFiles: [makeVideo('clip')] });
+    act(() => {
+      renderer.root.render(
+        <NavChip
+          iconName="Clapperboard"
+          labelKey="videoNavChipLabel"
+          missingHintKey="videoNavNoVideoHint"
+          mediaKind="video"
+          isEnabled={false}
+          onToggle={vi.fn()}
+          testId="video-nav-chip"
+        />,
+      );
+    });
+    const updated = renderer.container.querySelector<HTMLButtonElement>('[data-testid="video-nav-chip"]');
+    expect(updated?.getAttribute('title')).not.toContain('No video in this chat yet');
+  });
+
+  it('renders the image chip with its label and hints when no image exists', () => {
+    useChatStore.setState({ selectedFiles: [makePdf('report')] });
+    const chip = renderChip({
+      labelKey: 'imageNavChipLabel',
+      missingHintKey: 'imageNavNoImageHint',
+      mediaKind: 'image',
+      testId: 'image-nav-chip',
+      isEnabled: false,
+    });
+    expect(chip).not.toBeNull();
+    expect(chip?.getAttribute('aria-pressed')).toBe('false');
+    expect(chip?.textContent).toContain('Image Navigation');
+    expect(chip?.getAttribute('title')).toContain('No image in this chat yet');
+
+    useChatStore.setState({ selectedFiles: [makeImage('photo')] });
+    act(() => {
+      renderer.root.render(
+        <NavChip
+          iconName="MousePointer2"
+          labelKey="imageNavChipLabel"
+          missingHintKey="imageNavNoImageHint"
+          mediaKind="image"
+          isEnabled={false}
+          onToggle={vi.fn()}
+          testId="image-nav-chip"
+        />,
+      );
+    });
+    const updated = renderer.container.querySelector<HTMLButtonElement>('[data-testid="image-nav-chip"]');
+    expect(updated?.getAttribute('title')).not.toContain('No image in this chat yet');
+  });
+
+  it('clears missing video hint when YouTube video is attached', () => {
+    const chip = renderChip({
+      labelKey: 'videoNavChipLabel',
+      missingHintKey: 'videoNavNoVideoHint',
+      mediaKind: 'video',
+      testId: 'video-nav-chip',
+      isEnabled: false,
+    });
+    expect(chip?.getAttribute('title')).toContain('No video in this chat yet');
+
+    const ytFile = {
+      id: 'yt-1',
+      name: 'https://youtube.com/watch?v=abc12345678',
+      type: 'video/youtube-link',
+      size: 0,
+      fileUri: 'https://youtube.com/watch?v=abc12345678',
+    };
+    useChatStore.setState({ selectedFiles: [ytFile] });
     act(() => {
       renderer.root.render(
         <NavChip

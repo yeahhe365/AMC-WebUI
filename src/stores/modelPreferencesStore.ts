@@ -38,7 +38,7 @@ interface ModelPreferencesActions {
   cacheModelSettings: (modelId: string, settings: CachedModelSettings) => void;
 }
 
-const parseJson = (rawValue: string | null): unknown => (rawValue ? safeJsonParse(rawValue, undefined) : undefined);
+const parseJson = (rawValue: string | null): unknown => safeJsonParse(rawValue, undefined);
 
 const normalizeModelOptions = (value: unknown): ModelOption[] | null => {
   if (!Array.isArray(value)) {

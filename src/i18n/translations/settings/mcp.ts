@@ -515,15 +515,6 @@ const mcpSettings = {
     fr: 'Aucun journal',
     de: 'Keine Protokolle',
   },
-  settingsMcpAutoApprove: {
-    en: 'Auto-Approve',
-    zh: '自动批准',
-    ja: '自動承認',
-    es: 'Aprobación automática',
-    ko: '자동 승인',
-    fr: 'Approbation automatique',
-    de: 'Automatisch genehmigen',
-  },
   settingsMcpAutoApproveEnabled: {
     en: 'Auto-approved',
     zh: '已自动批准',
@@ -541,15 +532,6 @@ const mcpSettings = {
     ko: '승인 필요',
     fr: 'Nécessite une approbation',
     de: 'Genehmigung erforderlich',
-  },
-  settingsMcpTrustConfirm: {
-    en: 'This MCP server is not trusted. Enable and trust this server?',
-    zh: '此 MCP 服务器未受信任。是否启用并信任该服务器？',
-    ja: 'このMCPサーバーは信頼されていません。有効化して信頼しますか？',
-    es: 'Este servidor MCP no es de confianza. ¿Habilitar y confiar en este servidor?',
-    ko: '이 MCP 서버는 신뢰할 수 없습니다. 활성화하고 신뢰하시겠습니까?',
-    fr: 'Ce serveur MCP n’est pas fiable. Activer et faire confiance à ce serveur ?',
-    de: 'Dieser MCP-Server ist nicht vertrauenswürdig. Aktivieren und diesem Server vertrauen?',
   },
   settingsMcpTrustTitle: {
     en: 'Trust this MCP server?',

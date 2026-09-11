@@ -182,3 +182,88 @@ export const formatPriceUsd = (amount: number | null): string => {
 
   return formatter.format(amount);
 };
+
+const COST_DISPLAY_FLOOR = 0.0001;
+
+export interface TokenCostStats {
+  promptTokens?: number;
+  completionTokens?: number;
+  cachedPromptTokens?: number;
+  toolUsePromptTokens?: number;
+}
+
+export const estimateMessageCostUsd = (modelId: string, tokens: TokenCostStats): number | null => {
+  const normalized = normalizeModelId(modelId);
+  const promptTokens = tokens.promptTokens ?? 0;
+  const completionTokens = tokens.completionTokens ?? 0;
+  const cachedPromptTokens = tokens.cachedPromptTokens ?? 0;
+  const toolUsePromptTokens = tokens.toolUsePromptTokens ?? 0;
+
+  if (promptTokens === 0 && completionTokens === 0) {
+    return null;
+  }
+
+  let modalityPricing = MODALITY_TEXT_PRICING[normalized];
+  if (!modalityPricing) {
+    if (normalized.includes('flash-lite')) {
+      modalityPricing = MODALITY_TEXT_PRICING['gemini-3.5-flash-lite'];
+    } else if (normalized.includes('pro')) {
+      modalityPricing = MODALITY_TEXT_PRICING['gemini-3.1-pro-preview'];
+    } else if (normalized.includes('flash')) {
+      modalityPricing = MODALITY_TEXT_PRICING['gemini-3.6-flash'];
+    }
+  }
+
+  if (!modalityPricing) {
+    return null;
+  }
+
+  const uncachedPrompt = Math.max(0, promptTokens - cachedPromptTokens);
+  const useAboveThreshold = Boolean(
+    modalityPricing.thresholdTokens !== undefined && promptTokens > modalityPricing.thresholdTokens,
+  );
+
+  const promptRate =
+    (useAboveThreshold ? modalityPricing.promptAboveThreshold : modalityPricing.prompt)?.TEXT ??
+    modalityPricing.prompt?.TEXT ??
+    1.5;
+  const cacheRate =
+    (useAboveThreshold ? modalityPricing.cacheAboveThreshold : modalityPricing.cache)?.TEXT ??
+    modalityPricing.cache?.TEXT ??
+    0.15;
+  const responseRate =
+    (useAboveThreshold ? modalityPricing.responseAboveThreshold : modalityPricing.response)?.TEXT ??
+    modalityPricing.response?.TEXT ??
+    7.5;
+  const toolRate =
+    (useAboveThreshold ? modalityPricing.toolAboveThreshold : modalityPricing.tool)?.TEXT ??
+    modalityPricing.tool?.TEXT ??
+    promptRate;
+
+  const cost =
+    (uncachedPrompt / TOKENS_PER_MILLION) * promptRate +
+    (cachedPromptTokens / TOKENS_PER_MILLION) * cacheRate +
+    (completionTokens / TOKENS_PER_MILLION) * responseRate +
+    (toolUsePromptTokens / TOKENS_PER_MILLION) * toolRate;
+
+  return cost;
+};
+
+export const formatCostUsd = (amount: number | null): string => {
+  if (amount === null || !Number.isFinite(amount)) {
+    return '—';
+  }
+
+  if (amount > 0 && amount < COST_DISPLAY_FLOOR) {
+    return '<$0.0001';
+  }
+
+  const formatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: amount >= 0.01 ? 2 : 4,
+    maximumFractionDigits: amount >= 0.01 ? 2 : 4,
+  });
+
+  return formatter.format(amount);
+};

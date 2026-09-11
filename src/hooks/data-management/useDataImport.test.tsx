@@ -154,7 +154,7 @@ describe('useDataImport', () => {
       settings: {
         themeId: 'midnight',
         language: 'jp',
-        thinkingLevel: 'MAX',
+        thinkingLevel: 'ULTRA',
         mediaResolution: 'SUPER',
         filesApiConfig: {
           images: 'yes',

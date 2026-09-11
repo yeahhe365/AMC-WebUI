@@ -9,11 +9,6 @@ const SILENCE_RMS_THRESHOLD = 0.01;
 /** How long the input has to stay quiet before the UI warns about it. */
 const SILENCE_GRACE_MS = 3_000;
 
-type WindowWithWebkitAudioContext = Window &
-  typeof globalThis & {
-    webkitAudioContext?: typeof AudioContext;
-  };
-
 interface AudioAnalyser {
   analyser: AnalyserNode | null;
   /** True when the selected input has produced no audible signal for a while. */
@@ -35,7 +30,7 @@ export const useAudioAnalyser = (stream: MediaStream | null): AudioAnalyser => {
       return;
     }
 
-    const AudioContextConstructor = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
+    const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextConstructor) return;
 
     const audioContext = new AudioContextConstructor();

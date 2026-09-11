@@ -1,0 +1,40 @@
+---
+title: 高级文件与多模态 (Files & Multimodal)
+description: ZIP 代码库解包、浏览器端音频压缩、Gemini Cloud Files API 空间管理与媒体预览。
+---
+
+# 高级文件与多模态 (Files & Multimodal)
+
+AMC WebUI 为多模态文件输入、复杂工程代码库解析与音频预处理提供了业界领先的管线支持。
+
+---
+
+## 1. 文件夹与 ZIP 代码库解包解析
+
+- **拖拽即解包**：将任意项目工程文件夹或 `.zip` 压缩包拖入聊天窗口。
+- **智能树状目录构建**：前端自动过滤常见忽略目录（如 `node_modules`、`.git`、`dist`），递归解析源码文件树，并构造完整的项目结构摘要与内容拼接，方便进行大工程代码审查与重构。
+
+---
+
+## 2. 浏览器端音频压缩预处理 (Audio Compression Worker)
+
+语音和音频文件通常体积庞大、消耗极高 Token 与上传带宽：
+- AMC WebUI 在浏览器端实现了独立的 **Audio Compression Worker**。
+- 用户录制或上传的音频，会在客户端自动重采样、过滤静音片段并采用高效编码压缩，**在维持语音辨识度的同时削减多达 70% 的 Token 消耗与网络上传延迟**。
+
+---
+
+## 3. Gemini Cloud Files API 空间管理
+
+针对超大文档、长视频或高分辨率图像，AMC WebUI 提供了对 Google 官方 **Gemini Files API** 的深度管理面板：
+- **上传策略自由切换**：在上传设置中，可为每类文件指定走「直接 Base64 内嵌」还是走「Cloud Files API 独立托管」。
+- **云端文件管理器 (Cloud Files Modal)**：
+  - 支持查看当前 API Key 关联的云端已上传文件列表、文件大小、创建时间与过期剩余时间（官方通常保留 48 小时）。
+  - 支持一键删除废弃云端文件，释放存储配额。
+
+---
+
+## 4. 富文本与媒体预览能力
+- **PDF 阅读器**：内置 `pdfjs-dist` 与 `react-pdf` 高性能渲染器，支持多页缩放与文字检索。
+- **办公文档解析**：内置 `docx-preview` 与 `xlsx` (SheetJS)，直接在前端将 Word 与 Excel 转化为可视化预览表格。
+- **图像细节等级 (Detail Level)**：支持针对单张图片指定 Low / Medium / High / Ultra High（超高精度细节），满足细微裂痕识别或密集图纸阅读需求。

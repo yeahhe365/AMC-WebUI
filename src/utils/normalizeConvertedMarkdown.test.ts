@@ -26,4 +26,14 @@ describe('normalizeConvertedMarkdown', () => {
       ),
     ).toBe('![](https://cdn.example.com/optimized.avif)');
   });
+
+  it('normalizes copied Unicode bullets into standard markdown list items', () => {
+    const raw = `• item 1\n  • item 2\n    · item 3`;
+    expect(normalizeConvertedMarkdown(raw)).toBe(`- item 1\n  - item 2\n    - item 3`);
+  });
+
+  it('normalizes full-width em-dash dividers into markdown thematic breaks', () => {
+    expect(normalizeConvertedMarkdown('——————')).toBe('---');
+    expect(normalizeConvertedMarkdown('–––')).toBe('---');
+  });
 });

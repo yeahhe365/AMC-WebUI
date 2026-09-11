@@ -1,0 +1,37 @@
+---
+title: Search & Maps Grounding
+description: Real-time Google Search, multi-step Deep Search planning, and Google Maps geospatial grounding tools in AMC WebUI.
+---
+
+# Search & Maps Grounding
+
+AMC WebUI integrates Google Grounding capabilities, enabling models to retrieve current web information and authoritative geospatial coordinates.
+
+---
+
+## 1. Real-time Google Search Grounding
+
+- **Toggle**: Click the **Globe icon** on the input toolbar, or type `/online`.
+- **Mechanism**: The model formulates search queries against Google's search index during generation.
+- **Citations**: Responses include interactive numbered citations with source URLs, page titles, and snippets.
+
+---
+
+## 2. Multi-step Deep Search
+
+Designed for comprehensive research, market analysis, and multi-source verification:
+- **Toggle**: Select **Deep Search** in the tools menu, or type `/deep`.
+- **Workflow**:
+  1. **Decomposition**: Breaks complex inquiries into targeted sub-queries.
+  2. **Multi-turn Exploration**: Executes iterative Google searches and scores relevance across results.
+  3. **Synthesis**: Corroborates evidence to generate structured research summaries.
+
+---
+
+## 3. Google Maps Geospatial Grounding
+
+- **Supported Models**: `gemini-3.5-flash`, `gemini-3.8-flash`, and related Gemini 3.x endpoints.
+- **Toggle**: Click the **Map icon** or type `/maps`.
+- **Features**:
+  - Opens the **Google Maps Location Modal** to configure baseline coordinates and preferred regions.
+  - Queries Google Maps for exact business names, verified addresses, and geospatial coordinates.

@@ -117,4 +117,78 @@ describe('HtmlPreviewHeader', () => {
 
     expect(closeButton?.className).toContain('focus-visible:ring-2');
   });
+
+  it('renders mode switch and triggers onViewModeChange', () => {
+    const onViewModeChange = vi.fn();
+    act(() => {
+      renderer.root.render(
+        <HtmlPreviewHeader
+          title="Preview"
+          scale={1}
+          isTrueFullscreen={false}
+          isPreviewReady={true}
+          isScreenshotting={false}
+          minZoom={0.25}
+          maxZoom={3}
+          viewMode="preview"
+          onViewModeChange={onViewModeChange}
+          onZoomIn={vi.fn()}
+          onZoomOut={vi.fn()}
+          onRefresh={vi.fn()}
+          onDownload={vi.fn()}
+          onScreenshot={vi.fn()}
+          onToggleFullscreen={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+    });
+
+    const codeTab = Array.from(renderer.container.querySelectorAll('button')).find(
+      (button) => button.textContent?.includes('Code') || button.textContent?.includes('源码'),
+    );
+    expect(codeTab).toBeDefined();
+    act(() => {
+      codeTab?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(onViewModeChange).toHaveBeenCalledWith('code');
+  });
+
+  it('renders device switcher in preview mode and triggers onDeviceModeChange', () => {
+    const onDeviceModeChange = vi.fn();
+    act(() => {
+      renderer.root.render(
+        <HtmlPreviewHeader
+          title="Preview"
+          scale={1}
+          isTrueFullscreen={false}
+          isPreviewReady={true}
+          isScreenshotting={false}
+          minZoom={0.25}
+          maxZoom={3}
+          viewMode="preview"
+          deviceMode="desktop"
+          onDeviceModeChange={onDeviceModeChange}
+          onZoomIn={vi.fn()}
+          onZoomOut={vi.fn()}
+          onRefresh={vi.fn()}
+          onDownload={vi.fn()}
+          onScreenshot={vi.fn()}
+          onToggleFullscreen={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+    });
+
+    const mobileButton = Array.from(renderer.container.querySelectorAll('button')).find(
+      (button) =>
+        button.getAttribute('title')?.includes('Mobile') ||
+        button.getAttribute('title')?.includes('移动端') ||
+        button.getAttribute('title')?.includes('375px'),
+    );
+    expect(mobileButton).toBeDefined();
+    act(() => {
+      mobileButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(onDeviceModeChange).toHaveBeenCalledWith('mobile');
+  });
 });

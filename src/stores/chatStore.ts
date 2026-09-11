@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import {
   type SavedChatSession,
+  type ChatSettings,
   type ChatGroup,
   type ChatMessage,
   type UploadedFile,
@@ -17,6 +18,7 @@ import { sanitizeSessionModel, sortSessionsInPlace } from './sessionModels';
 import {
   updateMessageInSession as updateMessageInSessions,
   updateSessionById as updateSessionByIdInSessions,
+  type MessagePatchOrUpdater,
 } from '@/utils/chat/sessionMutations';
 import {
   finishActiveGenerationJob,
@@ -37,9 +39,9 @@ import { setupChatStoreSync } from './chatStoreSync';
 import { setupLastActiveSessionSync } from './lastActiveSessionSync';
 import { createChatUiSlice, type ChatUiSliceActions, type ChatUiSliceState } from './chatStoreSlices';
 import { resolveUpdaterOrValue, type UpdaterOrValue } from './stateUpdaters';
+import { useChatDraftStore } from './chatDraftStore';
 
 type SessionUpdateOptions = { persist?: boolean };
-type MessagePatchOrUpdater = Partial<ChatMessage> | ((message: ChatMessage) => ChatMessage);
 export type { SessionHistoryMode };
 export interface SetActiveSessionOptions {
   history?: SessionHistoryMode;
@@ -58,6 +60,7 @@ interface ChatState extends ChatUiSliceState {
   activeSessionId: string | null;
   activeMessages: ChatMessage[];
   pendingLockedApiKey: string | null;
+  pendingChatSettings: Partial<ChatSettings> | null;
 
   _activeJobs: { current: Map<string, AbortController> };
   _userScrolledUp: { current: boolean };
@@ -125,6 +128,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
   activeSessionId: null,
   activeMessages: [],
   pendingLockedApiKey: null,
+  pendingChatSettings: null,
 
   ...createChatUiSlice<ChatState & ChatActions>(set),
 
@@ -146,7 +150,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     const nextValue = resolveUpdaterOrValue(value, get().activeSessionId);
     set({
       activeSessionId: nextValue,
-      ...(nextValue !== get().activeSessionId ? { pendingLockedApiKey: null } : {}),
+      ...(nextValue !== get().activeSessionId ? { pendingLockedApiKey: null, pendingChatSettings: null } : {}),
     });
     syncActiveSessionRoute(nextValue, options?.history ?? 'auto');
   },
@@ -161,20 +165,28 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
       const metadataList = await dbService.getAllSessionMetadata();
       const { activeSessionId, loadingSessionIds, setActiveMessages, setSavedSessions } = get();
 
+      let rehydratedActiveMessages: SavedChatSession['messages'] | undefined;
       if (activeSessionId && !loadingSessionIds.has(activeSessionId)) {
         const fullActiveSession = await dbService.getSession(activeSessionId);
         if (fullActiveSession) {
           const rehydrated = rehydrateSessionFiles(sanitizeSessionModel(fullActiveSession));
-          setActiveMessages(rehydrated.messages);
+          rehydratedActiveMessages = rehydrated.messages;
+          setActiveMessages(rehydratedActiveMessages);
         }
       }
 
-      setSavedSessions((prev) =>
-        mergeSessionMetadata(prev, metadataList, {
+      setSavedSessions((prev) => {
+        const adjustedPrev =
+          rehydratedActiveMessages && activeSessionId
+            ? prev.map((session) =>
+                session.id === activeSessionId ? { ...session, messages: rehydratedActiveMessages } : session,
+              )
+            : prev;
+        return mergeSessionMetadata(adjustedPrev, metadataList, {
           activeSessionId,
           loadingSessionIds,
-        }),
-      );
+        });
+      });
     } catch (refreshError) {
       logService.error('Failed to refresh sessions from DB', { error: refreshError });
     }
@@ -344,9 +356,12 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
 
   cancelEdit: () => {
     logService.info('User cancelled message edit.');
-    const { setCommandedInput, setSelectedFiles, setEditingMessageId, setEditMode, setAppFileError } = get();
-    setCommandedInput({ text: '', id: Date.now() });
-    setSelectedFiles([]);
+    const { setCommandedInput, setSelectedFiles, setEditingMessageId, setEditMode, setAppFileError, activeSessionId } =
+      get();
+    const savedDraft = activeSessionId ? (useChatDraftStore.getState().drafts[activeSessionId]?.inputText ?? '') : '';
+    const savedFiles = activeSessionId ? (get()._fileDrafts.current[activeSessionId] ?? []) : [];
+    setCommandedInput({ text: savedDraft, id: Date.now() });
+    setSelectedFiles(savedFiles);
     setEditingMessageId(null);
     setEditMode('resend'); // Reset to default
     setAppFileError(null);
@@ -530,20 +545,48 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
   },
 
   setCurrentChatSettings: (updater) => {
-    const { activeSessionId, pendingLockedApiKey } = get();
+    const { activeSessionId, pendingChatSettings, pendingLockedApiKey } = get();
     if (!activeSessionId) {
-      const nextSettings = updater({
+      const currentBase: ChatSettings = {
         ...DEFAULT_CHAT_SETTINGS,
+        ...(pendingChatSettings ?? {}),
         lockedApiKey: pendingLockedApiKey,
+      };
+      const nextSettings = updater(currentBase);
+      if (nextSettings === currentBase) {
+        return;
+      }
+      set({
+        pendingLockedApiKey: nextSettings.lockedApiKey ?? null,
+        pendingChatSettings: nextSettings,
       });
-      set({ pendingLockedApiKey: nextSettings.lockedApiKey ?? null });
+      return;
+    }
+    const hasSession = get().savedSessions.some((session) => session.id === activeSessionId);
+    if (!hasSession) {
+      const currentBase: ChatSettings = {
+        ...DEFAULT_CHAT_SETTINGS,
+        ...(pendingChatSettings ?? {}),
+        lockedApiKey: pendingLockedApiKey,
+      };
+      const nextSettings = updater(currentBase);
+      set({
+        pendingLockedApiKey: nextSettings.lockedApiKey ?? null,
+        pendingChatSettings: nextSettings,
+      });
       return;
     }
     get().updateAndPersistSessions((prevSessions) =>
-      updateSessionByIdInSessions(prevSessions, activeSessionId, (session) => ({
-        ...session,
-        settings: updater(session.settings),
-      })),
+      updateSessionByIdInSessions(prevSessions, activeSessionId, (session) => {
+        const nextSettings = updater(session.settings);
+        if (nextSettings === session.settings) {
+          return session;
+        }
+        return {
+          ...session,
+          settings: nextSettings,
+        };
+      }),
     );
   },
 }));

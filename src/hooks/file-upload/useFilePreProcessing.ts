@@ -4,7 +4,7 @@ import { logService } from '@/services/logService';
 import { generateUniqueId } from '@/utils/chat/ids';
 import { isAudioMimeType } from '@/utils/file/fileTypeClassification';
 import { compressAudioToMp3 } from '@/features/audio/audioCompression';
-import { extractDocxText, isDocxFile } from '@/utils/docxPreview';
+import { isDocxFile } from '@/utils/docxPreview';
 import { useI18n } from '@/contexts/I18nContext';
 import { createProcessingPlaceholderFile } from '@/utils/file-upload/fileUploadPolicy';
 import { interpolate } from '@/i18n/interpolate';
@@ -19,7 +19,10 @@ export const useFilePreProcessing = ({ appSettings, setSelectedFiles }: UseFileP
   const processFiles = useCallback(
     async (
       files: FileList | File[],
-      options: { setSelectedFiles?: Dispatch<SetStateAction<UploadedFile[]>> } = {},
+      options: {
+        setSelectedFiles?: Dispatch<SetStateAction<UploadedFile[]>>;
+        convertZipToContext?: boolean;
+      } = {},
     ): Promise<File[]> => {
       const rawFilesArray = Array.isArray(files) ? files : Array.from(files);
       const processedFiles: File[] = [];
@@ -37,58 +40,36 @@ export const useFilePreProcessing = ({ appSettings, setSelectedFiles }: UseFileP
             ));
 
         if (fileNameLower.endsWith('.zip')) {
-          const tempId = generateUniqueId();
-          writeSelectedFiles((prev) => [
-            ...prev,
-            createProcessingPlaceholderFile({
-              id: tempId,
-              name: interpolate(t('fileProcessingZip'), { filename: file.name }),
-              type: 'application/zip',
-              size: file.size,
-            }),
-          ]);
+          if (options.convertZipToContext) {
+            const tempId = generateUniqueId();
+            writeSelectedFiles((prev) => [
+              ...prev,
+              createProcessingPlaceholderFile({
+                id: tempId,
+                name: interpolate(t('fileProcessingZip'), { filename: file.name }),
+                type: 'application/zip',
+                size: file.size,
+              }),
+            ]);
 
-          try {
-            logService.info(`Auto-converting ZIP file: ${file.name}`);
-            const { generateZipContext } = await import('@/utils/import-context/loaders');
-            const contextFile = await generateZipContext(file);
-            processedFiles.push(contextFile);
-          } catch (error) {
-            logService.error(`Failed to auto-convert zip file ${file.name}`, { error });
+            try {
+              logService.info(`Converting ZIP file to context: ${file.name}`);
+              const { generateZipContext } = await import('@/utils/import-context/loaders');
+              const contextFile = await generateZipContext(file);
+              processedFiles.push(contextFile);
+            } catch (zipError) {
+              logService.error(`Failed to auto-convert zip file ${file.name}`, { error: zipError });
+              processedFiles.push(file);
+            } finally {
+              writeSelectedFiles((prev) => prev.filter((selectedFile) => selectedFile.id !== tempId));
+            }
+          } else {
+            // Preserve original file so rich viewers (ZipViewer) can preview it
             processedFiles.push(file);
-          } finally {
-            writeSelectedFiles((prev) => prev.filter((selectedFile) => selectedFile.id !== tempId));
           }
         } else if (isDocxFile(file)) {
-          const tempId = generateUniqueId();
-          writeSelectedFiles((prev) => [
-            ...prev,
-            createProcessingPlaceholderFile({
-              id: tempId,
-              name: interpolate(t('fileProcessingDocx'), { filename: file.name }),
-              type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-              size: file.size,
-            }),
-          ]);
-
-          try {
-            logService.info(`Extracting text from Word file via Worker: ${file.name}`);
-            const { text: textContent, messages } = await extractDocxText(file);
-
-            if (messages.length > 0) {
-              logService.warn('Mammoth extraction warnings:', { messages });
-            }
-
-            const newFileName = file.name.replace(/\.docx$/i, '.txt');
-            const textFile = new File([textContent], newFileName, { type: 'text/plain' });
-
-            processedFiles.push(textFile);
-          } catch (error) {
-            logService.error(`Failed to extract text from docx ${file.name}`, { error });
-            processedFiles.push(file);
-          } finally {
-            writeSelectedFiles((prev) => prev.filter((selectedFile) => selectedFile.id !== tempId));
-          }
+          // Preserve original file so rich viewers (DocxViewer) can preview it
+          processedFiles.push(file);
         } else if (isAudio) {
           if (appSettings.isAudioCompressionEnabled) {
             const tempId = generateUniqueId();

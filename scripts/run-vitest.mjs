@@ -19,7 +19,8 @@ export const buildVitestNodeArgs = (allowedFlags, vitestArgs) => {
     args.push(WEBSTORAGE_OPT_OUT_FLAG);
   }
 
-  args.push('./node_modules/vitest/vitest.mjs', ...vitestArgs);
+  const forwardedArgs = vitestArgs.filter((arg) => arg !== '--');
+  args.push('./node_modules/vitest/vitest.mjs', ...forwardedArgs);
   return args;
 };
 

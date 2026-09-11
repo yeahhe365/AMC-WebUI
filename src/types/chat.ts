@@ -166,7 +166,7 @@ export interface CommandInfo {
 }
 
 export type AttachmentAction =
-  'upload' | 'gallery' | 'camera' | 'recorder' | 'id' | 'url' | 'text' | 'screenshot' | 'folder' | 'zip';
+  'upload' | 'library' | 'gallery' | 'camera' | 'recorder' | 'id' | 'url' | 'text' | 'screenshot' | 'folder' | 'zip';
 
 export interface SideViewContent {
   type: 'html' | 'mermaid' | 'graphviz' | 'svg';
@@ -174,3 +174,23 @@ export interface SideViewContent {
   language?: string;
   title?: string;
 }
+
+export type SessionsUpdater = (
+  updater: (prev: SavedChatSession[]) => SavedChatSession[],
+  options?: { persist?: boolean },
+) => void | Promise<void>;
+
+export type GroupsUpdater = (updater: (prev: ChatGroup[]) => ChatGroup[]) => void | Promise<void>;
+
+export interface UrlContextItem {
+  retrievedUrl?: string;
+  retrieved_url?: string;
+  urlRetrievalStatus?: string;
+  url_retrieval_status?: string;
+}
+
+export type SetSelectedFiles = (files: UploadedFile[] | ((prevFiles: UploadedFile[]) => UploadedFile[])) => void;
+
+export type CommandedInputSetter = (
+  command: InputCommand | null | ((prev: InputCommand | null) => InputCommand | null),
+) => void;

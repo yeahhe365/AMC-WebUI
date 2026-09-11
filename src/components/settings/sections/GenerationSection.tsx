@@ -1,20 +1,21 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Eraser, Image as ImageIcon, Info, SquarePen, X } from 'lucide-react';
+import { Eraser, Image as ImageIcon, Info, SquarePen } from 'lucide-react';
 import { SETTINGS_INPUT_CLASS } from '@/constants/formClasses';
 import { SMALL_ICON_BUTTON_CLASS } from '@/constants/buttonClasses';
 import {
-  SETTINGS_RANGE_SLIDER_CLASS,
   SETTINGS_SECTION_CARD_CLASS,
   SETTINGS_SECTION_LABEL_CLASS,
   SETTINGS_VALUE_BADGE_CLASS,
 } from '@/constants/designTokens';
 import { type AppSettings, MediaResolution } from '@/types';
 import { getCachedModelCapabilities } from '@/stores/modelCapabilitiesStore';
+import { bansModelTurnPrefill } from '@/utils/model/modelCapabilities';
 import { useSettingsUiStore } from '@/stores/settingsUiStore';
 import { useI18n } from '@/contexts/I18nContext';
 import { Tooltip } from '@/components/shared/Tooltip';
 import { Select } from '@/components/shared/Select';
 import { ToggleItem } from '@/components/shared/ToggleItem';
+import { Slider } from '@/components/shared/Slider';
 import { TextEditorModal } from '@/components/modals/TextEditorModal';
 
 interface GenerationSectionProps {
@@ -186,17 +187,25 @@ export const GenerationSection: React.FC<GenerationSectionProps> = ({
               <Info size={14} className="text-[var(--theme-text-secondary)] cursor-help" strokeWidth={1.5} />
             </Tooltip>
           </label>
-          <span className={SETTINGS_VALUE_BADGE_CLASS}>{Number(temperature).toFixed(2)}</span>
+          <div className="flex items-center gap-2">
+            <span className={SETTINGS_VALUE_BADGE_CLASS}>{Number(temperature).toFixed(2)}</span>
+            <span className="text-[11px] font-medium text-[var(--theme-text-secondary)] hidden sm:inline">
+              {temperature < 0.4
+                ? t('settingsTemperatureStrict')
+                : temperature > 1.2
+                  ? t('settingsTemperatureCreative')
+                  : t('settingsTemperatureBalanced')}
+            </span>
+          </div>
         </div>
-        <input
+        <Slider
           id="temperature-slider"
-          type="range"
-          min="0"
-          max="2"
-          step="0.05"
+          min={0}
+          max={2}
+          step={0.05}
           value={temperature}
-          onChange={(event) => onUpdateSetting('temperature', parseFloat(event.target.value))}
-          className={SETTINGS_RANGE_SLIDER_CLASS}
+          onChange={(val) => onUpdateSetting('temperature', val)}
+          ariaLabel={t('settingsTemperature')}
         />
         <div className="flex justify-between text-[11px] font-medium text-[var(--theme-text-tertiary)] pt-0.5 select-none">
           <span>{t('settingsTemperatureStrict')}</span>
@@ -215,15 +224,14 @@ export const GenerationSection: React.FC<GenerationSectionProps> = ({
           </label>
           <span className={SETTINGS_VALUE_BADGE_CLASS}>{Number(topP).toFixed(2)}</span>
         </div>
-        <input
+        <Slider
           id="top-p-slider"
-          type="range"
-          min="0"
-          max="1"
-          step="0.05"
+          min={0}
+          max={1}
+          step={0.05}
           value={topP}
-          onChange={(event) => onUpdateSetting('topP', parseFloat(event.target.value))}
-          className={SETTINGS_RANGE_SLIDER_CLASS}
+          onChange={(val) => onUpdateSetting('topP', val)}
+          ariaLabel={t('settingsTopP')}
         />
       </div>
 
@@ -241,15 +249,14 @@ export const GenerationSection: React.FC<GenerationSectionProps> = ({
               </label>
               <span className={SETTINGS_VALUE_BADGE_CLASS}>{topK}</span>
             </div>
-            <input
+            <Slider
               id="top-k-slider"
-              type="range"
-              min="0"
-              max="128"
-              step="1"
+              min={0}
+              max={128}
+              step={1}
               value={topK}
-              onChange={(event) => onUpdateSetting('topK', parseInt(event.target.value, 10))}
-              className={SETTINGS_RANGE_SLIDER_CLASS}
+              onChange={(val) => onUpdateSetting('topK', Math.round(val))}
+              ariaLabel={t('settingsTopK')}
             />
           </div>
 
@@ -330,18 +337,16 @@ export const GenerationSection: React.FC<GenerationSectionProps> = ({
                   {presencePenalty !== undefined ? Number(presencePenalty).toFixed(2) : '0.00'}
                 </span>
               </div>
-              <input
+              <Slider
                 id="presence-penalty-slider"
-                type="range"
-                min="-2"
-                max="2"
-                step="0.1"
+                min={-2}
+                max={2}
+                step={0.1}
                 value={presencePenalty ?? 0}
-                onChange={(event) => {
-                  const val = parseFloat(event.target.value);
+                onChange={(val) => {
                   onUpdateSetting('presencePenalty', val === 0 ? undefined : val);
                 }}
-                className={SETTINGS_RANGE_SLIDER_CLASS}
+                ariaLabel={t('settingsPresencePenalty')}
               />
             </div>
 
@@ -360,18 +365,16 @@ export const GenerationSection: React.FC<GenerationSectionProps> = ({
                   {frequencyPenalty !== undefined ? Number(frequencyPenalty).toFixed(2) : '0.00'}
                 </span>
               </div>
-              <input
+              <Slider
                 id="frequency-penalty-slider"
-                type="range"
-                min="-2"
-                max="2"
-                step="0.1"
+                min={-2}
+                max={2}
+                step={0.1}
                 value={frequencyPenalty ?? 0}
-                onChange={(event) => {
-                  const val = parseFloat(event.target.value);
+                onChange={(val) => {
                   onUpdateSetting('frequencyPenalty', val === 0 ? undefined : val);
                 }}
-                className={SETTINGS_RANGE_SLIDER_CLASS}
+                ariaLabel={t('settingsFrequencyPenalty')}
               />
             </div>
           </div>
@@ -408,7 +411,8 @@ export const GenerationSection: React.FC<GenerationSectionProps> = ({
             !capabilities.isTtsModel &&
             !capabilities.isLiveTranslate &&
             !capabilities.isLiveTranscribe &&
-            !capabilities.isTranscribeModel && (
+            !capabilities.isTranscribeModel &&
+            !capabilities.isImageGenerationModel && (
               <div
                 data-settings-item="models-media-resolution"
                 className="pt-1 border-t border-[var(--theme-border-secondary)]/40"
@@ -451,7 +455,7 @@ export const GenerationSection: React.FC<GenerationSectionProps> = ({
               </div>
             )}
 
-          {!isThirdPartyMode && capabilities.supportsRawReasoningPrefill && (
+          {!isThirdPartyMode && capabilities.supportsRawReasoningPrefill && !bansModelTurnPrefill(modelId) && (
             <div className="pt-1 border-t border-[var(--theme-border-secondary)]/40 space-y-1">
               <div data-settings-item="models-raw-mode">
                 <ToggleItem
@@ -465,6 +469,7 @@ export const GenerationSection: React.FC<GenerationSectionProps> = ({
           )}
 
           {!isThirdPartyMode &&
+            capabilities.supportsThinkingLevel &&
             !capabilities.isTtsModel &&
             !capabilities.isTranscribeModel &&
             !capabilities.isLiveTranscribe &&

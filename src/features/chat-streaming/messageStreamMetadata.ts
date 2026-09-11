@@ -1,12 +1,6 @@
 import type { ModalityTokenCount, UsageMetadata } from '@google/genai';
+import type { UrlContextItem } from '@/types';
 import { isRecord } from '../../../shared/predicates';
-
-type UrlContextItem = {
-  retrievedUrl?: string;
-  retrieved_url?: string;
-  urlRetrievalStatus?: string;
-  url_retrieval_status?: string;
-};
 
 const dedupeArray = (values: unknown[]): unknown[] => {
   const seen = new Set<string>();

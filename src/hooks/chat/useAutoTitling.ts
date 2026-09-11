@@ -1,11 +1,9 @@
 import { type Dispatch, type MutableRefObject, type SetStateAction, useCallback, useEffect, useRef } from 'react';
 import type { SupportedLanguage } from '@/i18n/languageRegistry';
-import { type AppSettings, type SavedChatSession } from '@/types';
+import { type AppSettings, type SavedChatSession, type SessionsUpdater } from '@/types';
 import { autoTitleSession, isSessionAutoTitleEligible } from '@/features/auto-titling/autoTitleSession';
 import { getVisibleChatMessages } from '@/utils/chat/visibility';
 import { isThirdPartyApiRoute } from '@/utils/chatApiRoute';
-
-type SessionsUpdater = (updater: (prev: SavedChatSession[]) => SavedChatSession[]) => void;
 
 interface AutoTitlingProps {
   appSettings: AppSettings;

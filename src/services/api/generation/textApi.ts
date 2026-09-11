@@ -64,12 +64,32 @@ type StructuredTextContent = Array<{
   parts: Array<{ text: string }>;
 }>;
 
-const stripWrappingQuotes = (text: string) => {
-  if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
-    return text.substring(1, text.length - 1);
+const sanitizeGeneratedTitle = (text: string) => {
+  let cleaned = text.trim();
+
+  for (let i = 0; i < 3; i += 1) {
+    const prev = cleaned;
+    if ((cleaned.startsWith('**') && cleaned.endsWith('**')) || (cleaned.startsWith('__') && cleaned.endsWith('__'))) {
+      cleaned = cleaned.substring(2, cleaned.length - 2).trim();
+    }
+    if (
+      (cleaned.startsWith('*') && cleaned.endsWith('*')) ||
+      (cleaned.startsWith('_') && cleaned.endsWith('_')) ||
+      (cleaned.startsWith('`') && cleaned.endsWith('`'))
+    ) {
+      cleaned = cleaned.substring(1, cleaned.length - 1).trim();
+    }
+    if (
+      (cleaned.startsWith('"') && cleaned.endsWith('"')) ||
+      (cleaned.startsWith("'") && cleaned.endsWith("'")) ||
+      (cleaned.startsWith('“') && cleaned.endsWith('”'))
+    ) {
+      cleaned = cleaned.substring(1, cleaned.length - 1).trim();
+    }
+    if (cleaned === prev) break;
   }
 
-  return text;
+  return cleaned;
 };
 
 const parseSuggestionLines = (text: string) =>
@@ -137,23 +157,37 @@ const buildTitleContents = (
   userContent: string,
   modelContent: string,
   language: SupportedLanguage,
-): StructuredTextContent => [
-  {
-    role: 'user',
-    parts: [
-      {
-        text:
-          language === 'zh'
-            ? '根据后续独立内容片段中的对话，创建一个非常简短、简洁的标题（最多4-6个词）。不要使用引号或任何其他格式。只返回标题文本。'
-            : `Based on the conversation in the following separate content parts, create a very short, concise title (4-6 words max). Do not use quotes or any other formatting. Just return the text of the title.${outputLanguageDirective(language)}`,
-      },
-      { text: language === 'zh' ? '用户消息:' : 'USER message:' },
-      { text: userContent },
-      { text: language === 'zh' ? '助手消息:' : 'ASSISTANT message:' },
-      { text: modelContent },
-    ],
-  },
-];
+): StructuredTextContent => {
+  const instruction =
+    language === 'zh'
+      ? `作为对话标题提炼专家，请基于后续独立内容片段中的对话，创建一个简短精练的会话标题。
+
+规则：
+1. 开头必须且仅包含 1 个最贴切的主题 Emoji 表情（如 💻代码、🐛排错、📝写作、💡创意、🌍翻译、📊数据等）。
+2. Emoji 与标题文字之间保留 1 个空格。
+3. 标题文字简明扼要（6~12 个字），突出核心动作或主题，避免“关于...”、“讨论...”等冗余泛话。
+4. 严禁使用引号、括号或 Markdown 格式（如加粗），仅返回单行纯文本标题。`
+      : `You are an expert at summarizing conversations into concise titles. Based on the conversation in the following separate content parts, create a short, focused title.
+
+Rules:
+1. Start with exactly 1 most relevant emoji reflecting the core topic (e.g. 💻, 🐛, 📝, 💡, 🌍, 📊).
+2. Put a single space between the emoji and the title text.
+3. Keep the title concise and specific (3-6 words max).
+4. Do not use quotes or markdown formatting. Return only the single-line title text.${outputLanguageDirective(language)}`;
+
+  return [
+    {
+      role: 'user',
+      parts: [
+        { text: instruction },
+        { text: language === 'zh' ? '用户消息:' : 'USER message:' },
+        { text: userContent },
+        { text: language === 'zh' ? '助手消息:' : 'ASSISTANT message:' },
+        { text: modelContent },
+      ],
+    },
+  ];
+};
 
 export const translateTextApi = async (
   apiKey: string,
@@ -324,7 +358,7 @@ export const generateTitleApi = async (
             });
             return '';
           }
-          return stripWrappingQuotes(titleText);
+          return sanitizeGeneratedTitle(titleText);
         } catch (error) {
           // Abort is intentional (timeout) — let it propagate so the timeout
           // controller can be observed; all other failures just fall back to
@@ -333,6 +367,99 @@ export const generateTitleApi = async (
             throw error;
           }
           logService.debug('Title generation request failed (will use heuristic)', error);
+          return '';
+        }
+      },
+    });
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+};
+
+const FILE_TITLE_SOURCE_MAX_CHARS = 4000;
+const clampForFileTitle = (text: string) =>
+  text.length > FILE_TITLE_SOURCE_MAX_CHARS ? `${text.slice(0, FILE_TITLE_SOURCE_MAX_CHARS)}…` : text;
+
+const buildFileTitleContents = (documentContent: string, language: SupportedLanguage): StructuredTextContent => {
+  const instruction =
+    language === 'zh'
+      ? `作为文件命名与内容提炼专家，请基于后续提供的文档内容，提炼一个简练、精准的文件名（不含扩展名）。
+
+规则：
+1. 提取核心主旨，字数控制在 4~15 个字之间。
+2. 严禁包含操作系统非法文件名字符（如 < > : " / \\ | ? *）。
+3. 严禁使用引号、书名号、括号、标点符号或 Markdown 格式。
+4. 仅返回提炼出的单行文件名文本，严禁包含多余解释说明。`
+      : `You are an expert at summarizing document content into a concise, filesystem-safe filename stem (without file extension).
+
+Rules:
+1. Extract the core topic in 2 to 6 words (under 40 characters).
+2. Do NOT use unsafe filename characters (< > : " / \\ | ? *).
+3. Do NOT use quotes, brackets, punctuation, or markdown formatting.
+4. Return ONLY the filename text on a single line with no explanation.${outputLanguageDirective(language)}`;
+
+  return [
+    {
+      role: 'user',
+      parts: [
+        { text: instruction },
+        { text: language === 'zh' ? '文档内容:' : 'Document content:' },
+        { text: clampForFileTitle(documentContent) },
+      ],
+    },
+  ];
+};
+
+const sanitizeFileTitleStem = (text: string): string => {
+  let cleaned = sanitizeGeneratedTitle(text);
+  cleaned = cleaned
+    .replace(/[<>:"/\\|?*]+/g, '_')
+    .replace(/^[-_\s.]+|[-_\s.]+$/g, '')
+    .trim();
+  return cleaned;
+};
+
+export const generateFileTitleApi = async (
+  apiKey: string,
+  documentContent: string,
+  language: SupportedLanguage,
+): Promise<string> => {
+  const contents = buildFileTitleContents(documentContent, language);
+  const timeoutController = new AbortController();
+  const timeoutId = window.setTimeout(() => timeoutController.abort(), AUX_API_TIMEOUT_MS);
+
+  try {
+    return await executeConfiguredApiRequest({
+      apiKey,
+      label: `Generating file title in ${language}...`,
+      errorLabel: 'Error during file title generation:',
+      abortSignal: timeoutController.signal,
+      run: async ({ client: ai }) => {
+        try {
+          const response = await ai.models.generateContent({
+            model: TEXT_GENERATION_MODEL_ID,
+            contents,
+            config: {
+              ...buildMinimalThinkingConfig(TEXT_GENERATION_MODEL_ID),
+              temperature: 0.3,
+              topP: 0.9,
+            },
+          });
+
+          const titleText = response.text?.trim();
+          if (!titleText) {
+            logService.debug('File title generation returned empty response', {
+              model: TEXT_GENERATION_MODEL_ID,
+              candidates: (response as { candidates?: unknown })?.candidates,
+            });
+            return '';
+          }
+          return sanitizeFileTitleStem(titleText);
+        } catch (error) {
+          if (error instanceof Error && error.name === 'AbortError') {
+            throw error;
+          }
+          logService.debug('File title generation request failed', error);
           return '';
         }
       },

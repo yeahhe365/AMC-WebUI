@@ -1,4 +1,5 @@
 import { act } from 'react';
+import { fireEvent } from '@testing-library/react';
 import { setupProviderTestRenderer as setupTestRenderer } from '@/test/render/providerRenderer';
 import { describe, expect, it, vi } from 'vitest';
 import { ToggleItem } from './ToggleItem';
@@ -22,6 +23,37 @@ describe('ToggleItem', () => {
 
     act(() => {
       row?.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    });
+
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it('renders Radix Switch primitive with silky styling and data-state', () => {
+    act(() => {
+      renderer.root.render(<ToggleItem label="Streaming" checked={true} onChange={vi.fn()} />);
+    });
+
+    const switchBtn = renderer.container.querySelector('button[role="switch"]');
+    expect(switchBtn).not.toBeNull();
+    expect(switchBtn?.getAttribute('data-state')).toBe('checked');
+    expect(switchBtn?.className).toContain('active:scale-95');
+
+    const thumb = switchBtn?.querySelector('span[data-state]');
+    expect(thumb?.className).toContain('will-change-transform');
+  });
+
+  it('allows clicking the Radix switch directly', () => {
+    const onChange = vi.fn();
+
+    act(() => {
+      renderer.root.render(<ToggleItem label="Auto scroll" checked={false} onChange={onChange} />);
+    });
+
+    const switchBtn = renderer.container.querySelector('button[role="switch"]');
+    expect(switchBtn).not.toBeNull();
+
+    act(() => {
+      fireEvent.click(switchBtn!);
     });
 
     expect(onChange).toHaveBeenCalledWith(true);

@@ -6,6 +6,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useSettingsUiStore } from '@/stores/settingsUiStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useMcpRuntimeStore } from '@/stores/mcpRuntimeStore';
+import { useLibraryStore } from '@/stores/libraryStore';
 
 const initialSettingsState = useSettingsStore.getState();
 const initialChatState = useChatStore.getState();
@@ -14,6 +15,7 @@ const initialSettingsUiState = useSettingsUiStore.getState();
 const initialModelPreferencesState = useModelPreferencesStore.getState();
 const initialUiState = useUIStore.getState();
 const initialMcpRuntimeState = useMcpRuntimeStore.getState();
+const initialLibraryState = useLibraryStore.getState();
 
 export const resetSettingsStoreState = () => {
   useSettingsStore.setState({
@@ -77,10 +79,22 @@ export const resetAllStoreState = () => {
     mobileHistorySidebarOpen: initialUiState.mobileHistorySidebarOpen,
     isLogViewerOpen: initialUiState.isLogViewerOpen,
     chatInputHeight: initialUiState.chatInputHeight,
+    activeView: 'chat',
   });
   useMcpRuntimeStore.setState({
     masterEnabled: initialMcpRuntimeState.masterEnabled,
     selectedServerIds: initialMcpRuntimeState.selectedServerIds,
+  });
+  useLibraryStore.setState({
+    viewMode: initialLibraryState.viewMode,
+    categoryFilter: initialLibraryState.categoryFilter,
+    sourceFilter: initialLibraryState.sourceFilter,
+    fileTypeFilter: initialLibraryState.fileTypeFilter,
+    sortOption: initialLibraryState.sortOption,
+    searchQuery: initialLibraryState.searchQuery,
+    selectedFileIds: new Set(),
+    isFilterMenuOpen: false,
+    isNewDropdownOpen: false,
   });
 };
 

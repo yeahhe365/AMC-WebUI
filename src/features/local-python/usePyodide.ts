@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { getErrorMessage } from '@/utils/errorMessage';
+import type { UploadedFile } from '@/types';
 import { getPyodideService, type PyodideFile } from './loadPyodideService';
 
 interface PyodideState {
@@ -9,6 +10,11 @@ interface PyodideState {
   files: PyodideFile[];
   error: string | null;
   hasRun: boolean;
+}
+
+export interface RunCodeOptions {
+  files?: UploadedFile[];
+  abortSignal?: AbortSignal;
 }
 
 /**
@@ -70,7 +76,7 @@ export const usePyodide = (codeKey?: string) => {
   });
 
   const runCode = useCallback(
-    async (code: string) => {
+    async (code: string, options?: RunCodeOptions) => {
       const runningState: PyodideState = {
         isRunning: true,
         error: null,
@@ -86,7 +92,10 @@ export const usePyodide = (codeKey?: string) => {
 
       try {
         const pyodideService = await getPyodideService();
-        const result = await pyodideService.runPython(code);
+        const result = await pyodideService.runPython(code, {
+          files: options?.files,
+          abortSignal: options?.abortSignal,
+        });
 
         const finalState: PyodideState = {
           isRunning: false,
@@ -102,9 +111,13 @@ export const usePyodide = (codeKey?: string) => {
         }
         return finalState;
       } catch (executionError) {
+        const errorOutput =
+          typeof executionError === 'object' && executionError !== null && 'output' in executionError
+            ? ((executionError as { output?: string }).output ?? null)
+            : null;
         const errorState: PyodideState = {
           isRunning: false,
-          output: null,
+          output: errorOutput,
           image: null,
           files: [],
           error: getErrorMessage(executionError),

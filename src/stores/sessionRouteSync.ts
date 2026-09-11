@@ -2,7 +2,55 @@ import { ACTIVE_CHAT_SESSION_ID_KEY } from '@/constants/storageKeys';
 
 export type SessionHistoryMode = 'auto' | 'push' | 'replace' | 'none';
 
-export const syncActiveSessionRoute = (activeSessionId: string | null, historyMode: SessionHistoryMode = 'auto') => {
+type ActiveViewGetter = () => 'chat' | 'library';
+let activeViewGetter: ActiveViewGetter | null = null;
+
+export const registerActiveViewGetter = (getter: ActiveViewGetter) => {
+  activeViewGetter = getter;
+};
+
+const isCurrentlyLibraryRoute = (): boolean => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  if (window.location.pathname === '/library') {
+    if (activeViewGetter) {
+      try {
+        return activeViewGetter() === 'library';
+      } catch {
+        return true;
+      }
+    }
+    return true;
+  }
+  return false;
+};
+
+export const syncLibraryRoute = (historyMode: SessionHistoryMode = 'auto') => {
+  if (historyMode === 'none' || typeof window === 'undefined') {
+    return;
+  }
+
+  const targetPath = '/library';
+  try {
+    if (window.location.pathname !== targetPath) {
+      const method = historyMode === 'push' ? 'pushState' : historyMode === 'replace' ? 'replaceState' : 'pushState';
+      window.history[method]({ view: 'library' }, '', targetPath);
+    }
+  } catch {
+    // Ignore history sync failures.
+  }
+};
+
+export const syncActiveSessionRoute = (
+  activeSessionId: string | null,
+  historyMode: SessionHistoryMode = 'auto',
+  options?: { force?: boolean },
+) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
   if (activeSessionId) {
     try {
       sessionStorage.setItem(ACTIVE_CHAT_SESSION_ID_KEY, activeSessionId);
@@ -11,6 +59,10 @@ export const syncActiveSessionRoute = (activeSessionId: string | null, historyMo
     }
 
     if (historyMode === 'none') {
+      return;
+    }
+
+    if (!options?.force && isCurrentlyLibraryRoute()) {
       return;
     }
 
@@ -40,6 +92,10 @@ export const syncActiveSessionRoute = (activeSessionId: string | null, historyMo
   }
 
   if (historyMode === 'none') {
+    return;
+  }
+
+  if (!options?.force && isCurrentlyLibraryRoute()) {
     return;
   }
 

@@ -1,13 +1,13 @@
-import { DEFAULT_OPENAI_COMPATIBLE_BASE_URL } from '@/utils/apiProxyUrl';
-import { getThirdPartyProxyBaseUrl } from '@/runtime/runtimeConfig';
+import { DEFAULT_OPENAI_COMPATIBLE_BASE_URL, trimTrailingSlashes } from '@/utils/apiProxyUrl';
+import { resolveThirdPartyBaseUrl } from '@/runtime/runtimeConfig';
 
 type OpenAICompatibleBaseUrlWarning = 'chat-completions-endpoint' | 'models-endpoint';
 
 const normalizeOpenAICompatibleBaseUrl = (baseUrl?: string | null): string =>
-  (baseUrl?.trim() || DEFAULT_OPENAI_COMPATIBLE_BASE_URL).replace(/\/+$/, '');
+  trimTrailingSlashes(baseUrl?.trim() || DEFAULT_OPENAI_COMPATIBLE_BASE_URL);
 
 const getOpenAICompatibleBaseUrlPath = (baseUrl?: string | null): string =>
-  normalizeOpenAICompatibleBaseUrl(baseUrl).split(/[?#]/, 1)[0].replace(/\/+$/, '').toLowerCase();
+  trimTrailingSlashes(normalizeOpenAICompatibleBaseUrl(baseUrl).split(/[?#]/, 1)[0]).toLowerCase();
 
 export const getOpenAICompatibleBaseUrlWarning = (baseUrl?: string | null): OpenAICompatibleBaseUrlWarning | null => {
   const baseUrlPath = getOpenAICompatibleBaseUrlPath(baseUrl);
@@ -23,38 +23,19 @@ export const getOpenAICompatibleBaseUrlWarning = (baseUrl?: string | null): Open
   return null;
 };
 
-// When the Docker runtime injects a third-party proxy (/api/openai), all
-// providers route through the api container, which selects the real upstream
-// from THIRD_PARTY_ROUTES. Returns null in static deploys so callers fall back
-// to the provider's own baseUrl.
-const resolveOpenAICompatibleBaseUrl = (baseUrl?: string | null): string | null => {
-  const proxyUrl = getThirdPartyProxyBaseUrl();
-  if (proxyUrl) {
-    return proxyUrl;
+const resolveOpenAICompatibleEndpoint = (baseUrl: string | null | undefined, endpoint: string): string => {
+  const resolved = resolveThirdPartyBaseUrl(baseUrl);
+  if (resolved && !/^https?:\/\//i.test(resolved)) {
+    return `${trimTrailingSlashes(resolved)}/${endpoint}`;
   }
-  return baseUrl?.trim() || null;
+  return `${normalizeOpenAICompatibleBaseUrl(resolved)}/${endpoint}`;
 };
 
-export const buildOpenAICompatibleChatCompletionsUrl = (baseUrl?: string | null): string => {
-  const resolved = resolveOpenAICompatibleBaseUrl(baseUrl);
-  if (resolved) {
-    // Relative proxy path: keep it relative so the browser posts same-origin.
-    if (!/^https?:\/\//i.test(resolved)) {
-      return `${resolved.replace(/\/+$/, '')}/chat/completions`;
-    }
-  }
-  return `${normalizeOpenAICompatibleBaseUrl(resolved)}/chat/completions`;
-};
+export const buildOpenAICompatibleChatCompletionsUrl = (baseUrl?: string | null): string =>
+  resolveOpenAICompatibleEndpoint(baseUrl, 'chat/completions');
 
 export const buildOpenAICompatibleUpstreamChatCompletionsUrl = (baseUrl?: string | null): string =>
   `${normalizeOpenAICompatibleBaseUrl(baseUrl)}/chat/completions`;
 
-export const buildOpenAICompatibleModelsUrl = (baseUrl?: string | null): string => {
-  const resolved = resolveOpenAICompatibleBaseUrl(baseUrl);
-  if (resolved) {
-    if (!/^https?:\/\//i.test(resolved)) {
-      return `${resolved.replace(/\/+$/, '')}/models`;
-    }
-  }
-  return `${normalizeOpenAICompatibleBaseUrl(resolved)}/models`;
-};
+export const buildOpenAICompatibleModelsUrl = (baseUrl?: string | null): string =>
+  resolveOpenAICompatibleEndpoint(baseUrl, 'models');

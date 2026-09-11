@@ -5,11 +5,6 @@ type NotificationOptionsWithTag = NotificationOptions & {
   tag?: string;
 };
 
-type WindowWithWebkitAudioContext = Window &
-  typeof globalThis & {
-    webkitAudioContext?: typeof AudioContext;
-  };
-
 const SUCCESS_FIRST_NOTE_FREQUENCY = 659.25; // E5
 const SUCCESS_SECOND_NOTE_FREQUENCY = 523.25; // C5
 const ERROR_FIRST_NOTE_FREQUENCY = 329.63; // E4
@@ -114,7 +109,7 @@ let lastSoundPlayedAt = 0;
 
 const getAudioContext = () => {
   if (!sharedAudioContext) {
-    const AudioContextClass = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (AudioContextClass) {
       sharedAudioContext = new AudioContextClass();
     }

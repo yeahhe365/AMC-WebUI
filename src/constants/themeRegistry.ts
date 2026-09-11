@@ -200,10 +200,74 @@ const GRAPHITE_THEME_COLORS: ThemeColors = {
   iconHistory: '#b8b8be',
 };
 
+const SEPIA_THEME_COLORS: ThemeColors = {
+  // Backgrounds — warm parchment cream with soft amber undertones
+  bgPrimary: '#fbf5ea',
+  bgSecondary: '#f3ebe0',
+  bgTertiary: '#e9dfd1',
+  bgAccent: '#9c5b28',
+  bgAccentHover: '#854c1f',
+  bgDanger: '#b91c1c',
+  bgDangerHover: '#991b1b',
+  bgInput: '#ffffff',
+  bgCodeBlock: '#f4ece0',
+  bgCodeBlockHeader: 'rgba(233, 223, 209, 0.9)',
+  bgUserMessage: '#efe3d3',
+  bgModelMessage: '#fbf5ea',
+  bgErrorMessage: '#fef2f2',
+  bgSuccess: 'rgba(22, 101, 52, 0.1)',
+  textSuccess: '#15803d',
+  bgInfo: 'rgba(156, 91, 40, 0.08)',
+  textInfo: '#9c5b28',
+  bgWarning: 'rgba(217, 119, 6, 0.1)',
+  bgWarningStrong: '#d97706',
+  bgWarningStrongHover: '#b45309',
+  textWarning: '#92400e',
+
+  // Text — warm espresso spectrum for reading ease
+  textPrimary: '#2c251f',
+  textSecondary: '#685a4e',
+  textTertiary: '#8c7b6e',
+  textAccent: '#ffffff',
+  textDanger: '#b91c1c',
+  textLink: '#8f4b1e',
+  textCode: '#2c251f',
+  bgUserMessageText: '#2c251f',
+  bgModelMessageText: '#2c251f',
+  bgErrorMessageText: '#b91c1c',
+
+  // Borders — warm subtle parchment dividers
+  borderPrimary: '#e6dacf',
+  borderSecondary: '#d8c8b8',
+  borderFocus: '#9c5b28',
+
+  // Scrollbar
+  scrollbarThumb: '#d8c8b8',
+  scrollbarTrack: '#f3ebe0',
+
+  // Selection
+  selectionBg: 'rgba(156, 91, 40, 0.2)',
+  selectionText: '#2c251f',
+
+  // Icons
+  iconUser: '#685a4e',
+  iconModel: '#9c5b28',
+  iconError: '#b91c1c',
+  iconThought: '#8c7b6e',
+  iconSettings: '#685a4e',
+  iconClearChat: '#ffffff',
+  iconSend: '#ffffff',
+  iconAttach: '#685a4e',
+  iconStop: '#ffffff',
+  iconEdit: '#685a4e',
+  iconHistory: '#685a4e',
+};
+
 export const AVAILABLE_THEMES: Theme[] = [
   { id: 'onyx', name: 'Onyx (Dark)', isDark: true, colors: ONYX_THEME_COLORS },
   { id: 'graphite', name: 'Graphite (Gray)', isDark: true, colors: GRAPHITE_THEME_COLORS },
   { id: 'pearl', name: 'Pearl (Light)', isDark: false, colors: PEARL_THEME_COLORS },
+  { id: 'sepia', name: 'Sepia (Warm)', isDark: false, colors: SEPIA_THEME_COLORS },
 ];
 
 export const DEFAULT_THEME_ID = 'pearl';

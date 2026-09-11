@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Filter, Download, Trash2, RefreshCw, Terminal } from 'lucide-react';
+import { Virtuoso } from 'react-virtuoso';
 import type { LogEntry, LogLevel, LogCategory } from '@/types/logging';
 import { LOG_LEVEL_COLORS, CATEGORY_COLORS } from './logColorClasses';
 import { LogRow } from './LogRow';
@@ -56,6 +57,29 @@ export const ConsoleTab: React.FC<ConsoleTabProps> = ({
     const blob = new Blob([dataStr], { type: 'application/json' });
     triggerDownload(createManagedObjectUrl(blob), `logs-export-${new Date().toISOString()}.json`);
   };
+
+  const VirtuosoFooter = useCallback(() => {
+    if (!hasMore || filteredLogs.length === 0) return null;
+    return (
+      <div className="p-4 flex justify-center border-t border-[var(--theme-border-secondary)]">
+        <button
+          onClick={onFetchMore}
+          disabled={isLoading}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-[var(--theme-text-link)] hover:bg-[var(--theme-bg-tertiary)] rounded-lg transition-colors disabled:opacity-50 ${FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS}`}
+        >
+          {isLoading ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
+          {t('logViewerLoadOlder')}
+        </button>
+      </div>
+    );
+  }, [hasMore, filteredLogs.length, isLoading, onFetchMore, t]);
+
+  const virtuosoComponents = useMemo(
+    () => ({
+      Footer: VirtuosoFooter,
+    }),
+    [VirtuosoFooter],
+  );
 
   return (
     <>
@@ -120,30 +144,24 @@ export const ConsoleTab: React.FC<ConsoleTabProps> = ({
         </button>
       </div>
 
-      <div className="flex-grow overflow-y-auto overflow-x-hidden custom-scrollbar bg-[var(--theme-bg-primary)]">
-        {filteredLogs.length === 0 ? (
+      {filteredLogs.length === 0 ? (
+        <div className="flex-grow overflow-y-auto overflow-x-hidden custom-scrollbar bg-[var(--theme-bg-primary)]">
           <div className="flex flex-col items-center justify-center h-full text-[var(--theme-text-tertiary)] opacity-50">
             <Terminal size={48} className="mb-2" />
             <p>{t('logViewerNoLogs')}</p>
             {loggingDisabled && <p className="mt-2 text-xs opacity-80">{t('logViewerLoggingDisabledHint')}</p>}
           </div>
-        ) : (
-          filteredLogs.map((log) => <LogRow key={log.id || log.timestamp.toISOString()} log={log} />)
-        )}
-
-        {hasMore && filteredLogs.length > 0 && (
-          <div className="p-4 flex justify-center border-t border-[var(--theme-border-secondary)]">
-            <button
-              onClick={onFetchMore}
-              disabled={isLoading}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium text-[var(--theme-text-link)] hover:bg-[var(--theme-bg-tertiary)] rounded-lg transition-colors disabled:opacity-50 ${FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS}`}
-            >
-              {isLoading ? <RefreshCw size={16} className="animate-spin" /> : <Download size={16} />}
-              {t('logViewerLoadOlder')}
-            </button>
-          </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <Virtuoso
+          data={filteredLogs}
+          className="flex-grow min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar bg-[var(--theme-bg-primary)]"
+          computeItemKey={(index, log) => log.id || `${log.timestamp.toISOString()}-${index}`}
+          itemContent={(_index, log) => <LogRow log={log} />}
+          components={virtuosoComponents}
+          initialItemCount={Math.min(filteredLogs.length, 50)}
+        />
+      )}
     </>
   );
 };

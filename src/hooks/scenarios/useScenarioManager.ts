@@ -5,6 +5,7 @@ import { type translations } from '@/i18n/translations';
 import { generateUniqueId } from '@/utils/chat/ids';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 import { triggerDownload, sanitizeFilename } from '@/utils/export/core';
+import { fileToString } from '@/utils/file/fileEncoding';
 import {
   buildSavedScenarios,
   buildScenarioExportPayload,
@@ -153,41 +154,37 @@ export const useScenarioManager = ({ isOpen, savedScenarios, onSaveAllScenarios,
   );
 
   const handleImportScenarios = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
+    async (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = (loadEvent) => {
-        try {
-          const text = loadEvent.target?.result as string;
-          const importPayload = JSON.parse(text);
+      try {
+        const text = await fileToString(file);
+        const importPayload = JSON.parse(text);
 
-          if (
-            importPayload &&
-            importPayload.type === 'AllModelChat-Scenarios' &&
-            Array.isArray(importPayload.scenarios)
-          ) {
-            const importedScenarios = importPayload.scenarios as SavedScenario[];
-            commitUserScenarios(
-              mergeImportedScenarios({
-                existingScenarios: scenariosRef.current,
-                importedScenarios,
-                createId: generateUniqueId,
-              }),
-            );
-            toastSuccess(t('scenariosFeedbackImported'));
-          } else {
-            throw new Error('Invalid format');
-          }
-        } catch (error) {
-          logService.error('Import failed', error);
-          toastError(t('scenariosFeedbackImportFailed'));
-        } finally {
-          if (importInputRef.current) importInputRef.current.value = '';
+        if (
+          importPayload &&
+          importPayload.type === 'AllModelChat-Scenarios' &&
+          Array.isArray(importPayload.scenarios)
+        ) {
+          const importedScenarios = importPayload.scenarios as SavedScenario[];
+          commitUserScenarios(
+            mergeImportedScenarios({
+              existingScenarios: scenariosRef.current,
+              importedScenarios,
+              createId: generateUniqueId,
+            }),
+          );
+          toastSuccess(t('scenariosFeedbackImported'));
+        } else {
+          throw new Error('Invalid format');
         }
-      };
-      reader.readAsText(file);
+      } catch (error) {
+        logService.error('Import failed', error);
+        toastError(t('scenariosFeedbackImportFailed'));
+      } finally {
+        if (importInputRef.current) importInputRef.current.value = '';
+      }
     },
     [commitUserScenarios, t],
   );

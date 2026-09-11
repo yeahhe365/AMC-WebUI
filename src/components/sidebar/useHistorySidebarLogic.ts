@@ -6,13 +6,18 @@ import { useI18n } from '@/contexts/I18nContext';
 import { DESKTOP_BREAKPOINT_PX, FOCUS_HISTORY_SEARCH_EVENT } from '@/constants/layout';
 import type { SupportedLanguage } from '@/i18n/languageRegistry';
 import { dbService } from '@/services/db/dbService';
+import { toastInfo, toastError } from '@/stores/toastStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useChatStore } from '@/stores/chatStore';
+import { autoTitleSession } from '@/features/auto-titling/autoTitleSession';
 import { SESSION_DRAG_TYPE, isGroupDrag, isSessionDrag } from './sidebarDragTypes';
+import type { HistoryDisplayMode } from '@/stores/uiStore';
+
+export type { HistoryDisplayMode };
 
 type HistoryTranslator = (key: string) => string;
 
 const TITLE_UPDATE_FEEDBACK_MS = 1500;
-
-export type HistoryDisplayMode = 'group' | 'time';
 
 interface UseHistorySidebarLogicProps {
   isOpen: boolean;
@@ -26,6 +31,7 @@ interface UseHistorySidebarLogicProps {
   onRenameGroup: (groupId: string, newTitle: string) => void;
   onMoveSessionToGroup: (sessionId: string, groupId: string | null) => void;
   onSelectSession: (sessionId: string) => void;
+  onRegenerateTitleSession?: (sessionId: string) => void | Promise<void>;
 }
 
 // BCP-47 locales for month-name buckets in the sidebar date grouping.
@@ -115,6 +121,7 @@ export const useHistorySidebarLogic = ({
   onRenameGroup,
   onMoveSessionToGroup,
   onSelectSession,
+  onRegenerateTitleSession: onRegenerateTitleSessionProp,
 }: UseHistorySidebarLogicProps) => {
   const { t, language } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
@@ -145,6 +152,15 @@ export const useHistorySidebarLogic = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Element | null;
+      if (
+        target?.closest?.('[data-radix-menu-content]') ||
+        target?.closest?.('[data-radix-popper-content-wrapper]') ||
+        target?.closest?.('[role="menu"]') ||
+        target?.closest?.('[role="menuitem"]')
+      ) {
+        return;
+      }
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) setActiveMenu(null);
     };
     if (activeMenu) targetDocument.addEventListener('mousedown', handleClickOutside);
@@ -152,8 +168,17 @@ export const useHistorySidebarLogic = ({
   }, [activeMenu, targetDocument]);
 
   useEffect(() => {
-    if (editingItem) editInputRef.current?.focus();
-  }, [editingItem]);
+    if (!editingItem) return undefined;
+    const focusAndSelect = () => {
+      if (editInputRef.current) {
+        editInputRef.current.focus();
+        editInputRef.current.select();
+      }
+    };
+    focusAndSelect();
+    const frameId = targetWindow.requestAnimationFrame(focusAndSelect);
+    return () => targetWindow.cancelAnimationFrame(frameId);
+  }, [editingItem, targetWindow]);
 
   useEffect(() => {
     const handleFocusHistorySearch = () => {
@@ -412,6 +437,75 @@ export const useHistorySidebarLogic = ({
     }
   };
 
+  const handleRegenerateTitle = async (sessionId: string) => {
+    if (onRegenerateTitleSessionProp) {
+      await onRegenerateTitleSessionProp(sessionId);
+      return;
+    }
+
+    if (generatingTitleSessionIds.has(sessionId)) {
+      return;
+    }
+
+    let session = sessions.find((s) => s.id === sessionId);
+    if (!session || session.messages.length === 0) {
+      try {
+        const loaded = await dbService.getSession(sessionId);
+        if (loaded) {
+          session = loaded;
+        }
+      } catch (loadSessionError) {
+        logService.warn('Failed to load session for regenerate title', { sessionId, loadSessionError });
+      }
+    }
+
+    const { activeSessionId, activeMessages } = useChatStore.getState();
+    if (activeSessionId === sessionId && activeMessages.length > 0 && session) {
+      session = {
+        ...session,
+        messages: activeMessages,
+      };
+    }
+
+    if (!session || session.messages.length === 0) {
+      toastInfo(t('regenerateTitleEmpty'));
+      return;
+    }
+
+    const hasCompletedExchange =
+      session.messages.some((m) => m.role === 'user' && m.content.trim() !== '') &&
+      session.messages.some((m) => m.role === 'model' && m.content.trim() !== '' && !m.stoppedByUser);
+
+    if (!hasCompletedExchange) {
+      toastInfo(t('regenerateTitleEmpty'));
+      return;
+    }
+
+    useChatStore.getState().setGeneratingTitleSessionIds((prev) => new Set(prev).add(sessionId));
+    try {
+      const appSettings = useSettingsStore.getState().appSettings;
+      const success = await autoTitleSession({
+        session,
+        appSettings,
+        language,
+        updateAndPersistSessions: useChatStore.getState().updateAndPersistSessions,
+        force: true,
+      });
+      if (!success) {
+        toastError(t('regenerateTitleFailed'));
+      }
+    } catch (regenerateTitleError) {
+      logService.error('Failed to regenerate title', regenerateTitleError);
+      toastError(t('regenerateTitleFailed'));
+    } finally {
+      useChatStore.getState().setGeneratingTitleSessionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sessionId);
+        return next;
+      });
+    }
+  };
+
   const isDragging = !!draggingSessionId || !!draggingGroupId;
 
   return {
@@ -459,5 +553,6 @@ export const useHistorySidebarLogic = ({
     handleMiniSearchClick,
     handleEmptySpaceClick,
     handleSessionSelect,
+    handleRegenerateTitle,
   };
 };

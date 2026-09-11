@@ -17,6 +17,7 @@ import { useAuxiliaryActionCollapse } from './actions/useAuxiliaryActionCollapse
 import { COMPOSER_CLUSTER_GAP_CLASS, COMPOSER_CLUSTER_SEPARATION_CLASS } from '@/constants/designTokens';
 import { useChatInputActionsContext, useChatInputComposerStatusContext } from './ChatInputContext';
 import { isGemmaModel } from '@/utils/model/modelCapabilities';
+import { GEMINI_PROVIDER_ID } from '@/types';
 
 const ChatInputActionsComponent: React.FC = () => {
   const { t } = useI18n();
@@ -42,6 +43,7 @@ const ChatInputActionsComponent: React.FC = () => {
   } = useChatInputActionsContext();
   const { canQueueMessage } = useChatInputComposerStatusContext();
   const isGemma = isGemmaModel(currentModelId);
+  const isGeminiNative = providerId === undefined || providerId === GEMINI_PROVIDER_ID;
   const focusedToolStates = useMemo(
     () => ({
       googleSearch: {
@@ -157,7 +159,7 @@ const ChatInputActionsComponent: React.FC = () => {
 
         {!isTtsModel && !isLiveTranslate && !isLiveTranscribe && <AttachmentMenu />}
 
-        {isNativeAudioModel && !isLiveTranslate && !isLiveTranscribe && (
+        {isGeminiNative && isNativeAudioModel && !isLiveTranslate && !isLiveTranscribe && (
           <WebSearchToggle
             isGoogleSearchEnabled={!!focusedToolStates.googleSearch?.isEnabled}
             onToggleGoogleSearch={focusedToolStates.googleSearch?.onToggle ?? (() => undefined)}
@@ -173,7 +175,8 @@ const ChatInputActionsComponent: React.FC = () => {
           disabled={disabled}
         />
 
-        {!isTtsModel &&
+        {isGeminiNative &&
+          !isTtsModel &&
           !isLiveTranslate &&
           !isLiveTranscribe &&
           !isTranscribeModel &&
@@ -187,9 +190,9 @@ const ChatInputActionsComponent: React.FC = () => {
         data-testid="chat-input-actions-right"
         className={`flex min-w-0 flex-shrink-0 items-center ${COMPOSER_CLUSTER_GAP_CLASS}`}
       >
-        {showVoiceInputButton && !isLiveConnected && !isNativeAudioModel && !isImageGenerationModel && !isTtsModel && (
-          <RecordControls />
-        )}
+        {showVoiceInputButton &&
+          !isLiveConnected &&
+          (!isGeminiNative || (!isNativeAudioModel && !isImageGenerationModel && !isTtsModel)) && <RecordControls />}
 
         {!showAuxiliaryActionsInMenu && auxiliaryActions.length > 0 && (
           <div className={`flex items-center ${COMPOSER_CLUSTER_GAP_CLASS}`}>
@@ -206,9 +209,9 @@ const ChatInputActionsComponent: React.FC = () => {
           </div>
         )}
 
-        {isNativeAudioModel && <LiveControls />}
+        {isGeminiNative && isNativeAudioModel && <LiveControls />}
 
-        {!isNativeAudioModel && <ThinkingSpeedControl />}
+        {(!isGeminiNative || !isNativeAudioModel) && <ThinkingSpeedControl />}
 
         <div className="ml-0.5 flex items-center">
           <SendControls />

@@ -4,6 +4,7 @@ import { createManagedObjectUrl } from '@/services/objectUrlManager';
 import { triggerDownload } from '@/utils/export/core';
 import { extractTextFromNode } from '@/utils/reactNodeText';
 import { MESSAGE_BLOCK_BUTTON_CLASS } from '@/constants/buttonClasses';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { type UploadedFile } from '@/types';
 import { FileDisplay } from '@/components/message/FileDisplay';
 import { useI18n } from '@/contexts/I18nContext';
@@ -43,7 +44,7 @@ export const ToolResultBlock: React.FC<ToolResultBlockProps> = ({
 }) => {
   const { t } = useI18n();
   const [downloaded, setDownloaded] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { isCopied: copied, copyToClipboard } = useCopyToClipboard(COPY_FEEDBACK_MS);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const outputRef = useRef<HTMLDivElement>(null);
@@ -116,16 +117,9 @@ export const ToolResultBlock: React.FC<ToolResultBlockProps> = ({
     setTimeout(() => setDownloaded(false), DOWNLOAD_FEEDBACK_MS);
   };
 
-  const handleCopy = async () => {
+  const handleCopy = () => {
     if (!hasOutput) return;
-    try {
-      await navigator.clipboard.writeText(rawOutput);
-      setCopied(true);
-      setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
-    } catch {
-      // Clipboard permission denied — keep the button silent, the user can
-      // still select/download the output.
-    }
+    void copyToClipboard(rawOutput);
   };
 
   const hasActions = hasOutput;

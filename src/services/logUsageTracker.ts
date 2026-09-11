@@ -1,5 +1,7 @@
 import { dbService, type ApiUsageExactPricing } from '@/services/db/dbService';
 import type { TokenUsageStats } from '@/types/logging';
+import { API_USAGE_STORAGE_KEY, TOKEN_USAGE_STORAGE_KEY } from '@/constants/storageKeys';
+import { readPersistentStorageItem, writePersistentStorageItem } from '@/stores/persistentStorage';
 
 export type ApiKeyListener = (usage: Map<string, number>) => void;
 export type TokenUsageListener = (usage: Map<string, TokenUsageStats>) => void;
@@ -14,9 +16,6 @@ export interface TokenUsageInput {
 }
 
 type UsageTrackerErrorReporter = (message: string, error: unknown) => void;
-
-const API_USAGE_STORAGE_KEY = 'chatApiUsageData';
-const TOKEN_USAGE_STORAGE_KEY = 'chatTokenUsageData';
 
 // SECURITY: API keys are persisted to localStorage only in masked form so that a
 // localStorage read (e.g. via an XSS or a compromised extension) cannot recover
@@ -66,7 +65,7 @@ class ApiKeyUsageTracker {
 
   private load() {
     try {
-      const storedUsage = localStorage.getItem(API_USAGE_STORAGE_KEY);
+      const storedUsage = readPersistentStorageItem(API_USAGE_STORAGE_KEY);
       if (!storedUsage) return;
 
       const parsed = JSON.parse(storedUsage);
@@ -79,11 +78,7 @@ class ApiKeyUsageTracker {
   }
 
   private save() {
-    try {
-      localStorage.setItem(API_USAGE_STORAGE_KEY, JSON.stringify(Array.from(this.usage.entries())));
-    } catch (storageError) {
-      this.reportError('Failed to save API key usage:', storageError);
-    }
+    writePersistentStorageItem(API_USAGE_STORAGE_KEY, JSON.stringify(Array.from(this.usage.entries())));
   }
 
   private notify() {
@@ -162,7 +157,7 @@ class TokenUsageTracker {
 
   private load() {
     try {
-      const storedUsage = localStorage.getItem(TOKEN_USAGE_STORAGE_KEY);
+      const storedUsage = readPersistentStorageItem(TOKEN_USAGE_STORAGE_KEY);
       if (!storedUsage) return;
 
       const parsed = JSON.parse(storedUsage);
@@ -175,11 +170,7 @@ class TokenUsageTracker {
   }
 
   private save() {
-    try {
-      localStorage.setItem(TOKEN_USAGE_STORAGE_KEY, JSON.stringify(Array.from(this.usage.entries())));
-    } catch (storageError) {
-      this.reportError('Failed to save token usage:', storageError);
-    }
+    writePersistentStorageItem(TOKEN_USAGE_STORAGE_KEY, JSON.stringify(Array.from(this.usage.entries())));
   }
 
   private notify() {

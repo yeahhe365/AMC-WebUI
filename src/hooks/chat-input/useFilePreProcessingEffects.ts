@@ -1,14 +1,12 @@
 import { logService } from '@/services/logService';
 import { useCallback, useRef, useState, type MutableRefObject, type RefObject } from 'react';
-import type { UploadedFile } from '@/types';
+import type { SetSelectedFiles } from '@/types';
 import { generateUniqueId } from '@/utils/chat/ids';
 import { readDirectoryHandle } from '@/utils/import-context/directoryHandleReader';
 import { captureScreenImage } from '@/utils/screenCapture';
 import { useI18n } from '@/contexts/I18nContext';
 import { createProcessingPlaceholderFile, DIRECTORY_PLACEHOLDER_MIME_TYPE } from '@/utils/file-upload/fileUploadPolicy';
-import { formatI18nErrorMessage } from '@/i18n/interpolate';
-
-type SetSelectedFiles = (files: UploadedFile[] | ((prevFiles: UploadedFile[]) => UploadedFile[])) => void;
+import { formatI18nErrorMessage, interpolate } from '@/i18n/interpolate';
 
 interface UseFilePreProcessingEffectsParams {
   fileInputRef: RefObject<HTMLInputElement>;
@@ -154,18 +152,57 @@ export const useFilePreProcessingEffects = ({
     [folderInputRef, processFolderImport],
   );
 
+  const processZipImport = useCallback(
+    async (files: File[] | FileList) => {
+      const rawFiles = Array.isArray(files) ? files : Array.from(files);
+      if (rawFiles.length === 0) {
+        return;
+      }
+
+      for (const zipFile of rawFiles) {
+        const tempId = generateUniqueId();
+
+        setIsConverting(true);
+        setSelectedFiles((prev) => [
+          ...prev,
+          createProcessingPlaceholderFile({
+            id: tempId,
+            name: interpolate(t('fileProcessingZip'), { filename: zipFile.name }),
+            type: DIRECTORY_PLACEHOLDER_MIME_TYPE,
+            size: zipFile.size,
+          }),
+        ]);
+
+        try {
+          justInitiatedFileOpRef.current = true;
+          const { generateZipContext } = await import('@/utils/import-context/loaders');
+          const contextFile = await generateZipContext(zipFile);
+          setSelectedFiles((prev) => prev.filter((file) => file.id !== tempId));
+          await onProcessFiles([contextFile]);
+        } catch (zipError) {
+          logService.error('Failed to process zip import.', zipError);
+          const errorMessage = zipError instanceof Error && zipError.message ? zipError.message : t('zipProcessFailed');
+          setAppFileError(errorMessage);
+          setSelectedFiles((prev) => prev.filter((file) => file.id !== tempId));
+        } finally {
+          setIsConverting(false);
+        }
+      }
+    },
+    [justInitiatedFileOpRef, onProcessFiles, setAppFileError, setSelectedFiles, t],
+  );
+
   const handleZipChange = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       if (event.target.files?.length) {
-        justInitiatedFileOpRef.current = true;
-        await onProcessFiles(event.target.files);
+        await processZipImport(event.target.files);
       }
 
       if (zipInputRef.current) {
         zipInputRef.current.value = '';
       }
     },
-    [justInitiatedFileOpRef, onProcessFiles, zipInputRef],
+    [processZipImport, zipInputRef],
   );
 
   return {
@@ -177,5 +214,6 @@ export const useFilePreProcessingEffects = ({
     handleFileChange,
     handleFolderChange,
     handleZipChange,
+    processZipImport,
   };
 };

@@ -35,6 +35,15 @@ const dataSettings = {
     fr: 'Scénarios',
     de: 'Szenarien',
   },
+  settingsDataProviders: {
+    en: 'API Providers',
+    zh: 'API 供应商',
+    ja: 'API プロバイダー',
+    ko: 'API 공급자',
+    es: 'Proveedores de API',
+    fr: 'Fournisseurs d’API',
+    de: 'API-Anbieter',
+  },
   settingsSystemTools: {
     en: 'Diagnostics & App',
     zh: '诊断与应用',

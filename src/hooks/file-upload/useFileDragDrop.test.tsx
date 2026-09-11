@@ -62,6 +62,32 @@ describe('useFileDragDrop', () => {
     expect(afterUnmount.defaultPrevented).toBe(false);
   });
 
+  it('activates dragging instantly upon entering window and resists child element flicker', () => {
+    const { result, unmount } = renderDragDropHook();
+
+    expect(result.current.isAppDraggingOver).toBe(false);
+
+    act(() => {
+      window.dispatchEvent(createWindowFileDragEvent('dragenter', ['Files']));
+    });
+    expect(result.current.isAppDraggingOver).toBe(true);
+
+    act(() => {
+      window.dispatchEvent(createWindowFileDragEvent('dragenter', ['Files']));
+    });
+    act(() => {
+      window.dispatchEvent(createWindowFileDragEvent('dragleave', ['Files']));
+    });
+    expect(result.current.isAppDraggingOver).toBe(true);
+
+    act(() => {
+      window.dispatchEvent(createWindowFileDragEvent('dragleave', ['Files']));
+    });
+    expect(result.current.isAppDraggingOver).toBe(false);
+
+    unmount();
+  });
+
   it('falls back to DataTransfer files when dropped items are unavailable', async () => {
     const file = new File(['plain text\n'], 'notes.txt', { type: 'text/plain' });
     const files = [file] as unknown as FileList;

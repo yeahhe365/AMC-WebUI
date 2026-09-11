@@ -63,6 +63,9 @@ export async function handleEphemeralTokenRequest(
     uses: typeof body.uses === 'number' ? body.uses : 1,
     expireTime: body.expireTime || defaultExpireTime,
   };
+  if (typeof body.newSessionExpireTime === 'string' && body.newSessionExpireTime) {
+    requestPayload.newSessionExpireTime = body.newSessionExpireTime;
+  }
 
   if (body.bidiGenerateContentSetup) {
     requestPayload.bidiGenerateContentSetup = body.bidiGenerateContentSetup;

@@ -2,7 +2,7 @@ import { act } from 'react';
 import { setupProviderTestRenderer } from '@/test/render/providerRenderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UploadedFile } from '@/types';
-import { TextFileViewer } from './TextFileViewer';
+import { TextFileViewer, resolveFileLanguage } from './TextFileViewer';
 
 const { mockLazyMarkdownRenderer } = vi.hoisted(() => ({
   mockLazyMarkdownRenderer: vi.fn(
@@ -75,5 +75,33 @@ describe('TextFileViewer', () => {
     });
 
     expect(renderer.container.querySelector('[data-testid="markdown-renderer"]')).not.toBeNull();
+  });
+
+  describe('resolveFileLanguage', () => {
+    it('resolves languages accurately from file extensions', () => {
+      expect(resolveFileLanguage('index.html')).toBe('html');
+      expect(resolveFileLanguage('style.css')).toBe('css');
+      expect(resolveFileLanguage('schema.sql')).toBe('sql');
+      expect(resolveFileLanguage('icon.svg')).toBe('xml');
+      expect(resolveFileLanguage('doc.xml')).toBe('xml');
+      expect(resolveFileLanguage('main.rs')).toBe('rust');
+      expect(resolveFileLanguage('main.cpp')).toBe('cpp');
+      expect(resolveFileLanguage('server.go')).toBe('go');
+      expect(resolveFileLanguage('App.java')).toBe('java');
+      expect(resolveFileLanguage('index.php')).toBe('php');
+      expect(resolveFileLanguage('config.yaml')).toBe('yaml');
+      expect(resolveFileLanguage('readme.md')).toBe('markdown');
+      expect(resolveFileLanguage('script.py')).toBe('python');
+      expect(resolveFileLanguage('app.tsx')).toBe('typescript');
+      expect(resolveFileLanguage('app.js')).toBe('javascript');
+    });
+
+    it('falls back to MIME type when file extension is absent or unmapped', () => {
+      expect(resolveFileLanguage('blob', 'text/html')).toBe('html');
+      expect(resolveFileLanguage('blob', 'application/json')).toBe('json');
+      expect(resolveFileLanguage('blob', 'text/x-python')).toBe('python');
+      expect(resolveFileLanguage('blob', 'image/svg+xml')).toBe('xml');
+      expect(resolveFileLanguage('unknown.bin', 'application/octet-stream')).toBe('plaintext');
+    });
   });
 });

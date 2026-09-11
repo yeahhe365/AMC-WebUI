@@ -17,6 +17,8 @@
  *   missing binding in the `new Function` scope cannot throw (a bad chart spec
  *   must never break an entire PNG export)
  */
+import * as echarts from 'echarts';
+import { buildEchartsThemeFromCssVars, normalizeEchartsOption } from './echartsRendererScript';
 
 export const CHART_RENDERER_SCRIPT = `
 (() => {
@@ -471,11 +473,9 @@ export const CHART_RENDERER_SCRIPT = `
     const svg = el('svg', {
       viewBox: '0 0 ' + W + ' ' + h,
       width: '100%',
-      height: 'auto',
-      display: 'block',
       role: 'img',
       'aria-label': spec.title || 'chart',
-      style: 'font-family:' + FONT,
+      style: 'font-family:' + FONT + ';display:block;height:auto;',
     });
     if (spec.title) svg.appendChild(el('title', {}, spec.title));
     return { svg, h };
@@ -548,21 +548,11 @@ interface HydrateChartsIntoDocumentOptions {
   themeStyle?: string;
 }
 
-const makeChartStubWindow = (doc: Document): Record<string, unknown> => ({
-  document: doc,
-  MutationObserver: undefined,
-  requestAnimationFrame: (fn: () => void) => fn(),
-  addEventListener: () => {},
-  navigator: {},
-  location: { origin: 'null' },
-});
-
 /**
  * Renders every `data-amc-chart` node in `doc` as static SVG, synchronously.
  *
- * This is the export-path twin of the iframe-embedded renderer: it executes the
- * exact same `CHART_RENDERER_SCRIPT` string via `new Function`, so the exported
- * PNG snapshot and the sandboxed frame always produce identical markup.
+ * Uses Apache ECharts SSR SVG renderer to produce crisp, publication-ready vector
+ * graphics for PNG snapshots and offline export previews.
  */
 export const hydrateChartsIntoDocument = (doc: Document, options: HydrateChartsIntoDocumentOptions = {}): void => {
   if (options.themeStyle) {
@@ -574,8 +564,62 @@ export const hydrateChartsIntoDocument = (doc: Document, options: HydrateChartsI
       doc.head.appendChild(styleEl);
     }
   }
-  // `new Function` is safe here: the string is a repo-owned constant and CSP
-  // does not apply on the parent page.
-  const run = new Function('window', 'document', CHART_RENDERER_SCRIPT);
-  run(makeChartStubWindow(doc), doc);
+
+  const cssVars: Record<string, string> = {};
+  if (options.themeStyle) {
+    const matches = options.themeStyle.matchAll(/(--amc-live-artifact-[a-z-]+)\s*:\s*([^;]+)/g);
+    for (const match of matches) {
+      cssVars[match[1]] = match[2].trim();
+    }
+  }
+  const theme = buildEchartsThemeFromCssVars(cssVars);
+
+  const nodes = doc.querySelectorAll('[data-amc-chart], [data-amc-echarts]');
+  nodes.forEach((node) => {
+    const attr = node.getAttribute('data-amc-chart') || node.getAttribute('data-amc-echarts') || '';
+    let raw: unknown;
+    try {
+      raw = JSON.parse(attr);
+    } catch {
+      node.setAttribute('data-amc-chart-error', '1');
+      return;
+    }
+
+    const option = normalizeEchartsOption(raw);
+    if (!option) {
+      node.setAttribute('data-amc-chart-error', '1');
+      return;
+    }
+
+    const htmlEl = node as HTMLElement;
+    const widthMatch = htmlEl.style?.width?.match(/^(\d+(?:\.\d+)?)px$/);
+    const heightMatch = htmlEl.style?.height?.match(/^(\d+(?:\.\d+)?)px$/);
+    const width = widthMatch ? parseFloat(widthMatch[1]) : 700;
+    const height = heightMatch ? parseFloat(heightMatch[1]) : 280;
+
+    try {
+      const chart = echarts.init(null, theme, {
+        renderer: 'svg',
+        ssr: true,
+        width,
+        height,
+      });
+      chart.setOption(option);
+      const svgString = chart.renderToSVGString();
+      chart.dispose();
+
+      node.innerHTML = svgString;
+      node.setAttribute('data-amc-chart-rendered', '1');
+      node.removeAttribute('data-amc-chart-error');
+      node.removeAttribute('data-amc-chart-pending');
+
+      const svg = node.querySelector('svg');
+      if (svg) {
+        svg.style.width = '100%';
+        svg.style.height = `${height}px`;
+      }
+    } catch {
+      node.setAttribute('data-amc-chart-error', '1');
+    }
+  });
 };

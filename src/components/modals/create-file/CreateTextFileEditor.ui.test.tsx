@@ -3,10 +3,17 @@ import { setupProviderTestRenderer as setupTestRenderer } from '@/test/render/pr
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreateTextFileEditor } from './CreateTextFileEditor';
 
+import { useSettingsStore } from '@/stores/settingsStore';
+
 const createMarkdownPdfBlobMock = vi.hoisted(() => vi.fn());
+const generateFileTitleApiMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@/utils/export/markdownPdf', () => ({
   createMarkdownPdfBlob: createMarkdownPdfBlobMock,
+}));
+
+vi.mock('@/services/api/generation/textApi', () => ({
+  generateFileTitleApi: generateFileTitleApiMock,
 }));
 
 const typeInto = (element: HTMLTextAreaElement | HTMLInputElement, value: string) => {
@@ -38,6 +45,14 @@ describe('CreateTextFileEditor UI', () => {
 
   beforeEach(() => {
     createMarkdownPdfBlobMock.mockReset();
+    generateFileTitleApiMock.mockReset();
+    useSettingsStore.setState({
+      appSettings: {
+        ...useSettingsStore.getState().appSettings,
+        apiKey: 'test-api-key',
+        useCustomApiConfig: true,
+      },
+    });
   });
 
   afterEach(() => {
@@ -76,7 +91,9 @@ describe('CreateTextFileEditor UI', () => {
     await renderEditor();
 
     const header = document.body.querySelector('[data-create-file-header]');
-    expect(header?.querySelector('input[placeholder="Filename"]')).toBeTruthy();
+    const input = header?.querySelector<HTMLInputElement>('input[type="text"]');
+    expect(input).toBeTruthy();
+    expect(input?.placeholder).toMatch(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/);
 
     const footer = document.body.querySelector('[data-create-file-footer]');
     expect(footer?.querySelector('input, select')).toBeNull();
@@ -122,7 +139,7 @@ describe('CreateTextFileEditor UI', () => {
     expect(document.body.textContent).not.toContain('Discard changes?');
   });
 
-  it('saves with Cmd+Enter from the content textarea and derives the filename', async () => {
+  it('saves with Cmd+Enter from the content textarea and uses the default timestamp filename', async () => {
     const onConfirm = vi.fn();
     await renderEditor({ onConfirm });
 
@@ -138,7 +155,8 @@ describe('CreateTextFileEditor UI', () => {
 
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onConfirm.mock.calls[0][0]).toBe('# My Report\n\nBody');
-    expect(onConfirm.mock.calls[0][1]).toBe('My Report.md');
+    expect(onConfirm.mock.calls[0][1]).toMatch(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.md$/);
+    expect(onConfirm.mock.calls[0][1]).not.toContain('My Report');
   });
 
   it('ignores Cmd+Enter while an IME composition is active', async () => {
@@ -227,7 +245,7 @@ describe('CreateTextFileEditor UI', () => {
     });
 
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(onConfirm.mock.calls[0][1]).toBe('Still works.md');
+    expect(onConfirm.mock.calls[0][1]).toMatch(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.md$/);
   });
 
   it('creates only one file when save is triggered twice', async () => {
@@ -273,18 +291,19 @@ describe('CreateTextFileEditor UI', () => {
     expect(onConfirm).toHaveBeenCalledWith('body', 'notes.txt');
   });
 
-  it('hints the derived filename in the empty filename field', async () => {
+  it('hints the default timestamp filename in the empty filename field and remains stable when editing content', async () => {
     await renderEditor();
 
     const input = document.body.querySelector<HTMLInputElement>('[data-create-file-header] input')!;
-    expect(input.getAttribute('placeholder')).toBe('Filename');
+    const initialPlaceholder = input.getAttribute('placeholder');
+    expect(initialPlaceholder).toMatch(/^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$/);
 
     const textarea = document.body.querySelector('textarea')!;
     await act(async () => {
       typeInto(textarea, '# Quarterly Report');
     });
 
-    expect(input.getAttribute('placeholder')).toBe('Quarterly Report');
+    expect(input.getAttribute('placeholder')).toBe(initialPlaceholder);
   });
 
   it('uses the proportional font for prose types and monospace for code types', async () => {
@@ -343,5 +362,94 @@ describe('CreateTextFileEditor UI', () => {
 
     expect(document.body.textContent).toContain('Error generating PDF.');
     expect(alertSpy).not.toHaveBeenCalled();
+  });
+
+  it('handles Tab key indentation by inserting 2 spaces', async () => {
+    await renderEditor({ initialContent: 'const a = 1;' });
+    const textarea = document.body.querySelector('textarea')!;
+    textarea.selectionStart = 0;
+    textarea.selectionEnd = 0;
+
+    const tabEvent = new KeyboardEvent('keydown', {
+      key: 'Tab',
+      bubbles: true,
+      cancelable: true,
+    });
+    let defaultPrevented = false;
+    tabEvent.preventDefault = () => {
+      defaultPrevented = true;
+    };
+
+    await act(async () => {
+      textarea.dispatchEvent(tabEvent);
+    });
+
+    expect(defaultPrevented).toBe(true);
+    expect(textarea.value).toBe('  const a = 1;');
+  });
+
+  it('allows retry if onConfirm rejects during text file save', async () => {
+    let callCount = 0;
+    const onConfirmMock = vi.fn().mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        throw new Error('Network timeout');
+      }
+    });
+
+    await renderEditor({ initialFilename: 'notes.md', initialContent: 'Initial content', onConfirm: onConfirmMock });
+
+    const saveButton = Array.from(document.body.querySelectorAll('button')).find(
+      (button) => button.getAttribute('title') === 'Save',
+    );
+    expect(saveButton).toBeTruthy();
+
+    // First attempt fails
+    await act(async () => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(onConfirmMock).toHaveBeenCalledTimes(1);
+
+    // Second attempt should be allowed because lock was cleared in finally
+    await act(async () => {
+      saveButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(onConfirmMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('disables the AI naming button when content is empty and enables it when content is typed', async () => {
+    await renderEditor();
+
+    const aiButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="AI Name"]')!;
+    expect(aiButton).toBeTruthy();
+    expect(aiButton).toBeDisabled();
+
+    const textarea = document.body.querySelector('textarea')!;
+    await act(async () => {
+      typeInto(textarea, 'Some draft content for AI to read');
+    });
+
+    expect(aiButton).not.toBeDisabled();
+  });
+
+  it('generates an AI title and updates the filename input when clicked', async () => {
+    generateFileTitleApiMock.mockResolvedValue('Q3-Financial-Report');
+    await renderEditor({ initialContent: 'Quarterly financial report 2026' });
+
+    const aiButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="AI Name"]')!;
+    expect(aiButton).toBeTruthy();
+    expect(aiButton).not.toBeDisabled();
+
+    await act(async () => {
+      aiButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    const input = document.body.querySelector<HTMLInputElement>('[data-create-file-header] input')!;
+    expect(input.value).toBe('Q3-Financial-Report');
   });
 });

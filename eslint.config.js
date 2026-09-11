@@ -4,7 +4,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default tseslint.config(
-  { ignores: ['dist/', 'server/dist/', 'node_modules/', '.worktrees/', 'coverage/', 'sw.js'] },
+  { ignores: ['dist/', 'server/dist/', 'node_modules/', '.worktrees/', 'coverage/', 'sw.js', 'docs-site/**'] },
   {
     extends: [js.configs.recommended],
     files: ['**/*.{js,mjs}'],
@@ -85,6 +85,14 @@ export default tseslint.config(
   {
     files: [
       'src/components/layout/chat-runtime/ChatRuntimeContext.tsx',
+      'src/components/shared/AlertDialog.tsx',
+      'src/components/shared/CodeEditor.tsx',
+      'src/components/shared/ContextMenu.tsx',
+      'src/components/shared/Dialog.tsx',
+      'src/components/shared/DropdownMenu.tsx',
+      'src/components/shared/Popover.tsx',
+      'src/components/shared/Select.tsx',
+      'src/components/shared/file-preview/TextFileViewer.tsx',
       'src/components/shared/ModelIcon.tsx',
       'src/components/message/code/LanguageIcon.tsx',
       'src/contexts/I18nContext.tsx',

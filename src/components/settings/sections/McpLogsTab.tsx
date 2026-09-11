@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Copy, RefreshCw } from 'lucide-react';
 import { fetchMcpLogs, type McpLogEntry } from '@/services/api/mcpApi';
 import type { McpServerConfig } from '@/types';
+import { copyTextToClipboard } from '@/utils/clipboard';
 
 interface McpLogsTabProps {
   server: McpServerConfig;
@@ -52,7 +53,7 @@ export const McpLogsTab: React.FC<McpLogsTabProps> = ({ server, t }) => {
 
   const handleCopy = useCallback(() => {
     const text = logs.map((entry) => `[${entry.level}] ${entry.message}`).join('\n');
-    void navigator.clipboard.writeText(text);
+    void copyTextToClipboard(text);
   }, [logs]);
 
   const levelBadgeClass = (level: string) => {

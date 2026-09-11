@@ -3,7 +3,8 @@ import type { ModelCapabilities } from '@/utils/model/modelCapabilities';
 
 type ChatToolSurface = 'tools-menu' | 'slash-command';
 
-export type ChatToolIconKey = 'telescope' | 'globe' | 'map' | 'terminal' | 'python' | 'link' | 'calculator' | 'brain';
+export type ChatToolIconKey =
+  'telescope' | 'globe' | 'map' | 'terminal' | 'python' | 'pyodide' | 'link' | 'calculator' | 'brain';
 
 export interface ChatToolDefinition {
   id: ChatToolId;
@@ -86,7 +87,7 @@ const CHAT_TOOL_REGISTRY: ChatToolDefinition[] = [
     id: 'localPython',
     labelKey: 'localPythonLabel',
     shortLabelKey: 'localPythonShort',
-    icon: 'python',
+    icon: 'pyodide',
     settingKey: 'isLocalPythonEnabled',
     isAvailable: (context) =>
       isGeminiNativeRoute(context) &&

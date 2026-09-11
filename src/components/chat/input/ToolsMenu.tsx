@@ -1,17 +1,31 @@
-import React from 'react';
-import { createPortal } from 'react-dom';
-import { Globe, Check, Terminal, Link, X, Telescope, Calculator, AlertTriangle, MapPin, Wrench } from 'lucide-react';
+import React, { useState } from 'react';
+import { Globe, Check, Terminal, Link, X, Telescope, Calculator, AlertTriangle, MapPinned, Wrench } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
-import { IconPython, IconThinking } from '@/components/icons';
+import { IconPyodide, IconThinking } from '@/components/icons';
 import { CHAT_INPUT_BUTTON_CLASS } from '@/constants/buttonClasses';
-import { usePortaledMenu } from '@/hooks/ui/usePortaledMenu';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/shared/DropdownMenu';
 import { getCachedModelCapabilities } from '@/stores/modelCapabilitiesStore';
 import {
   getChatToolsForSurface,
   type ChatToolDefinition,
   type ChatToolIconKey,
 } from '@/features/chat-tools/toolRegistry';
-import type { ChatToolId, ChatToolToggleStates, ChatToolUtilityActions, ToggleableChatToolId } from '@/types';
+import type {
+  ChatToolId,
+  ChatToolToggleStates,
+  ChatToolUtilityActions,
+  GeoLocationCoordinates,
+  ToggleableChatToolId,
+} from '@/types';
+import { GoogleMapsLocationModal } from './GoogleMapsLocationModal';
+import { UrlContextModal } from './UrlContextModal';
+import { formatLocationDisplay } from '@/utils/geolocation';
+import { useChatStore } from '@/stores/chatStore';
 
 interface ToolsMenuProps {
   currentModelId: string;
@@ -20,6 +34,9 @@ interface ToolsMenuProps {
   toolStates: ChatToolToggleStates;
   toolUtilityActions: ChatToolUtilityActions;
   disabled: boolean;
+  googleMapsLocation?: GeoLocationCoordinates;
+  onUpdateGoogleMapsLocation?: (location: GeoLocationCoordinates | undefined) => void;
+  onInsertUrls?: (urls: string[]) => void;
 }
 
 const ActiveToolBadge: React.FC<{
@@ -27,24 +44,53 @@ const ActiveToolBadge: React.FC<{
   onRemove: () => void;
   removeAriaLabel: string;
   icon: React.ReactNode;
-}> = ({ label, onRemove, removeAriaLabel, icon }) => (
+  onConfigure?: () => void;
+  configureAriaLabel?: string;
+}> = ({ label, onRemove, removeAriaLabel, icon, onConfigure, configureAriaLabel }) => (
   <>
     <div className="h-4 w-px bg-[var(--theme-border-secondary)] mx-1.5"></div>
-    <button
-      type="button"
-      className="group flex cursor-pointer items-center gap-1.5 rounded-full border-0 bg-[var(--theme-bg-accent)]/10 px-2.5 py-1 text-sm text-[var(--theme-text-primary)] transition-colors select-none hover:bg-[var(--theme-bg-tertiary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)]"
-      style={{ animation: `fadeInUp 0.3s ease-out both` }}
-      onClick={onRemove}
-      aria-label={removeAriaLabel}
-    >
-      <div className="relative flex h-3.5 w-3.5 items-center justify-center">
-        <span className="flex items-center justify-center group-hover:opacity-0">{icon}</span>
-        <span className="absolute inset-0 flex items-center justify-center text-[var(--theme-icon-error)] opacity-0 group-hover:opacity-100">
-          <X size={14} strokeWidth={2.5} />
-        </span>
+    {onConfigure ? (
+      <div
+        className="group inline-flex items-center rounded-full bg-[var(--theme-bg-accent)]/10 text-sm text-[var(--theme-text-primary)] pl-2.5 pr-1 py-0.5 gap-1.5 transition-colors hover:bg-[var(--theme-bg-tertiary)]"
+        style={{ animation: `fadeInUp 0.3s ease-out both` }}
+      >
+        <button
+          type="button"
+          className="flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 text-sm text-[var(--theme-text-primary)] hover:text-[var(--theme-text-link)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] rounded"
+          onClick={onConfigure}
+          aria-label={configureAriaLabel ?? label}
+          title={configureAriaLabel ?? label}
+        >
+          <span className="flex items-center justify-center text-[var(--theme-text-link)]">{icon}</span>
+          <span className="font-medium max-w-[140px] truncate">{label}</span>
+        </button>
+        <button
+          type="button"
+          className="flex h-4 w-4 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-[var(--theme-text-secondary)] hover:text-[var(--theme-icon-error)] hover:bg-[var(--theme-bg-secondary)] focus:outline-none"
+          onClick={onRemove}
+          aria-label={removeAriaLabel}
+          title={removeAriaLabel}
+        >
+          <X size={12} strokeWidth={2.5} />
+        </button>
       </div>
-      <span className="font-medium">{label}</span>
-    </button>
+    ) : (
+      <button
+        type="button"
+        className="group flex cursor-pointer items-center gap-1.5 rounded-full border-0 bg-[var(--theme-bg-accent)]/10 px-2.5 py-1 text-sm text-[var(--theme-text-primary)] transition-colors select-none hover:bg-[var(--theme-bg-tertiary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)]"
+        style={{ animation: `fadeInUp 0.3s ease-out both` }}
+        onClick={onRemove}
+        aria-label={removeAriaLabel}
+      >
+        <div className="relative flex h-3.5 w-3.5 items-center justify-center">
+          <span className="flex items-center justify-center group-hover:opacity-0">{icon}</span>
+          <span className="absolute inset-0 flex items-center justify-center text-[var(--theme-icon-error)] opacity-0 group-hover:opacity-100">
+            <X size={14} strokeWidth={2.5} />
+          </span>
+        </div>
+        <span className="font-medium">{label}</span>
+      </button>
+    )}
   </>
 );
 
@@ -72,11 +118,12 @@ const renderToolIcon = (icon: ChatToolIconKey, size: number) => {
     case 'globe':
       return <Globe size={size} strokeWidth={2} />;
     case 'map':
-      return <MapPin size={size} strokeWidth={2} />;
+      return <MapPinned size={size} strokeWidth={2} />;
     case 'terminal':
       return <Terminal size={size} strokeWidth={2} />;
+    case 'pyodide':
     case 'python':
-      return <IconPython size={size} strokeWidth={2} />;
+      return <IconPyodide size={size} />;
     case 'link':
       return <Link size={size} strokeWidth={2} />;
     case 'calculator':
@@ -92,34 +139,59 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({
   toolStates,
   toolUtilityActions,
   disabled,
+  googleMapsLocation: propGoogleMapsLocation,
+  onUpdateGoogleMapsLocation: propOnUpdateGoogleMapsLocation,
+  onInsertUrls,
 }) => {
   const { t } = useI18n();
-  const { isOpen, menuPosition, containerRef, buttonRef, menuRef, targetWindow, closeMenu, toggleMenu } =
-    usePortaledMenu();
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isUrlModalOpen, setIsUrlModalOpen] = useState(false);
+  const storeGoogleMapsLocation = useChatStore((state) => {
+    const session = state.savedSessions.find((s) => s.id === state.activeSessionId);
+    return session?.settings?.googleMapsLocation ?? state.pendingChatSettings?.googleMapsLocation;
+  });
+  const setCurrentChatSettings = useChatStore((state) => state.setCurrentChatSettings);
+  const effectiveLocation = propGoogleMapsLocation !== undefined ? propGoogleMapsLocation : storeGoogleMapsLocation;
+
+  const handleUpdateLocation = (location: GeoLocationCoordinates | undefined) => {
+    if (propOnUpdateGoogleMapsLocation) {
+      propOnUpdateGoogleMapsLocation(location);
+    } else {
+      setCurrentChatSettings((prev) => ({
+        ...prev,
+        googleMapsLocation: location,
+      }));
+    }
+  };
+
   const capabilities = getCachedModelCapabilities(currentModelId);
 
   const handleToggle = (toggleFunc?: () => void) => {
     if (toggleFunc) {
       toggleFunc();
-      closeMenu();
     }
   };
 
   // Matched icon size to other toolbar buttons (Attachment, Mic, etc.)
   const menuIconSize = 20;
 
+  const isItemActionTriggeredRef = React.useRef(false);
+
   const getToolAction = (tool: ChatToolDefinition) => {
     const toolId = tool.id;
 
     if (isToggleableToolId(toolId)) {
-      return () => handleToggle(toolStates[toolId]?.onToggle);
+      return () => {
+        isItemActionTriggeredRef.current = true;
+        handleToggle(toolStates[toolId]?.onToggle);
+      };
     }
 
     return () => {
       if (toolId === 'tokenCount') {
+        isItemActionTriggeredRef.current = true;
         toolUtilityActions.onCountTokens();
       }
-      closeMenu();
     };
   };
 
@@ -144,38 +216,41 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({
   return (
     <div className="flex flex-col items-start gap-2">
       <div className="flex items-center">
-        <div className="relative" ref={containerRef}>
-          <button
-            ref={buttonRef}
-            type="button"
-            onClick={toggleMenu}
-            disabled={disabled}
-            className={`${CHAT_INPUT_BUTTON_CLASS} text-[var(--theme-icon-attach)] ${isOpen ? 'bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-primary)]' : 'bg-transparent hover:bg-[var(--theme-bg-tertiary)]'}`}
-            aria-label={t('toolsButton')}
-            title={t('toolsButton')}
-            aria-haspopup="true"
-            aria-expanded={isOpen}
-          >
-            <Wrench size={menuIconSize} strokeWidth={2} />
-          </button>
-          {isOpen &&
-            targetWindow &&
-            createPortal(
-              <div
-                ref={menuRef}
-                className="fixed w-60 bg-[var(--theme-bg-primary)] border border-[var(--theme-border-secondary)] rounded-xl shadow-premium py-1.5 custom-scrollbar"
-                style={menuPosition}
-                role="menu"
+        <div className="relative">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                disabled={disabled}
+                className={`${CHAT_INPUT_BUTTON_CLASS} text-[var(--theme-icon-attach)] bg-transparent hover:bg-[var(--theme-bg-tertiary)] data-[state=open]:bg-[var(--theme-bg-tertiary)] data-[state=open]:text-[var(--theme-text-primary)]`}
+                aria-label={t('toolsButton')}
+                title={t('toolsButton')}
+                aria-haspopup="true"
               >
-                {filteredItems.map((item) => {
-                  const isEnabled = isToggleableToolId(item.id) ? !!toolStates[item.id]?.isEnabled : false;
+                <Wrench size={menuIconSize} strokeWidth={2} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              side="top"
+              align="start"
+              sideOffset={8}
+              className="w-60 max-h-[75vh] overflow-y-auto custom-scrollbar py-1.5 shadow-premium"
+              onCloseAutoFocus={(e) => {
+                if (isItemActionTriggeredRef.current) {
+                  e.preventDefault();
+                  isItemActionTriggeredRef.current = false;
+                }
+              }}
+            >
+              {filteredItems.map((item) => {
+                const isEnabled = isToggleableToolId(item.id) ? !!toolStates[item.id]?.isEnabled : false;
 
-                  return (
+                return (
+                  <DropdownMenuItem key={item.id} asChild onClick={getToolAction(item)} className="cursor-pointer">
                     <button
-                      key={item.id}
-                      onClick={getToolAction(item)}
-                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--theme-bg-tertiary)] focus:outline-none focus-visible:bg-[var(--theme-bg-tertiary)] flex items-center justify-between transition-colors ${isEnabled ? 'text-[var(--theme-text-link)]' : 'text-[var(--theme-text-primary)]'}`}
+                      type="button"
                       role="menuitem"
+                      className={`w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--theme-bg-tertiary)] focus:outline-none focus-visible:bg-[var(--theme-bg-tertiary)] flex items-center justify-between transition-colors ${isEnabled ? 'text-[var(--theme-text-link)]' : 'text-[var(--theme-text-primary)]'}`}
                     >
                       <div className="flex items-center gap-3.5">
                         <span
@@ -187,11 +262,11 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({
                       </div>
                       {isEnabled && <Check size={16} className="text-[var(--theme-text-link)]" strokeWidth={2} />}
                     </button>
-                  );
-                })}
-              </div>,
-              targetWindow.document.body,
-            )}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         {filteredItems
           .filter(
@@ -201,15 +276,31 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({
               toolStates[item.id]?.isEnabled &&
               toolStates[item.id]?.onToggle,
           )
-          .map((item) => (
-            <ActiveToolBadge
-              key={item.id}
-              label={t(item.shortLabelKey!)}
-              onRemove={toolStates[item.id as ToggleableChatToolId]!.onToggle!}
-              removeAriaLabel={`Disable ${t(item.labelKey)}`}
-              icon={renderToolIcon(item.icon, 14)}
-            />
-          ))}
+          .map((item) => {
+            const isMaps = item.id === 'googleMaps';
+            const isUrl = item.id === 'urlContext';
+            let badgeLabel = t(item.shortLabelKey!);
+            if (isMaps && effectiveLocation) {
+              const locName = formatLocationDisplay(effectiveLocation);
+              if (locName) {
+                badgeLabel = `${badgeLabel} · ${locName}`;
+              }
+            }
+
+            return (
+              <ActiveToolBadge
+                key={item.id}
+                label={badgeLabel}
+                onRemove={toolStates[item.id as ToggleableChatToolId]!.onToggle!}
+                removeAriaLabel={`Disable ${t(item.labelKey)}`}
+                icon={renderToolIcon(item.icon, 14)}
+                onConfigure={
+                  isMaps ? () => setIsLocationModalOpen(true) : isUrl ? () => setIsUrlModalOpen(true) : undefined
+                }
+                configureAriaLabel={isMaps ? t('mapsLocationConfigure') : isUrl ? t('urlContextConfigure') : undefined}
+              />
+            );
+          })}
       </div>
       {showBuiltInCustomToolNotice && (
         <div className="max-w-sm rounded-xl border border-[var(--theme-bg-danger)]/20 bg-[var(--theme-bg-danger)]/8 px-3 py-2 text-xs text-[var(--theme-text-secondary)]">
@@ -218,6 +309,23 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({
             <span>{t('toolsLocalPythonCombinationNotice')}</span>
           </div>
         </div>
+      )}
+      {isLocationModalOpen && (
+        <GoogleMapsLocationModal
+          isOpen={isLocationModalOpen}
+          onClose={() => setIsLocationModalOpen(false)}
+          location={effectiveLocation}
+          onSave={handleUpdateLocation}
+        />
+      )}
+      {isUrlModalOpen && (
+        <UrlContextModal
+          isOpen={isUrlModalOpen}
+          onClose={() => setIsUrlModalOpen(false)}
+          onInsertUrls={onInsertUrls}
+          onEnableTool={toolStates.urlContext?.onToggle}
+          isToolEnabled={!!toolStates.urlContext?.isEnabled}
+        />
       )}
     </div>
   );

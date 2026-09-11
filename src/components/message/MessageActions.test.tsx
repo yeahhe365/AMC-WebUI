@@ -3,6 +3,7 @@ import { renderWithProviders, setupProviderTestRenderer as setupTestRenderer } f
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MessageActions } from './MessageActions';
 import type { ChatMessage } from '@/types';
+import { useChatStore } from '@/stores/chatStore';
 
 vi.mock('./buttons/ExportMessageButton', () => ({
   ExportMessageButton: ({ className }: { className?: string }) => (
@@ -254,5 +255,56 @@ describe('MessageActions', () => {
     });
 
     expect(onEditMessage).toHaveBeenCalledWith('message-1', 'update');
+  });
+
+  it('hides continue generation action for audio messages, empty text, or image/tts models', () => {
+    // 1. Audio message
+    act(() => {
+      renderMessageActions({
+        message: {
+          ...message,
+          content: '',
+          audioSrc: 'blob:http://localhost/audio-1',
+        },
+      });
+    });
+    const moreButton = renderer.container.querySelector<HTMLButtonElement>('[aria-label="More message actions"]');
+    expect(moreButton).toBeInTheDocument();
+    act(() => {
+      moreButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(
+      renderer.container.querySelector('[role="menuitem"][aria-label="Continue Generating"]'),
+    ).not.toBeInTheDocument();
+
+    // 2. Image generation model
+    act(() => {
+      useChatStore.setState({
+        activeSessionId: 'sess-img',
+        savedSessions: [
+          {
+            id: 'sess-img',
+            title: 'Image Test',
+            messages: [],
+            settings: {
+              modelId: 'imagen-3.0-generate-002',
+            },
+          } as any,
+        ],
+      });
+      renderMessageActions({
+        message: {
+          ...message,
+          content: 'Generated image',
+        },
+      });
+    });
+    const moreBtn2 = renderer.container.querySelector<HTMLButtonElement>('[aria-label="More message actions"]');
+    act(() => {
+      moreBtn2?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(
+      renderer.container.querySelector('[role="menuitem"][aria-label="Continue Generating"]'),
+    ).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,10 @@
 import { TAB_ID } from '@/stores/tabIdentity';
+import {
+  readPersistentStorageItem,
+  writePersistentStorageItem,
+  removePersistentStorageItem,
+} from '@/stores/persistentStorage';
+import { safeJsonParse } from '@/utils/safeJsonParse';
 
 /**
  * Persistent record of an in-flight streamed generation that the api container
@@ -49,13 +55,6 @@ const PENDING_JOB_TTL_MS = 10 * 60_000; // match server-side job TTL
 
 const pendingJobStorageKey = (sessionId: string) => `${PENDING_JOB_KEY_PREFIX}${sessionId}`;
 
-const getStorage = (): Storage | null => {
-  if (typeof localStorage === 'undefined') {
-    return null;
-  }
-  return localStorage;
-};
-
 const isFresh = (job: PendingStreamJob, now = Date.now()): boolean => now - job.startedAt < PENDING_JOB_TTL_MS;
 
 /**
@@ -64,44 +63,41 @@ const isFresh = (job: PendingStreamJob, now = Date.now()): boolean => now - job.
  * left by a crashed tab does not trigger a doomed resume).
  */
 export const readPendingStreamJob = (sessionId: string): PendingStreamJob | null => {
-  const storage = getStorage();
-  if (!storage || !sessionId) {
+  if (!sessionId) {
     return null;
   }
-  try {
-    const raw = storage.getItem(pendingJobStorageKey(sessionId));
-    if (!raw) {
-      return null;
-    }
-    const parsed = JSON.parse(raw) as Partial<PendingStreamJob>;
-    if (
-      typeof parsed.sessionId !== 'string' ||
-      typeof parsed.generationId !== 'string' ||
-      typeof parsed.jobId !== 'string' ||
-      typeof parsed.startedAt !== 'number' ||
-      typeof parsed.lastSeq !== 'number' ||
-      typeof parsed.tabId !== 'string'
-    ) {
-      storage.removeItem(pendingJobStorageKey(sessionId));
-      return null;
-    }
-    const job: PendingStreamJob = {
-      sessionId: parsed.sessionId,
-      generationId: parsed.generationId,
-      jobId: parsed.jobId,
-      ...(typeof parsed.secret === 'string' ? { secret: parsed.secret } : {}),
-      startedAt: parsed.startedAt,
-      lastSeq: parsed.lastSeq,
-      tabId: parsed.tabId,
-    };
-    if (!isFresh(job)) {
-      storage.removeItem(pendingJobStorageKey(sessionId));
-      return null;
-    }
-    return job;
-  } catch {
+  const key = pendingJobStorageKey(sessionId);
+  const raw = readPersistentStorageItem(key);
+  if (!raw) {
     return null;
   }
+  const parsed = safeJsonParse<Partial<PendingStreamJob> | null>(raw, null);
+  if (
+    !parsed ||
+    typeof parsed.sessionId !== 'string' ||
+    typeof parsed.generationId !== 'string' ||
+    typeof parsed.jobId !== 'string' ||
+    typeof parsed.startedAt !== 'number' ||
+    typeof parsed.lastSeq !== 'number' ||
+    typeof parsed.tabId !== 'string'
+  ) {
+    removePersistentStorageItem(key);
+    return null;
+  }
+  const job: PendingStreamJob = {
+    sessionId: parsed.sessionId,
+    generationId: parsed.generationId,
+    jobId: parsed.jobId,
+    ...(typeof parsed.secret === 'string' ? { secret: parsed.secret } : {}),
+    startedAt: parsed.startedAt,
+    lastSeq: parsed.lastSeq,
+    tabId: parsed.tabId,
+  };
+  if (!isFresh(job)) {
+    removePersistentStorageItem(key);
+    return null;
+  }
+  return job;
 };
 
 /**
@@ -113,28 +109,23 @@ export const recordPendingStreamJob = (
     lastSeq?: number;
   },
 ): void => {
-  const storage = getStorage();
-  if (!storage || !job.sessionId) {
+  if (!job.sessionId) {
     return;
   }
-  try {
-    storage.setItem(
-      pendingJobStorageKey(job.sessionId),
-      JSON.stringify({
-        sessionId: job.sessionId,
-        generationId: job.generationId,
-        jobId: job.jobId,
-        // Caller-supplied secrets win (creation and resume must share one);
-        // otherwise generate one so the server binds the job to this browser.
-        secret: job.secret ?? generateJobSecret(),
-        startedAt: job.startedAt,
-        lastSeq: job.lastSeq ?? 0,
-        tabId: TAB_ID,
-      } satisfies PendingStreamJob),
-    );
-  } catch {
-    // Ignore storage failures in restricted browser contexts.
-  }
+  writePersistentStorageItem(
+    pendingJobStorageKey(job.sessionId),
+    JSON.stringify({
+      sessionId: job.sessionId,
+      generationId: job.generationId,
+      jobId: job.jobId,
+      // Caller-supplied secrets win (creation and resume must share one);
+      // otherwise generate one so the server binds the job to this browser.
+      secret: job.secret ?? generateJobSecret(),
+      startedAt: job.startedAt,
+      lastSeq: job.lastSeq ?? 0,
+      tabId: TAB_ID,
+    } satisfies PendingStreamJob),
+  );
 };
 
 /**
@@ -143,8 +134,7 @@ export const recordPendingStreamJob = (
  * one already-seen event (idempotent for Gemini SSE).
  */
 export const advancePendingStreamJobSeq = (sessionId: string, seq: number): void => {
-  const storage = getStorage();
-  if (!storage || !sessionId) {
+  if (!sessionId) {
     return;
   }
   const existing = readPendingStreamJob(sessionId);
@@ -154,27 +144,18 @@ export const advancePendingStreamJobSeq = (sessionId: string, seq: number): void
   if (seq <= existing.lastSeq) {
     return;
   }
-  try {
-    storage.setItem(
-      pendingJobStorageKey(sessionId),
-      JSON.stringify({ ...existing, lastSeq: seq } satisfies PendingStreamJob),
-    );
-  } catch {
-    // Ignore storage failures.
-  }
+  writePersistentStorageItem(
+    pendingJobStorageKey(sessionId),
+    JSON.stringify({ ...existing, lastSeq: seq } satisfies PendingStreamJob),
+  );
 };
 
 /** Removes the pending record (called on completion, abort, or error). */
 export const clearPendingStreamJob = (sessionId: string): void => {
-  const storage = getStorage();
-  if (!storage || !sessionId) {
+  if (!sessionId) {
     return;
   }
-  try {
-    storage.removeItem(pendingJobStorageKey(sessionId));
-  } catch {
-    // Ignore storage failures.
-  }
+  removePersistentStorageItem(pendingJobStorageKey(sessionId));
 };
 
 /**

@@ -17,6 +17,7 @@ import {
   AudioLines,
   MonitorPlay,
   Clapperboard,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 import { IconPdf } from '@/components/icons';
@@ -61,6 +62,8 @@ export const SuggestionIcon = ({ iconName, className }: { iconName?: string; cla
     case 'Pdf':
     case 'IconPdf':
       return <IconPdf className={className} size={size} />;
+    case 'Image':
+      return <ImageIcon className={className} size={size} />;
     default:
       return <Sparkles className={className} size={size} />;
   }

@@ -6,7 +6,13 @@ import { useI18n } from '@/contexts/I18nContext';
 import { useWindowContext } from '@/contexts/WindowContext';
 import { createManagedObjectUrl } from '@/services/objectUrlManager';
 import { triggerDownload } from '@/utils/export/core';
-import { useClickOutside } from '@/hooks/useClickOutside';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/shared/DropdownMenu';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS } from '@/constants/focusClasses';
 import { Z_INDEX_TABLE_FULLSCREEN } from '@/constants/layout';
@@ -48,11 +54,9 @@ const hasInlineStyle = (node: React.ReactNode): boolean => {
 export const TableBlock: React.FC<TableBlockProps> = ({ children, className, node, ...props }) => {
   const { t } = useI18n();
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
-  const [isCopied, setIsCopied] = useState(false);
+  const { isCopied, copyToClipboard } = useCopyToClipboard(COPY_FEEDBACK_MS);
   const { document: targetDocument } = useWindowContext();
   const tableRef = useRef<HTMLTableElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const fullscreenRef = useRef<HTMLDivElement>(null);
   const fullscreenTriggerRef = useRef<HTMLButtonElement>(null);
   // Distinguishes "first mount" from "fullscreen just closed": on mount the
@@ -61,7 +65,6 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
   // fullscreen → inline transition edge.
   const wasFullscreenRef = useRef(false);
 
-  useClickOutside(menuRef, () => setShowDownloadMenu(false));
   useFocusTrap(fullscreenRef, isFullscreen, {
     document: targetDocument,
     restoreFocusTo: fullscreenTriggerRef.current,
@@ -106,16 +109,18 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
       // placeholders and the structure is lost. Fall back to raw HTML so a copy
       // always round-trips the actual table content.
       if (tableRef.current.querySelector('[rowspan],[colspan]')) {
-        await navigator.clipboard.writeText(tableRef.current.outerHTML);
-        setIsCopied(true);
-        setTimeout(() => setIsCopied(false), COPY_FEEDBACK_MS);
+        await copyToClipboard({
+          plainText: tableRef.current.outerHTML,
+          html: tableRef.current.outerHTML,
+        });
         return;
       }
       const { convertHtmlToMarkdown } = await import('@/utils/htmlToMarkdown');
       const markdown = convertHtmlToMarkdown(tableRef.current.outerHTML);
-      await navigator.clipboard.writeText(markdown);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), COPY_FEEDBACK_MS);
+      await copyToClipboard({
+        plainText: markdown,
+        html: tableRef.current.outerHTML,
+      });
     } catch (error) {
       logService.error('Failed to copy markdown table', error);
     }
@@ -141,21 +146,16 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
     const blob = new Blob(['﻿' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = createManagedObjectUrl(blob);
     triggerDownload(url, `table-export-${Date.now()}.csv`);
-    setShowDownloadMenu(false);
   };
 
   const handleDownloadExcel = async () => {
     if (!tableRef.current) return;
-
-    const tableHtml = tableRef.current.outerHTML;
-    const template = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Sheet1</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><meta charset="utf-8"></head>
-            <body>${tableHtml}</body></html>`;
-    const blob = new Blob([template], { type: 'application/vnd.ms-excel' });
-    const url = createManagedObjectUrl(blob);
-    triggerDownload(url, `table-export-${Date.now()}.xls`);
-    setShowDownloadMenu(false);
+    try {
+      const { exportTableToExcel } = await import('@/utils/export/tableExcel');
+      await exportTableToExcel(tableRef.current);
+    } catch (error) {
+      logService.error('Failed to export table to Excel', error);
+    }
   };
 
   const isRichHtmlTable = hasRawHtmlInlineStyle(node) || hasInlineStyle(children);
@@ -188,34 +188,38 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
             {isCopied ? <Check size={16} className="text-[var(--theme-text-success)]" /> : <Copy size={16} />}
           </button>
 
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setShowDownloadMenu(!showDownloadMenu)}
-              className={`p-1.5 rounded-lg bg-[var(--theme-bg-primary)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] shadow-sm border border-[var(--theme-border-secondary)] transition-colors ${FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS}`}
-              title={t('download')}
-            >
-              <Download size={16} />
-            </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className={`p-1.5 rounded-lg bg-[var(--theme-bg-primary)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] shadow-sm border border-[var(--theme-border-secondary)] transition-colors cursor-pointer ${FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS}`}
+                title={t('download')}
+                aria-label={t('tableDownloadAria')}
+              >
+                <Download size={16} />
+              </button>
+            </DropdownMenuTrigger>
 
-            {showDownloadMenu && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-[var(--theme-bg-secondary)] border border-[var(--theme-border-secondary)] rounded-xl shadow-xl overflow-hidden z-50">
+            <DropdownMenuContent portalled={false} align="end" sideOffset={8} className="w-48 p-1">
+              <DropdownMenuItem asChild onClick={handleDownloadCSV}>
                 <button
-                  onClick={handleDownloadCSV}
+                  type="button"
                   className={`${MENU_ITEM_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS} px-4 py-3 gap-3`}
                 >
                   <FileText size={16} className="text-[var(--theme-text-tertiary)]" />
                   <span>{t('exportToCSV')}</span>
                 </button>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild onClick={handleDownloadExcel}>
                 <button
-                  onClick={handleDownloadExcel}
+                  type="button"
                   className={`${MENU_ITEM_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS} px-4 py-3 gap-3`}
                 >
                   <FileSpreadsheet size={16} className="text-[var(--theme-text-success)]" />
                   <span>{t('exportToExcel')}</span>
                 </button>
-              </div>
-            )}
-          </div>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <button
             onClick={toggleFullscreen}
@@ -258,34 +262,32 @@ export const TableBlock: React.FC<TableBlockProps> = ({ children, className, nod
           {isCopied ? <Check size={14} className="text-[var(--theme-text-success)]" /> : <Copy size={14} />}
         </button>
 
-        <div className="relative" ref={menuRef}>
-          <button
-            onClick={() => setShowDownloadMenu(!showDownloadMenu)}
-            aria-label={t('tableDownloadAria')}
-            className={`p-1.5 rounded-md text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors ${FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS}`}
-            title={t('download')}
-          >
-            <Download size={14} />
-          </button>
-          {showDownloadMenu && (
-            <div className="absolute right-0 top-full mt-1 w-40 bg-[var(--theme-bg-secondary)] border border-[var(--theme-border-secondary)] rounded-lg shadow-lg overflow-hidden z-50">
-              <button
-                onClick={handleDownloadCSV}
-                className={`${MENU_ITEM_COMPACT_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS}`}
-              >
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              aria-label={t('tableDownloadAria')}
+              className={`p-1.5 rounded-md text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors cursor-pointer ${FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS}`}
+              title={t('download')}
+            >
+              <Download size={14} />
+            </button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent portalled={false} align="end" sideOffset={4} className="w-40 p-1">
+            <DropdownMenuItem asChild onClick={handleDownloadCSV}>
+              <button type="button" className={`${MENU_ITEM_COMPACT_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS}`}>
                 <FileText size={14} className="text-[var(--theme-text-tertiary)]" />
                 <span>{t('exportToCSV')}</span>
               </button>
-              <button
-                onClick={handleDownloadExcel}
-                className={`${MENU_ITEM_COMPACT_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS}`}
-              >
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild onClick={handleDownloadExcel}>
+              <button type="button" className={`${MENU_ITEM_COMPACT_BUTTON_CLASS} ${MENU_ITEM_DEFAULT_STATE_CLASS}`}>
                 <FileSpreadsheet size={14} className="text-[var(--theme-text-success)]" />
                 <span>{t('exportToExcel')}</span>
               </button>
-            </div>
-          )}
-        </div>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <button
           ref={fullscreenTriggerRef}

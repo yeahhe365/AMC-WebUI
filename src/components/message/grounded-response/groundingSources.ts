@@ -21,6 +21,17 @@ export const getDomain = (url: string) => {
   }
 };
 
+export const formatUrlPath = (url: string) => {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, '');
+    const path = parsed.pathname === '/' ? '' : parsed.pathname.replace(/\/$/, '');
+    return `${host}${path}`;
+  } catch {
+    return url;
+  }
+};
+
 export const getFavicon = (url: string, title?: string) => {
   try {
     // If the title looks like a domain (has dot, no spaces), use it.

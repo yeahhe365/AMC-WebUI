@@ -10,6 +10,7 @@ export {
   HTML_PREVIEW_CLEAR_SELECTION_EVENT,
   HTML_PREVIEW_COPY_EVENT,
   HTML_PREVIEW_DIAGNOSTIC_EVENT,
+  HTML_PREVIEW_DIAGRAM_CLICK_EVENT,
   HTML_PREVIEW_GRAPHVIZ_RENDER_REQUEST_EVENT,
   HTML_PREVIEW_GRAPHVIZ_RENDER_RESPONSE_EVENT,
   HTML_PREVIEW_MESSAGE_CHANNEL,
@@ -84,7 +85,7 @@ export const whenKatexReady = (): Promise<void> => {
 // allow-same-origin for message-bubble artifacts, keeping them on an opaque
 // origin so scripted content cannot reach the parent page's origin.
 const PREVIEW_CONTENT_SECURITY_POLICY =
-  "default-src 'none'; img-src https: data: blob:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' https: blob:; font-src https: data:; media-src https: data: blob:; connect-src https: data: blob:; worker-src blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
+  "default-src 'none'; img-src https: data: blob:; style-src 'unsafe-inline' https:; script-src 'unsafe-inline' http: https: blob:; font-src https: data:; media-src https: data: blob:; connect-src http: https: data: blob:; worker-src blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
 const PREVIEW_CONTENT_SECURITY_POLICY_META = `<meta http-equiv="Content-Security-Policy" content="${PREVIEW_CONTENT_SECURITY_POLICY}">`;
 const PREVIEW_BASE_FONT_SIZE_ATTRIBUTE = 'data-amc-live-artifact-base-font-size';
 const PREVIEW_THEME_ATTRIBUTE = 'data-amc-live-artifact-theme';
@@ -368,7 +369,7 @@ const buildPreviewThemeStyle = (themeId?: string, options: { varsOnly?: boolean 
   // expands to the iframe viewport and reports a locked tall height (blank under content).
   // Surface tokens must be soft fills (bgInfo/bgSuccess/…), never solid interactive fills like bgAccent.
   // bgAccent equals textLink on pearl (#2563eb); pairing accent text on accent-surface would be invisible.
-  return `<style ${PREVIEW_THEME_ATTRIBUTE}="true">:root{color-scheme:${colorScheme};${cssVars};}html,body{margin:0;padding:0;height:auto!important;min-height:0!important;max-height:none!important;background:transparent!important;color:var(--amc-live-artifact-text);}body{overflow-x:auto;}</style>`;
+  return `<style ${PREVIEW_THEME_ATTRIBUTE}="true">:root{color-scheme:${colorScheme};${cssVars};}html,body{margin:0;padding:0;height:auto!important;min-height:0!important;max-height:none!important;background:transparent!important;color:var(--amc-live-artifact-text);}body{overflow-x:auto;}[data-amc-graphviz][data-amc-graphviz-state="rendered"]{cursor:zoom-in;}</style>`;
 };
 
 const injectPreviewTheme = (srcDoc: string, themeId?: string): string => {
@@ -416,11 +417,46 @@ const injectPreviewBaseFontSize = (srcDoc: string, baseFontSize?: number): strin
   return injectIntoParsedDocument(parsedDocument, { headElements: [style] });
 };
 
+const ECHARTS_SCRIPT_SRC = '/vendor/echarts.min.js';
+const ECHARTS_SCRIPT_ATTRIBUTE = 'data-amc-echarts-script';
+const ECHARTS_SCRIPT_TAG = `<script ${ECHARTS_SCRIPT_ATTRIBUTE}="true" src="${ECHARTS_SCRIPT_SRC}"></script>`;
+
+const hasEchartsChart = (htmlOrDoc: string | Document): boolean => {
+  if (typeof htmlOrDoc === 'string') {
+    return /data-amc-(?:chart|echarts)\b/.test(htmlOrDoc);
+  }
+  return Boolean(htmlOrDoc.querySelector('[data-amc-chart], [data-amc-echarts]'));
+};
+
+const injectEchartsScript = (srcDoc: string): string => {
+  const parsedDocument = parsePreviewDocument(srcDoc);
+  if (!parsedDocument) {
+    return srcDoc;
+  }
+
+  const hasChart =
+    hasEchartsChart(parsedDocument) || Boolean(parsedDocument.querySelector('[data-amc-stream-preview-root]'));
+  if (!hasChart) {
+    return srcDoc;
+  }
+
+  if (
+    parsedDocument.head.querySelector(`script[${ECHARTS_SCRIPT_ATTRIBUTE}]`) ||
+    parsedDocument.head.querySelector(`script[src="${ECHARTS_SCRIPT_SRC}"]`)
+  ) {
+    return srcDoc;
+  }
+
+  return injectIntoParsedDocument(parsedDocument, { headElements: [ECHARTS_SCRIPT_TAG] });
+};
+
 const prepareHtmlPreviewSrcDoc = (srcDoc: string, options: { baseFontSize?: number; themeId?: string } = {}): string =>
-  renderPreviewMath(
-    injectPreviewBaseFontSize(
-      injectPreviewTheme(injectPreviewSecurityPolicy(srcDoc), options.themeId),
-      options.baseFontSize,
+  injectEchartsScript(
+    renderPreviewMath(
+      injectPreviewBaseFontSize(
+        injectPreviewTheme(injectPreviewSecurityPolicy(srcDoc), options.themeId),
+        options.baseFontSize,
+      ),
     ),
   );
 
@@ -493,7 +529,7 @@ const buildUnrestrictedPreviewDocument = (htmlContent: string): string => {
     return htmlContent;
   }
 
-  return appendBridgeScriptToDocument(parsedDocument);
+  return injectEchartsScript(appendBridgeScriptToDocument(parsedDocument));
 };
 
 /**

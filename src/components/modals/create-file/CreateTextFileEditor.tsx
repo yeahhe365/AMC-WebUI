@@ -7,6 +7,7 @@ import { CreateFileFooter } from './CreateFileFooter';
 import { PROSE_EDITING_EXTENSIONS } from './createFileExtensionOptions';
 import { TextEditorModalShell } from '@/components/modals/TextEditorModalShell';
 import { ConfirmationModal } from '@/components/modals/ConfirmationModal';
+import { getSaveShortcutHint } from '@/utils/platform';
 
 interface CreateTextFileEditorProps {
   onConfirm: (content: string | Blob, filename: string) => void;
@@ -20,11 +21,6 @@ interface CreateTextFileEditorProps {
 }
 
 const CREATE_FILE_TITLE_ID = 'create-file-editor-title';
-
-const getSaveShortcutHint = () => {
-  const platform = typeof navigator === 'undefined' ? '' : navigator.platform || navigator.userAgent;
-  return /Mac|iPhone|iPad/.test(platform) ? '⌘ Enter' : 'Ctrl+Enter';
-};
 
 export const CreateTextFileEditor: React.FC<CreateTextFileEditorProps> = (props) => {
   const {
@@ -52,7 +48,7 @@ export const CreateTextFileEditor: React.FC<CreateTextFileEditorProps> = (props)
     setIsPreviewMode,
     isExportingPdf,
     pdfError,
-    derivedFilename,
+    defaultFilename,
     isDirty,
     textareaRef,
     isEditing,
@@ -62,6 +58,9 @@ export const CreateTextFileEditor: React.FC<CreateTextFileEditorProps> = (props)
     handleDownloadPdf,
     handlePaste,
     handleDrop,
+    canGenerateAiFilename,
+    isGeneratingAiFilename,
+    handleGenerateAiFilename,
   } = useCreateFileEditor({
     initialContent,
     initialFilename,
@@ -70,7 +69,7 @@ export const CreateTextFileEditor: React.FC<CreateTextFileEditorProps> = (props)
     isPasteRichTextAsMarkdownEnabled,
   });
 
-  const isBusy = isExportingPdf;
+  const isBusy = isExportingPdf || isGeneratingAiFilename;
 
   const handleSaveKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Enter' || !(event.metaKey || event.ctrlKey)) return;
@@ -109,10 +108,13 @@ export const CreateTextFileEditor: React.FC<CreateTextFileEditorProps> = (props)
             titleId={CREATE_FILE_TITLE_ID}
             filenameBase={filenameBase}
             setFilenameBase={setFilenameBase}
-            filenamePlaceholder={derivedFilename || t('createTextFilenamePlaceholder')}
+            filenamePlaceholder={defaultFilename || t('createTextFilenamePlaceholder')}
             extension={extension}
             setExtension={setExtension}
             onSaveKeyDown={handleSaveKeyDown}
+            canGenerateAiFilename={canGenerateAiFilename}
+            isGeneratingAiFilename={isGeneratingAiFilename}
+            handleGenerateAiFilename={handleGenerateAiFilename}
           />
         }
         body={

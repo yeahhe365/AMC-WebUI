@@ -1,0 +1,278 @@
+:root {
+  --sl-color-accent-low: #2e1065;
+  --sl-color-accent: #8b5cf6;
+  --sl-color-accent-high: #c4b5fd;
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #f8fafc;
+  --sl-color-gray-2: #e2e8f0;
+  --sl-color-gray-3: #cbd5e1;
+  --sl-color-gray-4: #94a3b8;
+  --sl-color-gray-5: #64748b;
+  --sl-color-gray-6: #334155;
+  --sl-color-black: #090d16;
+  --sl-font-system:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
+    sans-serif;
+}
+
+:root[data-theme='dark'] {
+  --sl-color-accent-low: #2e1065;
+  --sl-color-accent: #8b5cf6;
+  --sl-color-accent-high: #38bdf8;
+  --sl-color-bg: #090d16;
+  --sl-color-bg-sidebar: #0d1322;
+  --sl-color-bg-nav: #090d16;
+  --sl-color-hairline: #1e293b;
+  --sl-color-hairline-light: #1e293b;
+  --sl-color-black: #090d16;
+}
+
+/* 全局滚动条平滑化 */
+html {
+  scroll-behavior: smooth;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.5);
+}
+
+/* Starlight Card 微动效与光晕过渡 */
+.card,
+.sl-link-card {
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease !important;
+  border: 1px solid var(--sl-color-hairline) !important;
+}
+
+.card:hover,
+.sl-link-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(139, 92, 246, 0.5) !important;
+  box-shadow: 0 8px 24px -8px rgba(139, 92, 246, 0.25);
+}
+
+/* Hero 现代居中排版（移除冗余 2D Logo 后居中对齐） */
+.hero:not(:has(> img)) {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  text-align: center !important;
+  padding-block: clamp(2.5rem, calc(1.5rem + 5vmin), 5rem) !important;
+}
+
+.hero:not(:has(> img)) .stack {
+  align-items: center !important;
+  max-width: 56rem !important;
+  margin-inline: auto !important;
+}
+
+.hero:not(:has(> img)) .tagline {
+  font-size: clamp(1.1rem, calc(1rem + 0.4vw), 1.3rem) !important;
+  line-height: 1.6 !important;
+  color: var(--sl-color-gray-2) !important;
+}
+
+.hero:not(:has(> img)) .actions {
+  justify-content: center !important;
+  margin-top: 1.25rem !important;
+  gap: 0.875rem !important;
+}
+
+/* Hero CTA Actions 精致工程感设计（去 AI 感，极客现代工艺） */
+.hero .actions .sl-link-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem !important;
+  padding: 0.625rem 1.25rem !important;
+  font-size: 0.9375rem !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  letter-spacing: -0.01em !important;
+  border-radius: 8px !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.hero .actions .sl-link-button svg {
+  width: 1rem !important;
+  height: 1rem !important;
+  transition: transform 0.2s ease !important;
+}
+
+/* Primary 按钮：高对比纯净现代操作（深色模式下为精致微光白色） */
+.hero .actions .sl-link-button.primary {
+  background: #f8fafc !important;
+  color: #090d16 !important;
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.05) !important;
+}
+
+.hero .actions .sl-link-button.primary:hover {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-color: #ffffff !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.2) !important;
+}
+
+.hero .actions .sl-link-button.primary:hover svg {
+  transform: translateX(2px) !important;
+}
+
+/* Secondary 按钮：暗色微磨砂微边框（克制、高阶质感） */
+.hero .actions .sl-link-button.secondary {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--sl-color-gray-1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.hero .actions .sl-link-button.secondary:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+}
+
+.hero .actions .sl-link-button.secondary:hover svg {
+  transform: translate(1px, -1px) !important;
+}
+
+/* Minimal 按钮 (GitHub)：克制内敛的辅助操作，统一视觉规格 */
+.hero .actions .sl-link-button.minimal {
+  background: transparent !important;
+  color: var(--sl-color-gray-3) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.hero .actions .sl-link-button.minimal:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* 亮色模式适配 (Light Theme) */
+:root:not([data-theme='dark']) .hero .actions .sl-link-button.primary {
+  background: #0f172a !important;
+  color: #ffffff !important;
+  border: 1px solid #0f172a !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2) !important;
+}
+
+:root:not([data-theme='dark']) .hero .actions .sl-link-button.primary:hover {
+  background: #1e293b !important;
+  border-color: #1e293b !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25) !important;
+}
+
+:root:not([data-theme='dark']) .hero .actions .sl-link-button.secondary {
+  background: #ffffff !important;
+  color: #334155 !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+:root:not([data-theme='dark']) .hero .actions .sl-link-button.secondary:hover {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+
+:root:not([data-theme='dark']) .hero .actions .sl-link-button.minimal {
+  background: transparent !important;
+  color: #64748b !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+:root:not([data-theme='dark']) .hero .actions .sl-link-button.minimal:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* 产品界面预览框容器 */
+.preview-container {
+  margin: 2.5rem 0 3.5rem;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--sl-color-hairline);
+  box-shadow:
+    0 20px 50px -10px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  background: var(--sl-color-bg-sidebar);
+}
+
+.preview-container img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* 交互小部件通用容器样式 */
+.interactive-widget-box {
+  background: var(--sl-color-bg-sidebar);
+  border: 1px solid var(--sl-color-hairline);
+  border-radius: 12px;
+  padding: 1.25rem;
+  margin: 1.5rem 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  transition: border-color 0.2s ease;
+}
+
+.interactive-widget-box:hover {
+  border-color: rgba(139, 92, 246, 0.35);
+}
+
+/* 表格视觉美化 */
+.sl-markdown-content table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--sl-color-hairline);
+  width: 100%;
+}
+
+.sl-markdown-content th {
+  background: rgba(139, 92, 246, 0.1);
+  color: var(--sl-color-white);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--sl-color-hairline);
+  font-weight: 600;
+}
+
+.sl-markdown-content td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--sl-color-hairline);
+}
+
+.sl-markdown-content tr:last-child td {
+  border-bottom: none;
+}
+
+.sl-markdown-content tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}

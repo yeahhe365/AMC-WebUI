@@ -92,6 +92,7 @@ describe('SelectedFileDisplay', () => {
     });
 
     expect(renderer.container.textContent).toContain('Processing on Gemini');
+    expect(renderer.container.querySelector('.animate-pulse')).not.toBeNull();
   });
 
   it('renders primary file controls in a right-side action rail with larger targets', () => {
@@ -192,7 +193,7 @@ describe('SelectedFileDisplay', () => {
     expect(moveButton).toBeUndefined();
   });
 
-  it('renders a cover thumbnail with type badge for text files', () => {
+  it('renders a cover thumbnail for text files', () => {
     act(() => {
       renderer.root.render(
         <SelectedFileDisplay
@@ -208,7 +209,6 @@ describe('SelectedFileDisplay', () => {
 
     const thumbnail = renderer.container.querySelector('[data-thumbnail-kind="text"]');
     expect(thumbnail).not.toBeNull();
-    expect(thumbnail?.textContent).toContain('TXT');
     expect(renderer.container.textContent).not.toContain('first line');
   });
 

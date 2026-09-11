@@ -7,6 +7,7 @@ import { removeSessionScopedLocalStorageEntries } from '@/utils/sessionLocalStor
 import { useChatDraftStore } from '@/stores/chatDraftStore';
 import { useChatStore } from '@/stores/chatStore';
 import { clearPyodideResultCache } from '@/features/local-python/usePyodide';
+import { getPyodideService } from '@/features/local-python/loadPyodideService';
 
 interface UseHistoryClearerProps {
   savedSessions: SavedChatSession[];
@@ -44,6 +45,10 @@ export const useHistoryClearer = ({
       const sessionIds = savedSessions.map((session) => session.id);
       removeSessionScopedLocalStorageEntries(sessionIds);
       useChatDraftStore.getState().clearSessionDrafts(sessionIds);
+      sessionIds.forEach((id) => {
+        delete useChatStore.getState()._fileDrafts.current[id];
+        void dbService.deleteDraftFiles(id);
+      });
       logService.info(`Cleaned up session-scoped LocalStorage entries for ${savedSessions.length} sessions.`);
     } catch (cleanupError) {
       logService.error('Failed to clean up localStorage:', cleanupError);
@@ -53,6 +58,9 @@ export const useHistoryClearer = ({
     setSavedGroups([]);
     useChatStore.getState().setCompletedSessions({});
     clearPyodideResultCache();
+    void getPyodideService()
+      .then((service) => service.terminateWorker())
+      .catch(() => undefined);
     startNewChat();
   }, [savedSessions, setSavedSessions, setSavedGroups, startNewChat, activeJobs]);
 
@@ -60,6 +68,9 @@ export const useHistoryClearer = ({
     logService.warn('User clearing all application cache and settings.');
     activeJobs.current.forEach((controller) => controller.abort());
     activeJobs.current.clear();
+    void getPyodideService()
+      .then((service) => service.terminateWorker())
+      .catch(() => undefined);
     try {
       localStorage.clear();
     } catch (error) {

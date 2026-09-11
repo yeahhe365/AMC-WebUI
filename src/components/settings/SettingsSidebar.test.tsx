@@ -3,12 +3,12 @@ import { fireEvent } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupProviderTestRenderer as setupTestRenderer } from '@/test/render/providerRenderer';
 import { useSettingsUiStore, type SettingsTabDescriptor } from '@/stores/settingsUiStore';
-import { SETTINGS_TAB_IDS, SETTINGS_TAB_LABEL_KEYS } from '@/constants/settingsTabs';
+import { SETTINGS_TABS, SETTINGS_TAB_LABEL_KEYS } from '@/constants/settingsTabs';
 import { SettingsSidebar } from './SettingsSidebar';
 
 describe('SettingsSidebar', () => {
   const renderer = setupTestRenderer({ providers: { language: 'en' } });
-  const tabs: SettingsTabDescriptor[] = SETTINGS_TAB_IDS.map((id) => ({
+  const tabs: SettingsTabDescriptor[] = SETTINGS_TABS.map((id) => ({
     id,
     labelKey: SETTINGS_TAB_LABEL_KEYS[id],
   }));

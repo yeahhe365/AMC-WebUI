@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { toastError, toastInfo, toastSuccess, useToastStore } from './toastStore';
+import { toastError, toastInfo, toastSuccess, toastWarning, useToastStore } from './toastStore';
 
 describe('toastStore', () => {
   afterEach(() => {
@@ -46,8 +46,9 @@ describe('toastStore', () => {
     toastError('boom');
     toastSuccess('done');
     toastInfo('note');
+    toastWarning('caution');
 
     const types = useToastStore.getState().toasts.map((toast) => toast.type);
-    expect(types).toEqual(['error', 'success', 'info']);
+    expect(types).toEqual(['error', 'success', 'info', 'warning']);
   });
 });

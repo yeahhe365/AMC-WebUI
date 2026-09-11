@@ -31,6 +31,20 @@ const REACT_PACKAGES = ['react', 'react-dom', 'scheduler'];
 const PDF_VIEWER_PACKAGES = ['react-pdf'];
 const PDFJS_PACKAGES = ['pdfjs-dist'];
 const GRAPHVIZ_PACKAGES = ['@viz-js/viz'];
+const UI_PACKAGES = [
+  '@formkit/auto-animate',
+  'react-virtuoso',
+  '@radix-ui',
+  '@floating-ui',
+  'sonner',
+  'cmdk',
+  'react-textarea-autosize',
+  'react-remove-scroll',
+  '@iconify/react',
+  'react-h5-audio-player',
+  '@dnd-kit',
+];
+const DATA_PACKAGES = ['zod', 'dompurify'];
 const VITE_PRELOAD_HELPER_ID = 'vite/preload-helper';
 
 export const HEAVY_PRELOAD_PATTERNS = [
@@ -56,6 +70,18 @@ export const getManualChunk = (id: string) => {
 
   if (isSourcePath(id, '/src/constants/settingsModelOptions.ts')) {
     return 'settings-options';
+  }
+
+  if (
+    isSourcePath(id, '/src/constants/defaultScenarios.ts') ||
+    id.includes('/src/constants/scenarios/') ||
+    id.includes('\\src\\constants\\scenarios\\')
+  ) {
+    return 'default-scenarios';
+  }
+
+  if (id.includes('/src/utils/html-preview/') || id.includes('\\src\\utils\\html-preview\\')) {
+    return 'html-preview-runtime';
   }
 
   if (!id.includes('node_modules')) return undefined;
@@ -92,11 +118,11 @@ export const getManualChunk = (id: string) => {
     return 'graphviz-vendor';
   }
 
-  if (isPackagePath(id, ['@formkit/auto-animate'])) {
-    return 'ui-vendor';
+  if (isPackagePath(id, DATA_PACKAGES)) {
+    return 'data-vendor';
   }
 
-  if (isPackagePath(id, ['react-virtuoso'])) {
+  if (isPackagePath(id, UI_PACKAGES)) {
     return 'ui-vendor';
   }
 
@@ -106,6 +132,10 @@ export const getManualChunk = (id: string) => {
 
   if (isPackagePath(id, PDF_VIEWER_PACKAGES)) {
     return 'pdf-viewer-vendor';
+  }
+
+  if (isPackagePath(id, ['echarts', 'zrender'])) {
+    return 'echarts-vendor';
   }
 
   return undefined;

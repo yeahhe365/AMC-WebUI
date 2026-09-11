@@ -1,0 +1,30 @@
+---
+title: 斜杠命令速查 (Slash Commands)
+description: AMC WebUI 全量斜杠命令清单、分类速查与交互式命令查询器。
+---
+
+import { SlashCommandFinder } from '@/components/SlashCommandFinder';
+
+# 斜杠命令速查 (Slash Commands)
+
+在聊天输入框内键入 `/`，AMC WebUI 会立即唤起斜杠命令悬浮面板。使用上下方向键与回车即可盲打快速执行操作。
+
+以下为全量命令交互速查器：
+
+<SlashCommandFinder client:load />
+
+---
+
+## 核心使用技巧
+
+### 1. 快速换模型 (`/model`)
+输入 `/model` 并按下回车，输入框会自动填入 `/model ` 并展开当前所有可用模型的快速过滤选择浮层，按下 Tab 或回车即可瞬间完成模型切换。
+
+### 2. 思考速度急转弯 (`/fast`)
+对于复杂会话，临时需要快速获得一个简单答复时，输入 `/fast` 并发送，应用会自动把思考等级降至 `Low`（或 `Minimal`）；再次输入 `/fast` 则自动切回 `High` 深度推理。
+
+### 3. 多模态工具即时开关
+- `/online`：一键开启 Google 实时联网搜索。
+- `/maps`：一键调出 Google Maps 地图位置检索。
+- `/code`：切换代码执行沙箱。
+- `/file`：呼出文件上传窗口，无需鼠标离开键盘。

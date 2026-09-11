@@ -3,6 +3,9 @@ import { useI18n } from '@/contexts/I18nContext';
 import { Pin, MoreHorizontal } from 'lucide-react';
 import { type ChatGroup, type SavedChatSession } from '@/types';
 import { SessionItemMenu } from './SessionItemMenu';
+import { SessionItemContextMenu } from './SessionItemContextMenu';
+import { DropdownMenu, DropdownMenuTrigger } from '@/components/shared/DropdownMenu';
+import { ContextMenu, ContextMenuTrigger } from '@/components/shared/ContextMenu';
 import { InlineRenameInput } from './InlineRenameInput';
 import { LoadingDots } from '@/components/shared/LoadingDots';
 import { useChatStore } from '@/stores/chatStore';
@@ -26,6 +29,7 @@ export interface SessionItemProps {
   onDuplicateSession: (sessionId: string) => void;
   onOpenExportModal: (sessionId?: string) => void | Promise<void>;
   onMoveSessionToGroup: (sessionId: string, groupId: string | null) => void;
+  onRegenerateTitleSession?: (sessionId: string) => void;
   handleStartEdit: (item: SavedChatSession) => void;
   handleRenameConfirm: () => void;
   handleRenameKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
@@ -63,11 +67,11 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
     onDuplicateSession,
     onOpenExportModal,
     onMoveSessionToGroup,
+    onRegenerateTitleSession,
     handleStartEdit,
     handleRenameConfirm,
     handleRenameKeyDown,
     setEditingItem,
-    toggleMenu,
     setActiveMenu,
     draggingSessionId,
     draggingGroupId,
@@ -82,6 +86,7 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
   };
 
   const [isRightClickAnimating, setIsRightClickAnimating] = useState(false);
+  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
   const isActive = activeMenu === session.id;
   const displayTitle = session.title === 'New Chat' ? t('newChat') : session.title;
@@ -111,7 +116,6 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsRightClickAnimating(true);
-    setActiveMenu(session.id);
     setTimeout(() => setIsRightClickAnimating(false), RIGHT_CLICK_MENU_FEEDBACK_MS);
   };
 
@@ -171,143 +175,207 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
   const isBlockedByGroupDrag = !!draggingGroupId;
 
   return (
-    <li
-      onContextMenu={handleContextMenu}
-      onDragOver={onSessionDragOver ? (event) => onSessionDragOver(event, session.id) : undefined}
-      onDragLeave={onSessionDropIndicatorClear}
-      onDrop={handleItemDrop}
-      className={`group relative rounded-lg my-0.5 transition-all duration-150 ease-out ${
-        session.id === activeSessionId || isRightClickAnimating ? 'bg-[var(--theme-bg-accent)]/10' : ''
-      } ${newlyTitledSessionIds.has(session.id) ? 'title-update-animate' : ''} ${isActive ? 'z-20' : ''} ${isBlockedByGroupDrag ? 'opacity-50 pointer-events-none' : ''}`}
+    <ContextMenu
+      onOpenChange={(open) => {
+        setIsContextMenuOpen(open);
+        if (open) {
+          setIsRightClickAnimating(true);
+          setTimeout(() => setIsRightClickAnimating(false), RIGHT_CLICK_MENU_FEEDBACK_MS);
+          if (activeMenu === session.id) {
+            setActiveMenu(null);
+          }
+        }
+      }}
     >
-      {showBefore && (
-        <div className="absolute -top-[1px] left-1 right-1 h-0.5 rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_8px_var(--theme-bg-accent)] pointer-events-none z-10 animate-in fade-in duration-100 flex items-center">
-          <div className="h-1.5 w-1.5 -ml-0.5 rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_6px_var(--theme-bg-accent)]" />
-        </div>
-      )}
-      {showAfter && (
-        <div className="absolute -bottom-[1px] left-1 right-1 h-0.5 rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_8px_var(--theme-bg-accent)] pointer-events-none z-10 animate-in fade-in duration-100 flex items-center">
-          <div className="h-1.5 w-1.5 -ml-0.5 rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_6px_var(--theme-bg-accent)]" />
-        </div>
-      )}
-      <div
-        className={`relative w-full text-left pl-2.5 pr-1 py-2 text-sm transition-colors rounded-lg text-[var(--theme-text-primary)] ${
-          session.id === activeSessionId ? 'font-medium' : 'hover:bg-[var(--theme-bg-tertiary)]'
-        } ${isBeingDragged ? 'opacity-35 scale-[0.98] border border-dashed border-[var(--theme-border-focus)]/60 bg-[var(--theme-bg-tertiary)]/40 shadow-xs' : ''} ${isBlockedByGroupDrag ? 'opacity-40' : ''}`}
-      >
-        {editingItem?.type === 'session' && editingItem.id === session.id ? (
-          <InlineRenameInput
-            editInputRef={editInputRef}
-            title={editingItem.title}
-            onTitleChange={(e) => setEditingItem({ ...editingItem, title: e.target.value })}
-            onBlur={handleRenameConfirm}
-            onKeyDown={handleRenameKeyDown}
-            className="flex-grow bg-transparent border border-[var(--theme-border-focus)] rounded-md px-1 py-0 text-sm w-full"
-          />
-        ) : (
-          <a
-            href={`/chat/${session.id}`}
-            draggable={!disableNativeDrag}
-            onDragStart={disableNativeDrag ? undefined : handleDragStart}
-            onDragEnd={disableNativeDrag ? undefined : handleDragEnd}
-            onClick={(e) => {
-              if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-                e.preventDefault();
-                if (e.detail > 1) {
-                  // 双击的第二下：只进 onDoubleClick（重命名），不再重复选中。
-                  return;
-                }
-                // 双击第一下会先触发一次 micro-drag，click 被吞掉；这里不能把它
-                // 当成普通单击放行，否则双击后会话仍被选中一次。跳过它，让第二下
-                // 的 dblclick 专心处理。
-                if (isDoubleClickDrag(e as React.DragEvent<HTMLAnchorElement>)) {
-                  return;
-                }
-                onSelectSession(session.id);
-              }
-            }}
-            onDoubleClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              handleStartEdit(session);
-            }}
-            className="flex w-full min-w-0 items-center pr-8 no-underline text-inherit"
-            aria-current={session.id === activeSessionId ? 'page' : undefined}
+      <ContextMenuTrigger asChild>
+        <li
+          onContextMenu={handleContextMenu}
+          onDragOver={onSessionDragOver ? (event) => onSessionDragOver(event, session.id) : undefined}
+          onDragLeave={onSessionDropIndicatorClear}
+          onDrop={handleItemDrop}
+          className={`group relative rounded-lg my-0.5 transition-all duration-150 ease-out ${
+            session.id === activeSessionId || isRightClickAnimating || isContextMenuOpen
+              ? 'bg-[var(--theme-bg-accent)]/10'
+              : ''
+          } ${newlyTitledSessionIds.has(session.id) ? 'title-update-animate' : ''} ${isActive || isContextMenuOpen ? 'z-20' : ''} ${isBlockedByGroupDrag ? 'opacity-50 pointer-events-none' : ''}`}
+        >
+          {showBefore && (
+            <div className="absolute -top-[1px] left-1 right-1 h-0.5 rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_8px_var(--theme-bg-accent)] pointer-events-none z-10 animate-in fade-in duration-100 flex items-center">
+              <div className="h-1.5 w-1.5 -ml-0.5 rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_6px_var(--theme-bg-accent)]" />
+            </div>
+          )}
+          {showAfter && (
+            <div className="absolute -bottom-[1px] left-1 right-1 h-0.5 rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_8px_var(--theme-bg-accent)] pointer-events-none z-10 animate-in fade-in duration-100 flex items-center">
+              <div className="h-1.5 w-1.5 -ml-0.5 rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_6px_var(--theme-bg-accent)]" />
+            </div>
+          )}
+          <div
+            className={`relative w-full text-left pl-2.5 pr-1 py-2 text-sm transition-colors rounded-lg text-[var(--theme-text-primary)] ${
+              session.id === activeSessionId ? 'font-medium' : 'hover:bg-[var(--theme-bg-tertiary)]'
+            } ${isBeingDragged ? 'opacity-35 scale-[0.98] border border-dashed border-[var(--theme-border-focus)]/60 bg-[var(--theme-bg-tertiary)]/40 shadow-xs' : ''} ${isBlockedByGroupDrag ? 'opacity-40' : ''}`}
           >
-            {session.isPinned && (
-              <Pin size={12} className="mr-2 text-[var(--theme-text-link)] flex-shrink-0" strokeWidth={2} />
-            )}
-            <span className="font-medium truncate" title={displayTitle}>
-              {generatingTitleSessionIds.has(session.id) ? (
-                <div className="flex items-center gap-2 text-xs text-[var(--theme-text-secondary)]">
-                  <LoadingDots />
-                  <span>{t('generatingTitle')}</span>
-                </div>
-              ) : (
-                displayTitle
-              )}
-            </span>
-          </a>
-        )}
-        {loadingSessionIds.has(session.id) ? (
-          <span className="absolute right-1 top-1/2 -translate-y-1/2">
-            <LoadingDots />
-          </span>
-        ) : (
-          <>
-            {completedOutcome && (
-              <span
-                className={`absolute right-2 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ${
-                  completedOutcome === 'error' ? 'bg-[#ef4444]' : 'bg-[#22c55e]'
-                }`}
-                title={t(completedOutcome === 'error' ? 'sessionCompletedWithError' : 'sessionCompleted')}
-                aria-label={t(completedOutcome === 'error' ? 'sessionCompletedWithError' : 'sessionCompleted')}
+            {editingItem?.type === 'session' && editingItem.id === session.id ? (
+              <InlineRenameInput
+                editInputRef={editInputRef}
+                title={editingItem.title}
+                onTitleChange={(e) => setEditingItem({ ...editingItem, title: e.target.value })}
+                onBlur={handleRenameConfirm}
+                onKeyDown={handleRenameKeyDown}
+                className="flex-grow bg-transparent border border-[var(--theme-border-focus)] rounded-md px-1 py-0 text-sm w-full"
               />
-            )}
-            {!generatingTitleSessionIds.has(session.id) && (
-              <button
-                onClick={(e) => toggleMenu(e, session.id)}
-                title={t('sessionMoreOptions')}
-                aria-label={t('sessionMoreOptions')}
-                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-[var(--theme-bg-secondary)] p-1 text-[var(--theme-text-primary)] opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus:opacity-100 focus:pointer-events-auto transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-border-focus)]"
+            ) : (
+              <a
+                href={`/chat/${session.id}`}
+                draggable={!disableNativeDrag}
+                onDragStart={disableNativeDrag ? undefined : handleDragStart}
+                onDragEnd={disableNativeDrag ? undefined : handleDragEnd}
+                onClick={(e) => {
+                  if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                    e.preventDefault();
+                    if (e.detail > 1) {
+                      // 双击的第二下：只进 onDoubleClick（重命名），不再重复选中。
+                      return;
+                    }
+                    // 双击第一下会先触发一次 micro-drag，click 被吞掉；这里不能把它
+                    // 当成普通单击放行，否则双击后会话仍被选中一次。跳过它，让第二下
+                    // 的 dblclick 专心处理。
+                    if (isDoubleClickDrag(e as React.DragEvent<HTMLAnchorElement>)) {
+                      return;
+                    }
+                    onSelectSession(session.id);
+                  }
+                }}
+                onDoubleClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleStartEdit(session);
+                }}
+                className="flex w-full min-w-0 items-center pr-8 no-underline text-inherit"
+                aria-current={session.id === activeSessionId ? 'page' : undefined}
               >
-                <MoreHorizontal size={16} strokeWidth={2.2} />
-              </button>
+                {session.isPinned && (
+                  <Pin size={12} className="mr-2 text-[var(--theme-text-link)] flex-shrink-0" strokeWidth={2} />
+                )}
+                <span className="font-medium truncate" title={displayTitle}>
+                  {generatingTitleSessionIds.has(session.id) ? (
+                    <div className="flex items-center gap-2 text-xs text-[var(--theme-text-secondary)]">
+                      <LoadingDots />
+                      <span>{t('generatingTitle')}</span>
+                    </div>
+                  ) : (
+                    displayTitle
+                  )}
+                </span>
+              </a>
             )}
-          </>
-        )}
-      </div>
-      {showAfter && (
-        <div className="absolute -bottom-[1px] left-1 right-1 h-0.5 rounded-full bg-[var(--theme-bg-accent)] pointer-events-none z-10" />
-      )}
-      {activeMenu === session.id && (
-        <SessionItemMenu
-          session={session}
-          menuRef={menuRef}
-          groups={groups}
-          onMoveSessionToGroup={onMoveSessionToGroup}
-          onStartEdit={() => {
-            handleStartEdit(session);
-            setActiveMenu(null);
-          }}
-          onTogglePin={() => {
-            onTogglePinSession(session.id);
-            setActiveMenu(null);
-          }}
-          onDuplicate={() => {
-            onDuplicateSession(session.id);
-            setActiveMenu(null);
-          }}
-          onExport={() => {
-            onOpenExportModal(session.id);
-            setActiveMenu(null);
-          }}
-          onDelete={() => {
-            onDeleteSession(session.id);
-            setActiveMenu(null);
-          }}
-        />
-      )}
-    </li>
+            {loadingSessionIds.has(session.id) ? (
+              <span className="absolute right-1 top-1/2 -translate-y-1/2">
+                <LoadingDots />
+              </span>
+            ) : (
+              <>
+                {completedOutcome && (
+                  <span
+                    className={`absolute right-2 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full ${
+                      completedOutcome === 'error' ? 'bg-[#ef4444]' : 'bg-[#22c55e]'
+                    }`}
+                    title={t(completedOutcome === 'error' ? 'sessionCompletedWithError' : 'sessionCompleted')}
+                    aria-label={t(completedOutcome === 'error' ? 'sessionCompletedWithError' : 'sessionCompleted')}
+                  />
+                )}
+                {!generatingTitleSessionIds.has(session.id) && (
+                  <DropdownMenu
+                    open={activeMenu === session.id}
+                    onOpenChange={(open) => setActiveMenu(open ? session.id : null)}
+                  >
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        title={t('sessionMoreOptions')}
+                        aria-label={t('sessionMoreOptions')}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-[var(--theme-bg-secondary)] p-1 text-[var(--theme-text-primary)] opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus:opacity-100 focus:pointer-events-auto transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-border-focus)]"
+                      >
+                        <MoreHorizontal size={16} strokeWidth={2.2} />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <SessionItemMenu
+                      session={session}
+                      menuRef={menuRef}
+                      groups={groups}
+                      onMoveSessionToGroup={onMoveSessionToGroup}
+                      onStartEdit={() => {
+                        handleStartEdit(session);
+                        setActiveMenu(null);
+                      }}
+                      onTogglePin={() => {
+                        onTogglePinSession(session.id);
+                        setActiveMenu(null);
+                      }}
+                      onDuplicate={() => {
+                        onDuplicateSession(session.id);
+                        setActiveMenu(null);
+                      }}
+                      onExport={() => {
+                        onOpenExportModal(session.id);
+                        setActiveMenu(null);
+                      }}
+                      onDelete={() => {
+                        onDeleteSession(session.id);
+                        setActiveMenu(null);
+                      }}
+                      onRegenerateTitle={
+                        onRegenerateTitleSession
+                          ? () => {
+                              onRegenerateTitleSession(session.id);
+                              setActiveMenu(null);
+                            }
+                          : undefined
+                      }
+                      isGeneratingTitle={generatingTitleSessionIds.has(session.id)}
+                    />
+                  </DropdownMenu>
+                )}
+              </>
+            )}
+          </div>
+          {showAfter && (
+            <div className="absolute -bottom-[1px] left-1 right-1 h-0.5 rounded-full bg-[var(--theme-bg-accent)] pointer-events-none z-10" />
+          )}
+        </li>
+      </ContextMenuTrigger>
+      <SessionItemContextMenu
+        session={session}
+        groups={groups}
+        onMoveSessionToGroup={onMoveSessionToGroup}
+        onStartEdit={() => {
+          handleStartEdit(session);
+          setActiveMenu(null);
+        }}
+        onTogglePin={() => {
+          onTogglePinSession(session.id);
+          setActiveMenu(null);
+        }}
+        onDuplicate={() => {
+          onDuplicateSession(session.id);
+          setActiveMenu(null);
+        }}
+        onExport={() => {
+          onOpenExportModal(session.id);
+          setActiveMenu(null);
+        }}
+        onDelete={() => {
+          onDeleteSession(session.id);
+          setActiveMenu(null);
+        }}
+        onRegenerateTitle={
+          onRegenerateTitleSession
+            ? () => {
+                onRegenerateTitleSession(session.id);
+                setActiveMenu(null);
+              }
+            : undefined
+        }
+        isGeneratingTitle={generatingTitleSessionIds.has(session.id)}
+      />
+    </ContextMenu>
   );
 };

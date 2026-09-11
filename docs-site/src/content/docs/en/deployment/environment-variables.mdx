@@ -1,0 +1,43 @@
+---
+title: Environment Variables & Security
+description: Reference of all backend and public runtime environment variables with an interactive .env file generator.
+---
+
+import { EnvConfigGenerator } from '@/components/EnvConfigGenerator';
+
+# Environment Variables & Security
+
+Distinguishing between sensitive server-only variables and public runtime configurations is critical for secure deployment.
+
+---
+
+## Interactive Configuration Generator
+
+<EnvConfigGenerator client:load locale="en" />
+
+---
+
+## Environment Variables Matrix
+
+| Variable | Purpose | Scope | Default |
+| :--- | :--- | :--- | :--- |
+| `WEB_PORT` | Host exposed port for web container | Host | `8080` |
+| `PORT` | Node API server listening port | Server | `3001` |
+| `GEMINI_API_KEY` | Optional server-managed Gemini key | **Server only** | empty |
+| `LIVE_GEMINI_API_KEY`| Dedicated server key for Live WS proxy | **Server only** | empty |
+| `SERVER_KEY_PRIORITY`| `true`=server priority; `false`=browser key first | Server | `false` |
+| `ALLOWED_ORIGINS` | Comma-separated CORS whitelist | Server | empty |
+| `ENABLE_LIVE_WS_PROXY`| Enable `/api/live` WebSocket proxying | Server | `true` |
+| `ENABLE_MCP_STDIO` | Allow running local stdio MCP processes | Server | `false` |
+| `THIRD_PARTY_ROUTES`| Third-party provider routing table JSON | **Server only** | empty |
+| `RUNTIME_API_PROXY_URL`| Frontend Gemini proxy endpoint | Public runtime | `/api/gemini` |
+| `RUNTIME_LIVE_API_BASE_URL`| Frontend Live WS endpoint | Public runtime | `/api/live` |
+| `RUNTIME_THIRD_PARTY_PROXY_URL`| Third-party proxy endpoint | Public runtime | `/api/openai` |
+
+---
+
+## ⚠️ Security Boundary Notice
+
+This multi-service setup is tailored for **trusted self-hosted environments**:
+- Standard BYOK uses browser keys. This architecture does not provide multi-tenant authentication or billing quotas for open public internet access.
+- Deploy reverse proxy authentication (Nginx, Traefik, or Cloudflare Access) when exposing endpoints publicly.

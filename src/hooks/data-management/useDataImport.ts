@@ -1,5 +1,13 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import { type AppSettings, type SavedChatSession, type SavedScenario, type ChatGroup, type ChatMessage } from '@/types';
+import {
+  type AppSettings,
+  type SavedChatSession,
+  type SavedScenario,
+  type ChatGroup,
+  type ChatMessage,
+  type SessionsUpdater,
+  type GroupsUpdater,
+} from '@/types';
 import { logService } from '@/services/logService';
 import { toastError, toastSuccess } from '@/stores/toastStore';
 import { generateUniqueId } from '@/utils/chat/ids';
@@ -7,9 +15,6 @@ import { mergeImportedScenarios } from '@/features/scenarios/scenarioLibrary';
 import { sanitizeImportedAppSettings } from '@/schemas/appSettingsSchema';
 import { REDACTED_SECRET_SENTINEL, restoreRedactedSecrets } from '@/utils/secretRedaction';
 import { interpolate, formatI18nErrorMessage } from '@/i18n/interpolate';
-
-type SessionsUpdater = (updater: (prev: SavedChatSession[]) => SavedChatSession[]) => void;
-type GroupsUpdater = (updater: (prev: ChatGroup[]) => ChatGroup[]) => void;
 
 interface UseDataImportProps {
   setAppSettings: Dispatch<SetStateAction<AppSettings>>;
@@ -95,7 +100,7 @@ export const useDataImport = ({
       const reader = new FileReader();
       reader.onload = (event) => {
         try {
-          const text = event.target?.result as string;
+          const text = (reader.result ?? (event?.target as FileReader | null)?.result) as string;
           const importPayload = JSON.parse(text);
           if (importPayload && importPayload.type === expectedType) {
             onValid(importPayload);

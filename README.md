@@ -14,6 +14,9 @@
     <a href="https://all-model-chat.pages.dev/" target="_blank">
       <img src="https://img.shields.io/badge/在线演示-Live_Demo-6366f1?style=for-the-badge&logo=cloudflare&logoColor=white" alt="Online Demo">
     </a>
+    <a href="https://all-model-chat-docs.pages.dev/" target="_blank">
+      <img src="https://img.shields.io/badge/官方文档-Documentation-8b5cf6?style=for-the-badge&logo=astro&logoColor=white" alt="Documentation">
+    </a>
     <a href="https://github.com/yeahhe365/AMC-WebUI/actions/workflows/ci.yml" target="_blank">
       <img src="https://img.shields.io/github/actions/workflow/status/yeahhe365/AMC-WebUI/ci.yml?branch=main&style=for-the-badge&label=CI" alt="CI">
     </a>
@@ -27,7 +30,7 @@
     <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React">
     <img src="https://img.shields.io/badge/TypeScript-5.5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript">
     <img src="https://img.shields.io/badge/Tailwind-4.2-38BDF8?style=flat-square&logo=tailwind-css&logoColor=white" alt="Tailwind">
-    <img src="https://img.shields.io/badge/Gemini_SDK-1.50%2B-8E75B2?style=flat-square&logo=google&logoColor=white" alt="Gemini SDK">
+    <img src="https://img.shields.io/badge/Gemini_SDK-2.20%2B-8E75B2?style=flat-square&logo=google&logoColor=white" alt="Gemini SDK">
     <img src="https://img.shields.io/badge/PWA-Supported-5A0FC8?style=flat-square&logo=pwa&logoColor=white" alt="PWA">
   </p>
 
@@ -38,7 +41,7 @@
 ## 界面预览
 
 <p align="center">
-  <img src="./docs/screenshots/app-desktop-20260426.png" alt="AMC WebUI 桌面端界面预览" width="100%">
+  <img src="./docs/screenshots/app-desktop-20260909.png" alt="AMC WebUI 桌面端界面预览" width="100%">
 </p>
 
 ## 项目简介
@@ -118,6 +121,14 @@
 - **语音转录**：通过 Gemini 3.5 Transcribe 模型进行语音转文字
 - **Gemini 原生图片生成（Nano Banana）**：支持宽高比、尺寸与四图生成
 
+### Model Context Protocol (MCP)
+
+- 支持标准 Model Context Protocol (MCP)，通过 Node API（`/api/mcp/*`）提供服务端桥接
+- 支持 **stdio**、**SSE** 及 **Streamable HTTP** 三种传输协议（HTTP/SSE 连接受 `ENABLE_MCP_PRIVATE_HTTP` 私网安全策略保护）
+- 人在回路（Human-in-the-loop）工具调用授权机制：执行外部 MCP 工具调用前弹窗征得用户授权
+- 完整的 MCP 工具、提示词（Prompts）、资源（Resources）管理与连接状态展示
+- 支持开发者日志监控与实时错误排查
+
 ### 企业级 API 管理
 
 - **双 API 模式**：支持在 Gemini 原生 与 OpenAI 兼容 两条请求路径之间切换
@@ -141,7 +152,7 @@
 
 - 日志与用量页采用“严格精确”模式：只有在已存储字段足以精确还原官方费用时才显示价格
 - 新生成的聊天、TTS、转写与部分图片生成请求会记录更完整的计费元数据
-- 纯文本聊天请求会在本地补齐 `TEXT -> TEXT` 模态证据，因此纯文本 `gemini-3.1-pro-preview`、`gemini-3.6-flash`、`gemini-3.5-flash-lite` 等对话可显示价格
+- 纯文本聊天请求会在本地补齐 `TEXT -> TEXT` 模态证据，因此纯文本 `gemini-3.8-flash`、`gemini-3.1-pro-preview`、`gemini-3.5-flash-lite` 等对话可显示价格
 - 历史记录或缺少精确定价字段的请求会继续显示 `—`
 
 ### 多标签同步
@@ -156,13 +167,13 @@
 
 ### 安全设置
 
-- 4 个安全过滤类别：骚扰、仇恨言论、色情内容、危险内容
+- 5 个安全过滤类别：骚扰内容、仇恨言论、色情内容、危险内容、越狱防护 (Jailbreak)
 - 每个类别可独立配置过滤级别（关闭 / 不拦截 / 拦截少量 / 拦截部分 / 拦截大部分）
 - 默认全部为「关闭」，与 Gemini 2.5 / 3 系列模型的官方默认值一致
 
 ### 主题系统
 
-- 内置 Onyx（暗色）、Graphite（灰色）、Pearl（亮色）主题
+- 内置 Onyx（暗色）、Graphite（灰色）、Pearl（亮色，默认）与 Sepia（暖米色）4 款精选主题
 - 支持跟随系统主题自动切换
 
 ### 数据管理
@@ -178,43 +189,43 @@
 
 ### 方式一：标准开发模式
 
-本地开发推荐使用 Node.js 26（仓库提供 `.nvmrc`，CI 主流程使用同一主版本），最低支持 Node.js 24。Docker 镜像基于 `node:24-slim` 构建。仓库启用了 `engine-strict`，如果你使用 Node 27+ 或 23 及以下版本，`npm install` 会直接失败；建议先执行 `nvm use` 使用推荐版本。
+本地开发推荐使用 Node.js 26（仓库提供 `.nvmrc`，CI 主流程使用同一主版本），最低支持 Node.js 24。Docker 镜像基于 `node:24-slim` 构建。仓库使用 pnpm 管理依赖（声明于 `packageManager` 并由 `pnpm-lock.yaml` 锁定），启用了 `engine-strict`，如果你使用 Node 27+ 或 23 及以下版本，安装会直接失败；建议先执行 `nvm use` 使用推荐版本。
 
 ```bash
 # 克隆仓库
 git clone https://github.com/yeahhe365/AMC-WebUI.git
 cd AMC-WebUI
 
-# 安装依赖
-npm ci
+# 安装依赖（推荐使用 pnpm，亦兼容 npm ci）
+pnpm install
 
 # 启动开发服务器
-npm run dev
+pnpm dev
 ```
 
 如需分析生产包体积，可执行：
 
 ```bash
-npm run build:analyze
+pnpm run build:analyze
 ```
 
 命令会生成 `dist/bundle-stats.html`，用于查看主包、懒加载 chunk 与 PWA 预缓存边界。
 
-访问 `http://localhost:5175`，在 **设置 -> API 配置** 中填入你的 Gemini API Key。
+访问 `http://localhost:5175`，在 **设置 -> 服务商与 API** 中填入你的 Gemini API Key。
 
 除了在界面中手动配置，也可在根目录创建 `.env.local`（仅前端开发模式使用）：
 
 ```bash
-GEMINI_API_KEY=your_api_key_here
+VITE_GEMINI_API_KEY=your_api_key_here
 VITE_OPENAI_API_KEY=your_openai_compatible_key_here
 ```
 
-如需切换到 OpenAI 兼容模式：
+如需配置第三方服务商（OpenAI 兼容等）：
 
-1. 进入 **设置 -> API 配置**，将 API 模式切换为 **OpenAI 兼容**
-2. 填写 OpenAI 兼容 API Key，或在 `.env.local` 中预置 `VITE_OPENAI_API_KEY`
-3. 填写 OpenAI 兼容 Base URL，例如 `https://api.openai.com/v1`
-4. 进入 **设置 -> 模型**，选择或编辑该模式下独立维护的模型列表
+1. 进入 **设置 -> 服务商与 API**，选择已有服务商（如 OpenAI、DeepSeek、Anthropic、OpenRouter 等）或点击添加新服务商
+2. 填写 API Key，或在 `.env.local` 中预置 `VITE_OPENAI_API_KEY`
+3. 填写 Base URL（例如 `https://api.openai.com/v1`），并可点击测试连通性与延迟
+4. 进入 **设置 -> 模型** 或在服务商详情中同步模型列表，按需选择或编辑模型
 
 示例 Base URL：
 
@@ -227,13 +238,13 @@ VITE_OPENAI_API_KEY=your_openai_compatible_key_here
 项目包含双容器部署：
 
 - `web`：Node 轻量服务托管前端静态资源，并反向代理 `/api/*` 到 `api` 服务
-- `api`：Node 服务，提供 `/api/gemini/*` 代理
+- `api`：Node 服务，提供 Gemini 代理（`/api/gemini/*`）、第三方兼容转发（`/api/openai/*`）、Live API WebSocket 代理（`/api/live`）、剪贴板图片获取与 MCP 桥接等服务
 
 运行方式：
 
 ```bash
 # 在仓库根目录
-npm run build:docker
+pnpm run build:docker
 docker compose up -d --build
 ```
 
@@ -241,9 +252,9 @@ docker compose up -d --build
 
 说明：
 
-- Docker 默认是 BYOK 自用模式：启动后在 **设置 -> API 配置** 填入 Gemini API Key 即可使用普通聊天、Live API 与第三方兼容接口，不需要在 `.env` 或 `docker-compose.yml` 里配置 `GEMINI_API_KEY` 或 `THIRD_PARTY_ROUTES`。服务端 Key 仅在浏览器未携带 Key 时兜底。
+- Docker 默认是 BYOK 自用模式：启动后在 **设置 -> 服务商与 API** 填入 Gemini API Key 即可使用普通聊天、Live API 与第三方兼容接口，不需要在 `.env` 或 `docker-compose.yml` 里配置 `GEMINI_API_KEY` 或 `THIRD_PARTY_ROUTES`。服务端 Key 仅在浏览器未携带 Key 时兜底。
 - `web` 镜像默认直接打包宿主机已生成的 `dist/`，不再在容器内执行前端生产构建。
-- 修改前端或后端 API 代码后，请先重新执行 `npm run build:docker`，再执行 `docker compose up -d --build`。
+- 修改前端或后端 API 代码后，请先重新执行 `pnpm run build:docker`，再执行 `docker compose up -d --build`。
 
 > ⚠️ 安全边界说明
 > 当前 `web + api` 代理方案定位为 **受信任/自托管环境**（trusted self-hosted deployment）。
@@ -256,25 +267,27 @@ docker compose up -d --build
 
 部署时请区分两类配置：
 
-| 变量名                          | 用途                                                                  | 公开性             | Docker 默认值                               |
-| :------------------------------ | :-------------------------------------------------------------------- | :----------------- | :------------------------------------------ |
-| `GEMINI_API_KEY`                | 可选的服务端托管 Gemini API Key；浏览器 BYOK 优先，留空则回落此 Key   | **仅服务端**       | 空                                          |
-| `PORT`                          | `api` 服务监听端口                                                    | 仅服务端           | `3001`                                      |
-| `GEMINI_API_BASE`               | Gemini 上游地址（代理目标）                                           | 仅服务端           | `https://generativelanguage.googleapis.com` |
-| `ALLOWED_ORIGINS`               | 逗号分隔 CORS 白名单（跨域部署时使用）                                | 仅服务端           | 空                                          |
-| `ENABLE_MCP_STDIO`              | 启用 `stdio` MCP 服务调用能力                                         | 仅服务端           | `false`                                     |
-| `ENABLE_MCP_PRIVATE_HTTP`       | 允许 API 服务访问内网/本机 HTTP MCP 地址                              | 仅服务端           | `false`                                     |
-| `ENABLE_LIVE_WS_PROXY`          | 启用 `/api/live` WebSocket 全代理（Docker 默认开启）                  | 仅服务端           | `true`                                      |
-| `LIVE_WS_IDLE_TIMEOUT_MS`       | Live WS 空闲回收时间（毫秒）                                          | 仅服务端           | `300000`                                    |
-| `SERVER_KEY_PRIORITY`           | Key 优先级：`false`=浏览器 BYOK 优先·服务端兜底；`true`=服务端优先    | 仅服务端           | `false`                                     |
-| `THIRD_PARTY_ROUTES`            | JSON：provider → { baseUrl, apiKey } 第三方路由表（仅 https、非私网） | 仅服务端           | 空                                          |
-| `RUNTIME_SERVER_MANAGED_API`    | 前端默认启用服务端托管 API                                            | **公开运行时配置** | `true`                                      |
-| `RUNTIME_USE_CUSTOM_API_CONFIG` | 前端默认启用“自定义 API 配置”                                         | 公开运行时配置     | `true`                                      |
-| `RUNTIME_USE_API_PROXY`         | 前端默认启用 API 代理                                                 | 公开运行时配置     | `true`                                      |
-| `RUNTIME_API_PROXY_URL`         | 前端默认 Gemini 代理地址                                              | 公开运行时配置     | `/api/gemini`                               |
-| `RUNTIME_LIVE_API_BASE_URL`     | 前端 Live API 代理地址（留空则浏览器直连官方 WS）                     | 公开运行时配置     | `/api/live`                                 |
-| `RUNTIME_THIRD_PARTY_PROXY_URL` | 前端第三方兼容接口代理地址（留空则浏览器直连 provider）               | 公开运行时配置     | `/api/openai`                               |
-| `RUNTIME_PYODIDE_BASE_URL`      | 可选 Pyodide 运行时资源地址；留空时使用同源 `/pyodide/`               | 公开运行时配置     | 空                                          |
+| 变量名                          | 用途                                                                   | 公开性             | Docker 默认值                               |
+| :------------------------------ | :--------------------------------------------------------------------- | :----------------- | :------------------------------------------ |
+| `GEMINI_API_KEY`                | 可选的服务端托管 Gemini API Key；浏览器 BYOK 优先，留空则回落此 Key    | **仅服务端**       | 空                                          |
+| `LIVE_GEMINI_API_KEY`           | 可选的 Live API 专属服务端 Gemini API Key；优先级高于 `GEMINI_API_KEY` | 仅服务端           | 空                                          |
+| `PORT`                          | `api` 服务监听端口                                                     | 仅服务端           | `3001`                                      |
+| `WEB_PORT`                      | `web` 服务宿主机映射端口                                               | 仅宿主机           | `8080`                                      |
+| `GEMINI_API_BASE`               | Gemini 上游地址（代理目标）                                            | 仅服务端           | `https://generativelanguage.googleapis.com` |
+| `ALLOWED_ORIGINS`               | 逗号分隔 CORS 白名单（跨域部署时使用）                                 | 仅服务端           | 空                                          |
+| `ENABLE_MCP_STDIO`              | 启用 `stdio` MCP 服务调用能力                                          | 仅服务端           | `false`                                     |
+| `ENABLE_MCP_PRIVATE_HTTP`       | 允许 API 服务访问内网/本机 HTTP MCP 地址                               | 仅服务端           | `false`                                     |
+| `ENABLE_LIVE_WS_PROXY`          | 启用 `/api/live` WebSocket 全代理（Docker 默认开启）                   | 仅服务端           | `true`                                      |
+| `LIVE_WS_IDLE_TIMEOUT_MS`       | Live WS 空闲回收时间（毫秒）                                           | 仅服务端           | `300000`                                    |
+| `SERVER_KEY_PRIORITY`           | Key 优先级：`false`=浏览器 BYOK 优先·服务端兜底；`true`=服务端优先     | 仅服务端           | `false`                                     |
+| `THIRD_PARTY_ROUTES`            | JSON：provider → { baseUrl, apiKey } 第三方路由表（仅 https、非私网）  | 仅服务端           | 空                                          |
+| `RUNTIME_SERVER_MANAGED_API`    | 前端默认启用服务端托管 API                                             | **公开运行时配置** | `true`                                      |
+| `RUNTIME_USE_CUSTOM_API_CONFIG` | 前端默认启用“自定义 API 配置”                                          | 公开运行时配置     | `true`                                      |
+| `RUNTIME_USE_API_PROXY`         | 前端默认启用 API 代理                                                  | 公开运行时配置     | `true`                                      |
+| `RUNTIME_API_PROXY_URL`         | 前端默认 Gemini 代理地址                                               | 公开运行时配置     | `/api/gemini`                               |
+| `RUNTIME_LIVE_API_BASE_URL`     | 前端 Live API 代理地址（留空则浏览器直连官方 WS）                      | 公开运行时配置     | `/api/live`                                 |
+| `RUNTIME_THIRD_PARTY_PROXY_URL` | 前端第三方兼容接口代理地址（留空则浏览器直连 provider）                | 公开运行时配置     | `/api/openai`                               |
+| `RUNTIME_PYODIDE_BASE_URL`      | 可选 Pyodide 运行时资源地址；留空时使用同源 `/pyodide/`                | 公开运行时配置     | 空                                          |
 
 说明：
 
@@ -282,7 +295,7 @@ docker compose up -d --build
 - public/runtime-config.js 模板用于纯静态构建，默认不启用自定义 API 配置或代理；Docker 部署会由 `docker/web-server.js` 在容器启动时按上表默认值覆盖该文件。
 - Pyodide 产物会在生产构建时复制到 `dist/pyodide/`，运行时默认从同源 `/pyodide/` 加载；如需改用 CDN 或独立静态域，可将 `RUNTIME_PYODIDE_BASE_URL` 设置为完整目录 URL，例如 `https://cdn.jsdelivr.net/pyodide/v0.27.7/full/`。
 - PWA 预缓存默认排除 `pyodide/` 大体积产物，首次执行本地 Python 时仍会按上述地址按需加载。
-- 默认 BYOK 模式只需要在设置界面填写 API Key：普通 Gemini 代理会使用浏览器请求携带的 key；Live API 走 `/api/live` 的 WebSocket 全代理，由 `api` 容器桥接到官方 `wss://generativelanguage…/BidiGenerateContent`，浏览器 Key 存在时优先透传（BYOK 兜底），否则回落服务端 `GEMINI_API_KEY`。
+- 默认 BYOK 模式只需要在设置界面填写 API Key：普通 Gemini 代理会使用浏览器请求携带的 key；Live API 走 `/api/live` 的 WebSocket 全代理，由 `api` 容器桥接到官方 `wss://generativelanguage…/BidiGenerateContent`，浏览器 Key 存在时优先透传（BYOK 兜底），否则回落服务端 `LIVE_GEMINI_API_KEY` 或 `GEMINI_API_KEY`。
 - 如需服务端统一托管普通 Gemini 请求的 key，可配置 `GEMINI_API_KEY` 并将 `RUNTIME_SERVER_MANAGED_API=true`；Live API 与第三方接口同样遵循「浏览器 Key 优先·服务端兜底」（除非显式设 `SERVER_KEY_PRIORITY=true`）。
 - MCP 的 `stdio` 与内网/本机 HTTP 访问默认关闭；仅在可信自托管环境中按需设置 `ENABLE_MCP_STDIO=true` 或 `ENABLE_MCP_PRIVATE_HTTP=true`。
 - 第三方兼容接口（OpenAI / DeepSeek / Anthropic / OpenRouter / Qwen / Kimi / GLM / Custom）经 `/api/openai/*` 转发，按请求头 `x-third-party-provider` 在 `THIRD_PARTY_ROUTES` 路由表中查上游，仅接受 https、非私网 host；浏览器 Key 优先、缺失时回落路由表里的服务端 Key。静态部署（Pages）不注入 `RUNTIME_THIRD_PARTY_PROXY_URL`，前端自动回退浏览器直连 provider。
@@ -297,14 +310,14 @@ docker compose up -d --build
 1. 前端（Pages）执行标准构建并发布 `dist`：
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 2. 后端（独立服务）构建并启动：
 
 ```bash
-npm run build:api
-npm run start:api
+pnpm run build:api
+pnpm run start:api
 ```
 
 3. 在前端运行时配置中将以下值指向后端公开地址（示例）：
@@ -313,7 +326,7 @@ npm run start:api
 RUNTIME_API_PROXY_URL=https://your-api.example.com/api/gemini
 ```
 
-4. 如需服务端统一托管普通 Gemini 请求的密钥，在后端环境设置 `GEMINI_API_KEY`；如果使用 BYOK，可不设置该变量。跨域部署时按需配置 `ALLOWED_ORIGINS=https://your-pages-domain.pages.dev`。Live API 不使用独立 API 服务的 token 端点，而是从浏览器直连。
+4. 如需服务端统一托管普通 Gemini 请求的密钥，在后端环境设置 `GEMINI_API_KEY`；如果使用 BYOK，可不设置该变量。跨域部署时按需配置 `ALLOWED_ORIGINS=https://your-pages-domain.pages.dev`。在静态部署下，Live API 由浏览器使用本地 Key 直连官方服务。
 
 补充：
 
@@ -330,35 +343,35 @@ RUNTIME_API_PROXY_URL=https://your-api.example.com/api/gemini
 RUNTIME_API_PROXY_URL=https://your-aistudio-to-api.example.com/v1beta
 ```
 
-在界面中也可以进入 **设置 -> API 配置**，启用“自定义 API 配置 / API 代理”，并填入 AIStudioToAPI 的 Gemini 兼容 Base URL（例如 `http://localhost:7860/v1beta`）。AMC WebUI 中填写的 API Key 应与 AIStudioToAPI 部署时配置的 `API_KEYS` 对应。
+在界面中也可以进入 **设置 -> 服务商与 API**（或 API 配置），启用“自定义 API 配置 / API 代理”，并填入 AIStudioToAPI 的 Gemini 兼容 Base URL（例如 `http://localhost:7860/v1beta`）。AMC WebUI 中填写的 API Key 应与 AIStudioToAPI 部署时配置的 `API_KEYS` 对应。
 
-注意：AIStudioToAPI 属于第三方项目，请自行评估账号登录、鉴权、限流与公网暴露风险；它可替代普通 Gemini API 代理来源。AMC WebUI 的 Live API 当前采用浏览器直连官方 Live 服务，不再依赖 AMC 后端 token 端点。
+注意：AIStudioToAPI 属于第三方项目，请自行评估账号登录、鉴权、限流与公网暴露风险；它可替代普通 Gemini API 代理来源。静态部署下 AMC WebUI 的 Live API 采用浏览器直连官方 Live 服务。
 
 ### 构建与预览
 
 ```bash
-npm run build    # 构建生产版本
-npm run preview  # 本地预览构建结果
+pnpm run build    # 构建生产版本
+pnpm run preview  # 本地预览构建结果
 ```
 
 ### 质量检查
 
 ```bash
-npm run typecheck
-npm run lint
-npm run test
-npm run knip
-npm run build
-npm run build:api
+pnpm run typecheck
+pnpm run lint
+pnpm run test
+pnpm run knip
+pnpm run build
+pnpm run build:api
 
 # 或者一次性执行
-npm run verify
+pnpm run verify
 ```
 
 如果只想验证 Gemini Code Execution 相关链路，可以执行：
 
 ```bash
-npm run test:code-execution
+pnpm run test:code-execution
 ```
 
 这个命令覆盖：
@@ -371,7 +384,7 @@ npm run test:code-execution
 如果你想用真实 `GEMINI_API_KEY` 做一次手动联调检查，也可以执行：
 
 ```bash
-GEMINI_API_KEY=your_key_here npm run verify:code-execution:api
+GEMINI_API_KEY=your_key_here pnpm run verify:code-execution:api
 ```
 
 可选环境变量：
@@ -391,10 +404,10 @@ GEMINI_API_KEY=your_key_here npm run verify:code-execution:api
 
 | 层级            | 技术栈                                                                                   |
 | :-------------- | :--------------------------------------------------------------------------------------- |
-| **核心框架**    | React 18 + TypeScript 5.5 + Vite 7                                                       |
+| **核心框架**    | React 18 + TypeScript 5.5 + Vite 7 + pnpm                                                |
 | **样式方案**    | Tailwind CSS 4 + CSS 变量主题系统                                                        |
 | **持久化层**    | 原生 IndexedDB（dbService.ts 封装），支持 Web Locks 跨标签写锁                           |
-| **Gemini SDK**  | `@google/genai` 1.50+，含流式 / 非流式消息、文件上传、图片生成、TTS、转录                |
+| **Gemini SDK**  | `@google/genai` 2.20+，含流式 / 非流式消息、文件上传、图片生成、TTS、转录                |
 | **音频引擎**    | AudioWorklet API（实时流处理）+ 浏览器端 Worker 音频预处理 / 压缩流程                    |
 | **渲染引擎**    | React-Markdown + KaTeX (公式) + Highlight.js (代码高亮) + Mermaid.js + Graphviz (viz.js) |
 | **Python 沙箱** | Pyodide (WASM)，Web Worker 内执行，预加载常用科学计算库并按需安装扩展包                  |
@@ -437,6 +450,7 @@ Live API 在静态部署下由浏览器使用本地 API Key 直连官方 Live �
 ```
 AMC-WebUI/
 ├── src/                        # 前端应用源码（Vite SPA）
+│   ├── assets/                 # 模型图标等静态资源（model-icons 等）
 │   ├── components/             # UI 组件（chat / message / layout / settings / modals / audio 等）
 │   ├── features/               # 本地 Python（src/features/local-python/）、消息发送、场景、音频、标准聊天等业务能力
 │   ├── hooks/                  # 业务 hooks（app / chat / chat-input / data-management / live-api / ui）
@@ -454,7 +468,7 @@ AMC-WebUI/
 │   ├── styles/                 # 全局样式、动画、Markdown 样式
 │   ├── App.tsx                 # 应用入口组件
 │   └── index.tsx               # React 挂载入口
-├── server/                     # 独立 Node API（/api/gemini/*）
+├── server/                     # 独立 Node API（Gemini/OpenAI 代理、Live WS、MCP 等）
 │   ├── src/
 │   └── tsconfig.json
 ├── shared/                     # 前后端共用纯逻辑（image proxy、MCP、私网等）
@@ -463,14 +477,20 @@ AMC-WebUI/
 ├── public/                     # 静态资源与 runtime-config.js 模板
 ├── e2e/                        # Playwright 端到端测试
 ├── docs/                       # 截图、model-logos 等文档资源（运行时图标见 src/assets/model-icons/）
+├── docs-site/                  # Astro Starlight 官方文档站点源码
 ├── docker/                     # 部署辅助脚本（如 web-server.js）
+├── Dockerfile.api              # Node API 容器镜像构建配置
+├── Dockerfile.web              # Web 前端容器镜像构建配置
+├── docker-compose.yml          # web + api 双服务部署入口
+├── .env.example                # 环境变量配置模板
+├── .nvmrc                      # Node.js 推荐版本声明（v26）
+├── pnpm-lock.yaml              # pnpm 依赖锁定文件
 ├── vite.config.ts              # Vite 配置（React、静态复制、手工分包）
 ├── playwright.config.ts        # E2E 配置
 ├── vitest.config.ts            # 单元/集成测试配置
 ├── eslint.config.js            # ESLint 配置
 ├── knip.json                   # 未使用文件/导出分析配置
-├── package.json                # 前端依赖与脚本
-└── docker-compose.yml          # web + api 双服务部署入口
+└── package.json                # 前端依赖与脚本
 ```
 
 ---
@@ -479,13 +499,14 @@ AMC-WebUI/
 
 OpenAI 兼容模式使用独立模型列表，可在设置中手动维护或从兼容端点拉取；下表列出应用内置的 Gemini 原生默认模型。
 
-| 类型           | 模型                                                                                                                              |
-| :------------- | :-------------------------------------------------------------------------------------------------------------------------------- |
-| **Gemini 3.x** | gemini-3.8-flash, gemini-3.5-flash-lite, gemini-3.1-flash-live-preview, gemini-3.5-live-translate-preview, gemini-3.1-pro-preview |
-| **Robotics**   | gemini-robotics-er-2-preview                                                                                                      |
-| **Gemma 4**    | gemma-4-31b-it, gemma-4-26b-a4b-it                                                                                                |
-| **图片生成**   | gemini-3-pro-image-preview, gemini-3.1-flash-image-preview, gemini-3.1-flash-lite-image                                           |
-| **TTS**        | gemini-3.1-flash-tts-preview (30 种语音)                                                                                          |
+| 类型                | 模型                                                                                                                                                |
+| :------------------ | :-------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gemini 3.x**      | gemini-3.8-flash, gemini-3.7-flash, gemini-3.5-flash-lite, gemini-3.1-flash-live-preview, gemini-3.5-live-translate-preview, gemini-3.1-pro-preview |
+| **Robotics**        | gemini-robotics-er-2-preview                                                                                                                        |
+| **Gemma 4**         | gemma-4-31b-it, gemma-4-26b-a4b-it                                                                                                                  |
+| **图片生成**        | gemini-3-pro-image, gemini-3.1-flash-image, gemini-3.1-flash-lite-image                                                                             |
+| **TTS**             | gemini-3.1-flash-tts-preview (30 种语音)                                                                                                            |
+| **转写 / 实时转写** | gemini-3.5-transcribe, gemini-3.5-transcribe-live                                                                                                   |
 
 ---
 

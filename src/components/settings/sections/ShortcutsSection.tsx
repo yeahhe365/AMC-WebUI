@@ -1,6 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Search, MoreHorizontal, Undo2 } from 'lucide-react';
-import { createPortal } from 'react-dom';
 import { useI18n } from '@/contexts/I18nContext';
 import { SHORTCUT_REGISTRY, DEFAULT_SHORTCUTS } from '@/constants/shortcuts';
 import {
@@ -15,7 +14,13 @@ import { ShortcutRecorder } from './shortcuts/ShortcutRecorder';
 import { TabCycleModelsCard } from './TabCycleModelsCard';
 import { Select } from '@/components/shared/Select';
 import { Toggle } from '@/components/shared/Toggle';
-import { usePortaledMenu } from '@/hooks/ui/usePortaledMenu';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '@/components/shared/DropdownMenu';
 
 interface ShortcutsSectionProps {
   currentSettings?: AppSettings;
@@ -33,16 +38,6 @@ export const ShortcutsSection: React.FC<ShortcutsSectionProps> = ({
   const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('all');
-  const {
-    isOpen: isMoreOpen,
-    menuPosition,
-    containerRef,
-    buttonRef,
-    menuRef,
-    targetWindow,
-    toggleMenu,
-    closeMenu,
-  } = usePortaledMenu();
 
   const getCategoryLabel = (cat: CategoryFilter): string => {
     if (cat === 'all') return t('shortcutsFilterAll');
@@ -177,59 +172,39 @@ export const ShortcutsSection: React.FC<ShortcutsSectionProps> = ({
             <option value="input">{`${getCategoryLabel('input')} (${countByCategory.input})`}</option>
             <option value="global">{`${getCategoryLabel('global')} (${countByCategory.global})`}</option>
           </Select>
-          <div className="relative" ref={containerRef}>
-            <button
-              ref={buttonRef}
-              onClick={toggleMenu}
-              className={`inline-flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-[var(--theme-text-secondary)] transition-colors hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)] ${FOCUS_VISIBLE_RING_BASE_CLASS}`}
-              aria-label={t('shortcutsMoreActionsAria')}
-            >
-              <MoreHorizontal size={16} />
-            </button>
-            {isMoreOpen &&
-              targetWindow &&
-              createPortal(
-                <div
-                  ref={menuRef}
-                  className="fixed min-w-40 bg-[var(--theme-bg-primary)] border border-[var(--theme-border-secondary)] rounded-xl shadow-premium py-1.5"
-                  style={menuPosition}
-                  role="menu"
-                >
-                  <button
-                    onClick={() => {
-                      handleToggleVisible(true);
-                      closeMenu();
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-primary)]"
-                    role="menuitem"
-                  >
-                    {t('shortcutsEnableAllVisible')}
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleToggleVisible(false);
-                      closeMenu();
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-primary)]"
-                    role="menuitem"
-                  >
-                    {t('shortcutsDisableAllVisible')}
-                  </button>
-                  <div className="my-1 border-t border-[var(--theme-border-secondary)]/60" />
-                  <button
-                    onClick={() => {
-                      handleResetAll();
-                      closeMenu();
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-danger)]"
-                    role="menuitem"
-                  >
-                    {t('shortcutsResetAllDefaults')}
-                  </button>
-                </div>,
-                targetWindow.document.body,
-              )}
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={`inline-flex h-10 w-10 items-center justify-center rounded-lg border border-transparent text-[var(--theme-text-secondary)] transition-colors hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)] data-[state=open]:bg-[var(--theme-bg-tertiary)] data-[state=open]:text-[var(--theme-text-primary)] ${FOCUS_VISIBLE_RING_BASE_CLASS}`}
+                aria-label={t('shortcutsMoreActionsAria')}
+              >
+                <MoreHorizontal size={16} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-40 py-1.5 shadow-premium">
+              <DropdownMenuItem
+                onClick={() => handleToggleVisible(true)}
+                className="w-full px-3 py-2 text-sm text-[var(--theme-text-primary)] cursor-pointer"
+              >
+                {t('shortcutsEnableAllVisible')}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleToggleVisible(false)}
+                className="w-full px-3 py-2 text-sm text-[var(--theme-text-primary)] cursor-pointer"
+              >
+                {t('shortcutsDisableAllVisible')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleResetAll}
+                variant="danger"
+                className="w-full px-3 py-2 text-sm cursor-pointer"
+              >
+                {t('shortcutsResetAllDefaults')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

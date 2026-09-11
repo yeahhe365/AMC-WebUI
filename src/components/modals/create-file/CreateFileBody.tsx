@@ -57,6 +57,31 @@ export const CreateFileBody: React.FC<CreateFileBodyProps> = ({
     setIsDragging(false);
   };
 
+  const handleTextareaKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      event.preventDefault();
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const indent = '  ';
+
+      const nextContent = textContent.substring(0, start) + indent + textContent.substring(end);
+      setTextContent(nextContent);
+
+      requestAnimationFrame(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = start + indent.length;
+          textareaRef.current.selectionEnd = start + indent.length;
+        }
+      });
+      return;
+    }
+
+    onSaveKeyDown(event);
+  };
+
   return (
     <div className="flex-grow flex flex-col p-4 min-h-0 bg-[var(--theme-bg-primary)]">
       <div className="flex-grow flex flex-col lg:flex-row gap-4 min-h-0 h-full">
@@ -73,7 +98,7 @@ export const CreateFileBody: React.FC<CreateFileBodyProps> = ({
             value={textContent}
             onChange={(e) => setTextContent(e.target.value)}
             onPaste={handlePaste}
-            onKeyDown={onSaveKeyDown}
+            onKeyDown={handleTextareaKeyDown}
             onDragEnter={onDragEnter}
             onDragLeave={onDragLeave}
             onDragOver={onDragOver}

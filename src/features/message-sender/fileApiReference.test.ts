@@ -15,9 +15,10 @@ import {
   ensureFilesApiReferences,
   ensureHistoryFilesApiReferences,
   formatHistoryFileApiUnavailablePartText,
+  resolveUploadableFile,
   sessionHasGeminiFilesApiReferences,
 } from './fileApiReference';
-import { getApiKeyFingerprint } from '@/utils/chat/geminiFilesApi';
+import { getApiKeyFingerprint, INVALID_FILE_API_KEY_FINGERPRINT } from '@/utils/chat/geminiFilesApi';
 
 const translate = (key: string) => {
   if (key === 'messageSenderHistoryFileReferenceUnavailable') {
@@ -690,6 +691,37 @@ describe('ensureFilesApiReferences', () => {
     expect(mockUploadFileApi).not.toHaveBeenCalled();
   });
 
+  it('gracefully degrades file when allowDegrade is true and local backup is missing', async () => {
+    mockGetFileMetadataApi.mockRejectedValue(new Error('403 PERMISSION_DENIED: caller lacks access'));
+    const file = createUploadedFile({
+      name: 'remote-only.pdf',
+      type: 'application/pdf',
+      fileApiName: 'files/current',
+      fileUri: 'https://files/current',
+      uploadState: 'active',
+      transferStrategy: 'remote-file-id',
+    });
+
+    const result = await ensureFilesApiReferences({
+      files: [file],
+      apiKey: 'api-key',
+      abortSignal: new AbortController().signal,
+      allowDegrade: true,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error('expected success with degraded file');
+    }
+    expect(result.files[0]).toEqual(
+      expect.objectContaining({
+        omittedFromApiHistory: true,
+        uploadState: 'failed',
+        transferStrategy: 'inline',
+      }),
+    );
+  });
+
   it('surfaces File.error.message when a refreshed upload finishes FAILED', async () => {
     mockGetFileMetadataApi.mockResolvedValue({ state: 'FAILED' });
     mockUploadFileApi.mockResolvedValue({
@@ -726,5 +758,205 @@ describe('ensureFilesApiReferences', () => {
         error: 'Video codec is not supported.',
       }),
     );
+  });
+
+  it('reports upload progress via onFileUpdate when refreshing Files API reference', async () => {
+    mockGetFileMetadataApi.mockRejectedValue(new Error('403 PERMISSION_DENIED: caller lacks access'));
+    mockUploadFileApi.mockImplementation(async (_key, _file, _mime, _name, _sig, onProgress) => {
+      onProgress?.(50, 100);
+      return {
+        name: 'files/refreshed-with-progress',
+        uri: 'https://files/refreshed-with-progress',
+        state: 'ACTIVE',
+      };
+    });
+
+    const rawFile = new File(['pdf-bytes'], 'notes.pdf', { type: 'application/pdf' });
+    const file = createUploadedFile({
+      name: 'notes.pdf',
+      type: 'application/pdf',
+      rawFile,
+      fileApiName: 'files/expired',
+      fileUri: 'https://files/expired',
+      uploadState: 'active',
+      transferStrategy: 'files-api',
+    });
+
+    const updates: Array<{ fileId: string; patch: unknown }> = [];
+    const result = await ensureFilesApiReferences({
+      files: [file],
+      apiKey: 'api-key',
+      abortSignal: new AbortController().signal,
+      onFileUpdate: (fileId, patch) => {
+        updates.push({ fileId, patch });
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        fileId: file.id,
+        patch: expect.objectContaining({ progress: 50 }),
+      }),
+    );
+  });
+
+  it('forces re-upload when file is marked with INVALID_FILE_API_KEY_FINGERPRINT even if expiration is future', async () => {
+    mockUploadFileApi.mockResolvedValue({
+      name: 'files/reuploaded-fresh',
+      uri: 'https://files/reuploaded-fresh',
+      state: 'ACTIVE',
+    });
+
+    const file = createUploadedFile({
+      name: 'clip.mp4',
+      type: 'video/mp4',
+      rawFile: new Blob(['video-bytes'], { type: 'video/mp4' }),
+      fileApiName: 'files/fa786fe25ed31df578c059085db86bf4218a6561',
+      fileUri: 'https://files/fa786fe25ed31df578c059085db86bf4218a6561',
+      fileApiKeyFingerprint: INVALID_FILE_API_KEY_FINGERPRINT,
+      fileApiExpirationTime: new Date(Date.now() + 86400000).toISOString(),
+      uploadState: 'active',
+      transferStrategy: 'files-api',
+    });
+
+    const result = await ensureFilesApiReferences({
+      files: [file],
+      apiKey: 'api-key',
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mockUploadFileApi).toHaveBeenCalledWith(
+      'api-key',
+      expect.any(File),
+      'video/mp4',
+      'clip.mp4',
+      expect.any(AbortSignal),
+    );
+    if (result.ok) {
+      expect(result.files[0].fileUri).toBe('https://files/reuploaded-fresh');
+      expect(result.files[0].fileApiName).toBe('files/reuploaded-fresh');
+      expect(result.files[0].uploadState).toBe('active');
+    }
+  });
+
+  it('forces re-upload when file uploadState is failed or has error, and local backup exists', async () => {
+    mockUploadFileApi.mockResolvedValue({
+      name: 'files/recovered',
+      uri: 'https://files/recovered',
+      state: 'ACTIVE',
+    });
+
+    const file = createUploadedFile({
+      name: 'clip.mp4',
+      type: 'video/mp4',
+      rawFile: new Blob(['video-bytes'], { type: 'video/mp4' }),
+      fileApiName: 'files/stale',
+      fileUri: 'https://files/stale',
+      uploadState: 'failed',
+      error: 'Upload failed',
+      transferStrategy: 'files-api',
+    });
+
+    const result = await ensureFilesApiReferences({
+      files: [file],
+      apiKey: 'api-key',
+      abortSignal: new AbortController().signal,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(mockUploadFileApi).toHaveBeenCalled();
+    if (result.ok) {
+      expect(result.files[0].fileUri).toBe('https://files/recovered');
+      expect(result.files[0].error).toBeUndefined();
+      expect(result.files[0].uploadState).toBe('active');
+    }
+  });
+
+  it('rehydrates file from dataUrl blob URL when rawFile is missing and re-uploads', async () => {
+    const mockBlob = new Blob(['video-data'], { type: 'video/mp4' });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => mockBlob,
+    } as unknown as Response);
+
+    try {
+      mockUploadFileApi.mockResolvedValue({
+        name: 'files/reuploaded-from-dataurl',
+        uri: 'https://files/reuploaded-from-dataurl',
+        state: 'ACTIVE',
+      });
+
+      const file = createUploadedFile({
+        name: 'clip.mp4',
+        type: 'video/mp4',
+        rawFile: undefined,
+        dataUrl: 'blob:http://localhost:8082/12345',
+        fileApiName: 'files/stale',
+        fileUri: 'https://files/stale',
+        fileApiKeyFingerprint: INVALID_FILE_API_KEY_FINGERPRINT,
+        uploadState: 'active',
+        transferStrategy: 'files-api',
+      });
+
+      const result = await ensureFilesApiReferences({
+        files: [file],
+        apiKey: 'api-key',
+        abortSignal: new AbortController().signal,
+      });
+
+      expect(result.ok).toBe(true);
+      expect(mockUploadFileApi).toHaveBeenCalled();
+      if (result.ok) {
+        expect(result.files[0].fileUri).toBe('https://files/reuploaded-from-dataurl');
+        expect(result.files[0].rawFile).toBeInstanceOf(File);
+      }
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe('resolveUploadableFile', () => {
+  it('returns rawFile directly when it is a File', async () => {
+    const file = new File(['data'], 'test.txt', { type: 'text/plain' });
+    const uploaded = createUploadedFile({ rawFile: file, name: 'test.txt' });
+    const resolved = await resolveUploadableFile(uploaded);
+    expect(resolved).toBe(file);
+  });
+
+  it('converts rawFile Blob to a File with the file name and type', async () => {
+    const blob = new Blob(['data'], { type: 'text/plain' });
+    const uploaded = createUploadedFile({ rawFile: blob, name: 'notes.txt', type: 'text/plain' });
+    const resolved = await resolveUploadableFile(uploaded);
+    expect(resolved).toBeInstanceOf(File);
+    expect(resolved?.name).toBe('notes.txt');
+    expect(resolved?.type).toBe('text/plain');
+  });
+
+  it('fetches Blob from blob: dataUrl when rawFile is undefined', async () => {
+    const mockBlob = new Blob(['video-content'], { type: 'video/mp4' });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => mockBlob,
+    } as unknown as Response);
+
+    try {
+      const uploaded = createUploadedFile({
+        rawFile: undefined,
+        dataUrl: 'blob:http://localhost/test-blob',
+        name: 'test.mp4',
+        type: 'video/mp4',
+      });
+      const resolved = await resolveUploadableFile(uploaded);
+      expect(resolved).toBeInstanceOf(File);
+      expect(resolved?.name).toBe('test.mp4');
+      expect(resolved?.type).toBe('video/mp4');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

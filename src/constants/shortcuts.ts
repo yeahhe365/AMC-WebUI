@@ -11,6 +11,12 @@ export const SHORTCUT_REGISTRY: ShortcutDefinition[] = [
   // General
   { id: 'general.newChat', labelKey: 'shortcutsNewChat', defaultKey: 'mod+shift+o', category: 'general' },
   { id: 'general.searchChats', labelKey: 'shortcutsSearchChats', defaultKey: 'mod+k', category: 'general' },
+  {
+    id: 'general.commandPalette',
+    labelKey: 'shortcutsCommandPalette',
+    defaultKey: 'mod+shift+p',
+    category: 'general',
+  },
   { id: 'general.openLogs', labelKey: 'shortcutsOpenLogs', defaultKey: 'mod+alt+l', category: 'general' },
   { id: 'general.togglePip', labelKey: 'shortcutsTogglePip', defaultKey: 'mod+alt+p', category: 'general' },
   {

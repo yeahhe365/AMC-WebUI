@@ -62,6 +62,15 @@ const safetySettings = {
     fr: 'Contenu dangereux',
     de: 'Gefährliche Inhalte',
   },
+  safetyCategoryJailbreak: {
+    en: 'Jailbreak & Prompt Injection',
+    zh: '越狱与提示词注入',
+    ja: 'ジェイルブレイク・プロンプトインジェクション',
+    ko: '탈옥 및 프롬프트 주입',
+    es: 'Jailbreak e inyección de prompts',
+    fr: 'Jailbreak et injection de prompt',
+    de: 'Jailbreak & Prompt-Injection',
+  },
   safetyThresholdOff: { en: 'Off', zh: '关闭', ja: 'オフ', ko: '끔', es: 'Desactivado', fr: 'Désactivé', de: 'Aus' },
   safetyThresholdBlockNone: {
     en: 'Block None',

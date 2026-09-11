@@ -26,6 +26,15 @@ const shortcutsSettings = {
     fr: 'Rechercher des discussions',
     de: 'Chats durchsuchen',
   },
+  shortcutsCommandPalette: {
+    en: 'Command Palette',
+    zh: '全局命令面板',
+    ja: 'コマンドパレット',
+    ko: '명령 팔레트',
+    es: 'Paleta de comandos',
+    fr: 'Palette de commandes',
+    de: 'Befehlspalette',
+  },
   shortcutsOpenLogs: {
     en: 'Open Logs',
     zh: '打开日志',

@@ -8,4 +8,6 @@ test-results/
 tmp-live-artifact-demo/
 .worktrees/
 .codex-dev-*
+docs-site/.astro/
+docs-site/dist/
 *.min.js

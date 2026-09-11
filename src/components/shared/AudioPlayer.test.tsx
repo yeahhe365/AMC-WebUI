@@ -19,4 +19,29 @@ describe('AudioPlayer', () => {
     expect(renderer.container.querySelector('button[title="Playback Speed"]')).not.toBeNull();
     expect(renderer.container.querySelector('button[title="Download Audio"]')).not.toBeNull();
   });
+
+  it('toggles speed and triggers download', async () => {
+    const { triggerDownload } = await import('@/utils/export/core');
+
+    await act(async () => {
+      renderer.root.render(<AudioPlayer src="https://example.com/audio.wav" />);
+    });
+
+    const speedBtn = renderer.container.querySelector('button[title="Playback Speed"]');
+    expect(speedBtn?.textContent).toContain('1x');
+
+    await act(async () => {
+      speedBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(speedBtn?.textContent).toContain('1.25x');
+
+    const downloadBtn = renderer.container.querySelector('button[title="Download Audio"]');
+    await act(async () => {
+      downloadBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(triggerDownload).toHaveBeenCalledWith(
+      'https://example.com/audio.wav',
+      expect.stringMatching(/^audio-\d+\.wav$/),
+    );
+  });
 });

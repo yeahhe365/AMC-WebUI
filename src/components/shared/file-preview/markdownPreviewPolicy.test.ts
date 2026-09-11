@@ -8,7 +8,8 @@ describe('markdownPreviewPolicy', () => {
 
   it('defers markdown preview for large content, many lines, or many code fences', () => {
     expect(shouldDeferMarkdownPreview('x'.repeat(LARGE_FILE_PREVIEW_LENGTH_THRESHOLD + 1))).toBe(true);
-    expect(shouldDeferMarkdownPreview('line\n'.repeat(1201))).toBe(true);
-    expect(shouldDeferMarkdownPreview('```\ncode\n```\n'.repeat(6))).toBe(true);
+    expect(shouldDeferMarkdownPreview('line\n'.repeat(2501))).toBe(true);
+    expect(shouldDeferMarkdownPreview('```\ncode\n```\n'.repeat(40))).toBe(false);
+    expect(shouldDeferMarkdownPreview('```\ncode\n```\n'.repeat(150))).toBe(true);
   });
 });

@@ -5,8 +5,10 @@ import {
   type SavedChatSession,
   type UploadedFile,
   type ChatGroup,
-  type InputCommand,
   type ChatMessage,
+  type SessionsUpdater,
+  type GroupsUpdater,
+  type CommandedInputSetter,
 } from '@/types';
 import { logService } from '@/services/logService';
 import { getTranslator } from '@/i18n/translations';
@@ -15,13 +17,6 @@ import { useSessionLoader } from './history/useSessionLoader';
 import { useSessionActions } from './history/useSessionActions';
 import { useGroupActions } from './history/useGroupActions';
 import { useHistoryClearer } from './history/useHistoryClearer';
-
-type CommandedInputSetter = Dispatch<SetStateAction<InputCommand | null>>;
-type SessionsUpdater = (
-  updater: (prev: SavedChatSession[]) => SavedChatSession[],
-  options?: { persist?: boolean },
-) => void | Promise<void>;
-type GroupsUpdater = (updater: (prev: ChatGroup[]) => ChatGroup[]) => void | Promise<void>;
 
 interface ChatHistoryProps {
   appSettings: AppSettings;

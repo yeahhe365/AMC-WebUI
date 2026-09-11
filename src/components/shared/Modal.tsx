@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useWindowContext } from '@/contexts/WindowContext';
 import { Z_INDEX_MODAL_BACKDROP } from '@/constants/layout';
+import { getFocusableElements } from '@/hooks/useFocusTrap';
 
 interface ModalProps {
   isOpen: boolean;
@@ -15,31 +16,10 @@ interface ModalProps {
   ariaLabelledBy?: string;
   noPadding?: boolean;
   initialFocusRef?: RefObject<HTMLElement | null>;
+  role?: 'dialog' | 'alertdialog';
 }
 
 type InertElement = HTMLElement & { inert?: boolean };
-
-const FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'button:not([disabled])',
-  'textarea:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
-
-const getFocusableElements = (container: HTMLElement) =>
-  Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter((element) => {
-    const win = element.ownerDocument?.defaultView ?? window;
-    const style = win.getComputedStyle(element);
-
-    return (
-      !element.closest('[inert]') &&
-      element.getAttribute('aria-hidden') !== 'true' &&
-      style.display !== 'none' &&
-      style.visibility !== 'hidden'
-    );
-  });
 
 export const Modal: React.FC<ModalProps> = ({
   isOpen,
@@ -53,6 +33,7 @@ export const Modal: React.FC<ModalProps> = ({
   ariaLabelledBy,
   noPadding = false,
   initialFocusRef,
+  role = 'dialog',
 }) => {
   const [isActuallyOpen, setIsActuallyOpen] = useState(isOpen);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -126,7 +107,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   useEffect(() => {
     const isTopmostDialog = (modalNode: HTMLElement) => {
-      const dialogs = targetDocument.querySelectorAll('[role="dialog"]');
+      const dialogs = targetDocument.querySelectorAll('[role="dialog"], [role="alertdialog"]');
       return dialogs.length === 0 || dialogs[dialogs.length - 1] === modalNode;
     };
 
@@ -188,21 +169,19 @@ export const Modal: React.FC<ModalProps> = ({
     const backdropIndex = allBodyChildren.indexOf(backdropNode);
 
     const siblingStates = allBodyChildren
-      .filter(
-        (element): element is InertElement => {
-          if (element === backdropNode || !(element instanceof targetWindow.HTMLElement)) {
+      .filter((element): element is InertElement => {
+        if (element === backdropNode || !(element instanceof targetWindow.HTMLElement)) {
+          return false;
+        }
+        // Do not mark other modal backdrops as inert if they were mounted after this one (stacked on top)
+        if (element.getAttribute('data-modal-backdrop') === 'true') {
+          const elementIndex = allBodyChildren.indexOf(element);
+          if (elementIndex > backdropIndex) {
             return false;
           }
-          // Do not mark other modal backdrops as inert if they were mounted after this one (stacked on top)
-          if (element.getAttribute('data-modal-backdrop') === 'true') {
-            const elementIndex = allBodyChildren.indexOf(element);
-            if (elementIndex > backdropIndex) {
-              return false;
-            }
-          }
-          return true;
-        },
-      )
+        }
+        return true;
+      })
       .map((element) => ({
         element,
         inert: element.inert,
@@ -246,7 +225,7 @@ export const Modal: React.FC<ModalProps> = ({
     >
       <div
         ref={modalContentRef}
-        role="dialog"
+        role={role}
         aria-modal="true"
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
