@@ -1,0 +1,512 @@
+/* ==========================================================================
+   Homepage presentation.
+   Every rule is scoped to `html[data-has-hero]`, which Starlight only emits on
+   splash pages that render a hero — i.e. this homepage. Inner documentation
+   pages are untouched, which is why almost nothing here needs `!important`.
+   ========================================================================== */
+
+html[data-has-hero] {
+  --home-section-gap: clamp(3rem, 1.5rem + 5vw, 4.75rem);
+  --home-card-radius: 0.75rem;
+  --home-frame-radius: 0.875rem;
+  --home-hairline: 1px solid var(--sl-color-hairline);
+}
+
+/* --------------------------------------------------------------------------
+   Hero — tighter rhythm plus a restrained ambient glow behind the wordmark.
+   -------------------------------------------------------------------------- */
+html[data-has-hero] .hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-block: clamp(1.75rem, 0.5rem + 4vmin, 3.25rem) clamp(1.5rem, 1rem + 2vmin, 2.5rem);
+}
+
+html[data-has-hero] .hero::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  /* Horizontal bleed stays at 0: a negative inline inset widens the document
+     and introduces a horizontal scrollbar on the splash page. */
+  inset: -45% 0 -10%;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      46rem 20rem at 50% 8%,
+      color-mix(in oklab, var(--sl-color-accent) 30%, transparent),
+      transparent 68%
+    ),
+    radial-gradient(26rem 14rem at 74% 26%, color-mix(in oklab, #06b6d4 18%, transparent), transparent 72%);
+}
+
+html[data-has-hero] .hero .stack {
+  align-items: center;
+  max-width: 46rem;
+  margin-inline: auto;
+}
+
+html[data-has-hero] .hero h1 {
+  font-size: clamp(2.5rem, 1.6rem + 3.4vw, 3.5rem);
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  background: linear-gradient(
+    170deg,
+    var(--sl-color-white) 32%,
+    color-mix(in oklab, var(--sl-color-accent) 62%, var(--sl-color-white)) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+html[data-has-hero] .hero .tagline {
+  font-size: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+  line-height: 1.65;
+  color: var(--sl-color-gray-2);
+  margin-top: 0.9rem;
+  max-width: 44rem;
+}
+
+html[data-has-hero] .hero .actions {
+  justify-content: center;
+  margin-top: 1.6rem;
+  gap: 0.75rem;
+}
+
+/* Narrow screens: the three actions would wrap into a lopsided 2 + 1 with an
+   orphaned GitHub button, so lay them out as an even block instead. */
+@media (max-width: 30rem) {
+  html[data-has-hero] .hero .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 0.625rem;
+  }
+
+  html[data-has-hero] .hero .actions .sl-link-button {
+    width: 100%;
+    white-space: nowrap;
+  }
+
+  html[data-has-hero] .hero .actions .sl-link-button.minimal {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Below this the two-column row can no longer hold the longest label, so fall
+   back to a single full-width column. */
+@media (max-width: 22rem) {
+  html[data-has-hero] .hero .actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html[data-has-hero] .hero .actions .sl-link-button.minimal {
+    grid-column: auto;
+  }
+}
+
+/* Light theme keeps the glow subtle so the page does not turn lavender. */
+:root[data-theme='light'][data-has-hero] .hero::before {
+  background:
+    radial-gradient(
+      46rem 20rem at 50% 8%,
+      color-mix(in oklab, var(--sl-color-accent) 14%, transparent),
+      transparent 68%
+    ),
+    radial-gradient(26rem 14rem at 74% 26%, color-mix(in oklab, #06b6d4 10%, transparent), transparent 72%);
+}
+
+/* --------------------------------------------------------------------------
+   Hero actions — restrained, engineered buttons.
+   -------------------------------------------------------------------------- */
+html[data-has-hero] .hero .actions .sl-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  border-radius: 0.5rem;
+  border: 1px solid transparent;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html[data-has-hero] .hero .actions .sl-link-button svg {
+  width: 1rem;
+  height: 1rem;
+  transition: transform 0.2s ease;
+}
+
+/* Primary */
+html[data-has-hero] .hero .actions .sl-link-button.primary {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.2);
+}
+
+html[data-has-hero] .hero .actions .sl-link-button.primary:hover {
+  background: #1e293b;
+  border-color: #1e293b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+}
+
+html[data-has-hero] .hero .actions .sl-link-button.primary:hover svg {
+  transform: translateX(2px);
+}
+
+/* Secondary */
+html[data-has-hero] .hero .actions .sl-link-button.secondary {
+  background: var(--sl-color-bg-sidebar);
+  color: var(--sl-color-gray-1);
+  border-color: var(--sl-color-gray-5);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+html[data-has-hero] .hero .actions .sl-link-button.secondary:hover {
+  background: color-mix(in oklab, var(--sl-color-accent) 8%, var(--sl-color-bg-sidebar));
+  border-color: color-mix(in oklab, var(--sl-color-accent) 45%, transparent);
+  transform: translateY(-1px);
+}
+
+html[data-has-hero] .hero .actions .sl-link-button.secondary:hover svg {
+  transform: translate(1px, -1px);
+}
+
+/* Minimal */
+html[data-has-hero] .hero .actions .sl-link-button.minimal {
+  background: transparent;
+  color: var(--sl-color-gray-3);
+  border-color: var(--sl-color-hairline);
+}
+
+html[data-has-hero] .hero .actions .sl-link-button.minimal:hover {
+  background: color-mix(in oklab, var(--sl-color-white) 6%, transparent);
+  color: var(--sl-color-white);
+  border-color: var(--sl-color-gray-4);
+  transform: translateY(-1px);
+}
+
+:root[data-theme='dark'][data-has-hero] .hero .actions .sl-link-button.primary {
+  background: #f8fafc;
+  color: #090d16;
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme='dark'][data-has-hero] .hero .actions .sl-link-button.primary:hover {
+  background: #ffffff;
+  color: #000000;
+  border-color: #ffffff;
+  box-shadow: 0 4px 14px rgba(255, 255, 255, 0.2);
+}
+
+/* --------------------------------------------------------------------------
+   Product preview — window frame with a theme-matched screenshot.
+   -------------------------------------------------------------------------- */
+html[data-has-hero] .theme-shot {
+  margin: 0;
+  border: var(--home-hairline);
+  border-radius: var(--home-frame-radius);
+  overflow: hidden;
+  background: var(--sl-color-bg-sidebar);
+  box-shadow:
+    0 24px 60px -28px rgba(2, 6, 23, 0.7),
+    0 0 0 1px color-mix(in oklab, var(--sl-color-accent) 8%, transparent);
+}
+
+html[data-has-hero] .theme-shot-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.9rem;
+  border-bottom: var(--home-hairline);
+  background: color-mix(in oklab, var(--sl-color-white) 4%, var(--sl-color-bg-sidebar));
+}
+
+html[data-has-hero] .theme-shot-dots {
+  display: inline-flex;
+  gap: 0.375rem;
+  flex: none;
+}
+
+html[data-has-hero] .theme-shot-dots i {
+  display: block;
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border-radius: 50%;
+  background: color-mix(in oklab, var(--sl-color-gray-4) 55%, transparent);
+}
+
+html[data-has-hero] .theme-shot-label {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--sl-color-gray-3);
+  letter-spacing: 0.01em;
+}
+
+html[data-has-hero] .theme-shot-img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+html[data-has-hero] .theme-shot-img.is-dark {
+  display: none;
+}
+
+html[data-theme='dark'][data-has-hero] .theme-shot-img.is-light {
+  display: none;
+}
+
+html[data-theme='dark'][data-has-hero] .theme-shot-img.is-dark {
+  display: block;
+}
+
+/* --------------------------------------------------------------------------
+   Section headings — eyebrow label above a tightened h2.
+   -------------------------------------------------------------------------- */
+html[data-has-hero] .home-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: var(--home-section-gap) 0 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sl-color-accent);
+}
+
+html[data-has-hero] .home-eyebrow::before {
+  content: '';
+  flex: none;
+  width: 1.5rem;
+  height: 2px;
+  border-radius: 2px;
+  background: color-mix(in oklab, var(--sl-color-accent) 70%, transparent);
+}
+
+html[data-has-hero] .sl-markdown-content h2 {
+  margin-top: 0.4rem;
+  font-size: clamp(1.5rem, 1.25rem + 1vw, 1.875rem);
+  letter-spacing: -0.015em;
+}
+
+html[data-has-hero] .sl-markdown-content h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: clamp(1.75rem, 1rem + 2vw, 2.5rem);
+  font-size: 1.0625rem;
+  letter-spacing: -0.005em;
+}
+
+html[data-has-hero] .sl-markdown-content h3::before {
+  content: '';
+  flex: none;
+  width: 0.25rem;
+  height: 1.05em;
+  border-radius: 2px;
+  background: var(--sl-color-accent);
+}
+
+html[data-has-hero] .sl-markdown-content > p {
+  color: var(--sl-color-gray-2);
+}
+
+html[data-has-hero] .sl-markdown-content > p:has(+ h3) {
+  margin-bottom: 0.25rem;
+}
+
+/* --------------------------------------------------------------------------
+   Feature grid — even rows, one accent, baseline-aligned action links.
+   -------------------------------------------------------------------------- */
+html[data-has-hero] .feature-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+@media (min-width: 50rem) {
+  html[data-has-hero] .feature-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+}
+
+html[data-has-hero] .feature-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  /* Starlight's markdown flow spacing adds `margin-top: 1rem` to any element
+     that follows a sibling. Inside the grid that pushes every card after the
+     first out of alignment, so it has to be cleared here. */
+  margin: 0;
+  padding: 1.25rem 1.35rem;
+  border: var(--home-hairline);
+  border-radius: var(--home-card-radius);
+  background: var(--sl-color-bg-sidebar);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+html[data-has-hero] .feature-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--sl-color-accent) 45%, transparent);
+  box-shadow: 0 12px 30px -16px color-mix(in oklab, var(--sl-color-accent) 60%, transparent);
+}
+
+html[data-has-hero] .feature-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--sl-color-white);
+}
+
+html[data-has-hero] .feature-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 0.5rem;
+  color: var(--sl-color-accent);
+  background: color-mix(in oklab, var(--sl-color-accent) 14%, transparent);
+  border: 1px solid color-mix(in oklab, var(--sl-color-accent) 28%, transparent);
+}
+
+html[data-has-hero] .feature-card-icon svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+html[data-has-hero] .feature-card-body {
+  flex: 1;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--sl-color-gray-2);
+}
+
+html[data-has-hero] .feature-card-body > :first-child {
+  margin-top: 0;
+}
+
+html[data-has-hero] .feature-card-body > :last-child {
+  margin-bottom: 0;
+}
+
+html[data-has-hero] .feature-card-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: auto;
+  padding-top: 0.15rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--sl-color-accent);
+  text-decoration: none;
+}
+
+html[data-has-hero] .feature-card-action:hover {
+  color: var(--sl-color-accent-high);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+html[data-has-hero] .feature-card-arrow {
+  display: inline-flex;
+  transition: transform 0.2s ease;
+}
+
+html[data-has-hero] .feature-card-arrow svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+html[data-has-hero] .feature-card:hover .feature-card-arrow {
+  transform: translateX(3px);
+}
+
+/* --------------------------------------------------------------------------
+   Quick-link cards
+   -------------------------------------------------------------------------- */
+html[data-has-hero] .sl-link-card {
+  align-items: start;
+  padding: 0.9rem 1rem;
+  border-radius: var(--home-card-radius);
+  border: var(--home-hairline);
+  background: var(--sl-color-bg-sidebar);
+  box-shadow: none;
+}
+
+html[data-has-hero] .sl-link-card .title {
+  font-size: 1rem;
+}
+
+html[data-has-hero] .sl-link-card .description {
+  font-size: 0.875rem;
+  color: var(--sl-color-gray-3);
+}
+
+html[data-has-hero] .sl-link-card .icon {
+  align-self: center;
+  transition:
+    transform 0.2s ease,
+    color 0.2s ease;
+}
+
+html[data-has-hero] .sl-link-card:hover {
+  border-color: color-mix(in oklab, var(--sl-color-accent) 45%, transparent);
+  background: color-mix(in oklab, var(--sl-color-accent) 5%, var(--sl-color-bg-sidebar));
+}
+
+html[data-has-hero] .sl-link-card:hover .icon {
+  color: var(--sl-color-accent);
+  transform: translateX(3px);
+}
+
+/* --------------------------------------------------------------------------
+   Motion preferences
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  html[data-has-hero] .feature-card,
+  html[data-has-hero] .feature-card-arrow,
+  html[data-has-hero] .sl-link-card,
+  html[data-has-hero] .sl-link-card .icon,
+  html[data-has-hero] .hero .actions .sl-link-button,
+  html[data-has-hero] .hero .actions .sl-link-button svg {
+    transition: none;
+  }
+
+  html[data-has-hero] .feature-card:hover,
+  html[data-has-hero] .hero .actions .sl-link-button:hover {
+    transform: none;
+  }
+}

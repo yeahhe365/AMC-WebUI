@@ -1,0 +1,57 @@
+---
+import { Image } from 'astro:assets';
+import type { ImageMetadata } from 'astro';
+
+interface Props {
+  light: ImageMetadata;
+  dark: ImageMetadata;
+  alt: string;
+  label?: string;
+  widths?: number[];
+  sizes?: string;
+}
+
+const {
+  light,
+  dark,
+  alt,
+  label,
+  widths = [720, 1080, 1600, 2160],
+  sizes = '(min-width: 80rem) 1080px, 92vw',
+} = Astro.props;
+---
+
+<figure class="theme-shot">
+  {
+    label && (
+      <div class="theme-shot-bar" aria-hidden="true">
+        <span class="theme-shot-dots">
+          <i />
+          <i />
+          <i />
+        </span>
+        <span class="theme-shot-label">{label}</span>
+      </div>
+    )
+  }
+  <div class="theme-shot-stage">
+    <Image
+      class="theme-shot-img is-light"
+      src={light}
+      alt={alt}
+      widths={widths}
+      sizes={sizes}
+      loading="eager"
+      decoding="async"
+    />
+    <Image
+      class="theme-shot-img is-dark"
+      src={dark}
+      alt={alt}
+      widths={widths}
+      sizes={sizes}
+      loading="eager"
+      decoding="async"
+    />
+  </div>
+</figure>

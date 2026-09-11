@@ -52,7 +52,7 @@ export default defineConfig({
           },
         },
       ],
-      customCss: ['./src/styles/custom.css'],
+      customCss: ['./src/styles/custom.css', './src/styles/home.css'],
       sidebar: [
         {
           label: '🚀 快速上手',

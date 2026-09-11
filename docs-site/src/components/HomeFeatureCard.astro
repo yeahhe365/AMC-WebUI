@@ -1,0 +1,24 @@
+---
+import { Icon } from '@astrojs/starlight/components';
+
+interface Props {
+  icon: string;
+  title: string;
+  href: string;
+  linkText: string;
+}
+
+const { icon, title, href, linkText } = Astro.props;
+---
+
+<article class="feature-card">
+  <p class="feature-card-head">
+    <span class="feature-card-icon"><Icon name={icon} /></span>
+    <span class="feature-card-title">{title}</span>
+  </p>
+  <div class="feature-card-body"><slot /></div>
+  <a class="feature-card-action" href={href}>
+    <span>{linkText}</span>
+    <span class="feature-card-arrow"><Icon name="right-arrow" /></span>
+  </a>
+</article>

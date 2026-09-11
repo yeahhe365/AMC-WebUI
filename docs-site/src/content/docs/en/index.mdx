@@ -2,6 +2,8 @@
 title: AMC WebUI
 description: All-in-one Model Console WebUI featuring native Google Gemini capabilities and OpenAI-compatible endpoints.
 template: splash
+editUrl: false
+lastUpdated: false
 hero:
   title: AMC WebUI
   tagline: Advanced model console engineered for deep workflows · Native Google Gemini reasoning, real-time Live API, and OpenAI-compatible ecosystem.
@@ -20,44 +22,75 @@ hero:
       variant: minimal
 ---
 
-import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+import HomeFeatureCard from '../../../components/HomeFeatureCard.astro';
+import ThemeImage from '../../../components/ThemeImage.astro';
+import appPreviewLight from '../../../assets/app-preview-light.webp';
+import appPreviewDark from '../../../assets/app-preview-dark.webp';
 
-<div class="preview-container">
+<ThemeImage
+  light={appPreviewLight}
+  dark={appPreviewDark}
+  alt="AMC WebUI console preview showing a model cost comparison chat, a Python code block and a results table"
+  label="AMC WebUI · Model Console"
+/>
 
-![AMC WebUI Console Interface Preview](../../../assets/app-preview.png)
+<p class="home-eyebrow">Capabilities</p>
 
+## Core Architecture & Features
+
+<div class="feature-grid">
+  <HomeFeatureCard
+    icon="open-book"
+    title="Deep Reasoning (Thinking)"
+    href="/en/models/thinking/"
+    linkText="Explore Thinking Mode & Translation"
+  >
+    Visualized chain-of-thought for Gemini 3.x models, custom token budgets, and real-time thought translation.
+  </HomeFeatureCard>
+  <HomeFeatureCard
+    icon="laptop"
+    title="Real-time Audio & Video (Live API)"
+    href="/en/models/live-api/"
+    linkText="Learn about Live API Voice & Vision"
+  >
+    Bidirectional streaming voice calls, screen sharing, camera vision input, and AudioWorklet visualization.
+  </HomeFeatureCard>
+  <HomeFeatureCard
+    icon="puzzle"
+    title="Live Artifacts"
+    href="/en/tools/live-artifacts/"
+    linkText="Explore Chart Sandbox & Visualizations"
+  >
+    Automatic sandbox rendering of interactive HTML/SVG with Apache ECharts, Mermaid flowcharts, and Graphviz.
+  </HomeFeatureCard>
+  <HomeFeatureCard
+    icon="setting"
+    title="Local Python Sandbox (Pyodide)"
+    href="/en/tools/code-and-sandbox/"
+    linkText="Discover WASM Python with Pyodide"
+  >
+    Browser-side WASM environment with numpy/pandas preloaded, dynamic package installation, and plot capture.
+  </HomeFeatureCard>
+  <HomeFeatureCard
+    icon="add-document"
+    title="Model Context Protocol (MCP)"
+    href="/en/tools/mcp/"
+    linkText="Connect Stdio & SSE MCP Servers"
+  >
+    Full MCP client supporting local stdio and remote SSE/Stream servers with human-in-the-loop tool approvals.
+  </HomeFeatureCard>
+  <HomeFeatureCard
+    icon="bars"
+    title="Local-First Architecture"
+    href="/en/deployment/architecture/"
+    linkText="Read Local Storage & Security Specs"
+  >
+    IndexedDB persistence with Web Locks API concurrency control; Gemini and OpenAI settings strictly isolated.
+  </HomeFeatureCard>
 </div>
 
-## Core Capabilities
-
-<CardGrid stagger>
-  <Card title="Deep Reasoning (Thinking)" icon="open-book">
-    Visualized chain-of-thought for Gemini 3.x models, custom token budgets, and real-time thought translation. [Explore
-    Thinking Mode & Translation →](/en/models/thinking/)
-  </Card>
-  <Card title="Real-time Audio & Video (Live API)" icon="laptop">
-    Bidirectional streaming voice calls, screen sharing, camera vision input, and AudioWorklet visualization. [Learn
-    about Live API Voice & Vision →](/en/models/live-api/)
-  </Card>
-  <Card title="Live Artifacts" icon="puzzle">
-    Automatic sandbox rendering of interactive HTML/SVG with Apache ECharts, Mermaid flowcharts, and Graphviz. [Explore
-    Chart Sandbox & Visualizations →](/en/tools/live-artifacts/)
-  </Card>
-  <Card title="Local Python Sandbox (Pyodide)" icon="setting">
-    Browser-side WASM environment with numpy/pandas preloaded, dynamic package installation, and plot capture. [Discover
-    WASM Python with Pyodide →](/en/tools/code-and-sandbox/)
-  </Card>
-  <Card title="Model Context Protocol (MCP)" icon="add-document">
-    Full MCP client supporting local stdio and remote SSE/Stream servers with human-in-the-loop tool approvals. [Connect
-    Stdio & SSE MCP Servers →](/en/tools/mcp/)
-  </Card>
-  <Card title="Local-First Architecture" icon="bars">
-    IndexedDB persistence with Web Locks API concurrency control; Gemini and OpenAI settings strictly isolated. [Read
-    Local Storage & Security Specs →](/en/deployment/architecture/)
-  </Card>
-</CardGrid>
-
----
+<p class="home-eyebrow">Scenarios & Guides</p>
 
 ## Explore by Needs
 
