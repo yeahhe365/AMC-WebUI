@@ -23,9 +23,9 @@ describe('isPrivateNetworkHostname', () => {
     expect(isPrivateNetworkHostname('100.127.255.254')).toBe(true);
     expect(isPrivateNetworkHostname('100.63.0.1')).toBe(false);
     expect(isPrivateNetworkHostname('100.128.0.1')).toBe(false);
-    // Benchmarking 198.18.0.0/15
-    expect(isPrivateNetworkHostname('198.18.0.1')).toBe(true);
-    expect(isPrivateNetworkHostname('198.19.255.254')).toBe(true);
+    // Benchmarking 198.18.0.0/15 is allowed for TUN / Fake-IP compatibility
+    expect(isPrivateNetworkHostname('198.18.0.1')).toBe(false);
+    expect(isPrivateNetworkHostname('198.19.255.254')).toBe(false);
     expect(isPrivateNetworkHostname('198.17.0.1')).toBe(false);
     expect(isPrivateNetworkHostname('198.20.0.1')).toBe(false);
     // Documentation ranges (RFC 5737)

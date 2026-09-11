@@ -29,6 +29,7 @@ const CODE_LINE_HEIGHT = 5;
 const TEXT_STROKE_WIDTH = 0.06;
 const CJK_TEXT_STROKE_WIDTH = 0.07;
 const CJK_HEADING_STROKE_WIDTH = 0.22;
+const CSS_PX_TO_MM = 25.4 / 96;
 
 const getTextColor = (themeId: string) => (isDarkThemeId(themeId) ? [255, 255, 255] : [0, 0, 0]);
 const getMutedTextColor = (themeId: string) => (isDarkThemeId(themeId) ? [161, 161, 170] : [82, 82, 91]);
@@ -393,7 +394,8 @@ export class MarkdownPdfRenderer {
       const maxHeight = this.pageHeight - PAGE.marginTop - PAGE.marginBottom - 6;
       const naturalWidth = Math.max(1, size.width);
       const naturalHeight = Math.max(1, size.height);
-      let width = maxWidth;
+      const naturalWidthMm = naturalWidth * CSS_PX_TO_MM;
+      let width = Math.min(maxWidth, naturalWidthMm);
       let height = width * (naturalHeight / naturalWidth);
       if (height > maxHeight) {
         height = maxHeight;

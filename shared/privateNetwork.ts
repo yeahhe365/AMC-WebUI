@@ -11,8 +11,8 @@ const isPrivateIpv4 = (ip: string): boolean => {
     first === 0 ||
     // Carrier-grade NAT (RFC 6598) — reachable on many networks and must be treated as private.
     (first === 100 && second >= 64 && second <= 127) ||
-    // Benchmarking (RFC 2544) — 198.18.0.0/15.
-    (first === 198 && (second === 18 || second === 19)) ||
+    // Note: 198.18.0.0/15 (RFC 2544 benchmark range) is intentionally excluded from private IPs
+    // because TUN mode proxy clients (Clash, Surge, Mihomo, Sing-box) use it as the Fake-IP DNS pool.
     // Documentation ranges (RFC 5737) — not private per se, but not real upstreams.
     (first === 192 && second === 0 && Number(ip.split('.')[2]) === 2) ||
     (first === 203 && second === 0 && Number(ip.split('.')[2]) === 113)

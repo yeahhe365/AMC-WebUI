@@ -213,15 +213,15 @@ describe('createMarkdownPdfBlob', () => {
     );
   });
 
-  it('expands images to the PDF content width while preserving aspect ratio', async () => {
+  it('scales large images to the PDF content width while preserving aspect ratio', async () => {
     const originalFetch = globalThis.fetch;
     const originalImage = globalThis.Image;
 
     class MockImage {
-      naturalWidth = 400;
-      naturalHeight = 200;
-      width = 400;
-      height = 200;
+      naturalWidth = 1000;
+      naturalHeight = 500;
+      width = 1000;
+      height = 500;
       onload: (() => void) | null = null;
       onerror: (() => void) | null = null;
 
@@ -238,7 +238,7 @@ describe('createMarkdownPdfBlob', () => {
     });
 
     try {
-      await createMarkdownPdfBlob('![tall](https://cdn.example.com/tall.png)', {
+      await createMarkdownPdfBlob('![large](https://cdn.example.com/large.png)', {
         filename: 'article.pdf',
         themeId: 'pearl',
       });
@@ -257,6 +257,54 @@ describe('createMarkdownPdfBlob', () => {
     const height = imageCall[5] as number;
     expect(width).toBeCloseTo(174, 2);
     expect(height).toBeCloseTo(87, 2);
+  });
+
+  it('keeps small images (such as avatars) at their natural scale instead of blowing them up', async () => {
+    const originalFetch = globalThis.fetch;
+    const originalImage = globalThis.Image;
+
+    class MockAvatar {
+      naturalWidth = 48;
+      naturalHeight = 48;
+      width = 48;
+      height = 48;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      set src(_value: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+
+    const imageBlob = new Blob(['png'], { type: 'image/png' });
+    globalThis.Image = MockAvatar as unknown as typeof Image;
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: async () => imageBlob,
+    });
+
+    try {
+      await createMarkdownPdfBlob('![avatar](https://cdn.example.com/avatar.png)', {
+        filename: 'article.pdf',
+        themeId: 'pearl',
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+      globalThis.Image = originalImage;
+    }
+
+    const imageCall = addImageMock.mock.calls.at(-1);
+    expect(imageCall).toBeDefined();
+    if (!imageCall) {
+      throw new Error('Expected PDF export to draw an image');
+    }
+
+    const width = imageCall[4] as number;
+    const height = imageCall[5] as number;
+    const expectedMm = 48 * (25.4 / 96);
+    expect(width).toBeCloseTo(expectedMm, 2);
+    expect(height).toBeCloseTo(expectedMm, 2);
+    expect(width).toBeLessThan(174);
   });
 
   it('paints a dark page background so dark-theme text stays readable', async () => {
