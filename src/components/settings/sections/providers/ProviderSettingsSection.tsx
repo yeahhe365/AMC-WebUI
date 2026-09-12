@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Activity, ChevronLeft, Download, Loader2, Server, Sparkles, Upload } from 'lucide-react';
+import { Activity, ChevronLeft, Download, Loader2, Server, Upload } from 'lucide-react';
 import {
   GEMINI_PROVIDER_ID,
   type AppSettings,
@@ -35,6 +35,7 @@ import {
   ThirdPartyBackupDialog,
   type ThirdPartyBackupDialogMode,
 } from '@/components/settings/sections/api-config/ThirdPartyBackupDialog';
+import { useProviderUiStore } from '@/stores/providerUiStore';
 
 interface ProviderSettingsSectionProps {
   settings: AppSettings;
@@ -53,9 +54,9 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
   const currentSettings = settings.thirdPartyApi ?? createDefaultThirdPartyApiSettings();
   const connections = useMemo(() => currentSettings.connections ?? [], [currentSettings.connections]);
 
-  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(() => {
-    return initialSelectedId || connections[0]?.id || GEMINI_PROVIDER_ID;
-  });
+  const storedSelectedConnectionId = useProviderUiStore((s) => s.selectedConnectionId);
+  const setSelectedConnectionId = useProviderUiStore((s) => s.setSelectedConnectionId);
+  const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(true);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isBackupOpen, setIsBackupOpen] = useState(false);
@@ -72,17 +73,27 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
     };
   }, [settings.apiKey, settings.serverManagedApi, settings.useApiProxy, settings.apiProxyUrl]);
 
-  // Auto-select first connection or Gemini if selectedId becomes invalid
-  React.useEffect(() => {
-    if (selectedConnectionId === GEMINI_PROVIDER_ID) return;
-    if (connections.length > 0) {
-      if (!selectedConnectionId || !connections.some((c) => c.id === selectedConnectionId)) {
-        setSelectedConnectionId(connections[0].id);
-      }
-    } else {
-      setSelectedConnectionId(GEMINI_PROVIDER_ID);
+  const selectedConnectionId = useMemo(() => {
+    if (initialSelectedId) return initialSelectedId;
+    if (storedSelectedConnectionId === GEMINI_PROVIDER_ID) return GEMINI_PROVIDER_ID;
+    if (storedSelectedConnectionId && connections.some((c) => c.id === storedSelectedConnectionId)) {
+      return storedSelectedConnectionId;
     }
-  }, [connections, selectedConnectionId]);
+    return connections[0]?.id || GEMINI_PROVIDER_ID;
+  }, [initialSelectedId, storedSelectedConnectionId, connections]);
+
+  React.useEffect(() => {
+    if (initialSelectedId) {
+      setSelectedConnectionId(initialSelectedId);
+      setIsMobileDetailOpen(true);
+    }
+  }, [initialSelectedId, setSelectedConnectionId]);
+
+  React.useEffect(() => {
+    if (selectedConnectionId !== storedSelectedConnectionId) {
+      setSelectedConnectionId(selectedConnectionId);
+    }
+  }, [selectedConnectionId, storedSelectedConnectionId, setSelectedConnectionId]);
 
   const isGeminiSelected = selectedConnectionId === GEMINI_PROVIDER_ID;
 
@@ -95,10 +106,22 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
     [connections, selectedConnectionId],
   );
 
+  const isDetailVisibleOnMobile = isMobileDetailOpen && (Boolean(selectedConnection) || isGeminiSelected);
+
+  const handleSelectConnection = (id: string) => {
+    setSelectedConnectionId(id);
+    setIsMobileDetailOpen(true);
+  };
+
+  const handleBackToListOnMobile = () => {
+    setIsMobileDetailOpen(false);
+  };
+
   const handleAddTemplate = (templateId: ThirdPartyTemplateId) => {
     const connection = createConnectionFromTemplate(templateId, connections, createConnectionId());
     updateThirdPartyApi(addThirdPartyConnection(currentSettings, connection));
     setSelectedConnectionId(connection.id);
+    setIsMobileDetailOpen(true);
     setIsAddOpen(false);
     toastSuccess(t('thirdPartyProviderAdded', { name: connection.name }));
   };
@@ -111,6 +134,7 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
     };
     updateThirdPartyApi(addThirdPartyConnection(currentSettings, duplicated));
     setSelectedConnectionId(duplicated.id);
+    setIsMobileDetailOpen(true);
     toastSuccess(t('thirdPartyCopyCreated', { name: duplicated.name }));
   };
 
@@ -119,8 +143,9 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
     updateThirdPartyApi(removeThirdPartyConnection(currentSettings, id));
     if (selectedConnectionId === id) {
       const remaining = connections.filter((c) => c.id !== id);
-      setSelectedConnectionId(remaining[0]?.id ?? null);
+      setSelectedConnectionId(remaining[0]?.id ?? GEMINI_PROVIDER_ID);
     }
+    useProviderUiStore.getState().cleanupConnectionUi(id);
     if (target) {
       toastSuccess(t('thirdPartyProviderRemoved', { name: target.name }));
     }
@@ -241,15 +266,6 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
           }
         }}
       />
-      <div className="flex items-center justify-between px-4 py-1.5 bg-emerald-500/5 border-b border-emerald-500/15 text-[11px] flex-shrink-0">
-        <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
-          <Sparkles size={12} className="shrink-0" />
-          <span>
-            已集成 <strong>AMC Provider Manager</strong> 内置虚拟 MCP
-            服务，可在主聊天中直接通过自然语言配置与诊断服务商。
-          </span>
-        </div>
-      </div>
       <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--theme-border-secondary)]/30 bg-[var(--theme-bg-secondary)]/40 text-xs flex-shrink-0">
         <div className="flex items-center gap-2">
           <Server size={14} className="text-[var(--theme-text-secondary)]" />
@@ -292,13 +308,13 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
       <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
         <div
           className={`w-full md:w-64 lg:w-72 h-full flex-shrink-0 ${
-            selectedConnection || isGeminiSelected ? 'hidden md:flex' : 'flex'
+            isDetailVisibleOnMobile ? 'hidden md:flex' : 'flex'
           }`}
         >
           <ProviderList
             connections={connections}
             selectedConnectionId={selectedConnectionId}
-            onSelectConnection={setSelectedConnectionId}
+            onSelectConnection={handleSelectConnection}
             onReorder={handleReorder}
             onAddConnection={() => setIsAddOpen(true)}
             onEditConnection={() => {}}
@@ -310,7 +326,7 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
         </div>
         <div
           className={`flex-1 min-w-0 h-full flex flex-col ${
-            selectedConnection || isGeminiSelected ? 'flex' : 'hidden md:flex'
+            isDetailVisibleOnMobile ? 'flex' : 'hidden md:flex'
           }`}
         >
           {isGeminiSelected ? (
@@ -318,7 +334,7 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
               <div className="md:hidden p-2 border-b border-[var(--theme-border-secondary)]/30 flex-shrink-0">
                 <button
                   type="button"
-                  onClick={() => setSelectedConnectionId(null)}
+                  onClick={handleBackToListOnMobile}
                   className="flex items-center gap-1 text-xs text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]"
                 >
                   <ChevronLeft size={14} />
@@ -347,7 +363,7 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
               <div className="md:hidden p-2 border-b border-[var(--theme-border-secondary)]/30 flex-shrink-0">
                 <button
                   type="button"
-                  onClick={() => setSelectedConnectionId(null)}
+                  onClick={handleBackToListOnMobile}
                   className="flex items-center gap-1 text-xs text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]"
                 >
                   <ChevronLeft size={14} />

@@ -16,7 +16,8 @@ import { ApiKeyInput } from './api-config/ApiKeyInput';
 import { ApiProxySettings } from './api-config/ApiProxySettings';
 import { ApiConnectionTester } from './api-config/ApiConnectionTester';
 import { useSettingsUiStore } from '@/stores/settingsUiStore';
-import { getLatencyGrade, type LatencyGrade } from '@/utils/thirdPartyDiagnostics';
+import { useProviderUiStore } from '@/stores/providerUiStore';
+import { getLatencyGrade } from '@/utils/thirdPartyDiagnostics';
 
 interface ApiConfigSectionProps {
   useCustomApiConfig: boolean;
@@ -48,11 +49,17 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
   hideProviderRedirect = false,
 }) => {
   const { t } = useI18n();
-  const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-  const [testMessage, setTestMessage] = useState<string | null>(null);
-  const [testLatencyMs, setTestLatencyMs] = useState<number | null>(null);
-  const [testGrade, setTestGrade] = useState<LatencyGrade | null>(null);
-  const [testModelId, setTestModelId] = useState<string>(DEFAULT_LIVE_ARTIFACTS_MODEL_ID);
+  const testModelId = useProviderUiStore((s) => s.geminiTestModelId);
+  const setTestModelId = useProviderUiStore((s) => s.setGeminiTestModelId);
+  const geminiTestResult = useProviderUiStore((s) => s.geminiTestResult);
+  const setGeminiTestResult = useProviderUiStore((s) => s.setGeminiTestResult);
+
+  const [isTesting, setIsTesting] = useState(false);
+  const testStatus = isTesting ? 'testing' : (geminiTestResult?.status ?? 'idle');
+  const testMessage = isTesting ? null : (geminiTestResult?.message ?? null);
+  const testLatencyMs = isTesting ? null : (geminiTestResult?.latencyMs ?? null);
+  const testGrade = isTesting ? null : (geminiTestResult?.grade ?? null);
+
   const [allowOverflow, setAllowOverflow] = useState(useCustomApiConfig);
   const overflowTimerRef = useRef<number | null>(null);
   const viteEnv = (import.meta as ImportMeta & { env?: { VITE_GEMINI_API_KEY?: string } }).env;
@@ -116,14 +123,22 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
     const keyToTest = resolveKeyToTest();
 
     if (!keyToTest && useCustomApiConfig && !canUseServerManagedTestKey) {
-      setTestStatus('error');
-      setTestMessage(t('apiConfigNoKeyProvided'));
+      setGeminiTestResult({
+        status: 'error',
+        latencyMs: null,
+        grade: 'error',
+        message: t('apiConfigNoKeyProvided'),
+      });
       return;
     }
 
     if (!keyToTest) {
-      setTestStatus('error');
-      setTestMessage(t('apiConfigNoKeyAvailable'));
+      setGeminiTestResult({
+        status: 'error',
+        latencyMs: null,
+        grade: 'error',
+        message: t('apiConfigNoKeyAvailable'),
+      });
       return;
     }
 
@@ -131,17 +146,18 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
     const firstKey = keys[0];
 
     if (!firstKey) {
-      setTestStatus('error');
-      setTestMessage(t('apiConfigInvalidKeyFormat'));
+      setGeminiTestResult({
+        status: 'error',
+        latencyMs: null,
+        grade: 'error',
+        message: t('apiConfigInvalidKeyFormat'),
+      });
       return;
     }
 
     const effectiveUrl = useCustomApiConfig && useApiProxy && apiProxyUrl ? apiProxyUrl : null;
 
-    setTestStatus('testing');
-    setTestMessage(null);
-    setTestLatencyMs(null);
-    setTestGrade(null);
+    setIsTesting(true);
 
     const startTime = performance.now();
     try {
@@ -153,15 +169,22 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
       });
 
       const latency = Math.round(performance.now() - startTime);
-      setTestLatencyMs(latency);
-      setTestGrade(getLatencyGrade(latency, true));
-      setTestStatus('success');
+      setGeminiTestResult({
+        status: 'success',
+        latencyMs: latency,
+        grade: getLatencyGrade(latency, true),
+        message: null,
+      });
     } catch (error) {
       const latency = Math.round(performance.now() - startTime);
-      setTestLatencyMs(latency);
-      setTestGrade('error');
-      setTestStatus('error');
-      setTestMessage(getErrorMessage(error));
+      setGeminiTestResult({
+        status: 'error',
+        latencyMs: latency,
+        grade: 'error',
+        message: getErrorMessage(error),
+      });
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -183,7 +206,7 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
               apiKey={apiKey}
               setApiKey={(nextApiKey) => {
                 setApiKey(nextApiKey);
-                setTestStatus('idle');
+                setGeminiTestResult(null);
               }}
             />
 
@@ -191,12 +214,12 @@ export const ApiConfigSection: React.FC<ApiConfigSectionProps> = ({
               useApiProxy={useApiProxy}
               setUseApiProxy={(nextUseApiProxy) => {
                 setUseApiProxy(nextUseApiProxy);
-                setTestStatus('idle');
+                setGeminiTestResult(null);
               }}
               apiProxyUrl={apiProxyUrl}
               setApiProxyUrl={(nextApiProxyUrl) => {
                 setApiProxyUrl(nextApiProxyUrl);
-                setTestStatus('idle');
+                setGeminiTestResult(null);
               }}
             />
 
