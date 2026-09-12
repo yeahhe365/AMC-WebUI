@@ -172,6 +172,11 @@ test('dragging a session reorders it and the order survives a reload', async ({ 
 
   await expect(sessionLinks(page)).toHaveText(['Pinned chat', 'Oldest chat', 'Newest chat', 'Middle chat']);
 
+  // 松手后不得残留拖拽态：被拖动的行只应在拖动【过程中】变暗（SessionItem 的 isBeingDragged），
+  // 一旦 drop 完成就必须恢复。残留会表现为该行一直灰着 + 虚线边框。
+  const draggedRow = page.locator('li', { has: page.getByRole('link', { name: 'Oldest chat', exact: true }) });
+  await expect(draggedRow).not.toHaveClass(/opacity-35/);
+
   await page.reload();
 
   await expect(sessionLinks(page)).toHaveText(['Pinned chat', 'Oldest chat', 'Newest chat', 'Middle chat']);
