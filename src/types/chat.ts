@@ -127,6 +127,11 @@ export interface SavedChatSession {
   groupId?: string | null;
   createdTabId?: string; // for tab-isolated empty session reuse
   /**
+   * 桶内手动顺序（数字间隔键）。桶 = groupId ?? null。
+   * 只由 src/stores/sessionOrder.ts 维护，不要在其它地方手写数值。
+   */
+  sortOrder?: number;
+  /**
    * Title origin:
    * - 'default': heuristic title or 'New Chat' (may be overwritten by auto-titling)
    * - 'auto': AI-generated title (never auto-titled again)

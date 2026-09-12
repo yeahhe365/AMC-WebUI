@@ -2,12 +2,31 @@ import { normalizeProviderId, type ChatSettings, type SavedChatSession } from '@
 import { DEFAULT_MODEL_ID } from '@/constants/modelConfiguration';
 import { resolveSupportedModelId } from '@/utils/model/modelSorting';
 
-export function sortSessionsInPlace<T extends Pick<SavedChatSession, 'isPinned' | 'timestamp'>>(sessions: T[]): T[] {
-  sessions.sort((leftSession, rightSession) => {
-    if (leftSession.isPinned && !rightSession.isPinned) return -1;
-    if (!leftSession.isPinned && rightSession.isPinned) return 1;
-    return rightSession.timestamp - leftSession.timestamp;
-  });
+/**
+ * 会话显示顺序的唯一权威比较器：pinned 优先 → 桶内手动顺序 → timestamp 倒序。
+ * 只应在同一个桶（groupId ?? null）内比较 —— sortOrder 是桶内坐标。
+ */
+export function compareSessionOrder(
+  leftSession: Pick<SavedChatSession, 'isPinned' | 'timestamp' | 'sortOrder'>,
+  rightSession: Pick<SavedChatSession, 'isPinned' | 'timestamp' | 'sortOrder'>,
+): number {
+  if (!!leftSession.isPinned !== !!rightSession.isPinned) {
+    return leftSession.isPinned ? -1 : 1;
+  }
+
+  const leftOrder = leftSession.sortOrder ?? Number.POSITIVE_INFINITY;
+  const rightOrder = rightSession.sortOrder ?? Number.POSITIVE_INFINITY;
+  if (leftOrder !== rightOrder) {
+    return leftOrder - rightOrder;
+  }
+
+  return rightSession.timestamp - leftSession.timestamp;
+}
+
+export function sortSessionsInPlace<T extends Pick<SavedChatSession, 'isPinned' | 'timestamp' | 'sortOrder'>>(
+  sessions: T[],
+): T[] {
+  sessions.sort(compareSessionOrder);
   return sessions;
 }
 
