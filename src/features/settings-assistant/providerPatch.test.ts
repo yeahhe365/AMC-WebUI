@@ -105,6 +105,13 @@ describe('planProviderPatch update', () => {
     expect(verdict.changed).toEqual(['name', 'enabled']);
   });
 
+  it('requires approval when clearing an existing base URL with null', () => {
+    const verdict = planProviderPatch({ op: 'update', connectionId: 'c1', set: { baseUrl: null } }, connections());
+    expect(verdict.kind).toBe('needs-approval');
+    if (verdict.kind !== 'needs-approval') return;
+    expect(verdict.reason).toBe('clear-baseUrl');
+  });
+
   it('reports a normalized no-op instead of writing', () => {
     const verdict = planProviderPatch(
       { op: 'update', connectionId: 'c1', set: { baseUrl: 'https://openrouter.ai/api/v1' } },

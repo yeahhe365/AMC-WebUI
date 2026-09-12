@@ -175,7 +175,10 @@ const planUpdate = (
   }
 
   if (patch.set?.baseUrl !== undefined) {
-    const after = patch.set.baseUrl.trim() || null;
+    // baseUrl is `string | null` on the connection, so a caller may pass null
+    // to mean "clear it" — trim only applies to a real string.
+    const requestedBaseUrl = patch.set.baseUrl;
+    const after = requestedBaseUrl === null ? null : requestedBaseUrl.trim() || null;
     if (normalizeBaseUrlForCompare(current.baseUrl) !== normalizeBaseUrlForCompare(after)) {
       nextSet.baseUrl = after;
       if (!current.baseUrl?.trim()) {

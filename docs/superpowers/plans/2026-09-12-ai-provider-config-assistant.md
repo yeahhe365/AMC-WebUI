@@ -156,6 +156,13 @@ describe('planProviderPatch update', () => {
     expect(verdict.changed).toEqual(['name', 'enabled']);
   });
 
+  it('requires approval when clearing an existing base URL with null', () => {
+    const verdict = planProviderPatch({ op: 'update', connectionId: 'c1', set: { baseUrl: null } }, connections());
+    expect(verdict.kind).toBe('needs-approval');
+    if (verdict.kind !== 'needs-approval') return;
+    expect(verdict.reason).toBe('clear-baseUrl');
+  });
+
   it('reports a normalized no-op instead of writing', () => {
     const verdict = planProviderPatch(
       { op: 'update', connectionId: 'c1', set: { baseUrl: 'https://openrouter.ai/api/v1' } },
@@ -384,7 +391,10 @@ const planUpdate = (
   }
 
   if (patch.set?.baseUrl !== undefined) {
-    const after = patch.set.baseUrl.trim() || null;
+    // baseUrl is `string | null` on the connection, so a caller may pass null
+    // to mean "clear it" — trim only applies to a real string.
+    const requestedBaseUrl = patch.set.baseUrl;
+    const after = requestedBaseUrl === null ? null : requestedBaseUrl.trim() || null;
     if (normalizeBaseUrlForCompare(current.baseUrl) !== normalizeBaseUrlForCompare(after)) {
       nextSet.baseUrl = after;
       if (!current.baseUrl?.trim()) {
