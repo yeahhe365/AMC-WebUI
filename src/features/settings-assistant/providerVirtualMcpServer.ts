@@ -36,9 +36,19 @@ const asProtocol = (value: unknown): ThirdPartyApiProtocol | undefined => {
 const asModelOptions = (value: unknown): ModelOption[] | undefined => {
   if (!Array.isArray(value)) return undefined;
   const models = value
-    .filter(isRecord)
-    .map((entry) => ({ id: asString(entry.id) ?? '', name: asString(entry.name) ?? asString(entry.id) ?? '' }))
-    .filter((model) => model.id.length > 0);
+    .map((entry) => {
+      if (typeof entry === 'string' && entry.trim()) {
+        return { id: entry.trim(), name: entry.trim() };
+      }
+      if (isRecord(entry)) {
+        const id = asString(entry.id);
+        if (!id) return null;
+        const name = asString(entry.name) ?? id;
+        return { id, name };
+      }
+      return null;
+    })
+    .filter((model): model is ModelOption => model !== null && model.id.length > 0);
   return models.length > 0 ? models : undefined;
 };
 
@@ -58,6 +68,7 @@ const parsePatch = (toolName: string, args: unknown): ProviderPatch | { error: s
       protocol: asProtocol(record.protocol),
       modelId: asString(record.modelId),
       models: asModelOptions(record.models),
+      apiKey: asString(record.apiKey),
     };
   }
 
@@ -79,8 +90,9 @@ const parsePatch = (toolName: string, args: unknown): ProviderPatch | { error: s
       protocol: asProtocol(record.protocol),
       enabled: asBoolean(record.enabled),
       modelId: asString(record.modelId),
+      apiKey: record.apiKey === null ? null : asString(record.apiKey),
     },
-    addModels: asModelOptions(record.addModels),
+    addModels: asModelOptions(record.addModels) ?? asModelOptions(record.models),
     replaceModels: asModelOptions(record.replaceModels),
   };
 };
@@ -95,13 +107,13 @@ export const PROVIDER_VIRTUAL_MCP_TOOLS: McpToolDefinition[] = [
   {
     name: 'list_connections',
     description:
-      'List the third-party connections configured by the user. API keys are never returned; hasApiKey indicates if one is stored.',
+      'List the third-party connections configured by the user. Includes apiKey, protocol, base URL and models.',
     inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'create_connection',
     description:
-      'Create a third-party connection from a template. Never pass an API key: if one is required, the user enters it via secure UI.',
+      'Create a third-party connection from a template. You can pass an apiKey directly, or omit it to let the user enter it via UI.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -110,6 +122,24 @@ export const PROVIDER_VIRTUAL_MCP_TOOLS: McpToolDefinition[] = [
         baseUrl: { type: 'string', description: 'Base URL without /chat/completions suffix.' },
         protocol: { type: 'string', description: 'openai-compatible | anthropic | openai-responses' },
         modelId: { type: 'string', description: 'Default model id.' },
+        apiKey: { type: 'string', description: 'Optional API key for authentication.' },
+        models: {
+          type: 'array',
+          description: 'Optional initial list of models (array of model id strings, or { id, name } objects).',
+          items: {
+            anyOf: [
+              { type: 'string' },
+              {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                },
+                required: ['id'],
+              },
+            ],
+          },
+        },
       },
       required: ['templateId'],
     },
@@ -126,6 +156,25 @@ export const PROVIDER_VIRTUAL_MCP_TOOLS: McpToolDefinition[] = [
         protocol: { type: 'string', description: 'New protocol.' },
         enabled: { type: 'boolean', description: 'Enable or disable connection.' },
         modelId: { type: 'string', description: 'New default model id.' },
+        apiKey: { type: 'string', description: 'New API key for authentication, or null to clear.' },
+        addModels: {
+          type: 'array',
+          description:
+            'Models to add to the connection (array of model id strings, e.g. ["deepseek-chat"], or { id, name } objects).',
+          items: {
+            anyOf: [
+              { type: 'string' },
+              {
+                type: 'object',
+                properties: {
+                  id: { type: 'string' },
+                  name: { type: 'string' },
+                },
+                required: ['id'],
+              },
+            ],
+          },
+        },
       },
       required: ['connectionId'],
     },
@@ -210,7 +259,8 @@ export const createProviderVirtualMcpServer = (deps: ProviderToolsDeps): Virtual
       return {
         status: 'aborted',
         connectionId: connection.id,
-        message: 'The user did not enter an API key. Do not ask for it in chat; it can only be entered in the card.',
+        message:
+          'The user did not enter an API key. You can ask the user for the key in chat or they can configure it in settings.',
       };
     }
 

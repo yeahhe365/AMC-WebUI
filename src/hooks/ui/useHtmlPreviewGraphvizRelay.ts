@@ -11,6 +11,13 @@ interface UseHtmlPreviewGraphvizRelayOptions {
   iframeRef: RefObject<HTMLIFrameElement | null>;
   privilege: HtmlPreviewPrivilege;
   themeId?: string;
+  /**
+   * Live Artifacts base font size in px. Graph labels are laid out here in the
+   * parent, so the size travels with the render request for a diagram to follow
+   * the artifact font size setting. Code-block previews omit it and keep the
+   * 16px baseline.
+   */
+  baseFontSize?: number;
   enabled?: boolean;
 }
 
@@ -18,6 +25,7 @@ export const useHtmlPreviewGraphvizRelay = ({
   iframeRef,
   privilege,
   themeId,
+  baseFontSize,
   enabled = true,
 }: UseHtmlPreviewGraphvizRelayOptions) => {
   const { window: targetWindow } = useWindowContext();
@@ -39,7 +47,7 @@ export const useHtmlPreviewGraphvizRelay = ({
         return;
       }
 
-      void renderDotToSvgCached(resolved.dot, { themeId }).then((result) => {
+      void renderDotToSvgCached(resolved.dot, { themeId, baseFontSize }).then((result) => {
         iframeWindow?.postMessage(
           createHtmlPreviewGraphvizResponseMessage(
             resolved.id,
@@ -54,5 +62,5 @@ export const useHtmlPreviewGraphvizRelay = ({
     return () => {
       targetWindow.removeEventListener('message', handleMessage);
     };
-  }, [enabled, iframeRef, privilege, targetWindow, themeId]);
+  }, [baseFontSize, enabled, iframeRef, privilege, targetWindow, themeId]);
 };

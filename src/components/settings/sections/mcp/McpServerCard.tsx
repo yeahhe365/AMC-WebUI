@@ -423,14 +423,19 @@ export const McpServerCard: React.FC<McpServerCardProps> = ({
                 />
               </label>
             </div>
-            <label className="flex items-center gap-2 pt-1">
-              <Toggle
-                checked={server.longRunning === true}
-                onChange={(v) => onUpdateServer({ longRunning: v || undefined })}
-                ariaLabel={t('settingsMcpLongRunning')}
-              />
+            <div
+              className="flex items-center gap-2 pt-1 cursor-pointer select-none"
+              onClick={() => onUpdateServer({ longRunning: server.longRunning ? undefined : true })}
+            >
+              <div onClick={(e) => e.stopPropagation()}>
+                <Toggle
+                  checked={server.longRunning === true}
+                  onChange={(v) => onUpdateServer({ longRunning: v || undefined })}
+                  ariaLabel={t('settingsMcpLongRunning')}
+                />
+              </div>
               <span className={SETTINGS_SECTION_LABEL_CLASS}>{t('settingsMcpLongRunning')}</span>
-            </label>
+            </div>
           </div>
 
           {capabilities && (

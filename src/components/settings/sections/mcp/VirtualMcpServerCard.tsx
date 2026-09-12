@@ -197,6 +197,7 @@ export const VirtualMcpServerCard: React.FC<VirtualMcpServerCardProps> = ({
               <div className="space-y-2">
                 {filteredTools.map((tool) => {
                   const showSchema = schemaToolNames.has(tool.name);
+                  const isAutoApproved = !server.disabledAutoApproveTools?.includes(tool.name);
                   return (
                     <div
                       key={tool.name}
@@ -208,8 +209,16 @@ export const VirtualMcpServerCard: React.FC<VirtualMcpServerCardProps> = ({
                           <div className="flex items-center gap-2">
                             <Wrench size={13} className="text-[var(--theme-text-secondary)] shrink-0" />
                             <span className="font-mono font-medium text-[var(--theme-text-primary)]">{tool.name}</span>
-                            <span className="rounded bg-emerald-500/10 px-1 py-0.2 text-[9px] font-semibold text-emerald-600 dark:text-emerald-400">
-                              {t('settingsMcpAutoApproveEnabled')}
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-[9px] font-semibold ${
+                                isAutoApproved
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                  : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                              }`}
+                            >
+                              {isAutoApproved
+                                ? t('settingsMcpAutoApproveEnabled')
+                                : t('settingsMcpAutoApproveDisabled')}
                             </span>
                           </div>
                           {tool.description && (

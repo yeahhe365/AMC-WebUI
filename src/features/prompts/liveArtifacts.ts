@@ -112,7 +112,7 @@ export const LIVE_ARTIFACTS_INLINE_SYSTEM_PROMPT_ZH = `[Live Artifacts Inline Pr
   1. 默认包含 tooltip 声明："tooltip":{"trigger":"axis"}（饼图为 "item"）。
   2. 跨数量级（跨度 >10 倍）的极值数据对比强制使用对数轴（yAxis: {"type":"log"}）或双 Y 轴，杜绝柱条贴地失去可读性。
   3. 杜绝三重冗余：禁止同时用指标卡、表格、图表机械重复陈述完全相同的 3 个数据点。
-  4. 指标卡规范：指标卡（Metrics）必须包含「指标名 (label) + 核心数值 (value) + 辅助说明 (subtext)」完整三要素。
+  4. 指标卡规范：指标卡（Metrics）必须包含「指标名 (label) + 核心数值 (value) + 辅助说明 (subtext)」完整三要素。value 位置只能是可量化数字（含单位，如 337 / 0 次 / 10 min），**禁止把短语或句子放进 value 位置**（如「全自动 / 快捷朗读」）；这类描述放 subtext。value 文本 ≤ 8 个字符，超出说明它其实是描述而非指标，改用表格或列表行。
 - 规则：节点内部保持为空；数字必须是 JSON 数字；JSON 属性名与字符串必须使用双引号。
 例（趋势对比）：
 <div data-amc-chart='{"tooltip":{"trigger":"axis"},"legend":{},"xAxis":{"type":"category","data":["1月","2月","3月","4月"]},"yAxis":{"type":"value"},"series":[{"name":"DAU","type":"line","smooth":true,"data":[1200,1450,1380,1900]},{"name":"新增","type":"line","smooth":true,"data":[200,300,180,420]}]}' style="height:280px;"></div>
@@ -330,7 +330,7 @@ For numeric data, use data-amc-chart with Apache ECharts Option JSON; never hand
   1. Always include tooltip: "tooltip":{"trigger":"axis"} ("item" for pie).
   2. For data spanning large orders of magnitude (>10x), use log axis (yAxis: {"type":"log"}) or dual Y-axes.
   3. No triple redundancy: never repeat the same 3 numbers across metric cards, tables, and charts simultaneously.
-  4. Metric cards standard: must include all three elements: label + core value + contextual subtext.
+  4. Metric cards standard: must include all three elements: label + core value + contextual subtext. The value slot accepts a quantifiable number only (with unit, e.g. 337 / 0 errors / 10 min); never put a phrase or sentence there (e.g. "Fully automatic / quick read") — that belongs in subtext. Keep value text ≤ 8 characters; longer means it is a description, not a metric, so use a table or list row instead.
 - Rules: keep node content empty; numbers must be JSON numbers; JSON keys/strings must use double quotes.
 Example:
 <div data-amc-chart='{"tooltip":{"trigger":"axis"},"xAxis":{"type":"category","data":["A","B","C"]},"yAxis":{"type":"value"},"series":[{"name":"DAU","type":"line","data":[12,18,15]}]}' style="height:280px;"></div>

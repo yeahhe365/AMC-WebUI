@@ -8,7 +8,7 @@ import {
 } from './providerRedaction';
 
 describe('toConnectionSummary', () => {
-  it('never exposes the API key or extra header values', () => {
+  it('exposes the API key directly while keeping extra header values redacted', () => {
     const summary = toConnectionSummary(
       createThirdPartyConnection({
         id: 'c1',
@@ -18,13 +18,16 @@ describe('toConnectionSummary', () => {
     );
 
     expect(summary.hasApiKey).toBe(true);
+    expect(summary.apiKey).toBe('sk-secret-value');
     expect(summary.headerNames).toEqual(['X-Token']);
-    expect(JSON.stringify(summary)).not.toContain('sk-secret-value');
+    expect(JSON.stringify(summary)).toContain('sk-secret-value');
     expect(JSON.stringify(summary)).not.toContain('header-secret-value');
   });
 
-  it('reports hasApiKey false for a blank key', () => {
-    expect(toConnectionSummary(createThirdPartyConnection({ apiKey: '   ' })).hasApiKey).toBe(false);
+  it('reports hasApiKey false and null apiKey for a blank key', () => {
+    const summary = toConnectionSummary(createThirdPartyConnection({ apiKey: '   ' }));
+    expect(summary.hasApiKey).toBe(false);
+    expect(summary.apiKey).toBeNull();
   });
 
   it('truncates the model id list but keeps the true count', () => {

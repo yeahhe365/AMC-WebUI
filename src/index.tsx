@@ -3,8 +3,10 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import { toast, toastSuccess, toastError, toastInfo, toastWarning } from './stores/toastStore';
 import { initProviderVirtualMcpServer } from './features/settings-assistant/providerVirtualMcpServer';
+import { initSettingsVirtualMcpServer } from './features/settings-mcp/settingsVirtualMcpServer';
 
 initProviderVirtualMcpServer();
+initSettingsVirtualMcpServer();
 
 if (typeof window !== 'undefined') {
   Object.assign(window, {

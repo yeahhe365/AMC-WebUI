@@ -73,7 +73,16 @@ describe('getGraphvizCacheKey', () => {
   });
 
   it('prefixes the key with the render style version', () => {
-    expect(getGraphvizCacheKey('digraph { A -> B }')).toMatch(/^v7:/);
+    expect(getGraphvizCacheKey('digraph { A -> B }')).toMatch(/^v8:/);
+  });
+
+  it('differs when the artifact font size differs for the same dot', () => {
+    // The themed DOT embeds a scaled fontsize, so a cached SVG rendered at 16px
+    // must not be reused for a 24px artifact.
+    const baseline = getGraphvizCacheKey('digraph { A -> B }', { themeId: 'pearl', baseFontSize: 16 });
+    const scaled = getGraphvizCacheKey('digraph { A -> B }', { themeId: 'pearl', baseFontSize: 24 });
+
+    expect(baseline).not.toBe(scaled);
   });
 
   it('normalizes style="rounded" to style="rounded,filled" so fill is preserved', () => {
@@ -153,7 +162,7 @@ describe('buildThemeDefaults', () => {
     const defaults = buildThemeDefaults(PEARL);
     expect(defaults).toContain('shape="box"');
     expect(defaults).toContain('style="rounded,filled"');
-    expect(defaults).toContain('fillcolor="#ffffff"'); // pearl bgInput
+    expect(defaults).toContain(`fillcolor="${PEARL.bgSurfaceMuted}"`); // pearl muted surface
     expect(defaults).toContain('color="#d5d5dc"'); // pearl borderSecondary
     expect(defaults).toContain('pad="0.24"');
     expect(defaults).toContain('nodesep="0.45"');
@@ -169,6 +178,24 @@ describe('buildThemeDefaults', () => {
     expect(defaults).not.toContain('system-ui');
     expect(defaults).toContain('fontname="Helvetica"');
   });
+
+  it('keeps the 16px baseline type scale (graphviz default 14pt)', () => {
+    // The defaults must not change what a 16px artifact renders today; they only
+    // need to follow the font size setting from there.
+    expect(buildThemeDefaults(PEARL)).toContain('fontsize="14"');
+    expect(buildThemeDefaults(PEARL, 16)).toContain('fontsize="14"');
+  });
+
+  it('scales node, edge, and cluster type with the artifact font size', () => {
+    expect(buildThemeDefaults(PEARL, 24)).toContain('fontsize="21"');
+    expect(buildThemeDefaults(PEARL, 10)).toContain('fontsize="9"');
+
+    const clustered = applyThemeAndLayout('digraph { subgraph cluster_lane { A } }', {
+      themeId: 'pearl',
+      baseFontSize: 24,
+    });
+    expect(clustered).toContain('fontsize="17"'); // lane labels: round(24 * 0.6875)
+  });
 });
 
 describe('applyThemeAndLayout (v2 theme defaults)', () => {
@@ -176,7 +203,7 @@ describe('applyThemeAndLayout (v2 theme defaults)', () => {
     const code = applyThemeAndLayout('digraph { A -> B }', { themeId: 'pearl' });
     expect(code).toContain('shape="box"');
     expect(code).toContain('style="rounded,filled"');
-    expect(code).toContain('fillcolor="#ffffff"'); // pearl bgInput default node fill
+    expect(code).toContain(`fillcolor="${PEARL.bgSurfaceMuted}"`); // pearl muted surface default node fill
     expect(code).toContain('color="#d5d5dc"'); // pearl borderSecondary node stroke
     expect(code).toContain('pad="0.24"');
     expect(code).toContain('splines="true"');
@@ -214,7 +241,7 @@ describe('applyThemeAndLayout (v2 theme defaults)', () => {
   it('uses onyx surface colors for the dark theme', () => {
     const ONYX = AVAILABLE_THEMES.find((theme) => theme.id === 'onyx')!.colors;
     const code = applyThemeAndLayout('digraph { n1; n2[fillcolor=success] }', { themeId: 'onyx' });
-    expect(code).toContain('fillcolor="#141418"'); // onyx bgInput default node fill
+    expect(code).toContain('fillcolor="#141418"'); // onyx muted surface default node fill
     expect(code).toContain(`fillcolor="${flattenGraphvizFill(ONYX.bgSuccess, ONYX.bgInput)}"`);
   });
 
@@ -228,7 +255,7 @@ describe('applyThemeAndLayout (v2 theme defaults)', () => {
     const code = applyThemeAndLayout('digraph { workMode[label="wm" fillcolor="#0a0a0a"] }', { themeId: 'pearl' });
     // The model's black fill is removed; the injected pearl default fill remains.
     expect(code).not.toContain('fillcolor="#0a0a0a"');
-    expect(code).toContain('fillcolor="#ffffff"'); // pearl bgInput default node fill
+    expect(code).toContain(`fillcolor="${PEARL.bgSurfaceMuted}"`); // pearl muted surface default node fill
   });
 
   it('strips hardcoded rgb() and named color values', () => {
@@ -242,7 +269,7 @@ describe('applyThemeAndLayout (v2 theme defaults)', () => {
     const code = applyThemeAndLayout('digraph { n1[fillcolor="#000000" fontcolor="#ffffff"] }', { themeId: 'pearl' });
     expect(code).not.toContain('fillcolor="#000000"');
     expect(code).not.toContain('fontcolor="#ffffff"');
-    expect(code).toContain('fillcolor="#ffffff"'); // pearl default node fill
+    expect(code).toContain(`fillcolor="${PEARL.bgSurfaceMuted}"`); // pearl default node fill
     expect(code).toContain('fontcolor="#1a1a1f"'); // pearl default node text
   });
 
@@ -261,7 +288,7 @@ describe('applyThemeAndLayout (v2 theme defaults)', () => {
   it('does not strip theme-default attrs injected into node defaults', () => {
     const code = applyThemeAndLayout('digraph { A -> B }', { themeId: 'pearl' });
     // The injected node default fill/stroke/font survive the scrub.
-    expect(code).toContain('fillcolor="#ffffff"');
+    expect(code).toContain(`fillcolor="${PEARL.bgSurfaceMuted}"`);
     expect(code).toContain('color="#d5d5dc"');
     expect(code).toContain('fontcolor="#1a1a1f"');
   });
@@ -349,7 +376,7 @@ describe('renderDotToSvg', () => {
     expect(result.ok).toBe(true);
     const code = readProcessedCode((result as { ok: true; svg: string }).svg);
     expect(code).toContain('style="rounded,filled"');
-    expect(code).toContain('fillcolor="#ffffff"'); // pearl bgInput
+    expect(code).toContain(`fillcolor="${PEARL.bgSurfaceMuted}"`); // pearl muted surface
     expect(code).toContain('arrowsize="0.8"');
     expect(code).toContain('fontname="Helvetica"');
     expect(code).not.toContain('system-ui');

@@ -69,4 +69,25 @@ describe('VirtualMcpServerCard', () => {
 
     expect(await findByText('templateId')).toBeInTheDocument();
   });
+
+  it('renders requires approval badge when a tool is in disabledAutoApproveTools', async () => {
+    const serverWithApproval: VirtualMcpServer = {
+      ...dummyServer,
+      disabledAutoApproveTools: ['create_connection'],
+    };
+
+    const { findByText } = render(
+      <VirtualMcpServerCard
+        server={serverWithApproval}
+        isExpanded={true}
+        isEnabled={true}
+        onToggleExpanded={vi.fn()}
+        onToggleEnabled={vi.fn()}
+        t={t}
+      />,
+    );
+
+    expect(await findByText('settingsMcpAutoApproveDisabled')).toBeInTheDocument();
+    expect(await findByText('settingsMcpAutoApproveEnabled')).toBeInTheDocument();
+  });
 });

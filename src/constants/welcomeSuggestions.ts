@@ -28,7 +28,7 @@ export const SUGGESTIONS_KEYS = [
     titleKey: 'suggestionSrtTitle',
     descKey: 'suggestionSrtDesc',
     shortKey: 'suggestionSrtShort',
-    icon: 'Captions',
+    icon: 'ClosedCaption',
   },
   {
     titleKey: 'suggestionExplainTitle',

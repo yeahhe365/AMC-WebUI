@@ -72,4 +72,51 @@ describe('useHtmlPreviewGraphvizRelay', () => {
 
     unmount();
   });
+
+  it('forwards the artifact base font size so graph labels scale with the setting', async () => {
+    vi.mocked(renderDotToSvgCached).mockResolvedValue({ ok: true, svg: '<svg></svg>' });
+    const postMessage = vi.fn();
+    const contentWindowStub = { postMessage } as unknown as Window;
+    const iframe = document.createElement('iframe');
+    Object.defineProperty(iframe, 'contentWindow', {
+      value: contentWindowStub,
+      configurable: true,
+    });
+    const iframeRef = { current: iframe } as RefObject<HTMLIFrameElement>;
+
+    const { unmount } = renderHook(
+      () =>
+        useHtmlPreviewGraphvizRelay({
+          iframeRef,
+          privilege: 'sanitized',
+          themeId: 'pearl',
+          baseFontSize: 24,
+        }),
+      { attachToDocument: true, wrapper: GraphvizRelayWrapper },
+    );
+
+    await act(async () => {
+      window.dispatchEvent(
+        new MessageEvent('message', {
+          data: {
+            channel: HTML_PREVIEW_MESSAGE_CHANNEL,
+            event: 'graphviz-render-request',
+            payload: { id: 'g2', dot: 'digraph { A -> B }' },
+          },
+          // Live Artifacts run on an opaque origin, which is what the sanitized
+          // tier accepts (see isHtmlPreviewMessageOriginAllowed).
+          origin: 'null',
+          source: contentWindowStub,
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(renderDotToSvgCached).toHaveBeenCalledWith('digraph { A -> B }', {
+      themeId: 'pearl',
+      baseFontSize: 24,
+    });
+
+    unmount();
+  });
 });

@@ -239,7 +239,7 @@ describe('naming and structure optimization guardrails', () => {
     expect(endpointPreviewSource).toContain('buildOpenAICompatibleChatCompletionsUrl');
     expect(endpointPreviewSource).toContain('buildAnthropicMessagesUrl');
     expect(endpointPreviewSource).toContain('buildOpenAIResponsesUrl');
-    expect(providerSettingsSource).toContain('handleTestAllConnections');
+    expect(providerSettingsSource).toContain('handleAddTemplate');
     expect(listSource).toContain('onReorder');
     expect(countLines(endpointPreviewSource)).toBeLessThan(140);
   });

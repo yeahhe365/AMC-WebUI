@@ -7,6 +7,7 @@ import { useSettingsUiStore } from '@/stores/settingsUiStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useMcpRuntimeStore } from '@/stores/mcpRuntimeStore';
 import { useLibraryStore } from '@/stores/libraryStore';
+import { useProviderUiStore } from '@/stores/providerUiStore';
 
 const initialSettingsState = useSettingsStore.getState();
 const initialChatState = useChatStore.getState();
@@ -96,6 +97,7 @@ export const resetAllStoreState = () => {
     isFilterMenuOpen: false,
     isNewDropdownOpen: false,
   });
+  useProviderUiStore.getState().resetProviderUiState();
 };
 
 export const setupStoreStateReset = () => {

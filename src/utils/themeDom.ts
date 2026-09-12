@@ -1,6 +1,7 @@
 import { AVAILABLE_THEMES } from '@/constants/themeRegistry';
 import type { AppSettings } from '@/types';
 import type { Theme, ThemeColors } from '@/types/theme';
+import { buildLiveArtifactThemeVars } from '@/utils/live-artifacts/liveArtifactThemeTokens';
 
 /** When the OS asks for more contrast, promote muted text toward higher ranks. */
 const withPreferredContrast = (colors: ThemeColors, prefersMoreContrast: boolean): ThemeColors => {
@@ -35,28 +36,11 @@ const generateThemeCssVariables = (colors: ThemeColors): string => {
  * `allowHtml` path — e.g. "prose + HTML" or unrecognized fragments) still resolve
  * every color/background/border token instead of degrading to colorless HTML.
  *
- * The mapping is kept identical to buildPreviewThemeStyle so the two rendering
- * paths produce the same colors. Each value is a literal color resolved from the
- * current theme (never a var() indirection that would re-introduce the gap).
+ * Both channels wrap the same builder (liveArtifactThemeTokens.ts) so the mapping
+ * cannot drift; each value is a literal color resolved from the current theme
+ * (never a var() indirection that would re-introduce the gap).
  */
-const buildLiveArtifactThemeVariables = (colors: ThemeColors): string => {
-  return [
-    `--amc-live-artifact-text:${colors.textPrimary}`,
-    `--amc-live-artifact-muted:${colors.textSecondary}`,
-    `--amc-live-artifact-subtle:${colors.textTertiary}`,
-    `--amc-live-artifact-surface:${colors.bgTertiary}`,
-    `--amc-live-artifact-surface-muted:${colors.bgInput}`,
-    `--amc-live-artifact-border:${colors.borderSecondary}`,
-    `--amc-live-artifact-accent:${colors.textLink}`,
-    `--amc-live-artifact-accent-surface:${colors.bgInfo}`,
-    `--amc-live-artifact-success:${colors.textSuccess}`,
-    `--amc-live-artifact-success-surface:${colors.bgSuccess}`,
-    `--amc-live-artifact-danger:${colors.textDanger}`,
-    `--amc-live-artifact-danger-surface:${colors.bgErrorMessage}`,
-    `--amc-live-artifact-warning:${colors.textWarning}`,
-    `--amc-live-artifact-warning-surface:${colors.bgWarning}`,
-  ].join(';');
-};
+const buildLiveArtifactThemeVariables = (colors: ThemeColors): string => buildLiveArtifactThemeVars(colors);
 
 const prefersMoreContrast = (doc: Document): boolean => {
   try {

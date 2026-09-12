@@ -434,6 +434,15 @@ const mcpSettings = {
     fr: 'Insérer dans le chat',
     de: 'In Chat einfügen',
   },
+  settingsMcpInsertedToChat: {
+    en: 'Inserted into chat',
+    zh: '已插入聊天',
+    ja: 'チャットに挿入しました',
+    es: 'Insertado en el chat',
+    ko: '채팅에 삽입됨',
+    fr: 'Inséré dans le chat',
+    de: 'In Chat eingefügt',
+  },
   settingsMcpCopy: {
     en: 'Copy',
     zh: '复制',

@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from 'vitest';
+import { SEMANTIC_SURFACE_MIN_ALPHA } from '@/constants/themeRegistry';
 import {
   buildHtmlPreviewSrcDoc,
   buildStreamingHtmlPreviewSrcDoc,
@@ -137,15 +138,59 @@ describe('htmlPreview utilities', () => {
 
     // Pearl: textLink and bgAccent are both #2563eb; surface must use soft bgInfo instead.
     expect(pearl).toContain('--amc-live-artifact-accent:#2563eb');
-    expect(pearl).toContain('--amc-live-artifact-accent-surface:rgba(37, 99, 235, 0.06)');
+    // Surface alphas are floored at SEMANTIC_SURFACE_MIN_ALPHA (0.22) so the CSS
+    // channel and the composited Graphviz fill channel render the same strength.
+    expect(pearl).toContain('--amc-live-artifact-accent-surface:rgba(37, 99, 235, 0.22)');
     expect(pearl).not.toContain('--amc-live-artifact-accent-surface:#2563eb');
-    expect(pearl).toContain('--amc-live-artifact-success-surface:rgba(22, 163, 74, 0.1)');
-    expect(pearl).toContain('--amc-live-artifact-danger-surface:#fef2f2');
-    expect(pearl).toContain('--amc-live-artifact-warning-surface:rgba(212, 167, 44, 0.1)');
+    expect(pearl).toContain('--amc-live-artifact-success-surface:rgba(22, 163, 74, 0.22)');
+    // Every semantic surface is authored translucent, so the floor lands all four
+    // on the same strength instead of leaving danger at full opacity.
+    expect(pearl).toContain('--amc-live-artifact-danger-surface:rgba(220, 38, 38, 0.22)');
+    expect(pearl).toContain('--amc-live-artifact-warning-surface:rgba(212, 167, 44, 0.22)');
 
     expect(onyx).toContain('--amc-live-artifact-accent:#6ba3fc');
+    // Onyx already authors 0.25, above the floor, so it stays unchanged.
     expect(onyx).toContain('--amc-live-artifact-accent-surface:rgba(30, 58, 138, 0.25)');
     expect(onyx).not.toContain('--amc-live-artifact-accent-surface:#4f7cf5');
+  });
+
+  it('floors semantic surface alpha so CSS and Graphviz fills agree', () => {
+    // Every semantic surface token must be a translucent tint that lands at or
+    // above the shared floor; a lighter one renders as a pale tag while the
+    // equivalent Graphviz node composites to the floor strength, and an opaque
+    // one cannot be floored at all (the two channels then disagree).
+    for (const themeId of ['pearl', 'onyx', 'graphite', 'sepia']) {
+      const srcDoc = buildHtmlPreviewSrcDoc('<section>x</section>', { themeId });
+
+      for (const varName of ['accent-surface', 'success-surface', 'danger-surface', 'warning-surface'] as const) {
+        const match = new RegExp(`--amc-live-artifact-${varName}:(rgba\\([^)]*\\))`).exec(srcDoc);
+
+        expect(match, `${themeId} ${varName} should be a translucent tint`).not.toBeNull();
+
+        const alpha = Number(match![1].split(',').pop()?.replace(')', '').trim());
+        expect(alpha, `${themeId} ${varName}`).toBeGreaterThanOrEqual(SEMANTIC_SURFACE_MIN_ALPHA);
+      }
+    }
+  });
+
+  it('maps surface-muted to the artifact muted surface, not the white input fill', () => {
+    const pearl = buildHtmlPreviewSrcDoc('<section>x</section>', { themeId: 'pearl' });
+    const sepia = buildHtmlPreviewSrcDoc('<section>x</section>', { themeId: 'sepia' });
+
+    // bgInput is #ffffff in both light themes, which made table headers, inline
+    // code chips, and progress tracks invisible against the message background.
+    expect(pearl).toContain('--amc-live-artifact-surface-muted:#f4f5f7');
+    expect(pearl).not.toContain('--amc-live-artifact-surface-muted:#ffffff');
+    expect(sepia).toContain('--amc-live-artifact-surface-muted:#f4ece0');
+  });
+
+  it('adds an overflow guard so text cannot be silently clipped horizontally', () => {
+    const srcDoc = buildHtmlPreviewSrcDoc('<section><div style="display:grid">longvalue</div></section>');
+
+    // The frame measures vertical extent only, so horizontal overflow would be
+    // clipped by the frame's overflow-hidden with no scrollbar and no way to read it.
+    expect(srcDoc).toContain('min-width:0');
+    expect(srcDoc).toContain('overflow-wrap:anywhere');
   });
 
   it('injects a declarative Live Artifact follow-up click bridge', () => {
@@ -353,6 +398,24 @@ describe('htmlPreview utilities', () => {
     expect(container.querySelector('[onmouseover]')).toBeNull();
     expect(container.textContent).toContain('Run');
     expect(container.querySelector('style')?.textContent).toContain('.demo');
+
+    cleanup();
+  });
+
+  it('carries the artifact font size into the static snapshot so exported charts keep the scale', async () => {
+    const { container, cleanup } = await createStaticPreviewSnapshotContainer(
+      '<html><body><p>Export me</p></body></html>',
+      document,
+      { themeId: 'pearl', baseFontSize: 24 },
+    );
+
+    // The chart hydrator reads --amc-live-artifact-font-size out of this style
+    // block; without it an exported PNG would render its charts at the 16px
+    // baseline while the on-screen artifact used the user's setting.
+    const styleText = Array.from(container.querySelectorAll('style'))
+      .map((style) => style.textContent ?? '')
+      .join('\n');
+    expect(styleText).toContain('--amc-live-artifact-font-size:24px');
 
     cleanup();
   });

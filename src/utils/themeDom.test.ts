@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { AVAILABLE_THEMES } from '@/constants/themeRegistry';
 import type { AppSettings } from '@/types';
+import { buildHtmlPreviewSrcDoc } from '@/utils/html-preview/previewDocument';
 import { applyThemeToDocument } from './themeDom';
 
 const baseSettings: AppSettings = {
@@ -75,5 +76,30 @@ describe('applyThemeToDocument', () => {
 
     applyThemeToDocument(document, getTheme('pearl'), baseSettings);
     expect(document.body.classList.contains('dark')).toBe(false);
+  });
+
+  it('emits the same Live Artifact tokens as the sandboxed preview document', () => {
+    // These two channels drift silently: an artifact rendered inline (this path)
+    // and the same artifact rendered in the iframe (buildPreviewThemeStyle) would
+    // show different colors. themeDom once skipped the semantic-surface alpha
+    // floor, so every tag tint disagreed between the two.
+    for (const theme of AVAILABLE_THEMES) {
+      const tag = document.createElement('style');
+      tag.id = 'live-artifact-theme-variables';
+      document.head.appendChild(tag);
+
+      applyThemeToDocument(document, theme, baseSettings);
+
+      const inlineTokens = tag.textContent ?? '';
+      const iframeSrcDoc = buildHtmlPreviewSrcDoc('<section>x</section>', { themeId: theme.id });
+      const iframeTokens = [...iframeSrcDoc.matchAll(/--amc-live-artifact-[a-z-]+:[^;}]+/g)].map((match) => match[0]);
+
+      expect(iframeTokens.length, theme.id).toBeGreaterThan(0);
+      for (const token of iframeTokens) {
+        expect(inlineTokens, `${theme.id} ${token}`).toContain(token);
+      }
+
+      tag.remove();
+    }
   });
 });

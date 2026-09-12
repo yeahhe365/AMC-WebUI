@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify';
 import { logService } from '@/services/logService';
-import { AVAILABLE_THEMES, DEFAULT_THEME_ID } from '@/constants/themeRegistry';
+import { AVAILABLE_THEMES, DEFAULT_THEME_ID, SEMANTIC_SURFACE_MIN_ALPHA } from '@/constants/themeRegistry';
 import type { Theme } from '@/types/theme';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { hashString } from '@/utils/stringHash';
@@ -41,6 +41,13 @@ interface DotRenderOptions {
    * hardcoded colors down to the theme palette.
    */
   preserveAuthorColors?: boolean;
+  /**
+   * Live Artifacts base font size in px. Graphviz labels are host-rendered, so
+   * they do not inherit the preview document's font size the way model-authored
+   * `em` styles do; without this the artifact font size setting grew the prose
+   * while node labels stayed at graphviz's own 14pt default.
+   */
+  baseFontSize?: number;
 }
 
 type VizInstance = {
@@ -105,7 +112,9 @@ export const resolveDotLayout = (dot: string, forced?: 'LR' | 'TB'): 'LR' | 'TB'
 export const getGraphvizCacheKey = (dot: string, options: DotRenderOptions = {}): string => {
   const layout = resolveDotLayout(dot, options.layout);
   const colorMode = options.preserveAuthorColors ? 'author' : 'theme';
-  return `${RENDER_STYLE_VERSION}:${options.themeId ?? ''}:${layout}:${colorMode}:${hashString(dot)}`;
+  // The themed DOT embeds a scaled fontsize, so the key must separate sizes or a
+  // 16px SVG would be reused for a 24px artifact.
+  return `${RENDER_STYLE_VERSION}:${options.themeId ?? ''}:${options.baseFontSize ?? ''}:${layout}:${colorMode}:${hashString(dot)}`;
 };
 
 // Semantic color names allowed by the Live Artifacts graphviz DSL. Strokes and
@@ -127,7 +136,10 @@ const SEMANTIC_FILL_MAP: Record<string, keyof Theme['colors']> = {
   success: 'bgSuccess',
   warning: 'bgWarning',
   danger: 'bgErrorMessage',
-  muted: 'bgInput',
+  // Neutral fills use the muted artifact surface, not bgInput: bgInput is pure
+  // white in the light themes, so a neutral node rendered as a white card on a
+  // #fefefe page (and clashed with the warm sepia canvas).
+  muted: 'bgSurfaceMuted',
   subtle: 'bgTertiary',
 };
 
@@ -191,8 +203,9 @@ export const normalizeGraphvizColor = (color: string): string => {
   return `#${toHexByte(Number(r))}${toHexByte(Number(g))}${toHexByte(Number(b))}${toHexByte(alpha)}`;
 };
 
-/** Graphviz nodes are small; HTML surface alphas (~0.06–0.1) read as almost white. */
-const GRAPHVIZ_MIN_FILL_ALPHA = 0.22;
+/** Graphviz nodes are small; HTML surface alphas (~0.06–0.1) read as almost white.
+ *  Shared with the HTML channel so a tag and a node never disagree. */
+const GRAPHVIZ_MIN_FILL_ALPHA = SEMANTIC_SURFACE_MIN_ALPHA;
 
 /**
  * Flatten a (possibly translucent) theme surface onto an opaque base so Graphviz
@@ -216,7 +229,24 @@ const GRAPHVIZ_SVG_FONT_FAMILY =
 
 // Bump when the injected default styling changes so cached SVGs rendered with
 // the previous style are never reused (see getGraphvizCacheKey).
-const RENDER_STYLE_VERSION = 'v7';
+const RENDER_STYLE_VERSION = 'v8';
+
+const DEFAULT_GRAPHVIZ_BASE_FONT_SIZE = 16;
+// Ratios keep the 16px baseline pixel-identical to what shipped before (node and
+// edge text at graphviz's own 14pt default, lane labels at the previous 11pt).
+const GRAPHVIZ_LABEL_FONT_RATIO = 0.875;
+const GRAPHVIZ_CLUSTER_LABEL_FONT_RATIO = 0.6875;
+
+const resolveGraphvizFontSizes = (baseFontSize?: number): { label: number; clusterLabel: number } => {
+  const base =
+    typeof baseFontSize === 'number' && Number.isFinite(baseFontSize) && baseFontSize > 0
+      ? baseFontSize
+      : DEFAULT_GRAPHVIZ_BASE_FONT_SIZE;
+  return {
+    label: Math.round(base * GRAPHVIZ_LABEL_FONT_RATIO),
+    clusterLabel: Math.round(base * GRAPHVIZ_CLUSTER_LABEL_FONT_RATIO),
+  };
+};
 
 /**
  * Theme-aware default styles injected before the model's own DOT so a bare
@@ -225,7 +255,10 @@ const RENDER_STYLE_VERSION = 'v7';
  * union, so anything the model writes explicitly still overrides these
  * fallbacks — exactly the safety-net semantics we want.
  */
-export const buildThemeDefaults = (colors: Theme['colors']): string => `
+export const buildThemeDefaults = (colors: Theme['colors'], baseFontSize?: number): string => {
+  const fontSize = resolveGraphvizFontSizes(baseFontSize);
+
+  return `
   graph [
     bgcolor="transparent"
     pad="0.24"
@@ -241,10 +274,11 @@ export const buildThemeDefaults = (colors: Theme['colors']): string => `
   node [
     shape="box"
     style="rounded,filled"
-    fillcolor="${flattenGraphvizFill(colors.bgInput, colors.bgInput)}"
+    fillcolor="${flattenGraphvizFill(colors.bgSurfaceMuted, colors.bgSurfaceMuted)}"
     color="${normalizeGraphvizColor(colors.borderSecondary)}"
     fontname="Helvetica"
     fontcolor="${normalizeGraphvizColor(colors.textPrimary)}"
+    fontsize="${fontSize.label}"
     penwidth="1.2"
     margin="0.18,0.1"
   ];
@@ -252,10 +286,12 @@ export const buildThemeDefaults = (colors: Theme['colors']): string => `
     color="${normalizeGraphvizColor(colors.textSecondary)}"
     fontcolor="${normalizeGraphvizColor(colors.textSecondary)}"
     fontname="Helvetica"
+    fontsize="${fontSize.label}"
     penwidth="1.25"
     arrowsize="0.8"
   ];
 `;
+};
 
 /**
  * After hardcoded color attributes are deleted, comma-separated lists often
@@ -530,19 +566,20 @@ export const applyThemeAndLayout = (dot: string, options: DotRenderOptions): str
 
   // Theme defaults are injected after the opening brace and after semantic color
   // replacement (they only carry concrete hex values, so nothing is rewritten).
-  const themeDefaults = buildThemeDefaults(colors);
+  const themeDefaults = buildThemeDefaults(colors, options.baseFontSize);
 
   const openBraceIndex = code.indexOf('{');
   if (openBraceIndex !== -1) {
     code = code.slice(0, openBraceIndex + 1) + themeDefaults + code.slice(openBraceIndex + 1);
   }
 
-  code = injectClusterDefaults(code, colors);
+  code = injectClusterDefaults(code, colors, options.baseFontSize);
 
   return code;
 };
 
-const injectClusterDefaults = (dot: string, colors: Theme['colors']): string => {
+const injectClusterDefaults = (dot: string, colors: Theme['colors'], baseFontSize?: number): string => {
+  const fontSize = resolveGraphvizFontSizes(baseFontSize);
   const clusterStyle = `
     style="rounded,dashed"
     penwidth="1.35"
@@ -550,7 +587,7 @@ const injectClusterDefaults = (dot: string, colors: Theme['colors']): string => 
     fontcolor="${normalizeGraphvizColor(colors.textSecondary)}"
     bgcolor="${flattenGraphvizFill(colors.bgTertiary, colors.bgInput)}"
     margin="16"
-    fontsize="11"
+    fontsize="${fontSize.clusterLabel}"
     fontname="Helvetica"
 `;
   return dot.replace(/\bsubgraph\s+(cluster\w*)\s*\{/gi, (match) => `${match}${clusterStyle}`);

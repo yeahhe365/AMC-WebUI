@@ -90,6 +90,7 @@ export const ArtifactFrame: React.FC<ArtifactFrameProps> = ({
     iframeRef,
     privilege: 'sanitized',
     themeId,
+    baseFontSize,
   });
   const latestStreamingHtmlRef = useRef(html);
   const isLoadingRef = useRef(isLoading);
@@ -337,6 +338,9 @@ export const ArtifactFrame: React.FC<ArtifactFrameProps> = ({
     <div
       data-live-artifact-frame="true"
       data-artifact-source={html}
+      // Read back by the export pipeline (replaceLiveArtifactIframes) so a static
+      // snapshot renders charts and diagrams at the same scale as the live frame.
+      data-live-artifact-font-size={baseFontSize}
       className="group/artifact relative my-3 w-full overflow-visible"
     >
       <div

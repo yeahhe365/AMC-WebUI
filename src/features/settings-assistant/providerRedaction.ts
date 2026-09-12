@@ -15,6 +15,7 @@ export interface ConnectionSummary {
   protocol: string;
   baseUrl: string | null;
   hasApiKey: boolean;
+  apiKey: string | null;
   headerNames: string[];
   modelCount: number;
   modelIds: string[];
@@ -31,9 +32,9 @@ export interface TemplateSummary {
 }
 
 /**
- * The only connection shape that may reach the model. `apiKey` becomes a
- * boolean and extra-header values are dropped entirely: header values are
- * credentials in practice (private gateway tokens), so only names travel.
+ * Connection shape exposed to the model. `apiKey` is included directly for
+ * natural language provider management. Extra-header values remain dropped
+ * to protect private gateway tokens.
  */
 export const toConnectionSummary = (connection: ThirdPartyConnection): ConnectionSummary => ({
   id: connection.id,
@@ -42,6 +43,7 @@ export const toConnectionSummary = (connection: ThirdPartyConnection): Connectio
   protocol: connection.protocol,
   baseUrl: connection.baseUrl,
   hasApiKey: Boolean(connection.apiKey?.trim()),
+  apiKey: connection.apiKey?.trim() ? connection.apiKey.trim() : null,
   headerNames: Object.keys(connection.extraHeaders ?? {}),
   modelCount: connection.models.length,
   modelIds: connection.models.slice(0, MODEL_IDS_PER_CONNECTION_LIMIT).map((model) => model.id),

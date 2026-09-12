@@ -68,6 +68,50 @@ describe('themeRegistry', () => {
     expect(onyx!.colors.selectionBg).toBe('rgba(79, 124, 245, 0.35)');
   });
 
+  it('keeps the artifact muted surface a visible step away from the page canvas', () => {
+    // `surface-muted` backs table headers, inline-code chips, progress tracks, and
+    // neutral cards inside Live Artifacts. It used to reuse `bgInput`, which is
+    // pure white in the light themes: every one of those fills rendered invisible
+    // against a #fefefe / #fbf5ea message background.
+    for (const theme of AVAILABLE_THEMES) {
+      const surface = hexToRgb(theme.colors.bgSurfaceMuted);
+      const canvas = hexToRgb(theme.colors.bgPrimary);
+      const channelSteps = surface.map((channel, index) => Math.abs(channel - canvas[index]));
+
+      expect(Math.min(...channelSteps), theme.id).toBeGreaterThanOrEqual(6);
+    }
+  });
+
+  it('authors every semantic surface as a translucent tint', () => {
+    // An opaque surface (#fef2f2 in the light themes) cannot be raised to
+    // SEMANTIC_SURFACE_MIN_ALPHA, so the CSS tag, the composited Graphviz node
+    // fill, and the PNG export each rendered it at a different strength — and the
+    // cool pink clashed with the warm sepia canvas.
+    for (const theme of AVAILABLE_THEMES) {
+      for (const key of ['bgInfo', 'bgSuccess', 'bgWarning', 'bgErrorMessage'] as const) {
+        const value = theme.colors[key];
+        const match = /^rgba\(([^)]+)\)$/.exec(value);
+
+        expect(match, `${theme.id}.${key} should be a translucent tint, got ${value}`).not.toBeNull();
+
+        const alpha = Number(match![1].split(',')[3]?.trim());
+        expect(alpha, `${theme.id}.${key}`).toBeGreaterThan(0);
+        expect(alpha, `${theme.id}.${key}`).toBeLessThan(1);
+      }
+    }
+  });
+
+  it('fixes the light-theme surfaces that used to collapse into the page', () => {
+    const pearl = AVAILABLE_THEMES.find((theme) => theme.id === 'pearl');
+    const sepia = AVAILABLE_THEMES.find((theme) => theme.id === 'sepia');
+
+    // Warm sepia gets a warm muted surface and a warm danger tint, not white.
+    expect(pearl?.colors.bgSurfaceMuted).toBe('#f4f5f7');
+    expect(sepia?.colors.bgSurfaceMuted).toBe('#f4ece0');
+    expect(pearl?.colors.bgErrorMessage).toBe('rgba(220, 38, 38, 0.1)');
+    expect(sepia?.colors.bgErrorMessage).toBe('rgba(185, 28, 28, 0.12)');
+  });
+
   it('keeps onyx muted text readable on dark framing surfaces', () => {
     const onyx = AVAILABLE_THEMES.find((theme) => theme.id === 'onyx');
     expect(onyx).toBeDefined();

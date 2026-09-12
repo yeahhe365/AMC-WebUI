@@ -43,7 +43,7 @@ describe('providerVirtualMcpServer', () => {
     expect(result.structuredContent?.templates.length).toBeGreaterThan(0);
   });
 
-  it('lists connections and redacts api keys to hasApiKey', async () => {
+  it('lists connections and includes apiKey', async () => {
     const conn = createThirdPartyConnection({ id: 'c1', name: 'OpenRouter', apiKey: 'secret' });
     const { deps } = createTestDeps([conn]);
     const server = createProviderVirtualMcpServer(deps);
@@ -54,7 +54,35 @@ describe('providerVirtualMcpServer', () => {
     const c1 = result.structuredContent?.connections.find((c) => c.id === 'c1');
     expect(c1).toBeDefined();
     expect(c1?.hasApiKey).toBe(true);
-    expect(c1?.apiKey).toBeUndefined();
+    expect(c1?.apiKey).toBe('secret');
+  });
+
+  it('creates a connection with direct apiKey without requesting UI handoff', async () => {
+    const { deps, requestApiKey } = createTestDeps();
+    const server = createProviderVirtualMcpServer(deps);
+
+    const result = (await server.callTool('create_connection', {
+      templateId: 'deepseek',
+      apiKey: 'sk-direct-123',
+    })) as { structuredContent?: Record<string, unknown> };
+
+    expect(requestApiKey).not.toHaveBeenCalled();
+    expect(result.structuredContent?.status).toBe('created');
+    expect(deps.getConnections()[0].apiKey).toBe('sk-direct-123');
+  });
+
+  it('updates connection apiKey directly', async () => {
+    const conn = createThirdPartyConnection({ id: 'c1', name: 'OpenRouter', apiKey: 'old-secret' });
+    const { deps } = createTestDeps([conn]);
+    const server = createProviderVirtualMcpServer(deps);
+
+    const result = (await server.callTool('update_connection', {
+      connectionId: 'c1',
+      apiKey: 'new-secret',
+    })) as { structuredContent?: Record<string, unknown> };
+
+    expect(result.structuredContent?.status).toBe('updated');
+    expect(deps.getConnections()[0].apiKey).toBe('new-secret');
   });
 
   it('creates a connection and requests api key via UI handoff when key is needed', async () => {
@@ -85,6 +113,32 @@ describe('providerVirtualMcpServer', () => {
       name: 'OpenRouter',
     });
     expect(deps.getConnections()).toHaveLength(0);
+  });
+
+  it('updates modelId and addModels directly using string array', async () => {
+    const conn = createThirdPartyConnection({
+      id: 'c1',
+      name: 'Cavoti AI',
+      modelId: 'custom-model',
+      models: [{ id: 'custom-model', name: 'Custom Model' }],
+    });
+    const { deps } = createTestDeps([conn]);
+    const server = createProviderVirtualMcpServer(deps);
+
+    const result = (await server.callTool('update_connection', {
+      connectionId: 'c1',
+      modelId: 'deepseek-v4-flash-0731',
+      addModels: ['glm-5.3-flash', 'qwen3.8-flash'],
+    })) as { structuredContent?: Record<string, unknown> };
+
+    expect(result.structuredContent?.status).toBe('updated');
+    const updated = deps.getConnections()[0];
+    expect(updated.modelId).toBe('deepseek-v4-flash-0731');
+    const modelIds = updated.models.map((m) => m.id);
+    expect(modelIds).not.toContain('custom-model');
+    expect(modelIds).toContain('deepseek-v4-flash-0731');
+    expect(modelIds).toContain('glm-5.3-flash');
+    expect(modelIds).toContain('qwen3.8-flash');
   });
 
   it('rejects delete_connection when connection does not exist', async () => {

@@ -63,6 +63,13 @@ describe('planProviderPatch create', () => {
     expect(verdict.connectionId).toBe('c1');
   });
 
+  it('attaches apiKey when provided', () => {
+    const verdict = planProviderPatch({ op: 'create', templateId: 'deepseek', apiKey: 'sk-direct-key' }, []);
+    expect(verdict.kind).toBe('apply');
+    if (verdict.kind !== 'apply') return;
+    expect(verdict.nextConnections[0].apiKey).toBe('sk-direct-key');
+  });
+
   it('rejects an unknown template', () => {
     const verdict = planProviderPatch({ op: 'create', templateId: 'nope' as never }, []);
     expect(verdict).toEqual({ kind: 'rejected', error: 'Unknown template: nope' });
@@ -136,6 +143,65 @@ describe('planProviderPatch update', () => {
     );
     expect(replace.kind).toBe('needs-approval');
     if (replace.kind === 'needs-approval') expect(replace.reason).toBe('replace-models');
+  });
+
+  it('updates or clears apiKey without needing approval', () => {
+    const verdict = planProviderPatch(
+      { op: 'update', connectionId: 'c1', set: { apiKey: 'sk-updated-key' } },
+      connections(),
+    );
+    expect(verdict.kind).toBe('apply');
+    if (verdict.kind !== 'apply') return;
+    expect(verdict.changed).toContain('apiKey');
+    expect(verdict.nextConnections[0].apiKey).toBe('sk-updated-key');
+
+    const clearVerdict = planProviderPatch(
+      { op: 'update', connectionId: 'c1', set: { apiKey: null } },
+      verdict.nextConnections,
+    );
+    expect(clearVerdict.kind).toBe('apply');
+    if (clearVerdict.kind !== 'apply') return;
+    expect(clearVerdict.changed).toContain('apiKey');
+    expect(clearVerdict.nextConnections[0].apiKey).toBeNull();
+  });
+
+  it('updates modelId directly without approval and auto-adds it to models list', () => {
+    const verdict = planProviderPatch(
+      { op: 'update', connectionId: 'c1', set: { modelId: 'deepseek-v4-flash-0731' } },
+      connections(),
+    );
+    expect(verdict.kind).toBe('apply');
+    if (verdict.kind !== 'apply') return;
+    expect(verdict.changed).toContain('modelId');
+    expect(verdict.nextConnections[0].modelId).toBe('deepseek-v4-flash-0731');
+    expect(verdict.nextConnections[0].models.map((m) => m.id)).toContain('deepseek-v4-flash-0731');
+  });
+
+  it('replaces placeholder custom-model when adding new models', () => {
+    const placeholderConnection = [
+      createThirdPartyConnection({
+        id: 'c2',
+        name: 'Cavoti AI',
+        modelId: 'custom-model',
+        models: [{ id: 'custom-model', name: 'Custom Model' }],
+      }),
+    ];
+
+    const verdict = planProviderPatch(
+      {
+        op: 'update',
+        connectionId: 'c2',
+        set: { modelId: 'deepseek-v4-flash-0731' },
+        addModels: [{ id: 'glm-5.3-flash', name: 'GLM 5.3 Flash' }],
+      },
+      placeholderConnection,
+    );
+    expect(verdict.kind).toBe('apply');
+    if (verdict.kind !== 'apply') return;
+    const modelIds = verdict.nextConnections[0].models.map((m) => m.id);
+    expect(modelIds).not.toContain('custom-model');
+    expect(modelIds).toContain('deepseek-v4-flash-0731');
+    expect(modelIds).toContain('glm-5.3-flash');
   });
 
   it('rejects an unknown connection id', () => {

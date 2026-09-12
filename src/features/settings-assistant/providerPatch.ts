@@ -13,7 +13,9 @@ import {
   updateThirdPartyConnection,
 } from '@/utils/thirdPartyApiProviders';
 
-type PatchUpdateSet = Partial<Pick<ThirdPartyConnection, 'name' | 'baseUrl' | 'protocol' | 'enabled' | 'modelId'>>;
+type PatchUpdateSet = Partial<
+  Pick<ThirdPartyConnection, 'name' | 'baseUrl' | 'protocol' | 'enabled' | 'modelId' | 'apiKey'>
+>;
 
 export type ApprovalReason =
   | 'endpoint-exists'
@@ -39,6 +41,7 @@ export type ProviderPatch =
       protocol?: ThirdPartyApiProtocol;
       modelId?: string;
       models?: ModelOption[];
+      apiKey?: string;
     }
   | {
       op: 'update';
@@ -132,6 +135,9 @@ const planCreate = (
   if (patch.models !== undefined && patch.models.length > 0) {
     draft.models = patch.models;
   }
+  if (patch.apiKey !== undefined) {
+    draft.apiKey = patch.apiKey.trim() || null;
+  }
 
   const conflict = findEndpointConflict(connections, draft.protocol, draft.baseUrl);
   if (conflict) {
@@ -206,11 +212,7 @@ const planUpdate = (
     const after = patch.set.modelId.trim();
     if (after && after !== current.modelId) {
       nextSet.modelId = after;
-      if (current.modelId?.trim()) {
-        destructive.push({ reason: 'overwrite-modelId', diff: diffOf('modelId', current.modelId, after) });
-      } else {
-        changed.push('modelId');
-      }
+      changed.push('modelId');
     }
   }
 
@@ -219,12 +221,37 @@ const planUpdate = (
     changed.push('enabled');
   }
 
+  if (patch.set?.apiKey !== undefined) {
+    const requestedApiKey = patch.set.apiKey;
+    const after = requestedApiKey === null ? null : requestedApiKey.trim() || null;
+    if (after !== current.apiKey) {
+      nextSet.apiKey = after;
+      changed.push('apiKey');
+    }
+  }
+
   let nextModels = current.models;
-  if (patch.addModels?.length) {
-    const existingIds = new Set(current.models.map((model) => model.id));
-    const additions = patch.addModels.filter((model) => !existingIds.has(model.id));
+  const candidateAdditions = patch.addModels ?? [];
+  const allAdditions = [...candidateAdditions];
+
+  if (nextSet.modelId) {
+    const targetId = nextSet.modelId;
+    const existsInCurrent = current.models.some((m) => m.id === targetId);
+    const existsInAdditions = allAdditions.some((m) => m.id === targetId);
+    if (!existsInCurrent && !existsInAdditions) {
+      allAdditions.unshift({ id: targetId, name: targetId });
+    }
+  }
+
+  if (allAdditions.length > 0) {
+    const isPlaceholderOnly =
+      current.models.length === 1 &&
+      (current.models[0].id === 'custom-model' || current.models[0].id === 'local-model');
+    const baseModels = isPlaceholderOnly ? [] : current.models;
+    const existingIds = new Set(baseModels.map((model) => model.id));
+    const additions = allAdditions.filter((model) => !existingIds.has(model.id));
     if (additions.length > 0) {
-      nextModels = [...current.models, ...additions];
+      nextModels = [...baseModels, ...additions];
       changed.push('addModels');
     }
   }

@@ -48,6 +48,21 @@ describe('useMcpRuntimeStore', () => {
     expect(useMcpRuntimeStore.getState()).toMatchObject({ masterEnabled: true, selectedServerIds: null });
   });
 
+  it('clearAllServers empties selectedServerIds', () => {
+    useMcpRuntimeStore.setState({ masterEnabled: true, selectedServerIds: null });
+    useMcpRuntimeStore.getState().clearAllServers();
+    expect(useMcpRuntimeStore.getState().selectedServerIds).toEqual([]);
+  });
+
+  it('toggleAllServers toggles between all and none', () => {
+    useMcpRuntimeStore.setState({ masterEnabled: true, selectedServerIds: null });
+    useMcpRuntimeStore.getState().toggleAllServers();
+    expect(useMcpRuntimeStore.getState().selectedServerIds).toEqual([]);
+
+    useMcpRuntimeStore.getState().toggleAllServers();
+    expect(useMcpRuntimeStore.getState()).toMatchObject({ masterEnabled: true, selectedServerIds: null });
+  });
+
   it('toggleServer seeds the selection from the full set then excludes the id', () => {
     useMcpRuntimeStore.getState().toggleServer('a', ['a', 'b']);
     expect(useMcpRuntimeStore.getState().selectedServerIds).toEqual(['b']);

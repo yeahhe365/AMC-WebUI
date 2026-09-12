@@ -115,7 +115,15 @@ const replaceLiveArtifactIframes = async (
     const html = frame.getAttribute('data-artifact-source') ?? '';
     if (!html.trim()) continue;
 
-    const { container } = await createStaticPreviewSnapshotContainer(html, targetDocument, { themeId });
+    // The frame carries the artifact font size it was rendered with, so an
+    // exported transcript keeps charts and diagrams at the same scale.
+    const frameFontSize = Number.parseFloat(frame.getAttribute('data-live-artifact-font-size') ?? '');
+    const baseFontSize = Number.isFinite(frameFontSize) && frameFontSize > 0 ? frameFontSize : undefined;
+
+    const { container } = await createStaticPreviewSnapshotContainer(html, targetDocument, {
+      themeId,
+      baseFontSize,
+    });
 
     // The snapshot container is positioned off-screen with white background by default;
     // reset it so it flows inline within the exported transcript with theme transparency.

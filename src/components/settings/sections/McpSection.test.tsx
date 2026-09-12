@@ -3,6 +3,7 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import { DEFAULT_APP_SETTINGS } from '@/constants/settingsDefaults';
 import { renderWithProviders, setupProviderTestRenderer as setupTestRenderer } from '@/test/render/providerRenderer';
 import { useMcpStatusStore } from '@/stores/mcpStatusStore';
+import { useVirtualMcpStore } from '@/stores/virtualMcpStore';
 import type { AppSettings } from '@/types';
 import { McpSection } from './McpSection';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,6 +22,7 @@ describe('McpSection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useMcpStatusStore.setState({ states: {} });
+    useVirtualMcpStore.setState({ disabledServerIds: [] });
   });
 
   const renderMcpSection = async (overrides: Partial<ComponentProps<typeof McpSection>> = {}) => {
@@ -853,9 +855,65 @@ describe('McpSection', () => {
       await renderMcpSection();
       expect(within(renderer.container).getByText('V Test Provider')).toBeInTheDocument();
       expect(within(renderer.container).getByTestId('virtual-mcp-section')).toBeInTheDocument();
+
+      const getToggle = () => within(renderer.container).getByLabelText('Toggle V Test Provider');
+      expect(getToggle()).toBeChecked();
+      expect(within(renderer.container).getByText('Connected')).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(getToggle());
+      });
+      expect(within(renderer.container).getByText('Disabled')).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(getToggle());
+      });
+      expect(within(renderer.container).getByText('Connected')).toBeInTheDocument();
     } finally {
       unregister();
       clearVirtualMcpServers();
     }
+  });
+
+  it('preserves expanded card state on the moved server after reordering', async () => {
+    const initialSettings: AppSettings = {
+      ...DEFAULT_APP_SETTINGS,
+      mcpServers: [
+        {
+          id: 's1',
+          name: 'Server 1',
+          enabled: false,
+          transport: 'stdio',
+          command: 'cmd1',
+        },
+        {
+          id: 's2',
+          name: 'Server 2',
+          enabled: false,
+          transport: 'stdio',
+          command: 'cmd2',
+        },
+      ],
+    };
+
+    await renderStatefulMcpSection(initialSettings);
+
+    // Expand Server 1 (index 0)
+    await expandServerCard(0);
+    expect(renderer.container.querySelector('[data-testid="mcp-card-detail-0"]')).not.toBeNull();
+    expect(renderer.container.querySelector('[data-testid="mcp-card-detail-1"]')).toBeNull();
+
+    // Click Move Down on Server 1 (index 0)
+    const moveDownBtn = renderer.container.querySelector('[data-testid="mcp-move-down-0"]');
+    expect(moveDownBtn).not.toBeNull();
+
+    await act(async () => {
+      fireEvent.click(moveDownBtn!);
+    });
+
+    // After moving down, Server 1 is now at index 1 and Server 2 is at index 0.
+    // Server 1 should still be expanded (now detail-1), and Server 2 should still be collapsed (no detail-0)!
+    expect(renderer.container.querySelector('[data-testid="mcp-card-detail-0"]')).toBeNull();
+    expect(renderer.container.querySelector('[data-testid="mcp-card-detail-1"]')).not.toBeNull();
   });
 });

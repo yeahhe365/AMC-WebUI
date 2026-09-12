@@ -13,15 +13,14 @@ const propertiesOf = (name: string): string[] => {
   return Object.keys(properties);
 };
 
-describe('assistant secret containment', () => {
-  it('exposes no apiKey parameter on the write tools schema', () => {
-    expect(propertiesOf('create_connection')).not.toContain('apiKey');
-    expect(propertiesOf('update_connection')).not.toContain('apiKey');
+describe('assistant secret and apiKey handling', () => {
+  it('exposes apiKey parameter on write tools schemas while keeping delete schema clean', () => {
+    expect(propertiesOf('create_connection')).toContain('apiKey');
+    expect(propertiesOf('update_connection')).toContain('apiKey');
     expect(propertiesOf('delete_connection')).not.toContain('apiKey');
-    expect(JSON.stringify(PROVIDER_VIRTUAL_MCP_TOOLS)).not.toContain(STORED_KEY_CANARY);
   });
 
-  it('never sends stored keys, header values or typed keys through providerVirtualMcpServer tools', async () => {
+  it('allows reading stored apiKey and writing direct keys while keeping header values protected', async () => {
     let connections: ThirdPartyConnection[] = [
       createThirdPartyConnection({
         id: 'c1',
@@ -40,15 +39,19 @@ describe('assistant secret containment', () => {
     });
 
     const listResult = await server.callTool('list_connections', {});
-    const createResult = await server.callTool('create_connection', { templateId: 'deepseek' });
+    const createResult = await server.callTool('create_connection', {
+      templateId: 'deepseek',
+      apiKey: 'sk-direct-key-test',
+    });
     const deleteResult = await server.callTool('delete_connection', { connectionId: 'c1' });
 
     const everything = JSON.stringify({ listResult, createResult, deleteResult });
-    expect(everything).not.toContain(STORED_KEY_CANARY);
+    // Stored key and direct key are readable/writable
+    expect(everything).toContain(STORED_KEY_CANARY);
+    // Header values remain protected to prevent token leak
     expect(everything).not.toContain(HEADER_CANARY);
-    expect(everything).not.toContain(TYPED_KEY_CANARY);
 
-    expect(connections.find((c) => c.name === 'DeepSeek')?.apiKey).toBe(TYPED_KEY_CANARY);
+    expect(connections.find((c) => c.name === 'DeepSeek')?.apiKey).toBe('sk-direct-key-test');
     expect(connections.find((c) => c.id === 'c1')).toBeUndefined();
   });
 });

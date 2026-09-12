@@ -8,6 +8,14 @@ export interface ThemeColors {
   bgDanger: string;
   bgDangerHover: string;
   bgInput: string;
+  /**
+   * Subtle raised fill used for muted surfaces (table headers, inline-code
+   * chips, progress tracks, neutral cards) inside model-authored Live
+   * Artifacts. Must stay a visible step away from `bgPrimary` in every theme —
+   * `bgInput` is pure white in the light themes, which is why this is its own
+   * token rather than an alias for the input background.
+   */
+  bgSurfaceMuted: string;
   bgCodeBlock: string;
   bgCodeBlockHeader: string;
   bgUserMessage: string;

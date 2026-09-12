@@ -61,7 +61,11 @@ export const McpSection: React.FC<McpSectionProps> = ({ settings, onUpdate }) =>
   const [filter, setFilter] = useState<ServerFilter>('all');
   const [search, setSearch] = useState('');
   const [schemaToolNames, setSchemaToolNames] = useState<Set<string>>(new Set());
-  const [pendingTrustIndex, setPendingTrustIndex] = useState<number | null>(null);
+  const [pendingTrustTarget, setPendingTrustTarget] = useState<{
+    server: McpServerConfig;
+    index: number;
+    cardKey: string;
+  } | null>(null);
   const [showMarketplaces, setShowMarketplaces] = useState(false);
   // Server cards collapse to a one-line summary by default; editing and the
   // capability tabs live behind the expand chevron to keep the list scannable.
@@ -93,9 +97,14 @@ export const McpSection: React.FC<McpSectionProps> = ({ settings, onUpdate }) =>
   const filtered = servers.filter((s) => matchesFilter(filter, s) && matchKeywords(deferredSearch, s));
   const filteredAndSorted = [...filtered].sort((a, b) => sortOrder.indexOf(a.id) - sortOrder.indexOf(b.id));
 
-  const isVirtualServerEnabled = useVirtualMcpStore((s) => s.isServerEnabled);
-  const toggleVirtualServerEnabled = useVirtualMcpStore((s) => s.toggleServerEnabled);
+  const disabledVirtualServerIds = useVirtualMcpStore((s) => s.disabledServerIds);
+  const setVirtualServerEnabled = useVirtualMcpStore((s) => s.setServerEnabled);
   const virtualServers = getVirtualMcpServers();
+
+  const isVirtualServerEnabled = useCallback(
+    (id: string) => !disabledVirtualServerIds.includes(id),
+    [disabledVirtualServerIds],
+  );
 
   const filterVirtualServer = useCallback(
     (vServer: VirtualMcpServer): boolean => {
@@ -115,16 +124,6 @@ export const McpSection: React.FC<McpSectionProps> = ({ settings, onUpdate }) =>
   );
 
   const filteredVirtualServers = virtualServers.filter(filterVirtualServer);
-  const moveServer = (id: string, direction: -1 | 1) => {
-    const idx = sortOrder.indexOf(id);
-    const next = [...sortOrder];
-    const j = idx + direction;
-    if (j < 0 || j >= next.length) return;
-    [next[idx], next[j]] = [next[j], next[idx]];
-    setSortOrder(next);
-    const reordered = next.map((nid) => servers.find((s) => s.id === nid)!).filter(Boolean);
-    onUpdate('mcpServers', reordered);
-  };
   const [capabilityStates, setCapabilityStates] = useState<Record<string, CapabilityTestState>>({});
   const [activeTabs, setActiveTabs] = useState<Record<string, string>>({});
   const [toolQueries, setToolQueries] = useState<Record<string, string>>({});
@@ -149,6 +148,24 @@ export const McpSection: React.FC<McpSectionProps> = ({ settings, onUpdate }) =>
       return prev.slice(0, servers.length);
     });
   }, [servers.length, createCardKey]);
+
+  const moveServer = (id: string, direction: -1 | 1) => {
+    const idx = sortOrder.indexOf(id);
+    const next = [...sortOrder];
+    const j = idx + direction;
+    if (j < 0 || j >= next.length) return;
+    [next[idx], next[j]] = [next[j], next[idx]];
+    setSortOrder(next);
+    const reordered = next.map((nid) => servers.find((s) => s.id === nid)!).filter(Boolean);
+    setCardKeys((prev) => {
+      const keyMap = new Map<McpServerConfig, string>();
+      servers.forEach((s, i) => {
+        if (prev[i]) keyMap.set(s, prev[i]);
+      });
+      return reordered.map((s) => keyMap.get(s) ?? createCardKey());
+    });
+    onUpdate('mcpServers', reordered);
+  };
 
   const updateServers = (nextServers: McpServerConfig[]) => {
     onUpdate('mcpServers', nextServers);
@@ -377,7 +394,7 @@ export const McpSection: React.FC<McpSectionProps> = ({ settings, onUpdate }) =>
               isExpanded={expandedCards.has(`virtual-${vServer.id}`)}
               isEnabled={isVirtualServerEnabled(vServer.id)}
               onToggleExpanded={() => toggleCardExpanded(`virtual-${vServer.id}`)}
-              onToggleEnabled={() => toggleVirtualServerEnabled(vServer.id)}
+              onToggleEnabled={(enabled) => setVirtualServerEnabled(vServer.id, enabled)}
               t={t}
             />
           ))}
@@ -446,7 +463,7 @@ export const McpSection: React.FC<McpSectionProps> = ({ settings, onUpdate }) =>
                   onToggleExpanded={() => toggleCardExpanded(stateKey)}
                   onToggleEnabled={(enabled) => {
                     if (enabled && server.isTrusted === false) {
-                      setPendingTrustIndex(index);
+                      setPendingTrustTarget({ server, index, cardKey: stateKey });
                       return;
                     }
                     if (enabled) {
@@ -479,17 +496,18 @@ export const McpSection: React.FC<McpSectionProps> = ({ settings, onUpdate }) =>
           </div>
         )}
       </div>
-      {pendingTrustIndex !== null && servers[pendingTrustIndex] && (
+      {pendingTrustTarget && (
         <McpTrustDialog
-          server={servers[pendingTrustIndex]}
-          onCancel={() => setPendingTrustIndex(null)}
+          server={pendingTrustTarget.server}
+          onCancel={() => setPendingTrustTarget(null)}
           onConfirm={() => {
-            const index = pendingTrustIndex;
-            setPendingTrustIndex(null);
-            if (index === null) return;
-            const next = { ...servers[index], enabled: true, isTrusted: true };
+            const { index, cardKey } = pendingTrustTarget;
+            setPendingTrustTarget(null);
+            const target = servers[index];
+            if (!target) return;
+            const next = { ...target, enabled: true, isTrusted: true };
             updateServer(index, next);
-            void testServerCapabilities(next as McpServerConfig, cardKeys[index]);
+            void testServerCapabilities(next as McpServerConfig, cardKey);
           }}
         />
       )}

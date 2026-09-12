@@ -4,6 +4,7 @@ export interface VirtualMcpServer {
   id: string;
   name: string;
   description: string;
+  disabledAutoApproveTools?: string[];
   listTools: () => Promise<McpToolDefinition[]>;
   callTool: (
     toolName: string,

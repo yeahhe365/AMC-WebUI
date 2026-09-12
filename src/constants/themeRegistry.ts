@@ -21,6 +21,7 @@ const ONYX_THEME_COLORS: ThemeColors = {
   bgDanger: '#7f1d1d',
   bgDangerHover: '#991b1b',
   bgInput: '#141418', // Input fields — subtle lift from bgPrimary
+  bgSurfaceMuted: '#141418', // Muted artifact surface — raised above bgPrimary (#0c0c0e)
   bgCodeBlock: '#141418',
   bgCodeBlockHeader: '#1e1e24',
   bgUserMessage: '#202028', // Neutral raised tint with slight warmth
@@ -84,11 +85,12 @@ const PEARL_THEME_COLORS: ThemeColors = {
   bgDanger: '#dc2626',
   bgDangerHover: '#b91c1c',
   bgInput: '#ffffff',
+  bgSurfaceMuted: '#f4f5f7', // Muted artifact surface — must contrast with bgPrimary (#fefefe)
   bgCodeBlock: '#f6f7f9',
   bgCodeBlockHeader: 'rgba(237, 238, 242, 0.9)',
   bgUserMessage: '#eef0f5', // Neutral light tint — NOT accent
   bgModelMessage: '#fefefe',
-  bgErrorMessage: '#fef2f2',
+  bgErrorMessage: 'rgba(220, 38, 38, 0.1)', // Translucent so it can be floored like the other semantic surfaces
   bgSuccess: 'rgba(22, 163, 74, 0.1)',
   textSuccess: '#16a34a',
   bgInfo: 'rgba(37, 99, 235, 0.06)',
@@ -147,6 +149,7 @@ const GRAPHITE_THEME_COLORS: ThemeColors = {
   bgDanger: '#7f1d1d',
   bgDangerHover: '#991b1b',
   bgInput: '#343438',
+  bgSurfaceMuted: '#343438', // Muted artifact surface — raised above bgPrimary (#2b2b2e)
   bgCodeBlock: '#252528',
   bgCodeBlockHeader: '#313134',
   bgUserMessage: '#3c3c40', // Neutral raised tint
@@ -210,11 +213,12 @@ const SEPIA_THEME_COLORS: ThemeColors = {
   bgDanger: '#b91c1c',
   bgDangerHover: '#991b1b',
   bgInput: '#ffffff',
+  bgSurfaceMuted: '#f4ece0', // Warm muted artifact surface — cool white would clash with the parchment canvas
   bgCodeBlock: '#f4ece0',
   bgCodeBlockHeader: 'rgba(233, 223, 209, 0.9)',
   bgUserMessage: '#efe3d3',
   bgModelMessage: '#fbf5ea',
-  bgErrorMessage: '#fef2f2',
+  bgErrorMessage: 'rgba(185, 28, 28, 0.12)', // Warm translucent tint — #fef2f2 was a cool pink on parchment
   bgSuccess: 'rgba(22, 101, 52, 0.1)',
   textSuccess: '#15803d',
   bgInfo: 'rgba(156, 91, 40, 0.08)',
@@ -271,3 +275,16 @@ export const AVAILABLE_THEMES: Theme[] = [
 ];
 
 export const DEFAULT_THEME_ID = 'pearl';
+
+/**
+ * Minimum alpha for a semantic surface (`bgSuccess`/`bgInfo`/…) when it has to
+ * read as a *filled* shape rather than a tint behind text.
+ *
+ * Light themes author these tokens at alpha 0.06–0.1, which is invisible as a
+ * Graphviz node fill on a transparent canvas. Live Artifacts render semantic
+ * color through two channels — HTML/CSS (uses the token directly) and Graphviz
+ * (`flattenGraphvizFill` composites it) — and they must agree, otherwise a
+ * `success` tag and a `success` node next to each other look like two different
+ * systems. Both channels floor their alpha here.
+ */
+export const SEMANTIC_SURFACE_MIN_ALPHA = 0.22;

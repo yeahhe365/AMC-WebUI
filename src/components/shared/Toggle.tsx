@@ -31,7 +31,9 @@ export const Toggle: React.FC<{
       htmlFor={id}
       className={`inline-flex items-center ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
       onClick={(e) => {
-        e.preventDefault();
+        if (e.target !== e.currentTarget && (e.target as HTMLElement).tagName !== 'INPUT') {
+          e.preventDefault();
+        }
       }}
     >
       <input

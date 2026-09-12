@@ -3,9 +3,9 @@ import { setupProviderTestRenderer as setupTestRenderer } from '@/test/render/pr
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setupStoreStateReset } from '@/test/stores/reset';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useProviderUiStore } from '@/stores/providerUiStore';
 import { createThirdPartyConnection } from '@/test/data/factories';
-import * as thirdPartyDiagnostics from '@/utils/thirdPartyDiagnostics';
-import type { AppSettings } from '@/types';
+import { GEMINI_PROVIDER_ID, type AppSettings } from '@/types';
 import { ProviderSettingsSection } from './ProviderSettingsSection';
 
 describe('ProviderSettingsSection', () => {
@@ -75,46 +75,64 @@ describe('ProviderSettingsSection', () => {
     expect(renderer.container.textContent).toContain('检测');
   });
 
-  it('probes every enabled connection with a URL from the test-all action', async () => {
-    const probeSpy = vi
-      .spyOn(thirdPartyDiagnostics, 'probeThirdPartyConnection')
-      .mockResolvedValue({ status: 'success', latencyMs: 120, grade: 'fast' } as never);
-
-    const reachable = createThirdPartyConnection({
-      id: 'conn-a',
-      name: 'Reachable',
-      templateId: 'custom-openai',
-      baseUrl: 'https://a.example/v1',
-      apiKey: 'sk-a',
-      enabled: true,
+  it('persists selectedConnectionId and restores it on render', () => {
+    const conn1 = createThirdPartyConnection({
+      id: 'conn-1',
+      name: 'Provider One',
+      models: [{ id: 'p1-m1', name: 'Model 1', visibleInSelector: true }],
     });
-    const disabled = createThirdPartyConnection({
-      id: 'conn-b',
-      name: 'Disabled',
-      templateId: 'custom-openai',
-      baseUrl: 'https://b.example/v1',
-      apiKey: 'sk-b',
-      enabled: false,
+    const conn2 = createThirdPartyConnection({
+      id: 'conn-2',
+      name: 'Provider Two',
+      models: [{ id: 'p2-m1', name: 'Model 2', visibleInSelector: true }],
     });
 
-    const settingsWithConns: AppSettings = {
+    const settingsWithTwoConns: AppSettings = {
       ...useSettingsStore.getState().appSettings,
-      thirdPartyApi: { connections: [reachable, disabled] },
+      thirdPartyApi: {
+        connections: [conn1, conn2],
+      },
+    };
+
+    // Pre-select conn-2 in providerUiStore
+    useProviderUiStore.getState().setSelectedConnectionId('conn-2');
+
+    act(() => {
+      renderer.root.render(<ProviderSettingsSection {...createProps({ settings: settingsWithTwoConns })} />);
+    });
+
+    expect(renderer.container.textContent).toContain('Provider Two');
+    expect(renderer.container.textContent).toContain('Model 2');
+  });
+
+  it('switches to Gemini and persists selection when Gemini provider is clicked', () => {
+    const conn1 = createThirdPartyConnection({
+      id: 'conn-1',
+      name: 'Provider One',
+      models: [{ id: 'p1-m1', name: 'Model 1', visibleInSelector: true }],
+    });
+
+    const settingsWithConn: AppSettings = {
+      ...useSettingsStore.getState().appSettings,
+      thirdPartyApi: {
+        connections: [conn1],
+      },
     };
 
     act(() => {
-      renderer.root.render(<ProviderSettingsSection {...createProps({ settings: settingsWithConns })} />);
+      renderer.root.render(<ProviderSettingsSection {...createProps({ settings: settingsWithConn })} />);
     });
 
-    const testAllBtn = renderer.container.querySelector('[data-testid="third-party-test-all-btn"]');
-    expect(testAllBtn).not.toBeNull();
+    // Find and click Google Gemini in the list
+    const geminiItem = Array.from(renderer.container.querySelectorAll('span')).find((el) =>
+      el.textContent?.includes('Google Gemini'),
+    );
+    expect(geminiItem).toBeDefined();
 
-    await act(async () => {
-      (testAllBtn as HTMLButtonElement).click();
+    act(() => {
+      geminiItem?.closest('div[class*="cursor-pointer"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
 
-    // Only the enabled connection with a base URL is probed.
-    expect(probeSpy).toHaveBeenCalledTimes(1);
-    expect(probeSpy).toHaveBeenCalledWith(expect.objectContaining({ id: 'conn-a' }));
+    expect(useProviderUiStore.getState().selectedConnectionId).toBe(GEMINI_PROVIDER_ID);
   });
 });

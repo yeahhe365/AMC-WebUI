@@ -411,3 +411,59 @@ describe('mislabeled HTML fence unwrapping (tightened)', () => {
     expect(normalizePreviewableMarkdownContent(content)).toBe(content);
   });
 });
+
+describe('bare artifact fragments surrounded by prose', () => {
+  // Real Live Artifacts output always carries the injected theme tokens; the
+  // marker is what separates "artifact" from "markup shown on purpose".
+  const fragment =
+    '<div style="display:block;width:100%"><h2 style="color:var(--amc-live-artifact-text)">Hello</h2>' +
+    '<p style="color:var(--amc-live-artifact-muted)">Body</p></div>';
+
+  it('wraps a fragment that carries leading prose instead of leaking raw HTML', () => {
+    // Regression: a model reply that opens with a sentence and then emits a bare
+    // HTML fragment used to bypass wrapBarePreviewableArtifact entirely (it only
+    // ever wrapped when the WHOLE message was the artifact). The fragment then
+    // rendered as escaped source text in the chat bubble.
+    expect(normalizePreviewableMarkdownContent(`这是一段引导语。\n\n${fragment}`)).toBe(
+      `这是一段引导语。\n\n\`\`\`amc-live-artifact-html\n${fragment}\n\`\`\``,
+    );
+  });
+
+  it('wraps a fragment that carries trailing prose', () => {
+    expect(normalizePreviewableMarkdownContent(`${fragment}\n\n后面还有一段说明。`)).toBe(
+      `\`\`\`amc-live-artifact-html\n${fragment}\n\`\`\`\n\n后面还有一段说明。`,
+    );
+  });
+
+  it('wraps a fragment surrounded by prose on both sides', () => {
+    expect(normalizePreviewableMarkdownContent(`开头。\n\n${fragment}\n\n结尾。`)).toBe(
+      `开头。\n\n\`\`\`amc-live-artifact-html\n${fragment}\n\`\`\`\n\n结尾。`,
+    );
+  });
+
+  it('wraps a full html document that carries leading prose', () => {
+    const document = '<!DOCTYPE html><html><body>Hello</body></html>';
+
+    expect(normalizePreviewableMarkdownContent(`这是说明。\n\n${document}`)).toBe(
+      `这是说明。\n\n\`\`\`amc-live-artifact-html\n${document}\n\`\`\``,
+    );
+  });
+
+  it('leaves prose that merely mentions tags as prose', () => {
+    const prose = '你可以使用 <div> 标签来布局，也可以使用 <span> 标签来包裹行内文本。';
+
+    expect(normalizePreviewableMarkdownContent(prose)).toBe(prose);
+  });
+
+  it('does not wrap a fenced code example that merely sits next to prose', () => {
+    const content = '下面是一个例子：\n\n```html\n<div>hi</div>\n```';
+
+    expect(normalizePreviewableMarkdownContent(content)).toBe(content);
+  });
+
+  it('does not promote a marker-less bare fragment next to prose', () => {
+    const plain = '<div style="padding:20px"><strong>Transformer</strong></div>';
+
+    expect(normalizePreviewableMarkdownContent(`说明文字。\n\n${plain}`)).toBe(`说明文字。\n\n${plain}`);
+  });
+});

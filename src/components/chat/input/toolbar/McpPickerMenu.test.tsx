@@ -136,4 +136,61 @@ describe('McpPickerMenu', () => {
     expect(screen.getByText('Solo Server')).toBeInTheDocument();
     expect(screen.queryByTestId('mcp-picker-all')).toBeNull();
   });
+
+  it('displays the total count badge when all servers are active and unchecks all when clicked', async () => {
+    openMenu();
+    // Initially all 2 servers are active, count badge is 2
+    expect(screen.getByTestId('mcp-picker-count')).toHaveTextContent('2');
+
+    // Click all-servers row when allActive: toggles to unselect all
+    const allRow = screen.getByTestId('mcp-picker-all');
+    expect(allRow).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(allRow);
+
+    await waitFor(() => expect(useMcpRuntimeStore.getState().selectedServerIds).toEqual([]));
+    expect(allRow).toHaveAttribute('aria-checked', 'false');
+    // Shows empty hint when master is enabled but 0 servers are selected
+    expect(screen.getByTestId('mcp-picker-empty-hint')).toBeInTheDocument();
+
+    // Clicking all-servers again selects all servers
+    fireEvent.click(allRow);
+    await waitFor(() => expect(useMcpRuntimeStore.getState().selectedServerIds).toBeNull());
+    expect(allRow).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByTestId('mcp-picker-empty-hint')).toBeNull();
+  });
+
+  it('renders disabled button with clear tooltip when no servers are available', () => {
+    useSettingsStore.setState({
+      appSettings: {
+        ...useSettingsStore.getState().appSettings,
+        mcpServers: [],
+      } as never,
+    });
+
+    renderWithProviders(<McpPickerMenu />);
+    const button = screen.getByTestId('mcp-picker-button');
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', 'No MCP servers configured or enabled');
+  });
+
+  it('renders grouping headers when both external and virtual servers exist', async () => {
+    const { registerVirtualMcpServer, clearVirtualMcpServers } = await import('@/features/mcp/virtualMcpRegistry');
+    const unregister = registerVirtualMcpServer({
+      id: 'v_grouped',
+      name: 'Grouped Virtual',
+      description: 'Group test virtual server',
+      listTools: async () => [],
+      callTool: async () => ({}),
+    });
+
+    try {
+      openMenu();
+      expect(screen.getByText('External MCP Servers')).toBeInTheDocument();
+      expect(screen.getByText('Built-in Virtual Services')).toBeInTheDocument();
+      expect(screen.getByText('Grouped Virtual')).toBeInTheDocument();
+    } finally {
+      unregister();
+      clearVirtualMcpServers();
+    }
+  });
 });

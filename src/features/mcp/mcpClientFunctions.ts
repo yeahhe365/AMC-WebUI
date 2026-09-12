@@ -349,6 +349,7 @@ export const createMcpClientFunctions = async ({
               name: virtualServer.name,
               enabled: true,
               transport: 'stdio',
+              disabledAutoApproveTools: virtualServer.disabledAutoApproveTools,
             };
             if (requestApproval && requiresApproval(dummyServerConfig, tool.name)) {
               const approvalKey = sessionApprovalKey(virtualServer.id, tool.name);

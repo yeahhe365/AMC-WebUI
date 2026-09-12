@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ECHARTS_RENDERER_SCRIPT, buildEchartsThemeFromCssVars, normalizeEchartsOption } from './echartsRendererScript';
+import {
+  ECHARTS_RENDERER_SCRIPT,
+  buildEchartsThemeFromCssVars,
+  normalizeEchartsOption,
+  resolveBaseFontSize,
+  resolveEchartsFontSizes,
+} from './echartsRendererScript';
 
 describe('echartsRendererScript', () => {
   describe('normalizeEchartsOption', () => {
@@ -122,6 +128,66 @@ describe('echartsRendererScript', () => {
       expect(ECHARTS_RENDERER_SCRIPT).toContain('echarts.init');
       expect(ECHARTS_RENDERER_SCRIPT).toContain('renderer');
       expect(ECHARTS_RENDERER_SCRIPT).toContain('svg');
+    });
+
+    it('scales chart type with the Live Artifacts font size setting', () => {
+      // Model-authored text follows --amc-live-artifact-font-size; chart labels are
+      // host-rendered, so they must read the same token or a 24px artifact keeps
+      // 12px axis labels. The sandbox shares resolveEchartsFontSizes with the TS
+      // path instead of duplicating the math.
+      expect(ECHARTS_RENDERER_SCRIPT).toContain('--amc-live-artifact-font-size');
+      expect(ECHARTS_RENDERER_SCRIPT).toContain(resolveEchartsFontSizes.toString());
+    });
+
+    it('keeps the injected helpers self-contained so the sandbox can evaluate them', () => {
+      // The sandbox receives these helpers as Function.prototype.toString() text
+      // inside its own IIFE: any module-scope identifier they close over (the
+      // default font size constant, for instance) is undefined there, and the
+      // resulting ReferenceError is swallowed by ensureTheme's try/catch — the
+      // theme then silently never registers and every chart loses its styling.
+      // Evaluating them through new Function() reproduces exactly that scope.
+      const sandbox = new Function(`
+        const resolveEchartsFontSizes = ${resolveEchartsFontSizes.toString()};
+        const resolveBaseFontSize = ${resolveBaseFontSize.toString()};
+        return { resolveEchartsFontSizes, resolveBaseFontSize };
+      `)() as {
+        resolveEchartsFontSizes: (base: number) => { body: number; title: number };
+        resolveBaseFontSize: (raw: string | undefined) => number;
+      };
+
+      expect(sandbox.resolveEchartsFontSizes(24)).toEqual({ body: 18, title: 27 });
+      expect(sandbox.resolveEchartsFontSizes(Number.NaN)).toEqual({ body: 12, title: 18 });
+      expect(sandbox.resolveBaseFontSize('24px')).toBe(24);
+      expect(sandbox.resolveBaseFontSize('')).toBe(16);
+    });
+  });
+
+  describe('font scaling', () => {
+    it('keeps the 16px baseline type scale (12px body, 18px title)', () => {
+      const theme = buildEchartsThemeFromCssVars({ '--amc-live-artifact-font-size': '16px' });
+
+      expect(theme.textStyle.fontSize).toBe(12);
+      expect(theme.title.textStyle.fontSize).toBe(18);
+      expect(theme.categoryAxis.axisLabel.fontSize).toBe(12);
+      expect(theme.valueAxis.axisLabel.fontSize).toBe(12);
+      expect(theme.legend.textStyle.fontSize).toBe(12);
+      expect(theme.tooltip.textStyle.fontSize).toBe(12);
+    });
+
+    it('scales axis, legend, tooltip, and title type with the artifact font size', () => {
+      const large = buildEchartsThemeFromCssVars({ '--amc-live-artifact-font-size': '24px' });
+      expect(large.textStyle.fontSize).toBe(18);
+      expect(large.title.textStyle.fontSize).toBe(27);
+      expect(large.categoryAxis.axisLabel.fontSize).toBe(18);
+
+      const small = buildEchartsThemeFromCssVars({ '--amc-live-artifact-font-size': '10px' });
+      expect(small.textStyle.fontSize).toBe(8);
+      expect(small.title.textStyle.fontSize).toBe(11);
+    });
+
+    it('falls back to the 16px baseline when the token is missing or unusable', () => {
+      expect(buildEchartsThemeFromCssVars({}).textStyle.fontSize).toBe(12);
+      expect(buildEchartsThemeFromCssVars({ '--amc-live-artifact-font-size': 'huge' }).textStyle.fontSize).toBe(12);
     });
   });
 });

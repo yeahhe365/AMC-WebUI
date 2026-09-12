@@ -12,10 +12,11 @@ export interface EchartsThemeDefinition {
   textStyle: {
     fontFamily: string;
     color: string;
+    fontSize: number;
   };
   title: {
-    textStyle: { color: string; fontWeight: number };
-    subtextStyle: { color: string };
+    textStyle: { color: string; fontWeight: number; fontSize: number };
+    subtextStyle: { color: string; fontSize: number };
   };
   line: {
     smooth: boolean;
@@ -29,17 +30,17 @@ export interface EchartsThemeDefinition {
   categoryAxis: {
     axisLine: { lineStyle: { color: string } };
     axisTick: { lineStyle: { color: string } };
-    axisLabel: { color: string };
+    axisLabel: { color: string; fontSize: number };
     splitLine: { show: boolean };
   };
   valueAxis: {
     axisLine: { show: boolean };
     axisTick: { show: boolean };
-    axisLabel: { color: string };
+    axisLabel: { color: string; fontSize: number };
     splitLine: { lineStyle: { color: string; type: string } };
   };
   legend: {
-    textStyle: { color: string };
+    textStyle: { color: string; fontSize: number };
   };
   tooltip: {
     backgroundColor: string;
@@ -49,6 +50,35 @@ export interface EchartsThemeDefinition {
     extraCssText: string;
   };
 }
+
+const LIVE_ARTIFACT_FONT_SIZE_VAR = '--amc-live-artifact-font-size';
+
+/**
+ * Chart type scale for a given Live Artifacts base font size.
+ *
+ * Chart text is host-rendered, so it does not inherit the preview document's font
+ * size the way model-authored `em` styles do. Without this the Live Artifacts font
+ * size setting grew the prose while every axis label stayed at ECharts' 12px
+ * default. The 16px baseline reproduces the previous fixed sizes exactly (12px
+ * body, 18px title), so nothing changes until the user moves the setting.
+ *
+ * SANDBOX CONTRACT: this function is injected into the preview iframe as source
+ * text (`${resolveEchartsFontSizes.toString()}`), so it must stay self-contained.
+ * Reading a module-scope constant here would be a ReferenceError inside the
+ * iframe, and ensureTheme's try/catch would swallow it — silently leaving every
+ * chart unthemed. The fallback is spelled out for that reason; the guard test
+ * 'keeps the injected helpers self-contained' evaluates it in a bare scope.
+ */
+export const resolveEchartsFontSizes = (baseFontSize: number): { body: number; title: number } => {
+  const base = Number.isFinite(baseFontSize) && baseFontSize > 0 ? baseFontSize : 16;
+  return { body: Math.round(base * 0.75), title: Math.round(base * 1.125) };
+};
+
+export const resolveBaseFontSize = (raw: string | undefined): number => {
+  const parsed = Number.parseFloat(raw ?? '');
+  // Self-contained for the same sandbox reason as resolveEchartsFontSizes.
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 16;
+};
 
 export const buildEchartsThemeFromCssVars = (cssVars: Record<string, string> = {}): EchartsThemeDefinition => {
   const text = cssVars['--amc-live-artifact-text'] || '#1e293b';
@@ -60,6 +90,7 @@ export const buildEchartsThemeFromCssVars = (cssVars: Record<string, string> = {
   const success = cssVars['--amc-live-artifact-success'] || '#22c55e';
   const warning = cssVars['--amc-live-artifact-warning'] || '#f59e0b';
   const danger = cssVars['--amc-live-artifact-danger'] || '#ef4444';
+  const fontSize = resolveEchartsFontSizes(resolveBaseFontSize(cssVars[LIVE_ARTIFACT_FONT_SIZE_VAR]));
 
   return {
     color: [accent, success, warning, danger, '#8b5cf6', '#06b6d4', muted, subtle],
@@ -67,10 +98,11 @@ export const buildEchartsThemeFromCssVars = (cssVars: Record<string, string> = {
     textStyle: {
       fontFamily: 'system-ui, -apple-system, sans-serif',
       color: text,
+      fontSize: fontSize.body,
     },
     title: {
-      textStyle: { color: text, fontWeight: 600 },
-      subtextStyle: { color: muted },
+      textStyle: { color: text, fontWeight: 600, fontSize: fontSize.title },
+      subtextStyle: { color: muted, fontSize: fontSize.body },
     },
     line: {
       smooth: true,
@@ -84,23 +116,23 @@ export const buildEchartsThemeFromCssVars = (cssVars: Record<string, string> = {
     categoryAxis: {
       axisLine: { lineStyle: { color: border } },
       axisTick: { lineStyle: { color: border } },
-      axisLabel: { color: muted },
+      axisLabel: { color: muted, fontSize: fontSize.body },
       splitLine: { show: false },
     },
     valueAxis: {
       axisLine: { show: false },
       axisTick: { show: false },
-      axisLabel: { color: muted },
+      axisLabel: { color: muted, fontSize: fontSize.body },
       splitLine: { lineStyle: { color: border, type: 'dashed' } },
     },
     legend: {
-      textStyle: { color: muted },
+      textStyle: { color: muted, fontSize: fontSize.body },
     },
     tooltip: {
       backgroundColor: surface,
       borderColor: border,
       borderWidth: 1,
-      textStyle: { color: text, fontSize: 12 },
+      textStyle: { color: text, fontSize: fontSize.body },
       extraCssText: 'box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px;',
     },
   };
@@ -250,6 +282,9 @@ export const ECHARTS_RENDERER_SCRIPT = `
       const success = getVar('--amc-live-artifact-success', '#22c55e');
       const warning = getVar('--amc-live-artifact-warning', '#f59e0b');
       const danger = getVar('--amc-live-artifact-danger', '#ef4444');
+      // Same scale as the export path: chart text must follow the Live Artifacts
+      // font size setting, which the model-authored prose already inherits.
+      const fontSize = resolveEchartsFontSizes(resolveBaseFontSize(getVar(FONT_SIZE_VAR, '')));
 
       window.echarts.registerTheme(THEME_NAME, {
         color: [accent, success, warning, danger, '#8b5cf6', '#06b6d4', muted, subtle],
@@ -257,10 +292,11 @@ export const ECHARTS_RENDERER_SCRIPT = `
         textStyle: {
           fontFamily: 'system-ui, -apple-system, sans-serif',
           color: text,
+          fontSize: fontSize.body,
         },
         title: {
-          textStyle: { color: text, fontWeight: 600 },
-          subtextStyle: { color: muted },
+          textStyle: { color: text, fontWeight: 600, fontSize: fontSize.title },
+          subtextStyle: { color: muted, fontSize: fontSize.body },
         },
         line: {
           smooth: true,
@@ -274,23 +310,23 @@ export const ECHARTS_RENDERER_SCRIPT = `
         categoryAxis: {
           axisLine: { lineStyle: { color: border } },
           axisTick: { lineStyle: { color: border } },
-          axisLabel: { color: muted },
+          axisLabel: { color: muted, fontSize: fontSize.body },
           splitLine: { show: false },
         },
         valueAxis: {
           axisLine: { show: false },
           axisTick: { show: false },
-          axisLabel: { color: muted },
+          axisLabel: { color: muted, fontSize: fontSize.body },
           splitLine: { lineStyle: { color: border, type: 'dashed' } },
         },
         legend: {
-          textStyle: { color: muted },
+          textStyle: { color: muted, fontSize: fontSize.body },
         },
         tooltip: {
           backgroundColor: surface,
           borderColor: border,
           borderWidth: 1,
-          textStyle: { color: text, fontSize: 12 },
+          textStyle: { color: text, fontSize: fontSize.body },
           extraCssText: 'box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-radius: 6px;',
         },
       });
@@ -299,6 +335,9 @@ export const ECHARTS_RENDERER_SCRIPT = `
   };
 
   const normalizeOption = ${normalizeEchartsOption.toString()};
+  const resolveEchartsFontSizes = ${resolveEchartsFontSizes.toString()};
+  const resolveBaseFontSize = ${resolveBaseFontSize.toString()};
+  const FONT_SIZE_VAR = ${JSON.stringify(LIVE_ARTIFACT_FONT_SIZE_VAR)};
 
   const chartInstances = new Set();
 

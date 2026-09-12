@@ -1,5 +1,6 @@
 import { AVAILABLE_THEMES, DEFAULT_THEME_ID } from '@/constants/themeRegistry';
 import { hydrateGraphvizIntoDocument } from '@/features/graphviz/vizRuntime';
+import { buildLiveArtifactThemeVars } from '@/utils/live-artifacts/liveArtifactThemeTokens';
 import { PREVIEW_BRIDGE_SCRIPT } from './previewBridgeScript';
 import { hydrateChartsIntoDocument } from './chartRendererScript';
 import { sanitizeElementTree } from './previewSanitizer';
@@ -339,37 +340,44 @@ const resolvePreviewTheme = (themeId?: string) => {
   );
 };
 
-const buildPreviewThemeStyle = (themeId?: string, options: { varsOnly?: boolean } = {}): string => {
+const buildPreviewThemeStyle = (
+  themeId?: string,
+  options: { varsOnly?: boolean; baseFontSize?: number } = {},
+): string => {
   const theme = resolvePreviewTheme(themeId);
-  const colors = theme.colors;
   const colorScheme = DARK_LIVE_ARTIFACT_THEME_IDS.has(theme.id) ? 'dark' : 'light';
-
-  const cssVars = [
-    `--amc-live-artifact-text:${colors.textPrimary}`,
-    `--amc-live-artifact-muted:${colors.textSecondary}`,
-    `--amc-live-artifact-subtle:${colors.textTertiary}`,
-    `--amc-live-artifact-surface:${colors.bgTertiary}`,
-    `--amc-live-artifact-surface-muted:${colors.bgInput}`,
-    `--amc-live-artifact-border:${colors.borderSecondary}`,
-    `--amc-live-artifact-accent:${colors.textLink}`,
-    `--amc-live-artifact-accent-surface:${colors.bgInfo}`,
-    `--amc-live-artifact-success:${colors.textSuccess}`,
-    `--amc-live-artifact-success-surface:${colors.bgSuccess}`,
-    `--amc-live-artifact-danger:${colors.textDanger}`,
-    `--amc-live-artifact-danger-surface:${colors.bgErrorMessage}`,
-    `--amc-live-artifact-warning:${colors.textWarning}`,
-    `--amc-live-artifact-warning-surface:${colors.bgWarning}`,
-  ].join(';');
+  // Shared with themeDom.ts (host-document fallback rendering) so both channels
+  // cannot drift; see liveArtifactThemeTokens.buildLiveArtifactThemeVars.
+  const cssVars = buildLiveArtifactThemeVars(theme.colors);
+  // Static snapshots (PNG / standalone HTML export) have no separate font-size
+  // style element, so the size rides along in the vars block the chart hydrator
+  // already parses. The live iframe injects it separately (see
+  // buildPreviewBaseFontSizeStyle) and leaves this unset.
+  const baseFontSize =
+    typeof options.baseFontSize === 'number' && Number.isFinite(options.baseFontSize)
+      ? `--amc-live-artifact-font-size:${Math.max(1, Math.round(options.baseFontSize))}px;`
+      : '';
 
   if (options.varsOnly) {
-    return `<style ${PREVIEW_THEME_ATTRIBUTE}="true">:root{color-scheme:${colorScheme};${cssVars};}</style>`;
+    return `<style ${PREVIEW_THEME_ATTRIBUTE}="true">:root{color-scheme:${colorScheme};${cssVars};${baseFontSize}}</style>`;
   }
 
   // height/min-height auto: model CSS often uses min-height:100vh / height:100%, which
   // expands to the iframe viewport and reports a locked tall height (blank under content).
   // Surface tokens must be soft fills (bgInfo/bgSuccess/…), never solid interactive fills like bgAccent.
   // bgAccent equals textLink on pearl (#2563eb); pairing accent text on accent-surface would be invisible.
-  return `<style ${PREVIEW_THEME_ATTRIBUTE}="true">:root{color-scheme:${colorScheme};${cssVars};}html,body{margin:0;padding:0;height:auto!important;min-height:0!important;max-height:none!important;background:transparent!important;color:var(--amc-live-artifact-text);}body{overflow-x:auto;}[data-amc-graphviz][data-amc-graphviz-state="rendered"]{cursor:zoom-in;}</style>`;
+  //
+  // Overflow guard: the frame height is measured from element rects (see
+  // previewBridgeScript.measureContentHeight), which only sees VERTICAL extent. A
+  // long unbroken string in a narrow grid cell (typically a metric-card value that
+  // should have been a number) overflows horizontally and is clipped by the
+  // frame's `overflow-hidden` with no scrollbar and no height growth — it just
+  // disappears. Allowing descendants to shrink below their content width
+  // (`min-width:0`) and to wrap long tokens makes that text reflow onto another
+  // line instead of vanishing. Set on descendants only, so the artifact's own
+  // root keeps whatever display/width contract the model declared.
+  const overflowGuard = `body :where(div,section,article,main,aside,header,footer,li,td,th,p,h1,h2,h3,h4,h5,h6,span,strong,em,small,code){min-width:0;}body{overflow-wrap:anywhere;}`;
+  return `<style ${PREVIEW_THEME_ATTRIBUTE}="true">:root{color-scheme:${colorScheme};${cssVars};}html,body{margin:0;padding:0;height:auto!important;min-height:0!important;max-height:none!important;background:transparent!important;color:var(--amc-live-artifact-text);}body{overflow-x:auto;}${overflowGuard}[data-amc-graphviz][data-amc-graphviz-state="rendered"]{cursor:zoom-in;}</style>`;
 };
 
 const injectPreviewTheme = (srcDoc: string, themeId?: string): string => {
@@ -577,7 +585,7 @@ export const buildUnrestrictedHtmlPreviewSrcDoc = (
 export const createStaticPreviewSnapshotContainer = async (
   htmlContent: string,
   targetDocument: Document,
-  options: { themeId?: string; sanitize?: boolean } = {},
+  options: { themeId?: string; sanitize?: boolean; baseFontSize?: number } = {},
 ): Promise<{ container: HTMLElement; cleanup: () => void }> => {
   const parser = new DOMParser();
   const parsedDocument = parser.parseFromString(htmlContent, 'text/html');
@@ -589,11 +597,17 @@ export const createStaticPreviewSnapshotContainer = async (
   // on-screen artifact. The theme style (varsOnly) is injected so chart SVG
   // colors resolve on the parent page, which never defines --amc-live-artifact-*.
   hydrateChartsIntoDocument(parsedDocument, {
-    themeStyle: buildPreviewThemeStyle(options.themeId, { varsOnly: true }),
+    themeStyle: buildPreviewThemeStyle(options.themeId, {
+      varsOnly: true,
+      baseFontSize: options.baseFontSize,
+    }),
   });
   // Graphviz hydration needs the lazy viz-js runtime, so the snapshot build is
   // async. Both are awaited before the container is measured and exported.
-  await hydrateGraphvizIntoDocument(parsedDocument, { themeId: options.themeId });
+  await hydrateGraphvizIntoDocument(parsedDocument, {
+    themeId: options.themeId,
+    baseFontSize: options.baseFontSize,
+  });
 
   const container = targetDocument.createElement('div');
   container.className = 'is-exporting-png html-preview-snapshot';

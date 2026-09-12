@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Copy, MessageSquarePlus } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, Copy, MessageSquarePlus } from 'lucide-react';
 import { fetchMcpPrompt, type McpPromptDefinition } from '@/services/api/mcpApi';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { getErrorMessage } from '@/utils/errorMessage';
@@ -29,6 +29,7 @@ export const McpPromptsTab: React.FC<McpPromptsTabProps> = ({ server, prompts, t
   const [errorFor, setErrorFor] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [renderedText, setRenderedText] = useState<string | null>(null);
+  const [inserted, setInserted] = useState(false);
   const { isCopied: copied, copyToClipboard } = useCopyToClipboard(2000);
 
   if (!prompts.length) {
@@ -66,6 +67,8 @@ export const McpPromptsTab: React.FC<McpPromptsTabProps> = ({ server, prompts, t
     useChatDraftStore
       .getState()
       .setDraftText(sessionId, (prev) => (prev ? `${prev}\n\n${renderedText}` : renderedText));
+    setInserted(true);
+    setTimeout(() => setInserted(false), 2000);
   };
 
   return (
@@ -142,10 +145,14 @@ export const McpPromptsTab: React.FC<McpPromptsTabProps> = ({ server, prompts, t
                         type="button"
                         data-testid="mcp-prompt-insert"
                         onClick={() => void insertIntoChat()}
-                        className="flex items-center gap-1 text-[11px]"
+                        className={`flex items-center gap-1 text-[11px] transition-colors ${
+                          inserted
+                            ? 'text-emerald-600 dark:text-emerald-400 font-medium'
+                            : 'text-[var(--theme-text-primary)] hover:text-[var(--theme-text-link)]'
+                        }`}
                       >
-                        <MessageSquarePlus className="h-3 w-3" />
-                        {t('settingsMcpInsertToChat')}
+                        {inserted ? <Check className="h-3 w-3" /> : <MessageSquarePlus className="h-3 w-3" />}
+                        {inserted ? t('settingsMcpInsertedToChat') : t('settingsMcpInsertToChat')}
                       </button>
                       <button
                         type="button"

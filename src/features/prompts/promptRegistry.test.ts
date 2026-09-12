@@ -523,6 +523,18 @@ describe('promptRegistry', () => {
     expect(enPrompt).toContain('Numeric charts use data-amc-chart instead of hand-written SVG');
   });
 
+  it('restricts the metric-card value slot to quantifiable numbers', async () => {
+    const zhPrompt = await loadLiveArtifactsSystemPrompt('zh');
+    const enPrompt = await loadLiveArtifactsSystemPrompt('en');
+
+    // A phrase in the value slot renders as oversized text that overflows a
+    // narrow grid cell and is clipped by the artifact frame.
+    expect(zhPrompt).toContain('禁止把短语或句子放进 value 位置');
+    expect(zhPrompt).toContain('≤ 8 个字符');
+    expect(enPrompt).toContain('never put a phrase or sentence there');
+    expect(enPrompt).toContain('≤ 8 characters');
+  });
+
   it('teaches semantic colors with border exceptions for tags cards and callouts (option B)', async () => {
     const zhPrompt = await loadLiveArtifactsSystemPrompt('zh');
     const enPrompt = await loadLiveArtifactsSystemPrompt('en');

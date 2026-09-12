@@ -3,7 +3,6 @@ import {
   MousePointer2,
   ScanText,
   AudioWaveform,
-  Captions,
   Lightbulb,
   FileQuestion,
   FileText,
@@ -20,7 +19,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 
-import { IconPdf } from '@/components/icons';
+import { IconPdf, IconClosedCaption } from '@/components/icons';
 
 export const SuggestionIcon = ({ iconName, className }: { iconName?: string; className?: string }) => {
   const size = 13;
@@ -52,7 +51,10 @@ export const SuggestionIcon = ({ iconName, className }: { iconName?: string; cla
     case 'AudioWaveform':
       return <AudioWaveform className={className} size={size} />;
     case 'Captions':
-      return <Captions className={className} size={size} />;
+    case 'ClosedCaption':
+    case 'ClosedCaptionBox':
+    case 'closed-caption-box':
+      return <IconClosedCaption className={className} size={size} />;
     case 'Lightbulb':
       return <Lightbulb className={className} size={size} />;
     case 'FileQuestion':
