@@ -17,14 +17,14 @@
 
 ### 1.1 已确认的产品决策
 
-| 决策项 | 选择 | 理由 |
-| --- | --- | --- |
-| 入口 | **设置页专用助手面板**，非主聊天 | 复用 `runStandardToolLoop` 而不改造聊天管线；密钥输入可就近；不受"当前会话用什么模型"影响 |
-| 信任模型 | AI **直接写入**，仅删除/覆盖需审批 | 用户选择；用变更卡片 + 撤销 + 审计日志补偿 |
-| 能力边界 | 第三方连接增/改/删 + `test_connection` + `fetch_models` | 工具集即边界，不存在通用 `set_settings` 工具 |
-| 密钥 | **永不进入模型上下文**，用户经密钥卡片输入 | 聊天内容会发往模型服务商；密钥必须走 UI 通道 |
-| 助手通道 | Gemini 原生（用户 Gemini key 或 Docker 服务端托管 key） | 复用 `generateContentTurnApi`，其返回形状即 `StandardToolTurnResult` |
-| 会话持久化 | **不持久化**，面板关闭即弃 | YAGNI；避免引入第三套会话存储与同步 |
+| 决策项     | 选择                                                    | 理由                                                                                      |
+| ---------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 入口       | **设置页专用助手面板**，非主聊天                        | 复用 `runStandardToolLoop` 而不改造聊天管线；密钥输入可就近；不受"当前会话用什么模型"影响 |
+| 信任模型   | AI **直接写入**，仅删除/覆盖需审批                      | 用户选择；用变更卡片 + 撤销 + 审计日志补偿                                                |
+| 能力边界   | 第三方连接增/改/删 + `test_connection` + `fetch_models` | 工具集即边界，不存在通用 `set_settings` 工具                                              |
+| 密钥       | **永不进入模型上下文**，用户经密钥卡片输入              | 聊天内容会发往模型服务商；密钥必须走 UI 通道                                              |
+| 助手通道   | Gemini 原生（用户 Gemini key 或 Docker 服务端托管 key） | 复用 `generateContentTurnApi`，其返回形状即 `StandardToolTurnResult`                      |
+| 会话持久化 | **不持久化**，面板关闭即弃                              | YAGNI；避免引入第三套会话存储与同步                                                       |
 
 ## 2. 非目标（本设计明确不做）
 
@@ -75,7 +75,7 @@ runTurn: (contents) =>
       temperature: 0.2,
     },
     abortSignal,
-  )
+  );
 ```
 
 - `generateContentTurnApi`（`src/services/api/chatApi.ts`）的返回值为 `{ modelContent, parts, thoughts, usage, grounding, urlContext, functionCalls }`，**恰好等于** `runStandardToolLoop` 契约中的 `StandardToolTurnResult`，因此无需适配层。`MALFORMED_FUNCTION_CALL`、安全拦截、代理、API 版本等分支它已处理。
@@ -97,15 +97,15 @@ runTurn: (contents) =>
 
 ## 4. 工具契约
 
-| 工具 | 关键参数 | 返回给模型 | 写设置 | 需审批 |
-| --- | --- | --- | --- | --- |
-| `list_connections` | — | id / name / protocol / baseUrl / hasApiKey / modelCount / modelIds（前 50）/ enabled | 否 | 否 |
-| `list_templates` | — | 25 个模板的 id / name / baseUrl / protocol / defaultModelId / authOptional | 否 | 否 |
-| `create_connection` | templateId, name?, baseUrl?, protocol?, modelId?, models? | `{ connectionId, name, status: 'created' \| 'awaiting-api-key' }` | 是 | 撞端点时 |
-| `update_connection` | connectionId, `name` / `baseUrl` / `protocol` / `enabled` / `modelId` / `addModels` / `replaceModels` | `{ connectionId, changed: string[], status }` | 是 | 覆盖已有非空值时 |
-| `delete_connection` | connectionId | `{ status: 'deleted', name }` | 是 | **总是** |
-| `test_connection` | connectionId, modelId? | status / latencyMs / grade / diagnosticTip | 否（真实请求） | 否 |
-| `fetch_models` | connectionId | `{ ids: string[], truncated: boolean }` | 否（真实请求） | 否 |
+| 工具                | 关键参数                                                                                              | 返回给模型                                                                           | 写设置         | 需审批           |
+| ------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | -------------- | ---------------- |
+| `list_connections`  | —                                                                                                     | id / name / protocol / baseUrl / hasApiKey / modelCount / modelIds（前 50）/ enabled | 否             | 否               |
+| `list_templates`    | —                                                                                                     | 25 个模板的 id / name / baseUrl / protocol / defaultModelId / authOptional           | 否             | 否               |
+| `create_connection` | templateId, name?, baseUrl?, protocol?, modelId?, models?                                             | `{ connectionId, name, status: 'created' \| 'awaiting-api-key' }`                    | 是             | 撞端点时         |
+| `update_connection` | connectionId, `name` / `baseUrl` / `protocol` / `enabled` / `modelId` / `addModels` / `replaceModels` | `{ connectionId, changed: string[], status }`                                        | 是             | 覆盖已有非空值时 |
+| `delete_connection` | connectionId                                                                                          | `{ status: 'deleted', name }`                                                        | 是             | **总是**         |
+| `test_connection`   | connectionId, modelId?                                                                                | status / latencyMs / grade / diagnosticTip                                           | 否（真实请求） | 否               |
+| `fetch_models`      | connectionId                                                                                          | `{ ids: string[], truncated: boolean }`                                              | 否（真实请求） | 否               |
 
 模板默认值一律取自 `getThirdPartyTemplateDefaults`（`src/utils/thirdPartyApiProviders.ts`），不让模型凭空生成 baseUrl。模型自行给出 baseUrl 时，卡片上显示"AI 推断，请核对"——**这是 UI 层的临时标记，不新增持久化字段**（避免为此改动 `ThirdPartyConnection`、sanitize 与 schema）。
 
@@ -137,17 +137,17 @@ runTurn: (contents) =>
 
 `providerPatch.ts` 是纯函数，**是否需审批由它计算**，模型无法绕过：
 
-| 操作 | 判定 | 审批 |
-| --- | --- | --- |
-| create：无同端点连接 | 新增 | 否 |
-| create：存在同 `(protocol, baseUrl)` 连接 | 覆盖（是在改一个已有端点） | **是** |
-| create：同名但不同端点 | 自动去重命名（`nextConnectionName` → `OpenRouter 2`） | 否 |
-| update：字段由空/null → 有值 | 补全 | 否 |
-| update：`name` / `enabled` | 非破坏 | 否 |
-| update：`baseUrl` / `protocol` / `modelId` 非空值 → 另一个值 | 覆盖 | **是** |
-| update：`addModels`（并集，保留手工条目） | 追加 | 否 |
-| update：`replaceModels` / 清空 baseUrl | 覆盖或删除 | **是** |
-| `delete_connection` | 删除 | **是** |
+| 操作                                                         | 判定                                                  | 审批   |
+| ------------------------------------------------------------ | ----------------------------------------------------- | ------ |
+| create：无同端点连接                                         | 新增                                                  | 否     |
+| create：存在同 `(protocol, baseUrl)` 连接                    | 覆盖（是在改一个已有端点）                            | **是** |
+| create：同名但不同端点                                       | 自动去重命名（`nextConnectionName` → `OpenRouter 2`） | 否     |
+| update：字段由空/null → 有值                                 | 补全                                                  | 否     |
+| update：`name` / `enabled`                                   | 非破坏                                                | 否     |
+| update：`baseUrl` / `protocol` / `modelId` 非空值 → 另一个值 | 覆盖                                                  | **是** |
+| update：`addModels`（并集，保留手工条目）                    | 追加                                                  | 否     |
+| update：`replaceModels` / 清空 baseUrl                       | 覆盖或删除                                            | **是** |
+| `delete_connection`                                          | 删除                                                  | **是** |
 
 判定前的规范化（避免模型因大小写/尾斜杠差异触发误审批，也避免空改动弹窗）：
 
@@ -159,17 +159,27 @@ handler 复用现有工厂与更新函数，不自行拼装连接对象：`creat
 
 ```ts
 type ProviderPatch =
-  | { op: 'create'; templateId: ThirdPartyTemplateId; name?: string; baseUrl?: string;
-      protocol?: ThirdPartyApiProtocol; modelId?: string; models?: ModelOption[] }
-  | { op: 'update'; connectionId: string;
+  | {
+      op: 'create';
+      templateId: ThirdPartyTemplateId;
+      name?: string;
+      baseUrl?: string;
+      protocol?: ThirdPartyApiProtocol;
+      modelId?: string;
+      models?: ModelOption[];
+    }
+  | {
+      op: 'update';
+      connectionId: string;
       set?: Partial<Pick<ThirdPartyConnection, 'name' | 'baseUrl' | 'protocol' | 'enabled' | 'modelId'>>;
-      addModels?: ModelOption[]; replaceModels?: ModelOption[] }
+      addModels?: ModelOption[];
+      replaceModels?: ModelOption[];
+    }
   | { op: 'delete'; connectionId: string };
 
 type PatchVerdict =
   | { kind: 'apply'; nextConnections: ThirdPartyConnection[]; changed: string[] }
-  | { kind: 'needs-approval'; reason: ApprovalReason; diff: FieldDiff[];
-      nextConnections: ThirdPartyConnection[] }
+  | { kind: 'needs-approval'; reason: ApprovalReason; diff: FieldDiff[]; nextConnections: ThirdPartyConnection[] }
   | { kind: 'rejected'; error: string };
 ```
 
@@ -212,7 +222,7 @@ type PatchVerdict =
 
 ## 8. i18n 与设置搜索
 
-- 新增文案以扁平 key 形式加入 `src/i18n/translations/settings/`，每个 key 需 7 种语言（`en` / `zh` / `ja` / `ko` / `es` / `fr` / `de`）；`pnpm i18n:check` 在缺失时以退出码 1 失败。
+- 新增文案以扁平 key 形式加入 `src/i18n/translations/settings/`。**每个 key 必须一次性带上 7 种语言**（`en` / `zh` / `ja` / `ko` / `es` / `fr` / `de`）：`pnpm i18n:check`（`scripts/check-i18n-coverage.mjs`）会逐个 key 校验 7 语言齐全，缺失即以退出码 1 失败。因此文案**不能**延后到 PR3 补，必须随引入它的任务一起落地（类型上 `TranslationEntry` 是 `Partial<Record<SupportedLanguage, string>>`，缺语言能过类型检查但过不了 CI）。
 - 工具显示名（卡片标题）同样走 i18n，不硬编码英文。
 - PR3 在 `src/constants/settingsSearchCatalog.ts` 增加条目，让"AI 配置"能被设置搜索命中。
 
@@ -223,14 +233,14 @@ type PatchVerdict =
 - **工具层**：注入假 store / 假 probe / 假 fetch，断言写入参数、`awaiting-api-key` 分支、拒绝审批后设置不变。
 - **通道层**：无 Gemini key 时面板禁用且不发起请求；`getGeminiKeyForRequest` 返回 error 时不构造请求。
 - **组件层**：diff 渲染、撤销回滚、`ApiKeyInput` id 唯一性、禁用态文案。
-- **守卫**：`src/test/architecture/*` 全绿（新目录需符合 `projectStructureBoundaries` 与 `namingStructureOptimizations`）。
+- **守卫**：`src/test/architecture/*` 全绿（新目录需符合 `projectStructureBoundaries` 与 `namingStructureOptimizations`）；`pnpm i18n:check` 全绿（每个新 key 7 语言齐全，随引入它的任务一起提交）。
 - **e2e smoke**：打开设置 → 让助手"加一个 Ollama 连接" → 断言连接列表出现该行。选 Ollama 因为其模板 `authOptional: true`，无需真实密钥，e2e 不引入密钥管理。
 
 ## 10. 分期
 
 - **PR1（最小闭环）**：`providerPatch` + 通道 + `list_templates` / `list_connections` / `create_connection` / `update_connection` + 面板骨架 + 变更卡片 + 密钥卡片 + 红队测试。此阶段尚无审批弹窗，命中 `needs-approval` 的补丁**失败关闭**：工具返回 `{ status: 'approval-unavailable' }` 并说明"该改动需要确认，暂不支持"，**绝不静默写入**。
 - **PR2**：审批（覆盖 diff 弹窗 + 删除）+ 撤销 + `test_connection` / `fetch_models` + 结果卡片 + 审计日志。审批落地后 PR1 的失败关闭分支改为走弹窗。
-- **PR3**：i18n 全量 + 空态/错误态 + e2e smoke + `settingsSearchCatalog` 条目 + 文档。
+- **PR3**：空态/错误态打磨 + e2e smoke + `settingsSearchCatalog` 条目 + 文档。
 
 **挂载顺序约束**：`ProviderSettingsSection.tsx` 与 `ProviderDetail.tsx` 当前正处在第三方连接重构的工作区改动中。PR1 先做 `src/features/settings-assistant/` 与 store 层（不触碰设置 UI 大文件），UI 挂载放到 PR1 末尾或 PR2，避免与并行重构冲突。
 
@@ -238,14 +248,14 @@ type PatchVerdict =
 
 ## 11. 风险与缓解
 
-| 风险 | 缓解 |
-| --- | --- |
-| 密钥经模型上下文泄漏 | 参数 schema 无 `apiKey` 属性 + 只读视图只给布尔 + 红队测试 |
-| AI 直接写入造成难以察觉的错误改动 | 变更卡片常驻 diff + 撤销 + 审计日志 + 覆盖/删除审批 |
-| 助手模型 function calling 不稳定 | 默认 `gemini-3.8-flash`；`MALFORMED_FUNCTION_CALL` 已由 `generateContentTurnApi` 转为明确错误；系统提示词限制重试 2 轮 |
-| `fetch_models` / `test_connection` 携带真实密钥向用户端点发请求 | 卡片明示"已发起一次真实请求"；仅在用户本轮要求时触发 |
-| i18n ×7 与架构守卫带来的机械成本 | 集中在 PR3；文案先以 zh/en 落地，PR3 补齐其余语言 |
-| 与进行中的 provider 重构冲突 | 先做 feature 层，UI 挂载最后；契约（工具/patch）不依赖设置 UI 内部结构 |
+| 风险                                                            | 缓解                                                                                                                   |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 密钥经模型上下文泄漏                                            | 参数 schema 无 `apiKey` 属性 + 只读视图只给布尔 + 红队测试                                                             |
+| AI 直接写入造成难以察觉的错误改动                               | 变更卡片常驻 diff + 撤销 + 审计日志 + 覆盖/删除审批                                                                    |
+| 助手模型 function calling 不稳定                                | 默认 `gemini-3.8-flash`；`MALFORMED_FUNCTION_CALL` 已由 `generateContentTurnApi` 转为明确错误；系统提示词限制重试 2 轮 |
+| `fetch_models` / `test_connection` 携带真实密钥向用户端点发请求 | 卡片明示"已发起一次真实请求"；仅在用户本轮要求时触发                                                                   |
+| i18n ×7 带来的机械成本                                          | 每个新文案必须 7 语言齐全（CI 强制），随引入它的任务一起提交，不积压                                                   |
+| 与进行中的 provider 重构冲突                                    | 先做 feature 层，UI 挂载最后；契约（工具/patch）不依赖设置 UI 内部结构                                                 |
 
 ## 12. 成功标准
 
