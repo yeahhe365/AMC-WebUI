@@ -80,7 +80,8 @@ runTurn: (contents) =>
 
 - `generateContentTurnApi`（`src/services/api/chatApi.ts`）的返回值为 `{ modelContent, parts, thoughts, usage, grounding, urlContext, functionCalls }`，**恰好等于** `runStandardToolLoop` 契约中的 `StandardToolTurnResult`，因此无需适配层。`MALFORMED_FUNCTION_CALL`、安全拦截、代理、API 版本等分支它已处理。
 - 助手 config **不带内置工具**（无 `googleSearch` / `codeExecution` 等），因此 `appendFunctionDeclarationsToTools` 中"内置与自定义工具互斥（仅 Gemini 3 支持组合）"的分支不会被触发，声明一定被注入。
-- key 解析：`getGeminiKeyForRequest(appSettings, { modelId: assistantModelId })`。返回哨兵 `SERVER_MANAGED_API_KEY` 时走 Docker 托管 key 路径，功能天然可用。
+- key 解析：`getGeminiKeyForRequest(appSettings, { modelId: assistantModelId }, { skipIncrement: true, skipUsageLogging: true })`。三种既有来源都被覆盖：BYOK（`useCustomApiConfig` + `apiKey`）、构建期 `VITE_GEMINI_API_KEY`、以及 Docker 服务端托管（返回哨兵 `SERVER_MANAGED_API_KEY`）。
+- 该解析发生在渲染期（用于判断面板是否可用），因此**必须无副作用**：带上 `skipIncrement` / `skipUsageLogging`，否则每次设置变更都会消耗一个 key 轮换槽并写一条并未真正发生的用量日志。代价是助手请求不推进轮换、复用当前轮换槽（即聊天路径正在用、已被证明可用的那把 key）——这是有意取舍。
 - 助手模型默认 `DEFAULT_MODEL_ID`（`gemini-3.8-flash`），允许用户在面板内切到其他 Gemini 原生文本模型；选择结果不持久化。
 - 通道不可用时（`getGeminiKeyForRequest` 返回 `error`）：面板渲染禁用态 + 原因说明 + "去配置 Gemini" 链接，**不发起任何请求**。
 

@@ -1385,6 +1385,7 @@ git commit -m "test(settings-assistant): assert api keys never reach the model c
 - Create: `src/features/prompts/settingsAssistant.ts`
 - Create: `src/features/settings-assistant/assistantChannel.ts`
 - Test: `src/features/settings-assistant/assistantChannel.test.ts`
+- Test: `src/features/settings-assistant/assistantChannel.integration.test.ts`（**不 mock** `apiKeySelection`，验证最小 ChatSettings 真的可用、且解析无副作用）
 - Modify: `src/features/prompts/promptRegistry.ts`（追加一个懒加载导出）
 
 **Interfaces:**
@@ -1519,7 +1520,16 @@ export const resolveAssistantChannel = (
 ): AssistantChannel => {
   // Mirrors getLiveApiKey: a minimal ChatSettings is enough for the Gemini
   // route to resolve, since apiMode is forced to 'gemini-native' internally.
-  const keyResult = getGeminiKeyForRequest(appSettings, { modelId } as ChatSettings);
+  // skipIncrement/skipUsageLogging matter because this runs on render to decide
+  // whether the panel is enabled: without them every settings change would burn
+  // a key-rotation slot and write a usage log for a request that never happens.
+  // The consequence is deliberate — assistant turns reuse the rotation slot the
+  // chat path currently sits on (i.e. the key that is already working) instead
+  // of advancing the rotation.
+  const keyResult = getGeminiKeyForRequest(appSettings, { modelId } as ChatSettings, {
+    skipIncrement: true,
+    skipUsageLogging: true,
+  });
   if ('error' in keyResult) {
     return { ok: false, reason: 'no-gemini-key' };
   }
