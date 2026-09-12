@@ -23,6 +23,7 @@ import {
   type SessionLoaderHistoryOptions,
 } from './sessionLoaderSettings';
 import { TAB_ID } from '@/stores/tabIdentity';
+import { assignAllBucketsOrder } from '@/stores/sessionOrder';
 
 interface LoadInitialSessionDataOptions {
   appSettings: AppSettings;
@@ -171,6 +172,9 @@ export const loadInitialSessionData = async ({
     const sortedList = sortSessionsByPinnedAndTimestamp(metadataList.map(sanitizeSessionModel));
 
     setSavedSessions((prev) => mergeLoadedSessionMetadata(prev, sortedList));
+    // 旧数据一次性回填手动顺序：桶内按 (pinned, timestamp) 编号，升级后视觉零突变。
+    // 已完整编号的数据会原样返回（同一数组引用），不会产生任何写入。
+    updateAndPersistSessions((prev) => assignAllBucketsOrder(prev));
     // Backfill orderKey for legacy groups that lack it (old DB rows).
     const groupsWithOrder = groups.map((group, index) => ({
       ...group,

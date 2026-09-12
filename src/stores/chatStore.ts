@@ -35,6 +35,7 @@ import {
   stripStoredSessionMessages,
 } from './sessionPersistence';
 import { persistSessionChanges } from './sessionPersistenceEffects';
+import { placeNewSessionsAtBucketTop } from './sessionOrder';
 import { setupChatStoreSync } from './chatStoreSync';
 import { setupLastActiveSessionSync } from './lastActiveSessionSync';
 import { createChatUiSlice, type ChatUiSliceActions, type ChatUiSliceState } from './chatStoreSlices';
@@ -373,7 +374,9 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
 
     const virtualFullSessions = createVirtualFullSessions(savedSessions, activeSessionId, activeMessages);
 
-    const newFullSessions = updater(virtualFullSessions);
+    // 新建会话没有手动顺序，必须在排序前落到所属桶顶；没有新会话时返回原引用，
+    // 下面的 identity 检查才能继续守住流式热路径。
+    const newFullSessions = placeNewSessionsAtBucketTop(virtualFullSessions, updater(virtualFullSessions));
 
     sortSessionsInPlace(newFullSessions);
 

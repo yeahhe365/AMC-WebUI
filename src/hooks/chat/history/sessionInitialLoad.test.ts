@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { SavedChatSession } from '@/types';
 import { createChatMessage, createChatSettings, createSavedChatSession } from '@/test/data/factories';
 
 const { mockGetSession, mockGetAllSessionMetadata, mockGetAllGroups, mockRehydrateSessionFiles, mockGetDraftFiles } =
@@ -222,5 +223,36 @@ describe('loadInitialSessionData', () => {
     });
 
     expect(setActiveSessionId).toHaveBeenCalledWith('session-abc', { history: 'none' });
+  });
+
+  it('backfills legacy sessions with bucket-scoped manual order', async () => {
+    stubPathname('/');
+    mockGetAllSessionMetadata.mockResolvedValue([
+      createSavedChatSession({ id: 'legacy-newer', title: 'newer', timestamp: 2_000, messages: [] }),
+      createSavedChatSession({ id: 'legacy-older', title: 'older', timestamp: 1_000, messages: [] }),
+    ]);
+    mockGetAllGroups.mockResolvedValue([]);
+
+    const updateAndPersistSessions = vi.fn();
+    await loadInitialSessionData({
+      appSettings: {} as never,
+      setSavedSessions: vi.fn(),
+      setSavedGroups: vi.fn(),
+      setActiveSessionId: vi.fn(),
+      setActiveMessages: vi.fn(),
+      restoreDraftFiles: vi.fn(),
+      updateAndPersistSessions,
+      startNewChat: vi.fn(),
+    });
+
+    expect(updateAndPersistSessions).toHaveBeenCalledTimes(1);
+    const updater = updateAndPersistSessions.mock.calls[0][0] as (prev: SavedChatSession[]) => SavedChatSession[];
+    const result = updater([
+      createSavedChatSession({ id: 'legacy-newer', title: 'newer', timestamp: 2_000, messages: [] }),
+      createSavedChatSession({ id: 'legacy-older', title: 'older', timestamp: 1_000, messages: [] }),
+    ]);
+
+    expect(result.map((session) => session.id)).toEqual(['legacy-newer', 'legacy-older']);
+    expect(result.map((session) => session.sortOrder)).toEqual([1_048_576, 2_097_152]);
   });
 });
