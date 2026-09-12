@@ -138,6 +138,45 @@ async function seedReorderFixture(page: Page) {
 
 const sessionLinks = (page: Page) => page.locator('[data-history-sidebar-root] li a');
 
+/** 行内那层承载“被拖动”视觉状态的 div（opacity-35 加在它身上，不在 li 上）。 */
+const rowSurface = (page: Page, title: string) =>
+  page
+    .locator('li', { has: page.getByRole('link', { name: title, exact: true }) })
+    .locator('div.relative')
+    .first();
+
+async function openSidebar(page: Page) {
+  await page.evaluate(
+    ({ storageKey }) => {
+      localStorage.setItem(storageKey, JSON.stringify({ desktopOpen: true, mobileOpen: false }));
+    },
+    { storageKey: HISTORY_SIDEBAR_STORAGE_KEY },
+  );
+}
+
+/** 60 条会话 → 超过虚拟化阈值，走 Virtuoso 渲染窗口。 */
+async function seedLargeListFixture(page: Page) {
+  const now = Date.now();
+
+  await seedAppState(page, {
+    session: createSession('bulk-newest', 'Newest chat', now),
+    appSettings: {
+      useCustomApiConfig: true,
+      apiKey: 'e2e-key',
+      isStreamingEnabled: false,
+      language: 'en',
+    },
+  });
+
+  await openSidebar(page);
+  await addSessions(
+    page,
+    Array.from({ length: 59 }, (_, index) =>
+      createSession(`bulk-${index}`, `Bulk chat ${index}`, now - (index + 1) * 1_000),
+    ),
+  );
+}
+
 /** 真·原生拖拽：分步移动鼠标，让 Chromium 触发 dragstart / dragover / drop。 */
 async function dragSessionOnto(page: Page, sourceTitle: string, targetTitle: string, position: 'above' | 'below') {
   const source = page.getByRole('link', { name: sourceTitle, exact: true });
@@ -174,8 +213,7 @@ test('dragging a session reorders it and the order survives a reload', async ({ 
 
   // 松手后不得残留拖拽态：被拖动的行只应在拖动【过程中】变暗（SessionItem 的 isBeingDragged），
   // 一旦 drop 完成就必须恢复。残留会表现为该行一直灰着 + 虚线边框。
-  const draggedRow = page.locator('li', { has: page.getByRole('link', { name: 'Oldest chat', exact: true }) });
-  await expect(draggedRow).not.toHaveClass(/opacity-35/);
+  await expect(rowSurface(page, 'Oldest chat')).not.toHaveClass(/opacity-35/);
 
   await page.reload();
 
@@ -247,4 +285,42 @@ test('time view disables session dragging', async ({ page }) => {
 
   await expect(sessionLinks(page).first()).toHaveAttribute('draggable', 'false');
   await expect(page.locator('[data-history-sidebar-root]')).toContainText('Today');
+});
+
+test('a drag cancelled by the virtual list leaves no dimmed row behind', async ({ page }) => {
+  // 超过 50 条会话会走 Virtuoso。拖动中贴近列表边缘会触发自动滚动，被拖的行滚出渲染窗口后
+  // 会被卸载；浏览器随之取消这次拖拽，既不再派发 dragend 也没有 drop。这里锁定：
+  // 松手后那行不得残留“被拖动”的变暗样式（曾经的 bug：一直灰到刷新页面）。
+  await seedLargeListFixture(page);
+  await page.goto('/');
+
+  const source = page.getByRole('link', { name: 'Newest chat', exact: true });
+  await expect(source).toBeVisible();
+
+  const container = page.locator('[data-history-sidebar-root] .overflow-y-auto').first();
+  const containerBox = await container.boundingBox();
+  const sourceBox = await source.boundingBox();
+  if (!containerBox || !sourceBox) {
+    throw new Error('Missing bounding box for the drag');
+  }
+
+  await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2 - 12, { steps: 4 });
+
+  // 前提确认：拖动确实生效了（源行进入被拖动态），否则后面的断言毫无意义。
+  await expect(rowSurface(page, 'Newest chat')).toHaveClass(/opacity-35/);
+
+  // 贴近底部边缘 48px 内 → 自动滚动 → 源行被虚拟列表卸载
+  await page.mouse.move(containerBox.x + 60, containerBox.y + containerBox.height - 10, { steps: 10 });
+  await expect.poll(async () => container.evaluate((element) => element.scrollTop)).toBeGreaterThan(400);
+  await expect(source).toHaveCount(0);
+
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  await container.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+
+  await expect(rowSurface(page, 'Newest chat')).not.toHaveClass(/opacity-35/);
 });

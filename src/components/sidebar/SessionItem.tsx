@@ -1,4 +1,4 @@
-import React, { useRef, useState, type RefObject } from 'react';
+import React, { useEffect, useRef, useState, type RefObject } from 'react';
 import { useI18n } from '@/contexts/I18nContext';
 import { Pin, MoreHorizontal } from 'lucide-react';
 import { type ChatGroup, type SavedChatSession } from '@/types';
@@ -95,6 +95,24 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
   const isBeingDragged = draggingSessionId === session.id;
   const completedOutcome = useChatStore((state) => state.completedSessions[session.id]);
 
+  const dragLifecycleRef = useRef({ isBeingDragged, onSessionDragEnd });
+
+  useEffect(() => {
+    dragLifecycleRef.current = { isBeingDragged, onSessionDragEnd };
+  }, [isBeingDragged, onSessionDragEnd]);
+
+  // 兜底：承载“被拖动”样式的那一行如果在拖动途中被卸载（虚拟列表回收、筛选、删除……），
+  // 浏览器就不会再派发 dragend，拖拽状态会永久卡住（表现为该行一直灰着直到刷新）。
+  // 卸载即收尾，保证状态不可能活得比它所装饰的行更久。
+  useEffect(
+    () => () => {
+      if (dragLifecycleRef.current.isBeingDragged) {
+        dragLifecycleRef.current.onSessionDragEnd();
+      }
+    },
+    [],
+  );
+
   // A slight pointer move (< 10px) while pressing is a jittery click, not a
   // drag. Native HTML5 drag has a ~5px threshold, so a 6px wiggle triggers
   // dragstart/end but never fires click. Treat such a micro-drag as a click so
@@ -166,6 +184,9 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
     if (!isSessionDrag(e)) return;
     e.preventDefault();
     e.stopPropagation();
+    // drop 就是这次拖拽的终点。浏览器不保证随后一定派发 dragend（源节点已被卸载时就不会），
+    // 所以在这里主动收尾，别把“被拖动”的变暗样式留给下一次刷新去清。
+    onSessionDragEnd();
     const draggedId = e.dataTransfer.getData(SESSION_DRAG_TYPE) || e.dataTransfer.getData('text/plain');
     if (!draggedId || draggedId === session.id) return;
     onReorderSession?.(draggedId, session.id, resolveDropPosition(e));

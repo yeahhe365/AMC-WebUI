@@ -363,6 +363,8 @@ export const useHistorySidebarLogic = ({
     const targetGroupId = isContainerDrop ? null : groupId;
     if (sessionId) onMoveSessionToGroup(sessionId, targetGroupId, isContainerDrop ? 'end' : 'top');
     setDragOverId(null);
+    // 落在容器 / 分组头上的 drop 同样是这次拖拽的终点，一并收尾（dragend 不保证会到）。
+    setDraggingSessionId(null);
   };
 
   const handleSessionDragStart = (sessionId: string) => {

@@ -153,4 +153,70 @@ describe('SessionItem reorder drop', () => {
     });
     expect(onReorderSession).not.toHaveBeenCalled();
   });
+
+  it('ends the drag lifecycle on drop, even when the drop lands on the dragged row itself', () => {
+    // drop 就是终点：浏览器不保证随后一定派发 dragend，拖拽状态必须在这里收尾。
+    const onSessionDragEnd = vi.fn();
+    act(() => {
+      renderer.render(
+        <SessionItem
+          {...baseProps}
+          session={makeSession('session-a')}
+          draggingSessionId="session-a"
+          onSessionDragEnd={onSessionDragEnd}
+          onReorderSession={vi.fn()}
+        />,
+      );
+    });
+
+    const item = renderer.container.querySelector('li') as HTMLLIElement;
+    act(() => {
+      item.dispatchEvent(createDropEvent('session-a', 30));
+    });
+
+    expect(onSessionDragEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears a stuck drag state when the dragged row unmounts mid-drag', () => {
+    // 拖动途中这一行若被卸载（虚拟列表回收、筛选、删除……），dragend 就再也不会来了。
+    const onSessionDragEnd = vi.fn();
+    act(() => {
+      renderer.render(
+        <SessionItem
+          {...baseProps}
+          session={makeSession('session-a')}
+          draggingSessionId="session-a"
+          onSessionDragEnd={onSessionDragEnd}
+        />,
+      );
+    });
+
+    expect(onSessionDragEnd).not.toHaveBeenCalled();
+
+    act(() => {
+      renderer.render(<div />);
+    });
+
+    expect(onSessionDragEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not end any drag when an idle row unmounts', () => {
+    const onSessionDragEnd = vi.fn();
+    act(() => {
+      renderer.render(
+        <SessionItem
+          {...baseProps}
+          session={makeSession('session-b')}
+          draggingSessionId="session-a"
+          onSessionDragEnd={onSessionDragEnd}
+        />,
+      );
+    });
+
+    act(() => {
+      renderer.render(<div />);
+    });
+
+    expect(onSessionDragEnd).not.toHaveBeenCalled();
+  });
 });
