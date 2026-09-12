@@ -109,7 +109,7 @@ describe('WelcomeScreen', () => {
     expect(trigger).toHaveTextContent('Cogito, ergo sum.');
   });
 
-  it('triggers the desktop easter egg only after hovering for three seconds', async () => {
+  it('switches to one easter egg quote when the desktop welcome greeting is clicked', async () => {
     setHoverCapablePointer(true);
 
     await act(async () => {
@@ -123,22 +123,6 @@ describe('WelcomeScreen', () => {
       trigger?.click();
     });
 
-    expect(trigger).toHaveTextContent('How can I help you today?');
-
-    await act(async () => {
-      trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(2999);
-    });
-
-    expect(trigger).toHaveTextContent('How can I help you today?');
-
-    await act(async () => {
-      vi.advanceTimersByTime(1);
-    });
-
     expect(trigger).not.toHaveTextContent('Cogito, ergo sum.');
 
     await advanceTypewriter('Cogito, ergo sum.'.length);
@@ -146,9 +130,7 @@ describe('WelcomeScreen', () => {
     expect(trigger).toHaveTextContent('Cogito, ergo sum.');
   });
 
-  it('cancels the desktop easter egg when hover ends before three seconds', async () => {
-    setHoverCapablePointer(true);
-
+  it('switches to subsequent quotes on repeated clicks', async () => {
     await act(async () => {
       renderer.root.render(<WelcomeScreen />);
     });
@@ -157,65 +139,18 @@ describe('WelcomeScreen', () => {
     expect(trigger).not.toBeNull();
 
     await act(async () => {
-      trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-      vi.advanceTimersByTime(2000);
-      trigger?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
-      vi.advanceTimersByTime(1000);
-    });
-
-    expect(trigger).toHaveTextContent('How can I help you today?');
-  });
-
-  it('restores the welcome greeting when leaving after the desktop easter egg appears', async () => {
-    setHoverCapablePointer(true);
-
-    await act(async () => {
-      renderer.root.render(<WelcomeScreen />);
-    });
-
-    const trigger = renderer.container.querySelector<HTMLButtonElement>('button');
-    expect(trigger).not.toBeNull();
-
-    await act(async () => {
-      trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-      vi.advanceTimersByTime(3000);
+      trigger?.click();
     });
     await advanceTypewriter('Cogito, ergo sum.'.length);
 
     expect(trigger).toHaveTextContent('Cogito, ergo sum.');
 
     await act(async () => {
-      trigger?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+      trigger?.click();
     });
+    await advanceTypewriter('The Ghost in the Shell.'.length);
 
-    expect(trigger).toHaveTextContent('How can I help you today?');
-  });
-
-  it('restores the welcome greeting when leaving while the desktop easter egg is typing', async () => {
-    setHoverCapablePointer(true);
-
-    await act(async () => {
-      renderer.root.render(<WelcomeScreen />);
-    });
-
-    const trigger = renderer.container.querySelector<HTMLButtonElement>('button');
-    expect(trigger).not.toBeNull();
-
-    await act(async () => {
-      trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-      vi.advanceTimersByTime(3000);
-    });
-    await act(async () => {
-      vi.advanceTimersByTime(50);
-    });
-
-    expect(trigger).toHaveTextContent('C');
-
-    await act(async () => {
-      trigger?.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
-    });
-
-    expect(trigger).toHaveTextContent('How can I help you today?');
+    expect(trigger).toHaveTextContent('The Ghost in the Shell.');
   });
 
   it('supports keyboard activation for the easter egg', async () => {

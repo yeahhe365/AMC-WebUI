@@ -41,9 +41,7 @@ describe('motion-sensitive UI behavior', () => {
   it('keeps the welcome easter egg on explicit activation instead of hover timing', () => {
     const source = fs.readFileSync(welcomeScreenPath, 'utf8');
 
-    expect(source).toContain("window.matchMedia('(hover: hover) and (pointer: fine)').matches");
     expect(source).toContain('onClick={handleClick}');
-    expect(source).toContain('onMouseEnter={handleMouseEnter}');
     expect(source).toContain("event.key === 'Enter'");
     expect(source).toContain('setTimeout');
   });
