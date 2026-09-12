@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { type ChatGroup, type SavedChatSession } from '@/types';
 import { logService } from '@/services/logService';
+import { moveSessionToBucket, reorderSession } from '@/stores/sessionOrder';
 
 interface UseGroupActionsProps {
   updateAndPersistGroups: (updater: (prev: ChatGroup[]) => ChatGroup[]) => void | Promise<void>;
@@ -56,13 +57,18 @@ export const useGroupActions = ({ updateAndPersistGroups, updateAndPersistSessio
   );
 
   const handleMoveSessionToGroup = useCallback(
-    (sessionId: string, groupId: string | null) => {
+    (sessionId: string, groupId: string | null, placement: 'top' | 'end' = 'top') => {
       logService.info(`Moving session ${sessionId} to group ${groupId}`);
-      updateAndPersistSessions((prev) =>
-        prev.map((session) =>
-          session.id === sessionId ? (session.groupId === groupId ? session : { ...session, groupId }) : session,
-        ),
-      );
+      updateAndPersistSessions((prev) => moveSessionToBucket(prev, sessionId, groupId, placement));
+    },
+    [updateAndPersistSessions],
+  );
+
+  const handleReorderSession = useCallback(
+    (activeId: string, overId: string, position: 'before' | 'after') => {
+      if (activeId === overId) return;
+      logService.info(`Reordering session ${activeId} ${position} ${overId}`);
+      updateAndPersistSessions((prev) => reorderSession(prev, activeId, overId, position));
     },
     [updateAndPersistSessions],
   );
@@ -114,6 +120,7 @@ export const useGroupActions = ({ updateAndPersistGroups, updateAndPersistSessio
     handleDeleteGroup,
     handleRenameGroup,
     handleMoveSessionToGroup,
+    handleReorderSession,
     handleToggleGroupExpansion,
     handleReorderGroups,
     handleClearGroup,

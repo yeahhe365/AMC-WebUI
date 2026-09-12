@@ -382,6 +382,7 @@ export const createChatRuntimeApp = (value: ChatAreaProviderValue): AppViewModel
       handleClearGroup: vi.fn(),
       handleRenameGroup: vi.fn(),
       handleMoveSessionToGroup: vi.fn(),
+      handleReorderSession: vi.fn(),
       handleToggleGroupExpansion: vi.fn(),
       handleReorderGroups: vi.fn(),
       handleNewChatInGroup: vi.fn(),
