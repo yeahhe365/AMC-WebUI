@@ -211,92 +211,88 @@ describe('naming and structure optimization guardrails', () => {
     expect(useAppSource).not.toContain('export type AppViewModel = ReturnType<typeof useApp>');
   });
 
-  it('keeps OpenAI-compatible model list editing split by responsibility', () => {
-    const editorSource = readProjectFile(
-      'src/components/settings/sections/api-config/OpenAICompatibleModelListEditor.tsx',
-    );
-    const managerSource = readProjectFile(
-      'src/components/settings/sections/api-config/OpenAICompatibleModelManagerModal.tsx',
-    );
-    const currentModelsPanelSource = readProjectFile(
-      'src/components/settings/sections/api-config/OpenAICompatibleCurrentModelsPanel.tsx',
-    );
-    const importPanelSource = readProjectFile(
-      'src/components/settings/sections/api-config/OpenAICompatibleModelImportPanel.tsx',
-    );
-    const fetchResultSource = readProjectFile(
-      'src/components/settings/sections/api-config/OpenAICompatibleModelFetchResult.tsx',
-    );
-    const utilsSource = readProjectFile(
-      'src/components/settings/sections/api-config/openaiCompatibleModelListState.ts',
-    );
-
-    expect(
-      fs.existsSync(
-        path.join(projectRoot, 'src/components/settings/sections/api-config/OpenAICompatibleModelManagerModal.tsx'),
-      ),
-    ).toBe(true);
-    expect(
-      fs.existsSync(
-        path.join(projectRoot, 'src/components/settings/sections/api-config/OpenAICompatibleCurrentModelsPanel.tsx'),
-      ),
-    ).toBe(true);
-    expect(
-      fs.existsSync(
-        path.join(projectRoot, 'src/components/settings/sections/api-config/OpenAICompatibleModelImportPanel.tsx'),
-      ),
-    ).toBe(true);
-    expect(
-      fs.existsSync(
-        path.join(projectRoot, 'src/components/settings/sections/api-config/OpenAICompatibleModelFetchResult.tsx'),
-      ),
-    ).toBe(true);
-    expect(
-      fs.existsSync(
-        path.join(projectRoot, 'src/components/settings/sections/api-config/openaiCompatibleModelListState.ts'),
-      ),
-    ).toBe(true);
-    expect(editorSource).toContain("from './OpenAICompatibleModelManagerModal'");
-    expect(editorSource).toContain("from './OpenAICompatibleModelFetchResult'");
-    expect(editorSource).toContain("from './openaiCompatibleModelListState'");
-    expect(editorSource).toContain('onFetchModelsForImportPreview?:');
-    expect(managerSource).toContain("from './OpenAICompatibleCurrentModelsPanel'");
-    expect(managerSource).toContain("from './OpenAICompatibleModelImportPanel'");
-    expect(countLines(managerSource)).toBeLessThan(140);
-    expect(editorSource).not.toContain('settingsOpenAICompatibleBatchPasteTitle');
-    expect(editorSource).not.toContain('settingsOpenAICompatibleFetchedPreviewTitle');
-    expect(editorSource).not.toContain('parsePastedOpenAICompatibleModelIds');
-    expect(editorSource).not.toContain('dedupeOpenAICompatibleModelOptions');
-    expect(managerSource).not.toContain('settingsOpenAICompatibleBatchPasteTitle');
-    expect(managerSource).not.toContain('settingsOpenAICompatibleFetchedPreviewTitle');
-    expect(managerSource).not.toContain('parsePastedOpenAICompatibleModelIds');
-    expect(managerSource).not.toContain('dedupeOpenAICompatibleModelOptions');
-    expect(currentModelsPanelSource).toContain('settingsOpenAICompatibleCurrentModels');
-    expect(currentModelsPanelSource).toContain('openaiCompatibleModelMatchesSearch');
-    expect(importPanelSource).toContain('settingsOpenAICompatibleBatchPasteTitle');
-    expect(importPanelSource).toContain('settingsOpenAICompatibleFetchedPreviewTitle');
-    expect(importPanelSource).toContain('parsePastedOpenAICompatibleModelIds');
-    expect(importPanelSource).toContain('dedupeOpenAICompatibleModelOptions');
-    expect(fetchResultSource).toContain('OpenAICompatibleModelFetchResult');
-    expect(utilsSource).toContain('export const parsePastedOpenAICompatibleModelIds');
-    expect(utilsSource).toContain('export const dedupeOpenAICompatibleModelOptions');
-  });
-
   it('keeps third-party API settings isolated in dedicated provider section', () => {
     const apiConfigSource = readProjectFile('src/components/settings/sections/ApiConfigSection.tsx');
     const providerSettingsSource = readProjectFile(
       'src/components/settings/sections/providers/ProviderSettingsSection.tsx',
     );
+    const providerDetailSource = readProjectFile('src/components/settings/sections/providers/ProviderDetail.tsx');
+    const endpointPreviewSource = readProjectFile(
+      'src/components/settings/sections/providers/ProviderEndpointPreview.tsx',
+    );
+    const listSource = readProjectFile('src/components/settings/sections/providers/ProviderList.tsx');
 
     expect(
       fs.existsSync(path.join(projectRoot, 'src/components/settings/sections/providers/ProviderSettingsSection.tsx')),
     ).toBe(true);
     expect(providerSettingsSource).toContain('ProviderList');
     expect(providerSettingsSource).toContain('ProviderDetail');
+    // The third-party configuration surface lives only under sections/providers.
+    // api-config/ holds the Gemini API tab shared primitives, and no longer a
+    // parallel third-party editor (that unmounted branch was removed; see the
+    // 'keeps one third-party connection UI' case below).
     expect(apiConfigSource).not.toContain('buildOpenAICompatibleChatCompletionsUrl');
     expect(apiConfigSource).not.toContain('getOpenAICompatibleBaseUrlWarning');
     expect(apiConfigSource).not.toContain('DEFAULT_OPENAI_COMPATIBLE_BASE_URL');
     expect(apiConfigSource).not.toContain('settingsOpenAICompatibleRequestUrlPreview');
+    expect(providerDetailSource).toContain("from './ProviderEndpointPreview'");
+    expect(endpointPreviewSource).toContain('buildOpenAICompatibleChatCompletionsUrl');
+    expect(endpointPreviewSource).toContain('buildAnthropicMessagesUrl');
+    expect(endpointPreviewSource).toContain('buildOpenAIResponsesUrl');
+    expect(providerSettingsSource).toContain('handleTestAllConnections');
+    expect(listSource).toContain('onReorder');
+    expect(countLines(endpointPreviewSource)).toBeLessThan(140);
+  });
+
+  it('keeps one third-party connection UI reachable from the app entry', () => {
+    // Regression guard: the repository previously carried two parallel
+    // third-party configuration surfaces (sections/api-config/ThirdParty* and
+    // sections/providers/*). Only sections/providers is wired into
+    // SettingsContent, so the api-config copies were dead code that could not
+    // be reached by an import path from src/index.tsx. Keep them deleted.
+    const apiConfigDir = path.join(projectRoot, 'src/components/settings/sections/api-config');
+    const apiConfigFiles = fs.readdirSync(apiConfigDir);
+
+    expect(apiConfigFiles).not.toContain('ThirdPartyApiSettingsPanel.tsx');
+    expect(apiConfigFiles).not.toContain('ThirdPartyConnectionEditor.tsx');
+    expect(apiConfigFiles).not.toContain('ThirdPartyAddConnectionDialog.tsx');
+    expect(apiConfigFiles).not.toContain('OpenAICompatibleModelListEditor.tsx');
+
+    const settingsContentSource = readProjectFile('src/components/settings/SettingsContent.tsx');
+    expect(settingsContentSource).toContain("from './sections/providers/ProviderSettingsSection'");
+    expect(settingsContentSource).not.toContain('ThirdPartyApiSettingsPanel');
+
+    // Any leftover reference to the removed components anywhere in src/ would
+    // reintroduce the second surface. This guard file itself names them, so it
+    // is excluded by path.
+    const offenders: string[] = [];
+    const guardFile = path.join(projectRoot, 'src/test/architecture/namingStructureOptimizations.test.ts');
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          walk(full);
+          continue;
+        }
+        if (!/\.(ts|tsx)$/.test(entry.name) || full === guardFile) continue;
+        const content = fs.readFileSync(full, 'utf8');
+        for (const removed of [
+          'ThirdPartyApiSettingsPanel',
+          'ThirdPartyConnectionEditor',
+          'ThirdPartyAddConnectionDialog',
+          'OpenAICompatibleModelListEditor',
+          'openaiCompatibleModelListState',
+          'useOpenAICompatibleModelRowHandlers',
+        ]) {
+          if (content.includes(removed)) {
+            offenders.push(`${path.relative(projectRoot, full)} → ${removed}`);
+          }
+        }
+      }
+    };
+    walk(path.join(projectRoot, 'src'));
+
+    expect(offenders).toEqual([]);
   });
 
   it('keeps user message collapse state outside the markdown renderer component', () => {

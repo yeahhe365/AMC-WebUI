@@ -18,6 +18,10 @@ const LazyMcpShareInstallGate = lazyNamedComponent(
   () => import('./components/mcp/McpShareInstallGate'),
   'McpShareInstallGate',
 );
+const LazyAssistantApiKeyDialog = lazyNamedComponent(
+  () => import('./components/settings/sections/providers/assistant/AssistantApiKeyDialog'),
+  'AssistantApiKeyDialog',
+);
 const LazyGlobalCommandPalette = lazyNamedComponent(
   () => import('./components/command/GlobalCommandPalette'),
   'GlobalCommandPalette',
@@ -110,6 +114,9 @@ const AppContent: React.FC = () => {
       </Suspense>
       <Suspense fallback={null}>
         <LazyMcpShareInstallGate />
+      </Suspense>
+      <Suspense fallback={null}>
+        <LazyAssistantApiKeyDialog />
       </Suspense>
       <Suspense fallback={null}>
         <LazyGlobalCommandPalette

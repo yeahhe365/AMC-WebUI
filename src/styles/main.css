@@ -4,6 +4,10 @@
    not the OS prefers-color-scheme. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --shadow-premium: var(--shadow-premium);
+}
+
 /* Base Variables & Reset */
 :root {
   /* Apple-style spring easing for premium feel */
@@ -18,6 +22,17 @@
     'Segoe UI Emoji';
   --app-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   --app-text-measure: 75ch;
+
+  /* Multi-layer ambient elevation for floating popovers, dropdowns, and cards */
+  --shadow-premium:
+    0 16px 36px -6px rgba(0, 0, 0, 0.14), 0 6px 16px -4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+:where(.dark, .dark *),
+.theme-onyx,
+.theme-graphite {
+  --shadow-premium:
+    0 20px 44px -8px rgba(0, 0, 0, 0.65), 0 8px 20px -4px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 /* Global Layout Reset for Full Height */
@@ -256,6 +271,11 @@ body,
   box-shadow:
     0 1px 3px 0 rgba(0, 0, 0, 0.3),
     0 1px 2px -1px rgba(0, 0, 0, 0.2);
+}
+
+/* Floating overlay multi-layer shadow */
+.shadow-premium {
+  box-shadow: var(--shadow-premium);
 }
 
 /* React H5 Audio Player Theme Integration */

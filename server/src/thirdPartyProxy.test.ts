@@ -117,6 +117,81 @@ describe('third-party proxy routing + BYOK 兜底', () => {
     expect(headers.get('x-api-key')).toBe('browser-byok-key');
   });
 
+  it('lets the server route key win when SERVER_KEY_PRIORITY is on', async () => {
+    const { fetchImpl, calls } = fetchRecorder();
+    const app = createServer(
+      buildConfig({
+        serverKeyPriority: true,
+        thirdPartyRoutes: {
+          openai: { baseUrl: 'https://api.openai.com/v1', apiKey: 'server-route-key' },
+        },
+      }),
+      { fetchImpl },
+    );
+    const started = serverCleanup.track(await startHttpServer(app));
+
+    await fetch(`${started.baseUrl}/api/openai/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-third-party-provider': 'openai',
+        authorization: 'Bearer browser-byok-key',
+      },
+      body: JSON.stringify({}),
+    });
+
+    const headers = new Headers(calls[0].init.headers as HeadersInit);
+    expect(headers.get('authorization')).toBe('Bearer server-route-key');
+    expect(headers.get('x-api-key')).toBe('server-route-key');
+  });
+
+  it('keeps the browser key when SERVER_KEY_PRIORITY is on but the route has no key', async () => {
+    const { fetchImpl, calls } = fetchRecorder();
+    const app = createServer(
+      buildConfig({
+        serverKeyPriority: true,
+        thirdPartyRoutes: {
+          openai: { baseUrl: 'https://api.openai.com/v1' },
+        },
+      }),
+      { fetchImpl },
+    );
+    const started = serverCleanup.track(await startHttpServer(app));
+
+    await fetch(`${started.baseUrl}/api/openai/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-third-party-provider': 'openai',
+        authorization: 'Bearer browser-byok-key',
+      },
+      body: JSON.stringify({}),
+    });
+
+    const headers = new Headers(calls[0].init.headers as HeadersInit);
+    expect(headers.get('authorization')).toBe('Bearer browser-byok-key');
+  });
+
+  it('ignores SERVER_KEY_PRIORITY in pure-BYOK mode (no route table)', async () => {
+    const { fetchImpl, calls } = fetchRecorder();
+    const app = createServer(buildConfig({ thirdPartyRoutes: {}, serverKeyPriority: true }), { fetchImpl });
+    const started = serverCleanup.track(await startHttpServer(app));
+
+    await fetch(`${started.baseUrl}/api/openai/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-third-party-provider': 'kimi',
+        authorization: 'Bearer browser-byok-key',
+        'x-third-party-base-url': 'https://api.moonshot.ai/v1',
+      },
+      body: JSON.stringify({ model: 'kimi-k3' }),
+    });
+
+    const headers = new Headers(calls[0].init.headers as HeadersInit);
+    expect(headers.get('authorization')).toBe('Bearer browser-byok-key');
+  });
+
   it('forwards to a browser-supplied baseUrl in pure-BYOK mode (no route table)', async () => {
     const { fetchImpl, calls } = fetchRecorder();
     const app = createServer(buildConfig({ thirdPartyRoutes: {} }), { fetchImpl });

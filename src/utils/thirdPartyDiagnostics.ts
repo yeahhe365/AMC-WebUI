@@ -1,5 +1,5 @@
 import { getErrorMessage } from './errorMessage';
-import { parseApiKeys } from './apiKeySelection';
+import { AUTH_OPTIONAL_API_KEY, parseApiKeys } from './apiKeySelection';
 import { getProxyProviderHeader } from './thirdPartyApiProviders';
 import { sendAnthropicMessageNonStream } from '@/services/api/anthropicApi';
 import { sendOpenAICompatibleMessageNonStream } from '@/services/api/openaiCompatibleApi';
@@ -261,7 +261,7 @@ export const probeThirdPartyConnection = async (
   }
 
   const parsedKeys = keyToTest ? parseApiKeys(keyToTest) : [];
-  const firstKey = parsedKeys[0] || (connection.authOptional ? 'auth-optional' : '');
+  const firstKey = parsedKeys[0] || (connection.authOptional ? AUTH_OPTIONAL_API_KEY : '');
   if (!firstKey && !connection.authOptional) {
     return {
       connectionId: connection.id,

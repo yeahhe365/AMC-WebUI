@@ -42,11 +42,13 @@ import {
 } from '@/utils/model/modelHealthCheck';
 import { fetchOpenAICompatibleModels } from '@/services/api/openaiCompatibleApi';
 import { fetchOpenAIResponsesModels } from '@/services/api/openaiResponsesApi';
-import { parseApiKeys } from '@/utils/apiKeySelection';
+import { fetchAnthropicModels } from '@/services/api/anthropicApi';
+import { AUTH_OPTIONAL_API_KEY, parseApiKeys } from '@/utils/apiKeySelection';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { toastError, toastSuccess, toastWarning } from '@/stores/toastStore';
 import { enrichModelMetadata, formatContextWindow } from '@/utils/model/knownModelsCatalog';
 import { ProviderAvatar } from './ProviderAvatar';
+import { ProviderEndpointPreview } from './ProviderEndpointPreview';
 import { ModelParameterModal } from './ModelParameterModal';
 import { ProviderEditDialog } from './ProviderEditDialog';
 import { ModelSyncModal } from './ModelSyncModal';
@@ -230,7 +232,7 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
   // Sync models from upstream API and open reconcile dialog
   const handleSyncModels = async () => {
     const parsedKey = parseApiKeys(connection.apiKey)[0];
-    const effectiveKey = parsedKey || (connection.authOptional ? 'auth-optional' : '');
+    const effectiveKey = parsedKey || (connection.authOptional ? AUTH_OPTIONAL_API_KEY : '');
     if (!effectiveKey && !connection.authOptional) {
       toastWarning(t('apiConfigNoKeyAvailable'));
       return;
@@ -242,8 +244,14 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
 
     setIsSyncingModels(true);
     try {
+      // Each wire protocol exposes its own model-list endpoint and auth header
+      // (Anthropic uses x-api-key + anthropic-version on /v1/models).
       const fetchFn =
-        connection.protocol === 'openai-responses' ? fetchOpenAIResponsesModels : fetchOpenAICompatibleModels;
+        connection.protocol === 'anthropic'
+          ? fetchAnthropicModels
+          : connection.protocol === 'openai-responses'
+            ? fetchOpenAIResponsesModels
+            : fetchOpenAICompatibleModels;
 
       const rawRemoteModels = await fetchFn(
         effectiveKey,
@@ -662,6 +670,7 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
               <Settings size={15} />
             </button>
           </div>
+          <ProviderEndpointPreview protocol={connection.protocol} baseUrl={connection.baseUrl} />
         </div>
         <div className="space-y-3 pt-2" data-settings-item="providers-models">
           <div className="flex items-center justify-between gap-2">

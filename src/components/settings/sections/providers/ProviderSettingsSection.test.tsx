@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setupStoreStateReset } from '@/test/stores/reset';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { createThirdPartyConnection } from '@/test/data/factories';
+import * as thirdPartyDiagnostics from '@/utils/thirdPartyDiagnostics';
 import type { AppSettings } from '@/types';
 import { ProviderSettingsSection } from './ProviderSettingsSection';
 
@@ -72,5 +73,48 @@ describe('ProviderSettingsSection', () => {
     expect(renderer.container.textContent).toContain('API 密钥');
     expect(renderer.container.textContent).toContain('API 地址');
     expect(renderer.container.textContent).toContain('检测');
+  });
+
+  it('probes every enabled connection with a URL from the test-all action', async () => {
+    const probeSpy = vi
+      .spyOn(thirdPartyDiagnostics, 'probeThirdPartyConnection')
+      .mockResolvedValue({ status: 'success', latencyMs: 120, grade: 'fast' } as never);
+
+    const reachable = createThirdPartyConnection({
+      id: 'conn-a',
+      name: 'Reachable',
+      templateId: 'custom-openai',
+      baseUrl: 'https://a.example/v1',
+      apiKey: 'sk-a',
+      enabled: true,
+    });
+    const disabled = createThirdPartyConnection({
+      id: 'conn-b',
+      name: 'Disabled',
+      templateId: 'custom-openai',
+      baseUrl: 'https://b.example/v1',
+      apiKey: 'sk-b',
+      enabled: false,
+    });
+
+    const settingsWithConns: AppSettings = {
+      ...useSettingsStore.getState().appSettings,
+      thirdPartyApi: { connections: [reachable, disabled] },
+    };
+
+    act(() => {
+      renderer.root.render(<ProviderSettingsSection {...createProps({ settings: settingsWithConns })} />);
+    });
+
+    const testAllBtn = renderer.container.querySelector('[data-testid="third-party-test-all-btn"]');
+    expect(testAllBtn).not.toBeNull();
+
+    await act(async () => {
+      (testAllBtn as HTMLButtonElement).click();
+    });
+
+    // Only the enabled connection with a base URL is probed.
+    expect(probeSpy).toHaveBeenCalledTimes(1);
+    expect(probeSpy).toHaveBeenCalledWith(expect.objectContaining({ id: 'conn-a' }));
   });
 });

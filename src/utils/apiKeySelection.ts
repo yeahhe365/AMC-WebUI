@@ -4,9 +4,9 @@ import { logService } from '@/services/logService';
 import { readPersistentStorageItem, writePersistentStorageItem } from '@/stores/persistentStorage';
 import { safeJsonParse } from './safeJsonParse';
 import { isUnavailableThirdPartyRoute, resolveChatApiRoute } from './chatApiRoute';
-import { SERVER_MANAGED_API_KEY } from '../../shared/serverManagedApiKey';
+import { AUTH_OPTIONAL_API_KEY, isAuthOptionalApiKey, SERVER_MANAGED_API_KEY } from '../../shared/serverManagedApiKey';
 
-export { SERVER_MANAGED_API_KEY };
+export { AUTH_OPTIONAL_API_KEY, SERVER_MANAGED_API_KEY };
 const GEMINI_API_KEY_ROTATION_TARGET = '__gemini__';
 
 export const THIRD_PARTY_CONNECTION_MISSING_ERROR = 'Third-party connection is unavailable.';
@@ -148,7 +148,7 @@ export const getKeyForRequest = (
   const shouldLogUsage = !skipUsageLogging && (apiKeyRequestMode === 'third-party' || appSettings.useCustomApiConfig);
 
   const logUsage = (key: string) => {
-    if (shouldLogUsage && key !== 'auth-optional') {
+    if (shouldLogUsage && !isAuthOptionalApiKey(key)) {
       logService.recordApiKeyUsage(key);
     }
   };
@@ -158,7 +158,7 @@ export const getKeyForRequest = (
     if (apiKeyRequestMode === 'third-party') {
       const provider = resolveProviderForKey(appSettings, currentChatSettings, options);
       if (provider?.authOptional) {
-        return { key: 'auth-optional', isNewKey: false };
+        return { key: AUTH_OPTIONAL_API_KEY, isNewKey: false };
       }
     }
     if (shouldUseServerManagedMarker) {
@@ -173,7 +173,7 @@ export const getKeyForRequest = (
     if (apiKeyRequestMode === 'third-party') {
       const provider = resolveProviderForKey(appSettings, currentChatSettings, options);
       if (provider?.authOptional) {
-        return { key: 'auth-optional', isNewKey: false };
+        return { key: AUTH_OPTIONAL_API_KEY, isNewKey: false };
       }
     }
     if (shouldUseServerManagedMarker) {

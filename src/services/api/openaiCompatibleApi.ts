@@ -14,6 +14,7 @@ import {
   type OpenAIResponsePayload,
 } from './openaiCompatibleTypes';
 import { buildOpenAICompatibleChatCompletionsUrl, buildOpenAICompatibleModelsUrl } from './openaiCompatibleUrls';
+import { isAuthOptionalApiKey } from '../../../shared/serverManagedApiKey';
 import {
   createApiRequestInitFactory,
   executeNonStreamChatRequest,
@@ -22,7 +23,7 @@ import {
 } from './requestFactory';
 
 const openAiCompatibleAuthHeaders = (apiKey: string): Record<string, string> =>
-  apiKey && apiKey !== 'auth-optional'
+  apiKey && !isAuthOptionalApiKey(apiKey)
     ? {
         authorization: `Bearer ${apiKey}`,
       }

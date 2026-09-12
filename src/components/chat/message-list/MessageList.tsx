@@ -23,11 +23,9 @@ import {
   formatLiveArtifactFollowupPrompt,
   type LiveArtifactFollowupPayload,
 } from '@/utils/live-artifacts/liveArtifactFollowup';
-import { isDarkThemeId } from '@/utils/themeMode';
 
 const MessageListComponent: React.FC = () => {
   const appSettings = useSettingsStore((state) => state.appSettings);
-  const themeId = useSettingsStore((state) => state.currentTheme.id);
   const { language } = useI18n();
   const messages = useChatStore((state) => state.activeMessages);
   const setCommandedInput = useChatStore((state) => state.setCommandedInput);
@@ -197,9 +195,7 @@ const MessageListComponent: React.FC = () => {
 
   return (
     <>
-      <div
-        className={`relative flex-grow h-full ${!isDarkThemeId(themeId) ? 'bg-[var(--theme-bg-primary)]' : 'bg-[var(--theme-bg-secondary)]'}`}
-      >
+      <div className="relative flex-grow h-full bg-[var(--theme-bg-primary)]">
         {visibleMessages.length === 0 ? (
           <WelcomeScreen />
         ) : (

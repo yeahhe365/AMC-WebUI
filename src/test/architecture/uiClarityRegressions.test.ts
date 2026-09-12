@@ -214,9 +214,7 @@ describe('UI clarity regressions', () => {
     const logColors = readSourceFile('components/log-viewer/logColorClasses.ts');
     const collapsedRecent = readSourceFile('components/sidebar/CollapsedRecentChatsButton.tsx');
     const filePreview = readSourceFile('components/modals/FilePreviewModal.tsx');
-    const openaiModels = readSourceFile(
-      'components/settings/sections/api-config/OpenAICompatibleCurrentModelsPanel.tsx',
-    );
+    const shortcuts = readSourceFile('components/settings/sections/ShortcutsSection.tsx');
     const pdfMain = readSourceFile('components/shared/file-preview/pdf-viewer/PdfMainContent.tsx');
 
     expect(liveControls).not.toContain('text-purple-500');
@@ -278,7 +276,7 @@ describe('UI clarity regressions', () => {
 
     expect(collapsedRecent).not.toContain('rounded-2xl');
     expect(filePreview).not.toContain('bg-white/15');
-    expect(openaiModels).toContain('SETTINGS_SEARCH_INPUT_CLASS');
+    expect(shortcuts).toContain('SETTINGS_SEARCH_INPUT_CLASS');
     expect(pdfMain).not.toContain('tracking-widest');
   });
 });

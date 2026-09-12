@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronLeft, Download, Upload, Server } from 'lucide-react';
+import { Activity, ChevronLeft, Download, Loader2, Server, Sparkles, Upload } from 'lucide-react';
 import {
   GEMINI_PROVIDER_ID,
   type AppSettings,
@@ -18,6 +18,7 @@ import {
   reorderThirdPartyConnections,
 } from '@/utils/thirdPartyApiProviders';
 import { probeThirdPartyConnection, formatLatency } from '@/utils/thirdPartyDiagnostics';
+import { getErrorMessage } from '@/utils/errorMessage';
 import {
   exportProvidersBackupFile,
   parseProvidersBackupText,
@@ -29,7 +30,6 @@ import { interpolate } from '@/i18n/interpolate';
 import { ProviderList } from './ProviderList';
 import { ProviderDetail } from './ProviderDetail';
 import { ProviderAddModal } from './ProviderAddModal';
-import { ProviderAssistantPanel } from './assistant/ProviderAssistantPanel';
 import { ApiConfigSection } from '@/components/settings/sections/ApiConfigSection';
 import {
   ThirdPartyBackupDialog,
@@ -59,6 +59,7 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isBackupOpen, setIsBackupOpen] = useState(false);
+  const [isTestingAll, setIsTestingAll] = useState(false);
   const [backupDialogMode, setBackupDialogMode] = useState<ThirdPartyBackupDialogMode>('export');
   const [pendingImportedConnections, setPendingImportedConnections] = useState<ThirdPartyConnection[]>([]);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -142,6 +143,47 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
     }
   };
 
+  // Probe every enabled connection that has a base URL, in parallel, and
+  // report one aggregate toast. Individual results are also surfaced per
+  // connection via the list row's probe action.
+  const handleTestAllConnections = async () => {
+    const targets = connections.filter((conn) => conn.enabled && Boolean(conn.baseUrl?.trim()));
+    if (targets.length === 0) {
+      toastWarning(t('thirdPartyTestAllEmpty'));
+      return;
+    }
+
+    setIsTestingAll(true);
+    try {
+      const results = await Promise.allSettled(targets.map((conn) => probeThirdPartyConnection(conn)));
+      const successCount = results.filter(
+        (result) => result.status === 'fulfilled' && result.value.status === 'success',
+      ).length;
+
+      for (const [index, result] of results.entries()) {
+        const conn = targets[index];
+        if (result.status !== 'fulfilled') {
+          toastError(t('thirdPartyTestFailed', { name: conn.name, error: getErrorMessage(result.reason) }));
+          continue;
+        }
+        if (result.value.status === 'success') {
+          toastSuccess(t('thirdPartyTestSuccess', { name: conn.name, latency: formatLatency(result.value.latencyMs) }));
+        } else {
+          toastError(t('thirdPartyTestFailed', { name: conn.name, error: result.value.errorMessage || '' }));
+        }
+      }
+
+      const summary = t('thirdPartyTestAllSummary', { success: successCount, total: targets.length });
+      if (successCount === targets.length) {
+        toastSuccess(summary);
+      } else {
+        toastWarning(summary);
+      }
+    } finally {
+      setIsTestingAll(false);
+    }
+  };
+
   // Export / Import
   const handleExportClick = () => {
     if (connections.length === 0) {
@@ -199,7 +241,12 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
           }
         }}
       />
-      <ProviderAssistantPanel />
+      <div className="flex items-center justify-between px-4 py-1.5 bg-emerald-500/5 border-b border-emerald-500/15 text-[11px] flex-shrink-0">
+        <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
+          <Sparkles size={12} className="shrink-0" />
+          <span>已集成 <strong>AMC Provider Manager</strong> 内置虚拟 MCP 服务，可在主聊天中直接通过自然语言配置与诊断服务商。</span>
+        </div>
+      </div>
       <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--theme-border-secondary)]/30 bg-[var(--theme-bg-secondary)]/40 text-xs flex-shrink-0">
         <div className="flex items-center gap-2">
           <Server size={14} className="text-[var(--theme-text-secondary)]" />
@@ -207,6 +254,17 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
           <span className="text-[var(--theme-text-secondary)]">({connections.length})</span>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-testid="third-party-test-all-btn"
+            onClick={handleTestAllConnections}
+            disabled={connections.length === 0 || isTestingAll}
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors disabled:opacity-40"
+            title={t('apiConfigTestAllConnections')}
+          >
+            {isTestingAll ? <Loader2 size={13} className="animate-spin" /> : <Activity size={13} />}
+            <span>{isTestingAll ? t('apiConfigTestingAll') : t('apiConfigTestAllConnections')}</span>
+          </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}

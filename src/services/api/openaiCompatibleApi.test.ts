@@ -4,6 +4,7 @@ import {
   sendOpenAICompatibleMessageNonStream,
   sendOpenAICompatibleMessageStream,
 } from './openaiCompatibleApi';
+import { AUTH_OPTIONAL_API_KEY } from '../../../shared/serverManagedApiKey';
 
 describe('openaiCompatibleApi', () => {
   beforeEach(() => {
@@ -182,6 +183,26 @@ describe('openaiCompatibleApi', () => {
       { id: 'gpt-4.1', name: 'gpt-4.1' },
       { id: 'deepseek-chat', name: 'deepseek-chat' },
     ]);
+  });
+
+  it('omits the authorization header for the authOptional sentinel', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => {
+      return new Response(JSON.stringify({ data: [{ id: 'llama3.2' }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await fetchOpenAICompatibleModels(AUTH_OPTIONAL_API_KEY, 'http://localhost:11434/v1', new AbortController().signal);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:11434/v1/models',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.not.objectContaining({ authorization: expect.anything() }),
+      }),
+    );
   });
 
   it('reports model list fetch errors from OpenAI-compatible error payloads', async () => {

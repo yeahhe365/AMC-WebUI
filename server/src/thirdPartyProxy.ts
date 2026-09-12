@@ -35,6 +35,11 @@ const THIRD_PARTY_BASE_URL_HEADER = 'x-third-party-base-url';
 
 export interface ThirdPartyProxyConfig {
   thirdPartyRoutes: Record<string, ThirdPartyProxyRoute>;
+  /**
+   * Mirrors the Gemini proxy: `true` makes the server route key win over a
+   * browser-supplied BYOK key whenever a route key exists. Defaults to false
+   * (browser BYOK key first, server route key as the fallback).
+   */
   serverKeyPriority?: boolean;
   allowedOrigins: string[];
 }
@@ -55,6 +60,7 @@ interface ResolvedRoute {
 const resolveRoute = (
   request: IncomingMessage,
   routes: Record<string, ThirdPartyProxyRoute>,
+  serverKeyPriority: boolean,
 ): { route?: ResolvedRoute; providerId: string; error?: { status: number; message: string } } => {
   const providerId = resolveProviderId(request) ?? 'openai';
   const route = routes[providerId] ?? routes['openai'];
@@ -93,13 +99,21 @@ const resolveRoute = (
     };
   }
 
-  // BYOK 兜底: a real browser key wins; otherwise use the server route key.
+  // Key precedence mirrors the Gemini proxy (resolveGeminiRequestApiKey):
+  // SERVER_KEY_PRIORITY=true makes the server route key win whenever one is
+  // configured; otherwise a real browser key wins and the route key is the
+  // fallback.
+  const routeKey = route.apiKey?.trim();
+  if (serverKeyPriority && routeKey) {
+    return { route: { baseUrl: route.baseUrl, apiKey: routeKey, isBrowserKey: false }, providerId };
+  }
+
   if (browserKey) {
     return { route: { baseUrl: route.baseUrl, apiKey: browserKey, isBrowserKey: true }, providerId };
   }
 
-  if (route.apiKey) {
-    return { route: { baseUrl: route.baseUrl, apiKey: route.apiKey, isBrowserKey: false }, providerId };
+  if (routeKey) {
+    return { route: { baseUrl: route.baseUrl, apiKey: routeKey, isBrowserKey: false }, providerId };
   }
 
   return {
@@ -140,7 +154,7 @@ export async function proxyThirdPartyRequest(
   const requestUrl = new URL(request.url || '/', 'http://localhost');
   const upstreamPath = requestUrl.pathname.slice(OPENAI_PROXY_PREFIX.length) || '/';
 
-  const resolved = resolveRoute(request, config.thirdPartyRoutes);
+  const resolved = resolveRoute(request, config.thirdPartyRoutes, config.serverKeyPriority ?? false);
   if (resolved.error) {
     sendJson(request, response, resolved.error.status, { error: resolved.error.message }, config.allowedOrigins);
     return;

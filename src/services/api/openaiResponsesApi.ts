@@ -13,6 +13,7 @@ import {
   type OpenAIResponsesResponsePayload,
 } from './openaiResponsesTypes';
 import { buildOpenAIResponsesModelsUrl, buildOpenAIResponsesUrl } from './openaiResponsesUrls';
+import { isAuthOptionalApiKey } from '../../../shared/serverManagedApiKey';
 import {
   createApiRequestInitFactory,
   executeNonStreamChatRequest,
@@ -20,9 +21,10 @@ import {
   fetchProviderModelOptions,
 } from './requestFactory';
 
-const openAiResponsesAuthHeaders = (apiKey: string): Record<string, string> => ({
-  authorization: `Bearer ${apiKey}`,
-});
+// Omits the auth header for the authOptional sentinel (local engines that take
+// unauthenticated requests) instead of sending `Bearer auth-optional`.
+const openAiResponsesAuthHeaders = (apiKey: string): Record<string, string> =>
+  isAuthOptionalApiKey(apiKey) ? {} : { authorization: `Bearer ${apiKey}` };
 
 const TRUNCATION_NOTICE = '\n\n[Output truncated: the response hit max_output_tokens.]';
 

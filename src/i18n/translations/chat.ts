@@ -170,4 +170,14 @@ export const chatTranslations = {
     fr: 'Tous les serveurs ({count})',
     de: 'Alle Server ({count})',
   },
+  mcpPickerVirtualBadge: {
+    en: 'Built-in',
+    zh: '内置',
+    ja: '内蔵',
+    ko: '내장',
+    es: 'Integrado',
+    fr: 'Intégré',
+    de: 'Integriert',
+  },
 };
+

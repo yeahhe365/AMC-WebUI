@@ -125,6 +125,15 @@ const shellFeatureTranslations: TranslationMap = {
     de: 'Neu laden, um die installierte Shell und die neuesten Ressourcen zu aktualisieren.',
   },
   pwaUpdateLater: { en: 'Later', zh: '稍后', ja: '後で', ko: '나중에', es: 'Más tarde', fr: 'Plus tard', de: 'Später' },
+  settingsMcpVirtualBadge: {
+    en: 'Built-in',
+    zh: '内置',
+    ja: '内蔵',
+    ko: '내장',
+    es: 'Integrado',
+    fr: 'Intégré',
+    de: 'Integriert',
+  },
   ...ttsStyleTranslations,
 };
 

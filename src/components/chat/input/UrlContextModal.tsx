@@ -64,7 +64,12 @@ export const UrlContextModal: React.FC<UrlContextModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} contentClassName="max-w-lg w-full">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel={t('urlContextModalTitle')}
+      contentClassName="w-full max-w-lg overflow-hidden rounded-2xl bg-[var(--theme-bg-primary)] shadow-2xl border border-[var(--theme-border-secondary)]"
+    >
       <div className="flex flex-col max-h-[85vh] p-6 text-[var(--theme-text-primary)]">
         <div className="flex items-start justify-between pb-4 border-b border-[var(--theme-border-secondary)]">
           <div className="flex items-center gap-3">
@@ -82,7 +87,7 @@ export const UrlContextModal: React.FC<UrlContextModalProps> = ({
             type="button"
             onClick={onClose}
             aria-label={t('close')}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors"
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors cursor-pointer"
           >
             <X size={16} />
           </button>

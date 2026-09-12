@@ -10,6 +10,7 @@ import {
   type AnthropicStreamEvent,
 } from './anthropicTypes';
 import { buildAnthropicMessagesUrl, buildAnthropicModelsUrl } from './anthropicUrls';
+import { isAuthOptionalApiKey } from '../../../shared/serverManagedApiKey';
 import {
   createApiRequestInitFactory,
   executeNonStreamChatRequest,
@@ -20,7 +21,10 @@ import {
 const ANTHROPIC_VERSION = '2023-06-01';
 
 const anthropicAuthHeaders = (apiKey: string): Record<string, string> => ({
-  'x-api-key': apiKey,
+  // `anthropic-version` is a protocol header, not a credential, so it is always
+  // sent. The key header is omitted for the authOptional sentinel — otherwise
+  // the literal string "auth-optional" would be sent upstream as the key.
+  ...(isAuthOptionalApiKey(apiKey) ? {} : { 'x-api-key': apiKey }),
   'anthropic-version': ANTHROPIC_VERSION,
 });
 

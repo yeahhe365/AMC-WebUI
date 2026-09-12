@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { sendAnthropicMessageNonStream, sendAnthropicMessageStream, fetchAnthropicModels } from './anthropicApi';
+import { AUTH_OPTIONAL_API_KEY } from '../../../shared/serverManagedApiKey';
 
 const mockResponse = (body: BodyInit, init?: ResponseInit) =>
   new Response(body, { status: 200, headers: { 'content-type': 'application/json' }, ...init });
@@ -34,6 +35,26 @@ describe('sendAnthropicMessageNonStream', () => {
     expect(parts).toEqual([{ text: 'Hello' }]);
     const callInit = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit;
     expect((callInit.headers as Record<string, string>)['x-api-key']).toBe('sk-key');
+  });
+
+  it('omits x-api-key but keeps anthropic-version for the authOptional sentinel', async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockResponse(JSON.stringify({ content: [{ type: 'text', text: 'ok' }] })),
+    );
+    await sendAnthropicMessageNonStream(
+      AUTH_OPTIONAL_API_KEY,
+      'm',
+      [],
+      [{ text: 'x' }],
+      { baseUrl: 'http://localhost:11434' },
+      new AbortController().signal,
+      vi.fn(),
+      vi.fn(),
+    );
+
+    const headers = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].headers as Record<string, string>;
+    expect(headers['x-api-key']).toBeUndefined();
+    expect(headers['anthropic-version']).toBe('2023-06-01');
   });
 
   it('calls onError on non-ok response', async () => {

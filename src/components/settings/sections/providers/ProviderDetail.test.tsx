@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { setupStoreStateReset } from '@/test/stores/reset';
 import { createThirdPartyConnection } from '@/test/data/factories';
 import * as modelHealthCheck from '@/utils/model/modelHealthCheck';
+import * as anthropicApi from '@/services/api/anthropicApi';
+import * as openaiCompatibleApi from '@/services/api/openaiCompatibleApi';
+import * as openaiResponsesApi from '@/services/api/openaiResponsesApi';
 import { ProviderDetail } from './ProviderDetail';
 
 describe('ProviderDetail', () => {
@@ -355,5 +358,75 @@ describe('ProviderDetail', () => {
       [expect.objectContaining({ id: 'deepseek-chat' })],
       expect.anything(),
     );
+  });
+
+  describe('sync models dispatches on protocol', () => {
+    const clickSyncModels = async () => {
+      const syncBtn = Array.from(renderer.container.querySelectorAll('button')).find((btn) =>
+        btn.textContent?.includes('同步模型'),
+      );
+      expect(syncBtn).toBeDefined();
+      await act(async () => {
+        syncBtn?.click();
+      });
+    };
+
+    it('uses the Anthropic /v1/models fetcher for anthropic connections', async () => {
+      const anthropicFetch = vi
+        .spyOn(anthropicApi, 'fetchAnthropicModels')
+        .mockResolvedValue([{ id: 'claude-sonnet-5', name: 'claude-sonnet-5' }]);
+      const compatibleFetch = vi.spyOn(openaiCompatibleApi, 'fetchOpenAICompatibleModels');
+
+      act(() => {
+        renderer.root.render(
+          <ProviderDetail
+            connection={createThirdPartyConnection({
+              id: 'conn-anthropic',
+              templateId: 'anthropic',
+              protocol: 'anthropic',
+              baseUrl: 'https://api.anthropic.com',
+              apiKey: 'sk-ant',
+              modelId: 'claude-sonnet-5',
+              models: [{ id: 'claude-sonnet-5', name: 'Claude Sonnet 5' }],
+            })}
+            onUpdateConnection={vi.fn()}
+            onDeleteConnection={vi.fn()}
+          />,
+        );
+      });
+
+      await clickSyncModels();
+
+      expect(anthropicFetch).toHaveBeenCalledTimes(1);
+      expect(compatibleFetch).not.toHaveBeenCalled();
+    });
+
+    it('uses the Responses fetcher for openai-responses connections', async () => {
+      const responsesFetch = vi
+        .spyOn(openaiResponsesApi, 'fetchOpenAIResponsesModels')
+        .mockResolvedValue([{ id: 'gpt-5.6-sol', name: 'gpt-5.6-sol' }]);
+      const compatibleFetch = vi.spyOn(openaiCompatibleApi, 'fetchOpenAICompatibleModels');
+
+      act(() => {
+        renderer.root.render(
+          <ProviderDetail
+            connection={createThirdPartyConnection({
+              id: 'conn-responses',
+              templateId: 'openai',
+              protocol: 'openai-responses',
+              baseUrl: 'https://api.openai.com/v1',
+              apiKey: 'sk-openai',
+            })}
+            onUpdateConnection={vi.fn()}
+            onDeleteConnection={vi.fn()}
+          />,
+        );
+      });
+
+      await clickSyncModels();
+
+      expect(responsesFetch).toHaveBeenCalledTimes(1);
+      expect(compatibleFetch).not.toHaveBeenCalled();
+    });
   });
 });

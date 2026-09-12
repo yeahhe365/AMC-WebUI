@@ -3,7 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import type { McpServerConfig } from '../../shared/mcpServerConfig';
 import { createSyncedPersist } from './syncedPersist';
 
-const MCP_RUNTIME_STORAGE_KEY = 'all_model_chat_mcp_runtime_v1';
+const MCP_RUNTIME_STORAGE_KEY = 'all_model_chat_mcp_runtime_v2';
 const { storage: mcpRuntimeSyncedStorage } = createSyncedPersist(MCP_RUNTIME_STORAGE_KEY, {
   debounceMs: 150,
   enableCrossTabSync: false,
@@ -27,7 +27,7 @@ export interface McpRuntimeActions {
 export const useMcpRuntimeStore = create<McpRuntimeSelection & McpRuntimeActions>()(
   persist(
     (set) => ({
-      masterEnabled: true,
+      masterEnabled: false,
       selectedServerIds: null,
       toggleMaster: () => set((state) => ({ masterEnabled: !state.masterEnabled })),
       wakeWithServer: (id) => set({ masterEnabled: true, selectedServerIds: [id] }),

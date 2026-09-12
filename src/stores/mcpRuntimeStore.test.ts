@@ -12,12 +12,12 @@ const server = (id: string): McpServerConfig => ({
 
 describe('useMcpRuntimeStore', () => {
   beforeEach(() => {
-    useMcpRuntimeStore.setState({ masterEnabled: true, selectedServerIds: null });
+    useMcpRuntimeStore.setState({ masterEnabled: false, selectedServerIds: null });
   });
 
-  it('starts with everything enabled and no narrowing', () => {
+  it('starts with master switch disabled by default for composer', () => {
     const state = useMcpRuntimeStore.getState();
-    expect(state.masterEnabled).toBe(true);
+    expect(state.masterEnabled).toBe(false);
     expect(state.selectedServerIds).toBeNull();
   });
 

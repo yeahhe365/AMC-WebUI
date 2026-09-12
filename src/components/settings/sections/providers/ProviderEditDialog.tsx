@@ -11,6 +11,7 @@ import {
 } from '@/constants/buttonClasses';
 import { Select } from '@/components/shared/Select';
 import { Toggle } from '@/components/shared/Toggle';
+import { isForwardedThirdPartyExtraHeader } from '../../../../../shared/thirdPartyExtraHeaders';
 
 interface ProviderEditDialogProps {
   isOpen: boolean;
@@ -167,40 +168,54 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
               <p className="text-xs text-[var(--theme-text-secondary)] italic">{t('thirdPartyNoCustomHeaders')}</p>
             ) : (
               <div className="space-y-2">
-                {headerRows.map((row, index) => (
-                  <div key={row.id} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={row.name}
-                      placeholder={t('thirdPartyHeaderName')}
-                      onChange={(e) => {
-                        const updated = [...headerRows];
-                        updated[index] = { ...updated[index], name: e.target.value };
-                        setHeaderRows(updated);
-                      }}
-                      className={`flex-1 p-2 rounded-lg border text-xs font-mono ${SETTINGS_INPUT_CLASS}`}
-                    />
-                    <input
-                      type="text"
-                      value={row.value}
-                      placeholder={t('thirdPartyHeaderValue')}
-                      onChange={(e) => {
-                        const updated = [...headerRows];
-                        updated[index] = { ...updated[index], value: e.target.value };
-                        setHeaderRows(updated);
-                      }}
-                      className={`flex-1 p-2 rounded-lg border text-xs font-mono ${SETTINGS_INPUT_CLASS}`}
-                    />
-                    <button
-                      type="button"
-                      className={SMALL_ICON_DANGER_BUTTON_CLASS}
-                      onClick={() => setHeaderRows(headerRows.filter((_, i) => i !== index))}
-                      aria-label={t('thirdPartyRemoveHeader')}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
+                {headerRows.map((row, index) => {
+                  // Flag rows the upstream sanitizer would drop so the UI never
+                  // implies a header is in effect when it is not.
+                  const willBeForwarded = !row.name.trim() || isForwardedThirdPartyExtraHeader(row.name);
+
+                  return (
+                    <div key={row.id} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={row.name}
+                          placeholder={t('thirdPartyHeaderName')}
+                          aria-invalid={!willBeForwarded}
+                          onChange={(e) => {
+                            const updated = [...headerRows];
+                            updated[index] = { ...updated[index], name: e.target.value };
+                            setHeaderRows(updated);
+                          }}
+                          className={`flex-1 p-2 rounded-lg border text-xs font-mono ${SETTINGS_INPUT_CLASS}`}
+                        />
+                        <input
+                          type="text"
+                          value={row.value}
+                          placeholder={t('thirdPartyHeaderValue')}
+                          onChange={(e) => {
+                            const updated = [...headerRows];
+                            updated[index] = { ...updated[index], value: e.target.value };
+                            setHeaderRows(updated);
+                          }}
+                          className={`flex-1 p-2 rounded-lg border text-xs font-mono ${SETTINGS_INPUT_CLASS}`}
+                        />
+                        <button
+                          type="button"
+                          className={SMALL_ICON_DANGER_BUTTON_CLASS}
+                          onClick={() => setHeaderRows(headerRows.filter((_, i) => i !== index))}
+                          aria-label={t('thirdPartyRemoveHeader')}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      {!willBeForwarded && (
+                        <p className="text-[11px] text-[var(--theme-text-warning)]" role="status">
+                          {t('thirdPartyHeaderNotForwarded')}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

@@ -6,7 +6,6 @@ import { useChatStore } from '@/stores/chatStore';
 import { useMainContentViewModel } from './useMainContentViewModel';
 import { ChatRuntimeProvider } from './chat-runtime/ChatRuntimeContext';
 import { lazyNamedComponent } from '@/utils/lazyNamedComponent';
-import { isDarkThemeId } from '@/utils/themeMode';
 
 const LazyHistorySidebar = lazyNamedComponent(() => import('@/components/sidebar/HistorySidebar'), 'HistorySidebar');
 const LazySidePanel = lazyNamedComponent(() => import('./SidePanel'), 'SidePanel');
@@ -17,10 +16,10 @@ interface MainContentProps {
   app: AppViewModel;
 }
 
-const HistorySidebarFallback: React.FC<{ isOpen: boolean; themeId: string }> = ({ isOpen, themeId }) => (
+const HistorySidebarFallback: React.FC<{ isOpen: boolean; themeId?: string }> = ({ isOpen }) => (
   <aside
     aria-hidden="true"
-    className={`h-full flex-shrink-0 ${isDarkThemeId(themeId) ? 'bg-[var(--theme-bg-primary)]' : 'bg-[var(--theme-bg-secondary)]'} absolute md:static top-0 left-0 z-50 overflow-hidden border-r border-[var(--theme-border-primary)] ${
+    className={`h-full flex-shrink-0 bg-[var(--theme-bg-secondary)] absolute md:static top-0 left-0 z-50 overflow-hidden border-r border-[var(--theme-border-primary)] ${
       isOpen ? 'w-64 md:w-[16.2rem] translate-x-0' : 'w-64 md:w-[52.2px] -translate-x-full md:translate-x-0'
     }`}
   />

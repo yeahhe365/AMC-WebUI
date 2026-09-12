@@ -43,6 +43,7 @@ import { sendAnthropicMessageNonStream, sendAnthropicMessageStream } from '@/ser
 import { createMcpClientFunctions } from '@/features/mcp/mcpClientFunctions';
 import { requestToolApproval } from '@/stores/mcpApprovalStore';
 import { selectServersForTurn, useMcpRuntimeStore } from '@/stores/mcpRuntimeStore';
+import { useVirtualMcpStore, isVirtualServerActiveForTurn } from '@/stores/virtualMcpStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { createStandardClientFunctions } from '@/features/standard-chat/standardClientFunctions';
 import { runStandardToolLoop } from '@/features/standard-chat/standardToolLoop';
@@ -449,12 +450,20 @@ export const performStandardChatApiCall = async ({
   });
   const runtimeSelection = useMcpRuntimeStore.getState();
   const enabledMcpServers = selectServersForTurn(appSettings.mcpServers ?? [], runtimeSelection);
+  const virtualMcpStore = useVirtualMcpStore.getState();
+  const activeVirtualServers = virtualMcpStore
+    .getEnabledVirtualServers()
+    .filter((vs) => isVirtualServerActiveForTurn(vs.id, runtimeSelection));
   const isMcpEnabledForTurn =
-    finalRole === 'user' && !isRawMode && !isImageGenerationModel(apiModelId) && enabledMcpServers.length > 0;
+    finalRole === 'user' &&
+    !isRawMode &&
+    !isImageGenerationModel(apiModelId) &&
+    (enabledMcpServers.length > 0 || activeVirtualServers.length > 0);
   // Discovery is resilient: failures log and yield {} so chat continues without MCP tools.
   const mcpClientFunctions = isMcpEnabledForTurn
     ? await createMcpClientFunctions({
         servers: enabledMcpServers,
+        virtualServers: activeVirtualServers,
         abortSignal: newAbortController.signal,
         requestApproval: (request) => requestToolApproval(request, newAbortController.signal),
         // Discovery is cached for 30s; re-check disables at call time.

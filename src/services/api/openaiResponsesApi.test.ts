@@ -4,6 +4,7 @@ import {
   sendOpenAIResponsesNonStream,
   sendOpenAIResponsesStream,
 } from './openaiResponsesApi';
+import { AUTH_OPTIONAL_API_KEY } from '../../../shared/serverManagedApiKey';
 
 const mockResponse = (body: BodyInit, init?: ResponseInit) =>
   new Response(body, { status: 200, headers: { 'content-type': 'application/json' }, ...init });
@@ -77,6 +78,31 @@ describe('sendOpenAIResponsesNonStream', () => {
     expect((callInit.headers as Record<string, string>)['authorization']).toBe('Bearer sk-test-key');
     const callUrl = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0] as string;
     expect(callUrl).toBe('https://api.openai.com/v1/responses');
+  });
+
+  it('omits the authorization header for the authOptional sentinel', async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      mockResponse(
+        JSON.stringify({
+          status: 'completed',
+          output: [{ type: 'message', role: 'assistant', content: [{ type: 'text', text: 'ok' }] }],
+        }),
+      ),
+    );
+
+    await sendOpenAIResponsesNonStream(
+      AUTH_OPTIONAL_API_KEY,
+      'local-model',
+      [],
+      [{ text: 'Hello' }],
+      { baseUrl: 'http://localhost:1234/v1' },
+      new AbortController().signal,
+      vi.fn(),
+      vi.fn(),
+    );
+
+    const callInit = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1] as RequestInit;
+    expect((callInit.headers as Record<string, string>)['authorization']).toBeUndefined();
   });
 
   it('extracts reasoning thoughts from output', async () => {

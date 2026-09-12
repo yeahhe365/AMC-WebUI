@@ -5,8 +5,16 @@ import { IconMcp } from '@/components/icons';
 import { interpolate } from '@/i18n/interpolate';
 import { CHAT_INPUT_BUTTON_CLASS } from '@/constants/buttonClasses';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/shared/Popover';
-import { selectServersForTurn, useMcpRuntimeStore } from '@/stores/mcpRuntimeStore';
+import { useMcpRuntimeStore } from '@/stores/mcpRuntimeStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useVirtualMcpStore } from '@/stores/virtualMcpStore';
+import { getVirtualMcpServers } from '@/features/mcp/virtualMcpRegistry';
+
+interface PickerServerItem {
+  id: string;
+  name: string;
+  isVirtual?: boolean;
+}
 
 /**
  * Composer-level MCP control: master on/off plus per-server narrowing for the
@@ -16,6 +24,21 @@ export const McpPickerMenu: React.FC<{ disabled?: boolean }> = ({ disabled }) =>
   const { t } = useI18n();
   const mcpServers = useSettingsStore((state) => state.appSettings.mcpServers);
   const enabledServers = useMemo(() => (mcpServers ?? []).filter((server) => server.enabled), [mcpServers]);
+  const disabledServerIds = useVirtualMcpStore((state) => state.disabledServerIds);
+  const virtualServers = useMemo(() => {
+    const disabledSet = new Set(disabledServerIds);
+    return getVirtualMcpServers().filter((s) => !disabledSet.has(s.id));
+  }, [disabledServerIds]);
+
+  const allAvailableServers: PickerServerItem[] = useMemo(() => {
+    return [
+      ...enabledServers.map((s) => ({ id: s.id, name: s.name, isVirtual: false })),
+      ...virtualServers.map((vs) => ({ id: vs.id, name: vs.name, isVirtual: true })),
+    ];
+  }, [enabledServers, virtualServers]);
+
+  const allServerIds = useMemo(() => allAvailableServers.map((s) => s.id), [allAvailableServers]);
+
   const masterEnabled = useMcpRuntimeStore((state) => state.masterEnabled);
   const selectedServerIds = useMcpRuntimeStore((state) => state.selectedServerIds);
   const toggleMaster = useMcpRuntimeStore((state) => state.toggleMaster);
@@ -23,9 +46,14 @@ export const McpPickerMenu: React.FC<{ disabled?: boolean }> = ({ disabled }) =>
   const wakeWithServer = useMcpRuntimeStore((state) => state.wakeWithServer);
   const selectAllServers = useMcpRuntimeStore((state) => state.selectAllServers);
 
-  if (enabledServers.length === 0) return null;
+  if (allAvailableServers.length === 0) return null;
 
-  const activeCount = selectServersForTurn(enabledServers, { masterEnabled, selectedServerIds }).length;
+  const activeCount = masterEnabled
+    ? selectedServerIds === null
+      ? allAvailableServers.length
+      : allAvailableServers.filter((s) => selectedServerIds.includes(s.id)).length
+    : 0;
+
   const allOn = selectedServerIds === null && masterEnabled;
   const hasNarrowedSelection = masterEnabled && !allOn && activeCount > 0;
 
@@ -63,9 +91,9 @@ export const McpPickerMenu: React.FC<{ disabled?: boolean }> = ({ disabled }) =>
             side="top"
             align="start"
             sideOffset={8}
-            className="w-64 max-h-[70vh] overflow-y-auto custom-scrollbar p-1.5 shadow-premium"
+            className="w-72 sm:w-80 max-h-[70vh] overflow-y-auto custom-scrollbar p-1.5 shadow-premium"
           >
-            <div className="px-4 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)]">
+            <div className="px-3.5 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)]">
               {t('mcpPickerTitle')}
             </div>
             <button
@@ -74,31 +102,32 @@ export const McpPickerMenu: React.FC<{ disabled?: boolean }> = ({ disabled }) =>
               aria-checked={masterEnabled}
               data-testid="mcp-picker-master"
               onClick={() => toggleMaster()}
-              className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--theme-bg-tertiary)] focus:outline-none focus-visible:bg-[var(--theme-bg-tertiary)] flex items-center justify-between transition-colors rounded-lg cursor-pointer"
+              className="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--theme-bg-tertiary)] focus:outline-none focus-visible:bg-[var(--theme-bg-tertiary)] flex items-center justify-between transition-colors rounded-lg cursor-pointer"
             >
-              <span className="font-medium">{t('mcpPickerMaster')}</span>
-              {masterEnabled && <Check size={16} className="text-[var(--theme-text-link)]" strokeWidth={2} />}
+              <span className="font-medium text-[var(--theme-text-primary)]">{t('mcpPickerMaster')}</span>
+              {masterEnabled && <Check size={16} className="text-[var(--theme-text-link)] shrink-0" strokeWidth={2} />}
             </button>
             <div className="my-1 h-px bg-[var(--theme-border-secondary)]" />
-            {(() => {
-              const allActive = masterEnabled && selectedServerIds === null;
-              return (
-                <button
-                  type="button"
-                  role="menuitemcheckbox"
-                  aria-checked={allActive}
-                  data-testid="mcp-picker-all"
-                  onClick={selectAllServers}
-                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--theme-bg-tertiary)] focus:outline-none focus-visible:bg-[var(--theme-bg-tertiary)] flex items-center justify-between transition-colors rounded-lg cursor-pointer"
-                >
-                  <span className="font-medium">
-                    {interpolate(t('mcpPickerAllServers'), { count: enabledServers.length })}
-                  </span>
-                  {allActive && <Check size={16} className="text-[var(--theme-text-link)]" strokeWidth={2} />}
-                </button>
-              );
-            })()}
-            {enabledServers.map((server) => {
+            {allAvailableServers.length > 1 &&
+              (() => {
+                const allActive = masterEnabled && selectedServerIds === null;
+                return (
+                  <button
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={allActive}
+                    data-testid="mcp-picker-all"
+                    onClick={selectAllServers}
+                    className="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--theme-bg-tertiary)] focus:outline-none focus-visible:bg-[var(--theme-bg-tertiary)] flex items-center justify-between transition-colors rounded-lg cursor-pointer"
+                  >
+                    <span className="font-medium text-[var(--theme-text-secondary)]">
+                      {interpolate(t('mcpPickerAllServers'), { count: allAvailableServers.length })}
+                    </span>
+                    {allActive && <Check size={16} className="text-[var(--theme-text-link)] shrink-0" strokeWidth={2} />}
+                  </button>
+                );
+              })()}
+            {allAvailableServers.map((server) => {
               const checked = masterEnabled && (selectedServerIds === null || selectedServerIds.includes(server.id));
               return (
                 <button
@@ -112,15 +141,19 @@ export const McpPickerMenu: React.FC<{ disabled?: boolean }> = ({ disabled }) =>
                       wakeWithServer(server.id);
                       return;
                     }
-                    toggleServer(
-                      server.id,
-                      enabledServers.map((entry) => entry.id),
-                    );
+                    toggleServer(server.id, allServerIds);
                   }}
-                  className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--theme-bg-tertiary)] focus:outline-none focus-visible:bg-[var(--theme-bg-tertiary)] flex items-center justify-between transition-colors rounded-lg cursor-pointer"
+                  className="w-full text-left px-3.5 py-2 text-sm hover:bg-[var(--theme-bg-tertiary)] focus:outline-none focus-visible:bg-[var(--theme-bg-tertiary)] flex items-center justify-between transition-colors rounded-lg cursor-pointer"
                 >
-                  <span className="min-w-0 truncate">{server.name}</span>
-                  {checked && <Check size={16} className="text-[var(--theme-text-link)]" strokeWidth={2} />}
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <span className="min-w-0 truncate text-[var(--theme-text-primary)]">{server.name}</span>
+                    {server.isVirtual && (
+                      <span className="shrink-0 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium leading-none text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        {t('mcpPickerVirtualBadge', t('settingsMcpVirtualBadge', '内置'))}
+                      </span>
+                    )}
+                  </div>
+                  {checked && <Check size={16} className="text-[var(--theme-text-link)] shrink-0" strokeWidth={2} />}
                 </button>
               );
             })}

@@ -838,4 +838,25 @@ describe('McpSection', () => {
     expect(within(renderer.container).getByText('tool_a')).toBeInTheDocument();
     expect(within(renderer.container).queryByText('tool_b')).not.toBeInTheDocument();
   });
+
+  it('renders registered virtual MCP servers in the dedicated in-process section', async () => {
+    const { registerVirtualMcpServer, clearVirtualMcpServers } = await import('@/features/mcp/virtualMcpRegistry');
+    const unregister = registerVirtualMcpServer({
+      id: 'v_test_server',
+      name: 'V Test Provider',
+      description: 'Virtual provider test description',
+      listTools: async () => [],
+      callTool: async () => ({}),
+    });
+
+    try {
+      await renderMcpSection();
+      expect(within(renderer.container).getByText('V Test Provider')).toBeInTheDocument();
+      expect(within(renderer.container).getByTestId('virtual-mcp-section')).toBeInTheDocument();
+    } finally {
+      unregister();
+      clearVirtualMcpServers();
+    }
+  });
 });
+

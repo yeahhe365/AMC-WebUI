@@ -7,7 +7,6 @@ import { getCachedModelCapabilities } from '@/stores/modelCapabilitiesStore';
 import { type ModelOption, type ChatProviderId } from '@/types';
 
 import { HeaderModelSelector } from './HeaderModelSelector';
-import { isDarkThemeId } from '@/utils/themeMode';
 
 interface HeaderProps {
   onNewChat: () => void;
@@ -51,7 +50,7 @@ export const Header: React.FC<HeaderProps> = ({
   isPipSupported,
   isPipActive,
   onTogglePip,
-  themeId,
+  themeId: _themeId,
   newChatShortcut,
   pipShortcut,
 }) => {
@@ -79,9 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
   const showTextTools = permissions.canGenerateSuggestions;
 
   return (
-    <header
-      className={`${!isDarkThemeId(themeId) ? 'bg-[var(--theme-bg-primary)]' : 'bg-[var(--theme-bg-secondary)]'} px-2 py-[0.4rem] sm:px-3 sm:py-[0.52rem] flex items-center justify-between gap-2 sm:gap-3 flex-shrink-0 relative z-20`}
-    >
+    <header className="bg-[var(--theme-bg-primary)] px-2 py-[0.4rem] sm:px-3 sm:py-[0.52rem] flex items-center justify-between gap-2 sm:gap-3 flex-shrink-0 relative z-20">
       <div className="flex items-center gap-2 min-w-0">
         <button
           onClick={onToggleHistorySidebar}

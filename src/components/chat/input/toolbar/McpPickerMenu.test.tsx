@@ -100,4 +100,41 @@ describe('McpPickerMenu', () => {
       expect(state.selectedServerIds).toBeNull();
     });
   });
+
+  it('renders virtual MCP servers with built-in badge and allows toggling', async () => {
+    const { registerVirtualMcpServer, clearVirtualMcpServers } = await import('@/features/mcp/virtualMcpRegistry');
+    const unregister = registerVirtualMcpServer({
+      id: 'v_provider',
+      name: 'Provider Manager',
+      description: 'Test virtual server',
+      listTools: async () => [],
+      callTool: async () => ({}),
+    });
+
+    try {
+      openMenu();
+      expect(screen.getByText('Provider Manager')).toBeInTheDocument();
+      expect(screen.getByTestId('mcp-picker-server-v_provider')).toBeInTheDocument();
+      expect(screen.getByText('Built-in')).toBeInTheDocument();
+    } finally {
+      unregister();
+      clearVirtualMcpServers();
+    }
+  });
+
+  it('omits the all-servers row when only a single server is available', () => {
+    useSettingsStore.setState({
+      appSettings: {
+        ...useSettingsStore.getState().appSettings,
+        mcpServers: [
+          { id: 'solo', name: 'Solo Server', enabled: true, transport: 'http', url: 'https://solo.example.com' },
+        ],
+      } as never,
+    });
+
+    openMenu();
+    expect(screen.getByText('Solo Server')).toBeInTheDocument();
+    expect(screen.queryByTestId('mcp-picker-all')).toBeNull();
+  });
 });
+

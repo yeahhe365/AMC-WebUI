@@ -641,3 +641,32 @@ describe('createMcpClientFunctions live run lifecycle', () => {
     expect(run?.status).toBe('error');
   });
 });
+
+describe('createMcpClientFunctions virtual servers', () => {
+  it('discovers tools from virtual servers even when servers array is empty', async () => {
+    const virtualServer = {
+      id: 'internal_test',
+      name: 'Internal Test',
+      description: 'Internal virtual test server',
+      listTools: vi.fn(async () => [{ name: 'ping', description: 'Ping tool', inputSchema: { type: 'object' } }]),
+      callTool: vi.fn(async (_toolName: string, _args: Record<string, unknown>) => ({
+        content: [{ type: 'text', text: 'pong' }],
+      })),
+    };
+
+    const fns = await createMcpClientFunctions({
+      servers: [],
+      virtualServers: [virtualServer],
+    });
+
+    const expectedName = toMcpFunctionName('internal_test', 'ping');
+    expect(fns[expectedName]).toBeDefined();
+    expect(fns[expectedName].declaration.name).toBe(expectedName);
+
+    const callResult = await fns[expectedName].handler({ msg: 'hello' }, undefined);
+    expect(virtualServer.callTool).toHaveBeenCalledWith('ping', { msg: 'hello' }, undefined, expect.any(Function));
+    expect(callResult).toEqual({ response: { content: [{ type: 'text', text: 'pong' }] } });
+  });
+});
+
+

@@ -18,7 +18,10 @@ import { deriveStatus } from '@/features/mcp/mcpStatus';
 import { MCP_INPUT_BASE_CLASSES, createMcpServer, type CapabilityTestState } from './mcp/mcpSectionShared';
 import { McpMarketplaceGrid } from './mcp/McpMarketplaceGrid';
 import { McpServerCard } from './mcp/McpServerCard';
+import { VirtualMcpServerCard } from './mcp/VirtualMcpServerCard';
 import { McpTrustDialog } from './mcp/McpTrustDialog';
+import { getVirtualMcpServers, type VirtualMcpServer } from '@/features/mcp/virtualMcpRegistry';
+import { useVirtualMcpStore } from '@/stores/virtualMcpStore';
 
 interface McpSectionProps {
   settings: AppSettings;
@@ -89,6 +92,29 @@ export const McpSection: React.FC<McpSectionProps> = ({ settings, onUpdate }) =>
   }, [serverIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps -- realign only when the server id set changes
   const filtered = servers.filter((s) => matchesFilter(filter, s) && matchKeywords(deferredSearch, s));
   const filteredAndSorted = [...filtered].sort((a, b) => sortOrder.indexOf(a.id) - sortOrder.indexOf(b.id));
+
+  const isVirtualServerEnabled = useVirtualMcpStore((s) => s.isServerEnabled);
+  const toggleVirtualServerEnabled = useVirtualMcpStore((s) => s.toggleServerEnabled);
+  const virtualServers = getVirtualMcpServers();
+
+  const filterVirtualServer = useCallback(
+    (vServer: VirtualMcpServer): boolean => {
+      const isEnabled = isVirtualServerEnabled(vServer.id);
+      if (filter === 'enabled' && !isEnabled) return false;
+      if (filter === 'disabled' && isEnabled) return false;
+      if (filter === 'http' || filter === 'sse') return false;
+      if (!deferredSearch.trim()) return true;
+      const hay = `${vServer.name} ${vServer.id} ${vServer.description}`.toLowerCase();
+      return deferredSearch
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean)
+        .every((tok) => hay.includes(tok));
+    },
+    [deferredSearch, filter, isVirtualServerEnabled],
+  );
+
+  const filteredVirtualServers = virtualServers.filter(filterVirtualServer);
   const moveServer = (id: string, direction: -1 | 1) => {
     const idx = sortOrder.indexOf(id);
     const next = [...sortOrder];
@@ -337,91 +363,122 @@ export const McpSection: React.FC<McpSectionProps> = ({ settings, onUpdate }) =>
         />
       </div>
 
-      {servers.length === 0 ? (
-        <div
-          className={`${SETTINGS_SECTION_CARD_CLASS} flex flex-col items-center justify-center gap-2 border-dashed py-10 text-center text-sm text-[var(--theme-text-secondary)]`}
-        >
-          <Server size={28} strokeWidth={1.5} className="opacity-40" aria-hidden />
-          <span>{t('settingsMcpEmpty')}</span>
-        </div>
-      ) : filteredAndSorted.length === 0 ? (
-        <div
-          className={`${SETTINGS_SECTION_CARD_CLASS} flex flex-col items-center justify-center gap-2 border-dashed py-10 text-center text-sm text-[var(--theme-text-secondary)]`}
-        >
-          <SearchX size={28} strokeWidth={1.5} className="opacity-40" aria-hidden />
-          <span>{t('settingsMcpEmptyFiltered')}</span>
-          <button
-            type="button"
-            onClick={() => {
-              setFilter('all');
-              setSearch('');
-            }}
-            className={`${SETTINGS_OUTLINE_BUTTON_CLASS} mt-1`}
-          >
-            {t('settingsMcpClearFilters')}
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredAndSorted.map((server) => {
-            const origIndex = servers.indexOf(server);
-            const fallbackIndex = origIndex !== -1 ? origIndex : 0;
-            const stateKey =
-              origIndex !== -1
-                ? (cardKeys[origIndex] ?? `mcp-card-fallback-${origIndex}`)
-                : `mcp-card-fallback-${server.id}`;
-            const index = origIndex !== -1 ? origIndex : fallbackIndex;
-            const sortIndex = sortOrder.indexOf(server.id);
-            const isExpanded = expandedCards.has(stateKey);
-
-            return (
-              <McpServerCard
-                key={stateKey}
-                server={server}
-                index={index}
-                isExpanded={isExpanded}
-                capabilityState={capabilityStates[stateKey]}
-                canMoveUp={sortIndex > 0}
-                canMoveDown={sortIndex !== -1 && sortIndex < sortOrder.length - 1}
-                activeTab={activeTabs[stateKey] ?? 'tools'}
-                toolQuery={toolQueries[stateKey] ?? ''}
-                deferredToolQuery={deferredToolQueries[stateKey] ?? ''}
-                schemaToolNames={schemaToolNames}
-                onToggleExpanded={() => toggleCardExpanded(stateKey)}
-                onToggleEnabled={(enabled) => {
-                  if (enabled && server.isTrusted === false) {
-                    setPendingTrustIndex(index);
-                    return;
-                  }
-                  if (enabled) {
-                    enableServerWithProbe(index, stateKey);
-                    return;
-                  }
-                  updateServer(index, { enabled });
-                }}
-                onRemove={() => removeServer(index)}
-                onTestCapabilities={() => void testServerCapabilities(server, stateKey)}
-                onMove={(direction) => moveServer(server.id, direction)}
-                onUpdateServer={(updates) => updateServer(index, updates)}
-                onTabChange={(tab) => setActiveTabs((prev) => ({ ...prev, [stateKey]: tab }))}
-                onToolQueryChange={(query) => setToolQueries((prev) => ({ ...prev, [stateKey]: query }))}
-                onToggleSchemaTool={(toolName) =>
-                  setSchemaToolNames((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(toolName)) {
-                      next.delete(toolName);
-                    } else {
-                      next.add(toolName);
-                    }
-                    return next;
-                  })
-                }
-                t={t}
-              />
-            );
-          })}
+      {filteredVirtualServers.length > 0 && (
+        <div className="space-y-3" data-testid="virtual-mcp-section">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)]">
+              {t('settingsMcpVirtualSectionTitle')}
+            </span>
+          </div>
+          {filteredVirtualServers.map((vServer) => (
+            <VirtualMcpServerCard
+              key={vServer.id}
+              server={vServer}
+              isExpanded={expandedCards.has(`virtual-${vServer.id}`)}
+              isEnabled={isVirtualServerEnabled(vServer.id)}
+              onToggleExpanded={() => toggleCardExpanded(`virtual-${vServer.id}`)}
+              onToggleEnabled={() => toggleVirtualServerEnabled(vServer.id)}
+              t={t}
+            />
+          ))}
         </div>
       )}
+
+      <div className="space-y-3">
+        {servers.length > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--theme-text-tertiary)]">
+              {t('settingsMcpExternalSectionTitle')}
+            </span>
+          </div>
+        )}
+
+        {servers.length === 0 ? (
+          <div
+            className={`${SETTINGS_SECTION_CARD_CLASS} flex flex-col items-center justify-center gap-2 border-dashed py-8 text-center text-xs text-[var(--theme-text-secondary)]`}
+          >
+            <Server size={24} strokeWidth={1.5} className="opacity-40" aria-hidden />
+            <span>{t('settingsMcpEmpty')}</span>
+          </div>
+        ) : filteredAndSorted.length === 0 ? (
+          <div
+            className={`${SETTINGS_SECTION_CARD_CLASS} flex flex-col items-center justify-center gap-2 border-dashed py-8 text-center text-xs text-[var(--theme-text-secondary)]`}
+          >
+            <SearchX size={24} strokeWidth={1.5} className="opacity-40" aria-hidden />
+            <span>{t('settingsMcpEmptyFiltered')}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setFilter('all');
+                setSearch('');
+              }}
+              className={`${SETTINGS_OUTLINE_BUTTON_CLASS} mt-1`}
+            >
+              {t('settingsMcpClearFilters')}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredAndSorted.map((server) => {
+              const origIndex = servers.indexOf(server);
+              const fallbackIndex = origIndex !== -1 ? origIndex : 0;
+              const stateKey =
+                origIndex !== -1
+                  ? (cardKeys[origIndex] ?? `mcp-card-fallback-${origIndex}`)
+                  : `mcp-card-fallback-${server.id}`;
+              const index = origIndex !== -1 ? origIndex : fallbackIndex;
+              const sortIndex = sortOrder.indexOf(server.id);
+              const isExpanded = expandedCards.has(stateKey);
+
+              return (
+                <McpServerCard
+                  key={stateKey}
+                  server={server}
+                  index={index}
+                  isExpanded={isExpanded}
+                  capabilityState={capabilityStates[stateKey]}
+                  canMoveUp={sortIndex > 0}
+                  canMoveDown={sortIndex !== -1 && sortIndex < sortOrder.length - 1}
+                  activeTab={activeTabs[stateKey] ?? 'tools'}
+                  toolQuery={toolQueries[stateKey] ?? ''}
+                  deferredToolQuery={deferredToolQueries[stateKey] ?? ''}
+                  schemaToolNames={schemaToolNames}
+                  onToggleExpanded={() => toggleCardExpanded(stateKey)}
+                  onToggleEnabled={(enabled) => {
+                    if (enabled && server.isTrusted === false) {
+                      setPendingTrustIndex(index);
+                      return;
+                    }
+                    if (enabled) {
+                      enableServerWithProbe(index, stateKey);
+                      return;
+                    }
+                    updateServer(index, { enabled });
+                  }}
+                  onRemove={() => removeServer(index)}
+                  onTestCapabilities={() => void testServerCapabilities(server, stateKey)}
+                  onMove={(direction) => moveServer(server.id, direction)}
+                  onUpdateServer={(updates) => updateServer(index, updates)}
+                  onTabChange={(tab) => setActiveTabs((prev) => ({ ...prev, [stateKey]: tab }))}
+                  onToolQueryChange={(query) => setToolQueries((prev) => ({ ...prev, [stateKey]: query }))}
+                  onToggleSchemaTool={(toolName) =>
+                    setSchemaToolNames((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(toolName)) {
+                        next.delete(toolName);
+                      } else {
+                        next.add(toolName);
+                      }
+                      return next;
+                    })
+                  }
+                  t={t}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
       {pendingTrustIndex !== null && servers[pendingTrustIndex] && (
         <McpTrustDialog
           server={servers[pendingTrustIndex]}
