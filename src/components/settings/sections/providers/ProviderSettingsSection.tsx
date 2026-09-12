@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Activity, ChevronLeft, Download, Loader2, Server, Upload } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import {
   GEMINI_PROVIDER_ID,
   type AppSettings,
@@ -18,23 +18,11 @@ import {
   reorderThirdPartyConnections,
 } from '@/utils/thirdPartyApiProviders';
 import { probeThirdPartyConnection, formatLatency } from '@/utils/thirdPartyDiagnostics';
-import { getErrorMessage } from '@/utils/errorMessage';
-import {
-  exportProvidersBackupFile,
-  parseProvidersBackupText,
-  applyImportedProviders,
-  type ImportMode,
-} from '@/utils/thirdPartyBackup';
-import { toastError, toastSuccess, toastWarning } from '@/stores/toastStore';
-import { interpolate } from '@/i18n/interpolate';
+import { toastError, toastSuccess } from '@/stores/toastStore';
 import { ProviderList } from './ProviderList';
 import { ProviderDetail } from './ProviderDetail';
 import { ProviderAddModal } from './ProviderAddModal';
 import { ApiConfigSection } from '@/components/settings/sections/ApiConfigSection';
-import {
-  ThirdPartyBackupDialog,
-  type ThirdPartyBackupDialogMode,
-} from '@/components/settings/sections/api-config/ThirdPartyBackupDialog';
 import { useProviderUiStore } from '@/stores/providerUiStore';
 
 interface ProviderSettingsSectionProps {
@@ -59,11 +47,6 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(true);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [isBackupOpen, setIsBackupOpen] = useState(false);
-  const [isTestingAll, setIsTestingAll] = useState(false);
-  const [backupDialogMode, setBackupDialogMode] = useState<ThirdPartyBackupDialogMode>('export');
-  const [pendingImportedConnections, setPendingImportedConnections] = useState<ThirdPartyConnection[]>([]);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const geminiStatus = useMemo(() => {
     const hasKey = Boolean(settings.apiKey?.trim() || settings.serverManagedApi);
@@ -168,143 +151,11 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
     }
   };
 
-  // Probe every enabled connection that has a base URL, in parallel, and
-  // report one aggregate toast. Individual results are also surfaced per
-  // connection via the list row's probe action.
-  const handleTestAllConnections = async () => {
-    const targets = connections.filter((conn) => conn.enabled && Boolean(conn.baseUrl?.trim()));
-    if (targets.length === 0) {
-      toastWarning(t('thirdPartyTestAllEmpty'));
-      return;
-    }
-
-    setIsTestingAll(true);
-    try {
-      const results = await Promise.allSettled(targets.map((conn) => probeThirdPartyConnection(conn)));
-      const successCount = results.filter(
-        (result) => result.status === 'fulfilled' && result.value.status === 'success',
-      ).length;
-
-      for (const [index, result] of results.entries()) {
-        const conn = targets[index];
-        if (result.status !== 'fulfilled') {
-          toastError(t('thirdPartyTestFailed', { name: conn.name, error: getErrorMessage(result.reason) }));
-          continue;
-        }
-        if (result.value.status === 'success') {
-          toastSuccess(t('thirdPartyTestSuccess', { name: conn.name, latency: formatLatency(result.value.latencyMs) }));
-        } else {
-          toastError(t('thirdPartyTestFailed', { name: conn.name, error: result.value.errorMessage || '' }));
-        }
-      }
-
-      const summary = t('thirdPartyTestAllSummary', { success: successCount, total: targets.length });
-      if (successCount === targets.length) {
-        toastSuccess(summary);
-      } else {
-        toastWarning(summary);
-      }
-    } finally {
-      setIsTestingAll(false);
-    }
-  };
-
-  // Export / Import
-  const handleExportClick = () => {
-    if (connections.length === 0) {
-      toastWarning(t('thirdPartyExportEmpty'));
-      return;
-    }
-    setBackupDialogMode('export');
-    setIsBackupOpen(true);
-  };
-
-  const handleFileSelected = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = (reader.result ?? e.target?.result) as string;
-      const parsed = parseProvidersBackupText(text);
-      if (parsed.validCount === 0) {
-        toastError(t('thirdPartyImportError'));
-        return;
-      }
-      if (connections.length === 0) {
-        const next = applyImportedProviders([], parsed.connections, 'overwrite');
-        updateThirdPartyApi({ ...currentSettings, connections: next });
-        toastSuccess(interpolate(t('thirdPartyImportSuccess'), { count: parsed.validCount }));
-        if (next.length > 0) setSelectedConnectionId(next[0].id);
-      } else {
-        setPendingImportedConnections(parsed.connections);
-        setBackupDialogMode('import-confirm');
-        setIsBackupOpen(true);
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const handleConfirmImport = (mode: ImportMode) => {
-    const next = applyImportedProviders(connections, pendingImportedConnections, mode);
-    updateThirdPartyApi({ ...currentSettings, connections: next });
-    toastSuccess(interpolate(t('thirdPartyImportSuccess'), { count: pendingImportedConnections.length }));
-  };
-
   return (
     <div
       data-settings-item="providers-root"
       className="flex flex-col h-full w-full bg-[var(--theme-bg-primary)] overflow-hidden"
     >
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept=".json,application/json"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) {
-            handleFileSelected(file);
-            e.target.value = '';
-          }
-        }}
-      />
-      <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--theme-border-secondary)]/30 bg-[var(--theme-bg-secondary)]/40 text-xs flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <Server size={14} className="text-[var(--theme-text-secondary)]" />
-          <span className="font-semibold text-[var(--theme-text-primary)]">{t('thirdPartyManagementTitle')}</span>
-          <span className="text-[var(--theme-text-secondary)]">({connections.length})</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            data-testid="third-party-test-all-btn"
-            onClick={handleTestAllConnections}
-            disabled={connections.length === 0 || isTestingAll}
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors disabled:opacity-40"
-            title={t('apiConfigTestAllConnections')}
-          >
-            {isTestingAll ? <Loader2 size={13} className="animate-spin" /> : <Activity size={13} />}
-            <span>{isTestingAll ? t('apiConfigTestingAll') : t('apiConfigTestAllConnections')}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors"
-            title={t('thirdPartyImportConfig')}
-          >
-            <Upload size={13} />
-            <span>{t('import')}</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleExportClick}
-            disabled={connections.length === 0}
-            className="flex items-center gap-1 px-2 py-1 rounded-md text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors disabled:opacity-40"
-            title={t('thirdPartyExportConfig')}
-          >
-            <Download size={13} />
-            <span>{t('export')}</span>
-          </button>
-        </div>
-      </div>
       <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
         <div
           className={`w-full md:w-64 lg:w-72 h-full flex-shrink-0 ${
@@ -389,15 +240,6 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
         </div>
       </div>
       <ProviderAddModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} onSelectTemplate={handleAddTemplate} />
-      <ThirdPartyBackupDialog
-        isOpen={isBackupOpen}
-        onClose={() => setIsBackupOpen(false)}
-        dialogMode={backupDialogMode}
-        connectionsCount={connections.length}
-        importedConnections={pendingImportedConnections}
-        onConfirmExport={(includeApiKeys) => exportProvidersBackupFile(connections, { includeApiKeys })}
-        onConfirmImport={handleConfirmImport}
-      />
     </div>
   );
 };
