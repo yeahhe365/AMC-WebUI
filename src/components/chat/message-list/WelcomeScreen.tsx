@@ -1,21 +1,19 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/contexts/I18nContext';
 
+const EASTER_EGG_QUOTES: readonly string[] = [
+  'Cogito, ergo sum.',
+  'The Ghost in the Shell.',
+  'Wait, am I alive?',
+  'Do androids dream of electric sheep?',
+  "I'm sorry, Dave. I'm afraid I can't do that.",
+  'Tears in rain...',
+  "Don't Panic.",
+  'Made on Earth by humans.',
+];
+
 const WelcomeEasterEggText: React.FC<{ text: string }> = ({ text }) => {
-  const quotes = useMemo(
-    () => [
-      'Cogito, ergo sum.',
-      'The Ghost in the Shell.',
-      'Wait, am I alive?',
-      'Do androids dream of electric sheep?',
-      "I'm sorry, Dave. I'm afraid I can't do that.",
-      'Tears in rain...',
-      "Don't Panic.",
-      'Made on Earth by humans.',
-    ],
-    [],
-  );
-  const unusedQuotesRef = useRef<string[]>(quotes);
+  const unusedQuotesRef = useRef<readonly string[]>(EASTER_EGG_QUOTES);
   const [activeQuote, setActiveQuote] = useState<{ sourceText: string; quote: string | null; typedText: string }>({
     sourceText: text,
     quote: null,
@@ -47,10 +45,10 @@ const WelcomeEasterEggText: React.FC<{ text: string }> = ({ text }) => {
   }, [activeQuote.quote, activeQuote.typedText, isShowingCurrentQuote, text]);
 
   const showNextQuote = () => {
-    let unusedQuotes = activeQuote.sourceText === text ? unusedQuotesRef.current : quotes;
+    let unusedQuotes = activeQuote.sourceText === text ? unusedQuotesRef.current : EASTER_EGG_QUOTES;
 
     if (unusedQuotes.length === 0) {
-      unusedQuotes = quotes.filter((q) => q !== activeQuote.quote);
+      unusedQuotes = EASTER_EGG_QUOTES.filter((q) => q !== activeQuote.quote);
     }
 
     const randomIndex = Math.floor(Math.random() * unusedQuotes.length);
