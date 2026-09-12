@@ -29,6 +29,7 @@
 **Files:**
 
 - Create: `src/features/settings-assistant/providerPatch.ts`
+- Modify: `src/utils/thirdPartyApiProviders.ts:664`（给 `nextConnectionName` 加 `export`，供去重复用；不复制实现）
 - Test: `src/features/settings-assistant/providerPatch.test.ts`
 
 **Interfaces:**
@@ -91,7 +92,7 @@ describe('planProviderPatch create', () => {
     expect(verdict.kind).toBe('apply');
     if (verdict.kind !== 'apply') return;
     expect(verdict.nextConnections).toHaveLength(1);
-    expect(verdict.nextConnections[0].baseUrl).toBe('https://api.deepseek.com/v1');
+    expect(verdict.nextConnections[0].baseUrl).toBe('https://api.deepseek.com');
     expect(verdict.changed).toContain('created');
   });
 
@@ -99,7 +100,7 @@ describe('planProviderPatch create', () => {
     const verdict = planProviderPatch({ op: 'create', templateId: 'deepseek', name: 'OpenRouter' }, connections());
     expect(verdict.kind).toBe('apply');
     if (verdict.kind !== 'apply') return;
-    expect(verdict.nextConnections.map((c) => c.name)).toEqual(['OpenRouter', 'DeepSeek']);
+    expect(verdict.nextConnections.map((c) => c.name)).toEqual(['OpenRouter', 'OpenRouter 2']);
   });
 
   it('requires approval when the endpoint already exists', () => {
@@ -212,6 +213,7 @@ import {
   addThirdPartyConnection,
   createConnectionFromTemplate,
   createConnectionId,
+  nextConnectionName,
   updateThirdPartyConnection,
 } from '@/utils/thirdPartyApiProviders';
 
@@ -317,7 +319,10 @@ const planCreate = (
 
   const draft = createConnectionFromTemplate(patch.templateId, connections, createConnectionId());
   if (patch.name !== undefined && patch.name.trim()) {
-    draft.name = patch.name.trim();
+    // The factory de-duplicates the template's own name; an explicitly
+    // requested name has to go through the same helper, otherwise a repeat
+    // request for an existing name would create two identically named rows.
+    draft.name = nextConnectionName(connections, patch.name.trim());
   }
   if (patch.baseUrl !== undefined) {
     draft.baseUrl = patch.baseUrl.trim() || null;
@@ -567,7 +572,7 @@ describe('templates', () => {
   it('summarizes a template with its defaults and no secrets', () => {
     const summary = toTemplateSummary('deepseek');
     expect(summary.name).toBe('DeepSeek');
-    expect(summary.baseUrl).toBe('https://api.deepseek.com/v1');
+    expect(summary.baseUrl).toBe('https://api.deepseek.com');
     expect(summary.protocol).toBe('openai-compatible');
   });
 
@@ -956,7 +961,7 @@ describe('createProviderTools', () => {
     expect(requestApiKey).toHaveBeenCalledWith({ connectionId: expect.any(String), connectionName: 'DeepSeek' });
     expect(result.response).toMatchObject({ status: 'key-configured', name: 'DeepSeek' });
     expect(current()[0].apiKey).toBe('sk-from-card');
-    expect(current()[0].baseUrl).toBe('https://api.deepseek.com/v1');
+    expect(current()[0].baseUrl).toBe('https://api.deepseek.com');
   });
 
   it('skips the key request for auth-optional local engines', async () => {

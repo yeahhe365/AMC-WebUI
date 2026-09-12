@@ -661,7 +661,7 @@ export const buildProviderAwareModelList = (
   ];
 };
 
-const nextConnectionName = (connections: ThirdPartyConnection[], baseName: string): string => {
+export const nextConnectionName = (connections: ThirdPartyConnection[], baseName: string): string => {
   const names = new Set(connections.map((connection) => connection.name));
   if (!names.has(baseName)) {
     return baseName;
