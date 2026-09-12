@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { act, type DragEvent } from 'react';
 import type { SavedChatSession } from '@/types';
 import { createChatSettings } from '@/test/data/factories';
 import { renderHook } from '@/test/render/renderer';
@@ -19,7 +20,10 @@ const createSession = (id: string, daysAgo: number): SavedChatSession => {
   };
 };
 
-const renderHistoryLogic = (sessions: SavedChatSession[]) => {
+const renderHistoryLogic = (
+  sessions: SavedChatSession[],
+  overrides: Partial<Parameters<typeof useHistorySidebarLogic>[0]> = {},
+) => {
   useSettingsStore.setState({ language: 'en' });
 
   return renderHook(() =>
@@ -34,30 +38,80 @@ const renderHistoryLogic = (sessions: SavedChatSession[]) => {
       onRenameGroup: () => {},
       onMoveSessionToGroup: () => {},
       onSelectSession: () => {},
+      ...overrides,
     }),
   );
 };
 
-describe('categorizeSessionsByDate', () => {
-  it('places yesterday into its own category before previous 7 days', () => {
-    const { result, unmount } = renderHistoryLogic([
-      createSession('today', 0),
-      createSession('yesterday', 1),
-      createSession('previous', 2),
-    ]);
-    const { categoryOrder, categories } = result.current.categorizedUngroupedSessions;
+const createDragOverEvent = (clientY: number) =>
+  ({
+    preventDefault: () => {},
+    stopPropagation: () => {},
+    clientY,
+    currentTarget: { getBoundingClientRect: () => ({ top: 0, height: 40 }) },
+    dataTransfer: { types: ['sessionid'], dropEffect: 'none' },
+  }) as unknown as DragEvent;
 
+describe('sidebar date grouping', () => {
+  it('only categorizes by date in time mode', () => {
+    const sessions = [createSession('today', 0), createSession('yesterday', 1), createSession('previous', 2)];
+
+    const grouped = renderHistoryLogic(sessions);
+    expect(grouped.result.current.categorizedUngroupedSessions.categoryOrder).toEqual([]);
+    grouped.unmount();
+
+    const timed = renderHistoryLogic(sessions, { displayMode: 'time' });
+    const { categoryOrder, categories } = timed.result.current.categorizedUngroupedSessions;
     expect(categoryOrder).toEqual(['Today', 'Yesterday', 'Previous 7 Days']);
     expect(categories.Yesterday.map((session) => session.id)).toEqual(['yesterday']);
+    timed.unmount();
+  });
+
+  it('exposes a flat unpinned ungrouped list in group mode', () => {
+    const sessions = [
+      { ...createSession('plain-newer', 0), sortOrder: 2_097_152 },
+      { ...createSession('pinned', 1), isPinned: true, sortOrder: 1_048_576 },
+      { ...createSession('plain-older', 2), sortOrder: 1_048_576 },
+    ];
+
+    const { result, unmount } = renderHistoryLogic(sessions);
+
+    expect(result.current.unpinnedUngroupedSessions.map((session) => session.id)).toEqual([
+      'plain-older',
+      'plain-newer',
+    ]);
+    unmount();
+  });
+});
+
+describe('handleSessionDragOver', () => {
+  it('resolves the drop position from the pointer and keeps willPin false over an unpinned row', () => {
+    const sessions = [createSession('a', 0), createSession('b', 1)];
+    const { result, unmount } = renderHistoryLogic(sessions);
+
+    act(() => {
+      result.current.handleSessionDragStart('a');
+    });
+    act(() => {
+      result.current.handleSessionDragOver(createDragOverEvent(5), 'b');
+    });
+
+    expect(result.current.sessionDropIndicator).toEqual({ id: 'b', position: 'before', willPin: false });
     unmount();
   });
 
-  it('keeps previous 30 days separate from the new yesterday and previous 7 days buckets', () => {
-    const { result, unmount } = renderHistoryLogic([createSession('older', 20)]);
-    const { categoryOrder, categories } = result.current.categorizedUngroupedSessions;
+  it('flags willPin when an unpinned session is dragged over a pinned row', () => {
+    const sessions = [createSession('a', 0), { ...createSession('b', 1), isPinned: true }];
+    const { result, unmount } = renderHistoryLogic(sessions);
 
-    expect(categoryOrder).toEqual(['Previous 30 Days']);
-    expect(categories['Previous 30 Days'].map((session) => session.id)).toEqual(['older']);
+    act(() => {
+      result.current.handleSessionDragStart('a');
+    });
+    act(() => {
+      result.current.handleSessionDragOver(createDragOverEvent(35), 'b');
+    });
+
+    expect(result.current.sessionDropIndicator).toEqual({ id: 'b', position: 'after', willPin: true });
     unmount();
   });
 });

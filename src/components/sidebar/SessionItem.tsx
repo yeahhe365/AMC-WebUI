@@ -9,7 +9,7 @@ import { ContextMenu, ContextMenuTrigger } from '@/components/shared/ContextMenu
 import { InlineRenameInput } from './InlineRenameInput';
 import { LoadingDots } from '@/components/shared/LoadingDots';
 import { useChatStore } from '@/stores/chatStore';
-import { SESSION_DRAG_TYPE, isSessionDrag } from './sidebarDragTypes';
+import { SESSION_DRAG_TYPE, isSessionDrag, resolveDropPosition } from './sidebarDragTypes';
 import { Z_INDEX_TOPMOST_OVERLAY } from '@/constants/layout';
 
 export interface SessionItemProps {
@@ -39,11 +39,14 @@ export interface SessionItemProps {
   setDragOverId: (id: string | null) => void;
   draggingSessionId: string | null;
   draggingGroupId?: string | null;
-  dropIndicator?: { id: string; position: 'before' | 'after' } | null;
+  dropIndicator?: { id: string; position: 'before' | 'after'; willPin?: boolean } | null;
   onSessionDragStart: (sessionId: string) => void;
   onSessionDragEnd: () => void;
   onSessionDragOver?: (event: React.DragEvent, sessionId: string) => void;
   onSessionDropIndicatorClear?: () => void;
+  onReorderSession?: (activeId: string, overId: string, position: 'before' | 'after') => void;
+  /** 时间视图下关闭原生拖拽（含落点处理），避免"拖了但排不了"的错觉。 */
+  disableNativeDrag?: boolean;
 }
 
 const RIGHT_CLICK_MENU_FEEDBACK_MS = 200;
@@ -80,10 +83,9 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
     onSessionDragEnd,
     onSessionDragOver,
     onSessionDropIndicatorClear,
+    onReorderSession,
     disableNativeDrag,
-  } = props as typeof props & {
-    disableNativeDrag?: boolean;
-  };
+  } = props;
 
   const [isRightClickAnimating, setIsRightClickAnimating] = useState(false);
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
@@ -165,13 +167,13 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
     e.preventDefault();
     e.stopPropagation();
     const draggedId = e.dataTransfer.getData(SESSION_DRAG_TYPE) || e.dataTransfer.getData('text/plain');
-    if (draggedId && draggedId !== session.id) {
-      onMoveSessionToGroup(draggedId, session.groupId ?? null);
-    }
+    if (!draggedId || draggedId === session.id) return;
+    onReorderSession?.(draggedId, session.id, resolveDropPosition(e));
   };
 
   const showBefore = dropIndicator?.id === session.id && dropIndicator.position === 'before';
   const showAfter = dropIndicator?.id === session.id && dropIndicator.position === 'after';
+  const showPinHint = !!dropIndicator?.willPin && dropIndicator.id === session.id;
   const isBlockedByGroupDrag = !!draggingGroupId;
 
   return (
@@ -190,9 +192,15 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
       <ContextMenuTrigger asChild>
         <li
           onContextMenu={handleContextMenu}
-          onDragOver={onSessionDragOver ? (event) => onSessionDragOver(event, session.id) : undefined}
-          onDragLeave={onSessionDropIndicatorClear}
-          onDrop={handleItemDrop}
+          onDragOver={
+            disableNativeDrag
+              ? undefined
+              : onSessionDragOver
+                ? (event) => onSessionDragOver(event, session.id)
+                : undefined
+          }
+          onDragLeave={disableNativeDrag ? undefined : onSessionDropIndicatorClear}
+          onDrop={disableNativeDrag ? undefined : handleItemDrop}
           className={`group relative rounded-lg my-0.5 transition-all duration-150 ease-out ${
             session.id === activeSessionId || isRightClickAnimating || isContextMenuOpen
               ? 'bg-[var(--theme-bg-accent)]/10'
@@ -207,6 +215,12 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
           {showAfter && (
             <div className="absolute -bottom-[1px] left-1 right-1 h-0.5 rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_8px_var(--theme-bg-accent)] pointer-events-none z-10 animate-in fade-in duration-100 flex items-center">
               <div className="h-1.5 w-1.5 -ml-0.5 rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_6px_var(--theme-bg-accent)]" />
+            </div>
+          )}
+          {showPinHint && (showBefore || showAfter) && (
+            <div className="pointer-events-none absolute right-1 top-0 z-10 flex items-center gap-1 rounded-md bg-[var(--theme-bg-accent)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--theme-bg-primary)] shadow-sm">
+              <Pin size={10} strokeWidth={2.4} />
+              <span>{t('historyDropToPin')}</span>
             </div>
           )}
           <div

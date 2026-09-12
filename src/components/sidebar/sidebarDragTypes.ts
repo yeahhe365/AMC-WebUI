@@ -16,3 +16,15 @@ export const isGroupDrag = (event: { dataTransfer?: DataTransfer | null }): bool
   if (!event?.dataTransfer?.types) return false;
   return Array.from(event.dataTransfer.types).includes(GROUP_DRAG_TYPE);
 };
+
+/**
+ * before/after 的唯一判定实现：指示线渲染与落点处理必须共用它，
+ * 否则"看到的线"和"落下的位置"会各说各话。
+ */
+export const resolveDropPosition = (event: {
+  clientY: number;
+  currentTarget: EventTarget & { getBoundingClientRect: () => { top: number; height: number } };
+}): 'before' | 'after' => {
+  const rect = event.currentTarget.getBoundingClientRect();
+  return event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+};

@@ -301,4 +301,22 @@ export const historyTranslations = {
     fr: 'Faites glisser l’en-tête pour réorganiser',
     de: 'Gruppenkopf ziehen zum Sortieren',
   },
+  historyDropToPin: {
+    en: 'Drop to pin',
+    zh: '松手即置顶',
+    ja: 'ドロップでピン留め',
+    ko: '놓으면 고정',
+    es: 'Suelta para fijar',
+    fr: 'Déposer pour épingler',
+    de: 'Zum Anheften ablegen',
+  },
+  historyReorderDisabledInTimeView: {
+    en: 'Manual reordering is available in group view',
+    zh: '手动排序仅在分组视图可用',
+    ja: '手動並べ替えはグループ表示でのみ利用できます',
+    ko: '수동 정렬은 그룹 보기에서만 사용할 수 있습니다',
+    es: 'La reordenación manual solo está disponible en la vista de grupos',
+    fr: 'Le réordonnancement manuel est disponible dans la vue par groupes',
+    de: 'Manuelles Sortieren ist nur in der Gruppenansicht verfügbar',
+  },
 };

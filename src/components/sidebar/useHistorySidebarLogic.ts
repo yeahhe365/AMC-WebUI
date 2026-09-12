@@ -10,7 +10,8 @@ import { toastInfo, toastError } from '@/stores/toastStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useChatStore } from '@/stores/chatStore';
 import { autoTitleSession } from '@/features/auto-titling/autoTitleSession';
-import { SESSION_DRAG_TYPE, isGroupDrag, isSessionDrag } from './sidebarDragTypes';
+import { compareSessionOrder } from '@/stores/sessionModels';
+import { SESSION_DRAG_TYPE, isGroupDrag, isSessionDrag, resolveDropPosition } from './sidebarDragTypes';
 import type { HistoryDisplayMode } from '@/stores/uiStore';
 
 export type { HistoryDisplayMode };
@@ -29,7 +30,7 @@ interface UseHistorySidebarLogicProps {
   displayMode?: HistoryDisplayMode;
   onRenameSession: (sessionId: string, newTitle: string) => void;
   onRenameGroup: (groupId: string, newTitle: string) => void;
-  onMoveSessionToGroup: (sessionId: string, groupId: string | null) => void;
+  onMoveSessionToGroup: (sessionId: string, groupId: string | null, placement?: 'top' | 'end') => void;
   onSelectSession: (sessionId: string) => void;
   onRegenerateTitleSession?: (sessionId: string) => void | Promise<void>;
 }
@@ -134,6 +135,7 @@ export const useHistorySidebarLogic = ({
   const [sessionDropIndicator, setSessionDropIndicator] = useState<{
     id: string;
     position: 'before' | 'after';
+    willPin: boolean;
   } | null>(null);
   const [groupDropIndicator, setGroupDropIndicator] = useState<{
     id: string;
@@ -278,13 +280,7 @@ export const useHistorySidebarLogic = ({
       const key = session.groupId && map.has(session.groupId) ? session.groupId : null;
       map.get(key)?.push(session);
     });
-    map.forEach((sessionList) =>
-      sessionList.sort((leftSession, rightSession) => {
-        if (leftSession.isPinned && !rightSession.isPinned) return -1;
-        if (!leftSession.isPinned && rightSession.isPinned) return 1;
-        return rightSession.timestamp - leftSession.timestamp;
-      }),
-    );
+    map.forEach((sessionList) => sessionList.sort(compareSessionOrder));
     return map;
   }, [filteredSessions, groups]);
 
@@ -302,14 +298,17 @@ export const useHistorySidebarLogic = ({
   }, [groups]);
 
   const categorizedUngroupedSessions = useMemo(() => {
-    if (displayMode === 'time') {
-      const allUnpinned = filteredSessions.filter((session) => !session.isPinned);
-      return categorizeSessionsByDate(allUnpinned, language, t);
-    }
-    const ungroupedSessions = sessionsByGroupId.get(null) || [];
-    const unpinned = ungroupedSessions.filter((session) => !session.isPinned);
-    return categorizeSessionsByDate(unpinned, language, t);
-  }, [sessionsByGroupId, filteredSessions, displayMode, t, language]);
+    // 分组模式的未分组区改成平铺手动列表（见 unpinnedUngroupedSessions），
+    // 日期分类从此只服务时间视图。
+    if (displayMode !== 'time') return { categories: {}, categoryOrder: [] as string[] };
+    const allUnpinned = filteredSessions.filter((session) => !session.isPinned);
+    return categorizeSessionsByDate(allUnpinned, language, t);
+  }, [filteredSessions, displayMode, t, language]);
+
+  const unpinnedUngroupedSessions = useMemo(() => {
+    if (displayMode === 'time') return [];
+    return (sessionsByGroupId.get(null) || []).filter((session) => !session.isPinned);
+  }, [sessionsByGroupId, displayMode]);
 
   const categorizedTimeModePinned = useMemo(() => {
     if (displayMode !== 'time') return [];
@@ -360,8 +359,9 @@ export const useHistorySidebarLogic = ({
     event.preventDefault();
     event.stopPropagation();
     const sessionId = event.dataTransfer.getData(SESSION_DRAG_TYPE);
-    const targetGroupId = groupId === 'all-conversations' ? null : groupId;
-    if (sessionId) onMoveSessionToGroup(sessionId, targetGroupId);
+    const isContainerDrop = groupId === 'all-conversations';
+    const targetGroupId = isContainerDrop ? null : groupId;
+    if (sessionId) onMoveSessionToGroup(sessionId, targetGroupId, isContainerDrop ? 'end' : 'top');
     setDragOverId(null);
   };
 
@@ -392,9 +392,13 @@ export const useHistorySidebarLogic = ({
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = 'move';
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const position = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
-    setSessionDropIndicator({ id: sessionId, position });
+    const target = sessions.find((session) => session.id === sessionId);
+    const dragging = draggingSessionId ? sessions.find((session) => session.id === draggingSessionId) : undefined;
+    setSessionDropIndicator({
+      id: sessionId,
+      position: resolveDropPosition(event),
+      willPin: !!target?.isPinned && !dragging?.isPinned,
+    });
     setDragOverId(null);
   };
 
@@ -534,6 +538,7 @@ export const useHistorySidebarLogic = ({
     sessionsByGroupId,
     sortedGroups,
     categorizedUngroupedSessions,
+    unpinnedUngroupedSessions,
     categorizedTimeModePinned,
     handleStartEdit,
     handleRenameConfirm,

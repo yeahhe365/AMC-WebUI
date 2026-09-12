@@ -19,7 +19,7 @@ interface GroupItemProps extends SessionItemPassedProps {
   editingItem: { type: 'session' | 'group'; id: string; title: string } | null;
   dragOverId: string | null;
   groupDropIndicator?: { id: string; position: 'before' | 'after' } | null;
-  sessionDropIndicator?: { id: string; position: 'before' | 'after' } | null;
+  sessionDropIndicator?: { id: string; position: 'before' | 'after'; willPin?: boolean } | null;
   isDragging?: boolean;
   dndListeners?: Record<string, unknown>;
   isSortableDragging?: boolean;

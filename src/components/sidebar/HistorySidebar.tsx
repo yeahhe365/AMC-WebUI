@@ -12,7 +12,6 @@ import { useHistorySidebarLogic, type HistoryDisplayMode } from './useHistorySid
 import { SIDEBAR_CLICKABLE_ICON_BUTTON_CLASS, SIDEBAR_ICON_LINK_BUTTON_CLASS } from './sidebarStyles';
 import { LimitedSessionList } from './LimitedSessionList';
 import { DESKTOP_BREAKPOINT_PX } from '@/constants/layout';
-import { isDarkThemeId } from '@/utils/themeMode';
 import { useUIStore } from '@/stores/uiStore';
 import { isGroupDrag, isSessionDrag } from './sidebarDragTypes';
 import {
@@ -49,7 +48,8 @@ interface HistorySidebarProps {
   onDeleteGroup: (groupId: string) => void;
   onClearGroup?: (groupId: string) => void;
   onRenameGroup: (groupId: string, newTitle: string) => void;
-  onMoveSessionToGroup: (sessionId: string, groupId: string | null) => void;
+  onMoveSessionToGroup: (sessionId: string, groupId: string | null, placement?: 'top' | 'end') => void;
+  onReorderSession?: (activeId: string, overId: string, position: 'before' | 'after') => void;
   onRegenerateTitleSession?: (sessionId: string) => void | Promise<void>;
   onToggleGroupExpansion: (groupId: string) => void;
   onNewChatInGroup: (groupId: string) => void;
@@ -139,14 +139,18 @@ const SessionListGroup = ({
   sessionItemProps,
   isDragging,
 }: {
-  title: string;
+  title?: string;
   sessions: SavedChatSession[];
   sessionItemProps: SessionItemPassedProps;
   isDragging?: boolean;
 }) => {
   return (
     <div>
-      <div className="px-3 pt-4 pb-1 text-xs font-semibold tracking-wide text-[var(--theme-text-primary)]">{title}</div>
+      {title && (
+        <div className="px-3 pt-4 pb-1 text-xs font-semibold tracking-wide text-[var(--theme-text-primary)]">
+          {title}
+        </div>
+      )}
       <LimitedSessionList sessions={sessions} sessionItemProps={sessionItemProps} isDragging={isDragging} />
     </div>
   );
@@ -181,6 +185,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
     onRenameSession,
     onRenameGroup,
     onMoveSessionToGroup,
+    onReorderSession,
     onSelectSession,
     onRegenerateTitleSession,
     newChatShortcut,
@@ -220,6 +225,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
     sessionsByGroupId,
     sortedGroups,
     categorizedUngroupedSessions,
+    unpinnedUngroupedSessions,
     categorizedTimeModePinned,
     handleStartEdit,
     handleRenameConfirm,
@@ -358,6 +364,8 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
     onSessionDragEnd: handleSessionDragEnd,
     onSessionDragOver: handleSessionDragOver,
     onSessionDropIndicatorClear: handleSessionDropIndicatorClear,
+    onReorderSession,
+    disableNativeDrag: displayMode === 'time',
   };
 
   const [listParentRef] = useAutoAnimate<HTMLDivElement>({ duration: 200 });
@@ -462,7 +470,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
   return (
     <aside
       data-history-sidebar-root="true"
-      className={`h-full flex flex-col ${isDarkThemeId(themeId) ? 'bg-[var(--theme-bg-primary)]' : 'bg-[var(--theme-bg-secondary)]'} flex-shrink-0
+      className={`h-full flex flex-col bg-[var(--theme-bg-secondary)] flex-shrink-0
                  transition-transform duration-300 ease-[cubic-bezier(0.19,1,0.22,1)] ${isResizingSidebar ? 'transition-none' : 'md:transition-[width]'} transform-gpu
                  absolute md:static top-0 left-0 z-50
                  overflow-hidden
@@ -525,6 +533,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
               </button>
               <button
                 onClick={() => onDisplayModeChange('time')}
+                title={t('historyReorderDisabledInTimeView')}
                 className={`flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${displayMode === 'time' ? 'bg-[var(--theme-bg-primary)] text-[var(--theme-text-primary)] shadow-sm' : 'text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)]'}`}
               >
                 {t('historyDisplayModeTime')}
@@ -566,7 +575,11 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
               }}
               onDragLeave={handleMainDragLeave}
               onDragEnd={handleSessionDragEnd}
-              className={`rounded-lg transition-colors min-h-[50px] cursor-auto ${dragOverId === 'all-conversations' ? 'bg-[var(--theme-bg-accent)] bg-opacity-10 ring-2 ring-[var(--theme-bg-accent)] ring-inset ring-opacity-50' : ''}`}
+              className={`rounded-lg transition-colors min-h-[50px] cursor-auto ${
+                dragOverId === 'all-conversations'
+                  ? 'bg-[color-mix(in_srgb,var(--theme-bg-accent)_12%,transparent)] ring-2 ring-[color-mix(in_srgb,var(--theme-bg-accent)_50%,transparent)] ring-inset'
+                  : ''
+              }`}
             >
               <DndContext
                 sensors={sensors}
@@ -623,19 +636,14 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
                 />
               )}
 
-              {categoryOrder.map((categoryName) => (
-                <SessionListGroup
-                  key={categoryName}
-                  title={categoryName}
-                  sessions={categories[categoryName]}
-                  sessionItemProps={sessionItemSharedProps}
-                  isDragging={isDragging}
-                />
-              ))}
+              <SessionListGroup
+                sessions={unpinnedUngroupedSessions}
+                sessionItemProps={sessionItemSharedProps}
+                isDragging={isDragging}
+              />
             </div>
           )}
         </div>
-
         <div className="p-3">
           <button
             onClick={onOpenSettingsModal}
