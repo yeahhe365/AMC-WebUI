@@ -22,11 +22,14 @@
 ### Task 1: 虚拟 MCP 注册表 `virtualMcpRegistry.ts`
 
 **Files:**
+
 - Create: `src/features/mcp/virtualMcpRegistry.ts`
 - Test: `src/features/mcp/virtualMcpRegistry.test.ts`
 
 **Interfaces:**
+
 - Produces:
+
   ```typescript
   export interface VirtualMcpServer {
     id: string;
@@ -49,6 +52,7 @@
 - [ ] **Step 1: 编写失败的测试**
 
 创建 `src/features/mcp/virtualMcpRegistry.test.ts`：
+
 ```typescript
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -119,10 +123,12 @@ describe('virtualMcpRegistry', () => {
 ### Task 2: 虚拟 MCP 服务在 `createMcpClientFunctions` 中的无缝调度
 
 **Files:**
+
 - Modify: `src/features/mcp/mcpClientFunctions.ts`
 - Test: `src/features/mcp/mcpClientFunctions.test.ts`
 
 **Interfaces:**
+
 - Consumes: `getVirtualMcpServers`, `findVirtualMcpServer` from `./virtualMcpRegistry`
 - Produces: 支持 `virtualServers` 参数，无网络开销直接调用本地方法，支持工具审批与事件追踪。
 
@@ -147,10 +153,12 @@ describe('virtualMcpRegistry', () => {
 ### Task 3: 实现服务商管理虚拟 MCP 服务 `providerVirtualMcpServer.ts`
 
 **Files:**
+
 - Create: `src/features/settings-assistant/providerVirtualMcpServer.ts`
 - Test: `src/features/settings-assistant/providerVirtualMcpServer.test.ts`
 
 **Interfaces:**
+
 - Produces:
   `createProviderVirtualMcpServer(deps: ProviderToolsDeps): VirtualMcpServer`
   支持工具：`list_templates`、`list_connections`、`create_connection`、`update_connection`、`test_connection`、`fetch_models`。
@@ -166,11 +174,13 @@ describe('virtualMcpRegistry', () => {
 ### Task 4: 助手通道解耦 Gemini 支持第三方模型 `assistantChannel.ts`
 
 **Files:**
+
 - Modify: `src/features/settings-assistant/assistantChannel.ts`
 - Modify: `src/features/settings-assistant/useSettingsAssistant.ts`
 - Test: `src/features/settings-assistant/assistantChannel.test.ts`
 
 **Interfaces:**
+
 - Produces:
   支持在 Gemini 不可用时，自动选取或支持已配置的第三方 OpenAI 兼容端点作为助手驱动模型，单轮适配 `tools` 与 `tool_calls`。
 
@@ -185,9 +195,9 @@ describe('virtualMcpRegistry', () => {
 ### Task 5: 集成验证与红队安全性回归
 
 - [ ] **Step 1: 执行红队测试**  
-  运行：`node scripts/run-vitest.mjs run src/features/settings-assistant/noSecretLeakFromAssistant.test.ts`  
-  断言：所有 API Key 依然绝对零泄露。
+      运行：`node scripts/run-vitest.mjs run src/features/settings-assistant/noSecretLeakFromAssistant.test.ts`  
+      断言：所有 API Key 依然绝对零泄露。
 - [ ] **Step 2: 运行全量设置助手与 MCP 测试**  
-  运行：`node scripts/run-vitest.mjs run src/features/settings-assistant src/features/mcp`
+      运行：`node scripts/run-vitest.mjs run src/features/settings-assistant src/features/mcp`
 - [ ] **Step 3: TypeScript 静态类型检查**  
-  运行：`pnpm typecheck`
+      运行：`pnpm typecheck`

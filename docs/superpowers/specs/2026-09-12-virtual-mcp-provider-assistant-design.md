@@ -9,10 +9,12 @@
 ## 1. 背景与目标
 
 原方案（`docs/superpowers/specs/2026-09-12-ai-provider-config-assistant-design.md`）通过在设置页内嵌专有工具环（`providerTools.ts` + `generateContentTurnApi`）实现了服务商配置助手。但存在两大核心瓶颈：
+
 1. **通道锁死 Gemini（先有鸡还是先有蛋）**：助手通道强制依赖 Gemini API Key 或 Docker 托管 Key；对于刚上手 AMC-WebUI、只有 DeepSeek/SiliconFlow/Ollama 等第三方密钥的新用户，助手直接置灰不可用。
 2. **架构冗余与机制割裂**：AMC-WebUI 本身已经具备成熟完整的 MCP 客户端架构（`src/features/mcp/`、`mcpApprovalStore`、`mcpToolRuntimeStore`、调用进度卡片与审批弹窗），而设置助手却独立造了一套临时的审批和状态系统。
 
 **本设计目标**：
+
 1. 在前端 MCP 客户端体系中引入**内置虚拟 MCP 服务（In-Process Virtual MCP Server）**抽象，纯内存执行，零后端网络依赖，完全兼容静态部署（Pages/CDN）与 Docker。
 2. 将服务商管理作为第一个内置虚拟 MCP 服务（`amc_provider_manager`），统一工具声明、审批门禁与执行追踪。
 3. 助手通道解耦 Gemini：支持使用任何已配置且具备工具调用能力的第三方模型（OpenAI-compatible、Anthropic 等）驱动助手。
@@ -43,14 +45,16 @@ export interface VirtualMcpServer {
 ```
 
 提供全局单例注册机制：
-* `registerVirtualMcpServer(server: VirtualMcpServer): () => void`（返回反注册清理函数）
-* `getVirtualMcpServers(): VirtualMcpServer[]`
-* `findVirtualMcpServer(id: string): VirtualMcpServer | undefined`
-* `clearVirtualMcpServers(): void`（主要供测试用）
+
+- `registerVirtualMcpServer(server: VirtualMcpServer): () => void`（返回反注册清理函数）
+- `getVirtualMcpServers(): VirtualMcpServer[]`
+- `findVirtualMcpServer(id: string): VirtualMcpServer | undefined`
+- `clearVirtualMcpServers(): void`（主要供测试用）
 
 ### 2.2 调度层无缝穿透（`src/features/mcp/mcpClientFunctions.ts`）
 
 扩展 `createMcpClientFunctions`：
+
 1. **工具发现合并**：
    - 不仅抓取远端配置中的 `servers`，同时拉取已注册的 `VirtualMcpServer` 列表；
    - 虚拟服务工具同样转换为标准 `FunctionDeclaration`，命名统一遵循既有规范：`mcp_{serverId}_{toolName}`。
@@ -63,8 +67,9 @@ export interface VirtualMcpServer {
 ### 2.3 服务商管理虚拟服务（`src/features/settings-assistant/providerVirtualMcpServer.ts`）
 
 将原 `providerTools.ts` 改造为标准的 `VirtualMcpServer` 实例：
-* **服务 ID**：`amc_provider_manager`
-* **工具清单**：
+
+- **服务 ID**：`amc_provider_manager`
+- **工具清单**：
   1. `list_templates`: 返回 25 个服务商模版。
   2. `list_connections`: 返回已配置的服务商列表（`hasApiKey: boolean` 脱敏）。
   3. `create_connection`: 模版新建连接，计算冲突；若缺 Key，返回 `{ status: 'awaiting-api-key', connectionId, name }`。
@@ -73,19 +78,21 @@ export interface VirtualMcpServer {
   6. `fetch_models`: 从端点真实同步远端模型列表。
 
 #### 密钥红线与挂起机制
-* 参数 Schema 严格禁止 `apiKey` 属性。
-* 依然走 UI 交互卡片拦截：当需要 Key 时，前端展示 `ApiKeyHandoffCard`，用户在 DOM 输入后直接落盘 IndexedDB，模型永远不会拿到密钥。
+
+- 参数 Schema 严格禁止 `apiKey` 属性。
+- 依然走 UI 交互卡片拦截：当需要 Key 时，前端展示 `ApiKeyHandoffCard`，用户在 DOM 输入后直接落盘 IndexedDB，模型永远不会拿到密钥。
 
 ### 2.4 助手通道多模型适配（`src/features/settings-assistant/assistantChannel.ts`）
 
 破除对单一 `generateContentTurnApi`（Gemini）的依赖：
-* 检查当前助手选择的模型：
+
+- 检查当前助手选择的模型：
   - 若为 Gemini 原生模型（或默认模式）：继续走 `generateContentTurnApi`。
   - 若为第三方连接模型（如用户选了已连接的 DeepSeek-Chat 或 Claude 3.5 Sonnet）：
     - 构造轻量单轮请求：将 `StandardClientFunctions` 的声明转为 OpenAI 兼容的 `tools: [{ type: 'function', function: ... }]`；
     - 发送请求，如果返回包含 `tool_calls`，将其映射为 `StandardToolTurnResult`；
     - 单轮无流式，代码量极小（约 50-80 行），立即解绑 Gemini。
-* 当没有配置 Gemini 且用户配置了任何可用的第三方连接时，助手不再置灰，而是自动默认使用首个可用的第三方模型！
+- 当没有配置 Gemini 且用户配置了任何可用的第三方连接时，助手不再置灰，而是自动默认使用首个可用的第三方模型！
 
 ---
 

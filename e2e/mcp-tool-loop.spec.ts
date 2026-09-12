@@ -32,7 +32,7 @@ test('executes a real MCP tool inside the Gemini tool loop', async ({ page }) =>
       return;
     }
 
-    const decl = body.match(/"name":"(mcp_[a-z0-9_]+)"/);
+    const decl = body.match(/"name":"(mcp_[a-z0-9_]*echo[a-z0-9_]*)"/) ?? body.match(/"name":"(mcp_[a-z0-9_]+)"/);
     const fnName = decl ? decl[1] : 'mcp_UNKNOWN';
     await route.fulfill({
       status: 200,
@@ -64,6 +64,16 @@ test('executes a real MCP tool inside the Gemini tool loop', async ({ page }) =>
         },
       ],
     },
+  });
+
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'all_model_chat_mcp_runtime_v2',
+      JSON.stringify({
+        state: { masterEnabled: true, selectedServerIds: null },
+        version: 0,
+      }),
+    );
   });
 
   await page.goto('/');

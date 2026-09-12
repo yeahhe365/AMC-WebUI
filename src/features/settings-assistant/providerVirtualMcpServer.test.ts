@@ -99,4 +99,3 @@ describe('providerVirtualMcpServer', () => {
     expect(result.structuredContent?.error).toContain('Connection not found');
   });
 });
-

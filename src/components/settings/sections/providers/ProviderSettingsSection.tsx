@@ -244,7 +244,10 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
       <div className="flex items-center justify-between px-4 py-1.5 bg-emerald-500/5 border-b border-emerald-500/15 text-[11px] flex-shrink-0">
         <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-300">
           <Sparkles size={12} className="shrink-0" />
-          <span>已集成 <strong>AMC Provider Manager</strong> 内置虚拟 MCP 服务，可在主聊天中直接通过自然语言配置与诊断服务商。</span>
+          <span>
+            已集成 <strong>AMC Provider Manager</strong> 内置虚拟 MCP
+            服务，可在主聊天中直接通过自然语言配置与诊断服务商。
+          </span>
         </div>
       </div>
       <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--theme-border-secondary)]/30 bg-[var(--theme-bg-secondary)]/40 text-xs flex-shrink-0">

@@ -153,11 +153,7 @@ export const VirtualMcpServerCard: React.FC<VirtualMcpServerCardProps> = ({
           >
             <RefreshCw size={14} strokeWidth={1.7} className={loadingTools ? 'animate-spin' : ''} />
           </button>
-          <Toggle
-            checked={isEnabled}
-            onChange={onToggleEnabled}
-            ariaLabel={`Toggle ${server.name}`}
-          />
+          <Toggle checked={isEnabled} onChange={onToggleEnabled} ariaLabel={`Toggle ${server.name}`} />
         </div>
       </div>
 

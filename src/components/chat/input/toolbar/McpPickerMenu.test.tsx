@@ -137,4 +137,3 @@ describe('McpPickerMenu', () => {
     expect(screen.queryByTestId('mcp-picker-all')).toBeNull();
   });
 });
-

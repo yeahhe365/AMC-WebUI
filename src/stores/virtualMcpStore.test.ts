@@ -42,17 +42,17 @@ describe('virtualMcpStore', () => {
   });
 
   it('evaluates turn activity based on runtime selection and master toggle', () => {
-    expect(
-      isVirtualServerActiveForTurn('test_server', { masterEnabled: false, selectedServerIds: null }, true),
-    ).toBe(false);
+    expect(isVirtualServerActiveForTurn('test_server', { masterEnabled: false, selectedServerIds: null }, true)).toBe(
+      false,
+    );
 
-    expect(
-      isVirtualServerActiveForTurn('test_server', { masterEnabled: true, selectedServerIds: null }, false),
-    ).toBe(false);
+    expect(isVirtualServerActiveForTurn('test_server', { masterEnabled: true, selectedServerIds: null }, false)).toBe(
+      false,
+    );
 
-    expect(
-      isVirtualServerActiveForTurn('test_server', { masterEnabled: true, selectedServerIds: null }, true),
-    ).toBe(true);
+    expect(isVirtualServerActiveForTurn('test_server', { masterEnabled: true, selectedServerIds: null }, true)).toBe(
+      true,
+    );
 
     expect(
       isVirtualServerActiveForTurn('test_server', { masterEnabled: true, selectedServerIds: ['other_server'] }, true),

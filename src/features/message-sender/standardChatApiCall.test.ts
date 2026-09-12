@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_APP_SETTINGS, DEFAULT_CHAT_SETTINGS } from '@/constants/settingsDefaults';
+import { useMcpRuntimeStore } from '@/stores/mcpRuntimeStore';
 import type { ContentPart } from '@/types';
 import { performStandardChatApiCall } from './standardChatApiCall';
 
@@ -121,6 +122,7 @@ describe('performStandardChatApiCall', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    useMcpRuntimeStore.setState({ masterEnabled: false, selectedServerIds: null });
     handlers = {
       streamOnError: vi.fn(),
       streamOnComplete: vi.fn(),
@@ -251,6 +253,7 @@ describe('performStandardChatApiCall', () => {
   });
 
   it('runs the tool loop, injects internal tool messages, and replays the final turn', async () => {
+    useMcpRuntimeStore.setState({ masterEnabled: true, selectedServerIds: null });
     mocks.createMcpClientFunctions.mockResolvedValue({
       mcpTool: { declaration: { name: 'mcpTool' }, handler: vi.fn() },
     });

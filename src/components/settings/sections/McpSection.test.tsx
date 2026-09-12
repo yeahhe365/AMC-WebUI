@@ -859,4 +859,3 @@ describe('McpSection', () => {
     }
   });
 });
-

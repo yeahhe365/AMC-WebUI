@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ThirdPartyConnection } from '@/types';
 import { createThirdPartyConnection } from '@/test/data/factories';
-import {
-  PROVIDER_VIRTUAL_MCP_TOOLS,
-  createProviderVirtualMcpServer,
-} from './providerVirtualMcpServer';
+import { PROVIDER_VIRTUAL_MCP_TOOLS, createProviderVirtualMcpServer } from './providerVirtualMcpServer';
 
 const STORED_KEY_CANARY = 'sk-LEAKCANARY-stored-0001';
 const HEADER_CANARY = 'header-LEAKCANARY-0002';

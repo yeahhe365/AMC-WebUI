@@ -64,6 +64,3 @@ export const loadLocalPythonSystemPrompt = async () => LOCAL_PYTHON_SYSTEM_PROMP
 export const loadBboxSystemPrompt = async () => (await import('./vision')).BBOX_SYSTEM_PROMPT;
 
 export const loadHdGuideSystemPrompt = async () => (await import('./vision')).HD_GUIDE_SYSTEM_PROMPT;
-
-export const loadSettingsAssistantSystemPrompt = async () =>
-  (await import('./settingsAssistant')).SETTINGS_ASSISTANT_SYSTEM_PROMPT;

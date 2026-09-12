@@ -123,7 +123,9 @@ export const McpPickerMenu: React.FC<{ disabled?: boolean }> = ({ disabled }) =>
                     <span className="font-medium text-[var(--theme-text-secondary)]">
                       {interpolate(t('mcpPickerAllServers'), { count: allAvailableServers.length })}
                     </span>
-                    {allActive && <Check size={16} className="text-[var(--theme-text-link)] shrink-0" strokeWidth={2} />}
+                    {allActive && (
+                      <Check size={16} className="text-[var(--theme-text-link)] shrink-0" strokeWidth={2} />
+                    )}
                   </button>
                 );
               })()}

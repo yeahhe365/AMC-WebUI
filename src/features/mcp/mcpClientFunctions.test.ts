@@ -668,5 +668,3 @@ describe('createMcpClientFunctions virtual servers', () => {
     expect(callResult).toEqual({ response: { content: [{ type: 'text', text: 'pong' }] } });
   });
 });
-
-

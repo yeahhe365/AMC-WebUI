@@ -33,7 +33,7 @@ interface SettingsAssistantState {
 
 let nextItemId = 1;
 
-export const createAssistantItemId = (): string => {
+const createAssistantItemId = (): string => {
   nextItemId += 1;
   return `assistant-item-${nextItemId}`;
 };

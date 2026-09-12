@@ -5,6 +5,7 @@ import { createStandardChatProps, type StandardChatPropsOverrides } from '@/test
 import { MediaResolution } from '@/types';
 import { createThirdPartyConnection } from '@/test/data/factories';
 import { createMessage } from '@/utils/chat/session';
+import { useMcpRuntimeStore } from '@/stores/mcpRuntimeStore';
 import type { PreparedModelRequest } from './useModelRequestRunner';
 
 const {
@@ -180,6 +181,7 @@ describe('standardChatStrategy', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    useMcpRuntimeStore.setState({ masterEnabled: false, selectedServerIds: null });
 
     mockGetKeyForRequest.mockReturnValue({ key: 'api-key', isNewKey: false });
     mockBuildContentParts.mockResolvedValue({
@@ -979,6 +981,8 @@ describe('standardChatStrategy', () => {
       tools: [{ functionDeclarations: declarations }],
     }));
 
+    useMcpRuntimeStore.setState({ masterEnabled: true, selectedServerIds: null });
+
     const { result, unmount } = renderStandardChat({
       appSettings: {
         mcpServers: [mcpServer],
@@ -998,6 +1002,7 @@ describe('standardChatStrategy', () => {
 
     expect(mockCreateMcpClientFunctions).toHaveBeenCalledWith({
       servers: [mcpServer],
+      virtualServers: expect.any(Array),
       abortSignal: expect.any(AbortSignal),
       requestApproval: expect.any(Function),
       resolveLatestServers: expect.any(Function),

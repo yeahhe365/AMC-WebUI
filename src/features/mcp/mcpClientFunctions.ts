@@ -441,71 +441,70 @@ export const createMcpClientFunctions = async ({
           continue;
         }
 
-
-      for (const tool of serverTools.tools) {
-        const functionName = toMcpFunctionName(serverTools.serverId, tool.name);
-        functions[functionName] = {
-          declaration: {
-            name: functionName,
-            description: buildDescription(serverTools.serverName, tool),
-            parameters: toGeminiSchema(tool.inputSchema),
-          },
-          handler: async (args, options) => {
-            // Execution-time disable re-check: discovery results are cached
-            // for 30s, so honor what the user toggled after this turn began.
-            const latestServers = resolveLatestServers?.();
-            const latestServer = latestServers?.find((entry) => entry.id === server.id);
-            if (latestServer && (!latestServer.enabled || (latestServer.disabledTools ?? []).includes(tool.name))) {
-              throw new Error(`Tool ${tool.name} on ${serverTools.serverName} was disabled by the user.`);
-            }
-            if (requestApproval && requiresApproval(server, tool.name)) {
-              const approvalKey = sessionApprovalKey(server.id, tool.name);
-              if (!isSessionApproved(approvalKey)) {
-                const decision = await requestApproval({
-                  serverId: server.id,
-                  serverName: serverTools.serverName,
-                  toolName: tool.name,
-                  args: isRecord(args) ? args : {},
-                });
-                if (decision === 'deny') {
-                  throw new Error(`User denied tool execution: ${tool.name}`);
-                }
-                if (decision === 'allow-session') {
-                  rememberSessionApproval(approvalKey);
+        for (const tool of serverTools.tools) {
+          const functionName = toMcpFunctionName(serverTools.serverId, tool.name);
+          functions[functionName] = {
+            declaration: {
+              name: functionName,
+              description: buildDescription(serverTools.serverName, tool),
+              parameters: toGeminiSchema(tool.inputSchema),
+            },
+            handler: async (args, options) => {
+              // Execution-time disable re-check: discovery results are cached
+              // for 30s, so honor what the user toggled after this turn began.
+              const latestServers = resolveLatestServers?.();
+              const latestServer = latestServers?.find((entry) => entry.id === server.id);
+              if (latestServer && (!latestServer.enabled || (latestServer.disabledTools ?? []).includes(tool.name))) {
+                throw new Error(`Tool ${tool.name} on ${serverTools.serverName} was disabled by the user.`);
+              }
+              if (requestApproval && requiresApproval(server, tool.name)) {
+                const approvalKey = sessionApprovalKey(server.id, tool.name);
+                if (!isSessionApproved(approvalKey)) {
+                  const decision = await requestApproval({
+                    serverId: server.id,
+                    serverName: serverTools.serverName,
+                    toolName: tool.name,
+                    args: isRecord(args) ? args : {},
+                  });
+                  if (decision === 'deny') {
+                    throw new Error(`User denied tool execution: ${tool.name}`);
+                  }
+                  if (decision === 'allow-session') {
+                    rememberSessionApproval(approvalKey);
+                  }
                 }
               }
-            }
-            // Surface the call live: the card rendered from the FunctionCall
-            // part holds this exact args object, so the run attaches to it.
-            const callArgs = isRecord(args) ? args : {};
-            const runId = beginMcpToolRun(callArgs);
-            try {
-              const rawResult = await callTool(
-                server,
-                tool.name,
-                callArgs,
-                options?.abortSignal ?? abortSignal,
-                (event) => appendMcpToolProgress(runId, event),
-              );
-              // MCP signals execution failure with isError:true on a successful
-              const callError = extractMcpCallError(rawResult);
-              if (callError) {
-                finishMcpToolRun(runId, 'error');
-                throw new Error(callError);
+              // Surface the call live: the card rendered from the FunctionCall
+              // part holds this exact args object, so the run attaches to it.
+              const callArgs = isRecord(args) ? args : {};
+              const runId = beginMcpToolRun(callArgs);
+              try {
+                const rawResult = await callTool(
+                  server,
+                  tool.name,
+                  callArgs,
+                  options?.abortSignal ?? abortSignal,
+                  (event) => appendMcpToolProgress(runId, event),
+                );
+                // MCP signals execution failure with isError:true on a successful
+                const callError = extractMcpCallError(rawResult);
+                if (callError) {
+                  finishMcpToolRun(runId, 'error');
+                  throw new Error(callError);
+                }
+                finishMcpToolRun(runId, 'success');
+                return {
+                  response: summarizeMcpResultForModel(rawResult),
+                };
+              } catch (error) {
+                finishMcpToolRun(runId, options?.abortSignal?.aborted ? 'cancelled' : 'error');
+                throw error;
               }
-              finishMcpToolRun(runId, 'success');
-              return {
-                response: summarizeMcpResultForModel(rawResult),
-              };
-            } catch (error) {
-              finishMcpToolRun(runId, options?.abortSignal?.aborted ? 'cancelled' : 'error');
-              throw error;
-            }
-          },
-        };
+            },
+          };
+        }
       }
     }
-  }
 
     const totalToolCount = Object.keys(functions).length;
     const totalServerCount = enabledServers.length + virtualServers.length;

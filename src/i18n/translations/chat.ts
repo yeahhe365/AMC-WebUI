@@ -180,4 +180,3 @@ export const chatTranslations = {
     de: 'Integriert',
   },
 };
-

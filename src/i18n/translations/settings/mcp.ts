@@ -778,8 +778,8 @@ const mcpSettings = {
   },
   settingsMcpVirtualSectionTitle: {
     en: 'Built-in Virtual MCP Servers (In-Process)',
-    zh: '系统内置虚拟 MCP 服务 (In-Process)',
-    ja: '組み込み仮想MCPサーバー (In-Process)',
+    zh: '系统内置虚拟 MCP 服务（In-Process）',
+    ja: '組み込み仮想MCPサーバー（In-Process）',
     es: 'Servidores virtuales MCP integrados (En proceso)',
     ko: '내장 가상 MCP 서버 (In-Process)',
     fr: 'Serveurs MCP virtuels intégrés (En cours)',
@@ -787,8 +787,8 @@ const mcpSettings = {
   },
   settingsMcpExternalSectionTitle: {
     en: 'External MCP Servers (HTTP / SSE / Stdio)',
-    zh: '外部 MCP 服务器 (HTTP / SSE / Stdio)',
-    ja: '外部MCPサーバー (HTTP / SSE / Stdio)',
+    zh: '外部 MCP 服务器（HTTP / SSE / Stdio）',
+    ja: '外部MCPサーバー（HTTP / SSE / Stdio）',
     es: 'Servidores MCP externos (HTTP / SSE / Stdio)',
     ko: '외부 MCP 서버 (HTTP / SSE / Stdio)',
     fr: 'Serveurs MCP externes (HTTP / SSE / Stdio)',
