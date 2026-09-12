@@ -49,7 +49,9 @@ describe('AssistantMessageList', () => {
   });
 
   it('submits the typed key to the pending key request', async () => {
-    const pending = useSettingsAssistantStore.getState().requestApiKey({ connectionId: 'c1', connectionName: 'DeepSeek' });
+    const pending = useSettingsAssistantStore
+      .getState()
+      .requestApiKey({ connectionId: 'c1', connectionName: 'DeepSeek' });
 
     act(() => {
       renderer.root.render(
