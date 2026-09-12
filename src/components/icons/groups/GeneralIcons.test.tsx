@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render } from '@/test/render/renderer';
-import { IconBranch, IconNewGroup, IconSidebarToggle } from './GeneralIcons';
+import { IconBranch, IconClosedCaption, IconNewGroup, IconSidebarToggle } from './GeneralIcons';
 
 describe('GeneralIcons', () => {
   it('renders the sidebar toggle as two horizontal lines', () => {
@@ -41,5 +41,19 @@ describe('GeneralIcons', () => {
     expect(paths[0]?.getAttribute('fill')).toBe('currentColor');
     expect(paths[0]?.getAttribute('fill-rule')).toBe('evenodd');
     expect(paths[0]?.getAttribute('d')).toMatch(/^M13\.0762 1\.37207/);
+  });
+
+  it('renders the closed caption box badge with rounded rect and double C glyphs', () => {
+    const { container } = render(<IconClosedCaption size={20} strokeWidth={2} />);
+
+    const svg = container.querySelector('svg');
+    const rect = container.querySelector('rect');
+    const paths = Array.from(container.querySelectorAll('path'));
+
+    expect(svg?.getAttribute('viewBox')).toBe('0 0 24 24');
+    expect(rect?.getAttribute('width')).toBe('20');
+    expect(rect?.getAttribute('height')).toBe('16');
+    expect(rect?.getAttribute('rx')).toBe('4');
+    expect(paths).toHaveLength(2);
   });
 });

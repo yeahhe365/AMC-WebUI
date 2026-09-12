@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, X, Plus, Trash2 } from 'lucide-react';
+import { X, Plus, Trash2 } from 'lucide-react';
 import type { ThirdPartyApiProtocol, ThirdPartyConnection } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
 import { SETTINGS_INPUT_CLASS } from '@/constants/formClasses';
@@ -12,6 +12,7 @@ import {
 import { Select } from '@/components/shared/Select';
 import { Toggle } from '@/components/shared/Toggle';
 import { isForwardedThirdPartyExtraHeader } from '../../../../../shared/thirdPartyExtraHeaders';
+import { ProviderAvatar } from './ProviderAvatar';
 
 interface ProviderEditDialogProps {
   isOpen: boolean;
@@ -89,7 +90,7 @@ export const ProviderEditDialog: React.FC<ProviderEditDialogProps> = ({
       >
         <div className="flex items-center justify-between border-b border-[var(--theme-border-secondary)]/40 pb-3 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <Settings size={18} className="text-[var(--theme-text-secondary)]" />
+            <ProviderAvatar name={connection.name} templateId={connection.templateId} size={22} />
             <h3 className="text-base font-semibold text-[var(--theme-text-primary)]">{t('settingsEditProvider')}</h3>
           </div>
           <button

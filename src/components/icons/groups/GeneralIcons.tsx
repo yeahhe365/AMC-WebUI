@@ -1,6 +1,12 @@
 import React from 'react';
 import { Folders, History as HistoryIcon, ScrollText, Square } from 'lucide-react';
-import { type IconProps, defaultSize, defaultStroke, defaultColor } from '@/components/icons/iconPrimitives';
+import {
+  type IconProps,
+  defaultSize,
+  defaultStroke,
+  defaultColor,
+  StrokeIcon,
+} from '@/components/icons/iconPrimitives';
 
 /**
  * Cherry Studio 原版新建聊天图标 - 1:1 复刻
@@ -155,3 +161,22 @@ export const IconBranch: React.FC<IconProps> = ({ size = defaultSize, className,
     />
   </svg>
 );
+
+/**
+ * Closed Caption Box 图标 - 经典 CC 字母徽章
+ * 用于视频字幕、CC 字幕控制与提示按钮
+ */
+export const IconClosedCaption: React.FC<IconProps> = ({
+  size = defaultSize,
+  strokeWidth = defaultStroke,
+  className,
+  color = defaultColor,
+}) => (
+  <StrokeIcon size={size} strokeWidth={strokeWidth} className={className} color={color}>
+    <rect width="20" height="16" x="2" y="4" rx="4" />
+    <path d="M10 9.5a2 2 0 0 0-2-2 2 2 0 0 0-2 2v5a2 2 0 0 0 2 2 2 2 0 0 0 2-2" />
+    <path d="M18 9.5a2 2 0 0 0-2-2 2 2 0 0 0-2 2v5a2 2 0 0 0 2 2 2 2 0 0 0 2-2" />
+  </StrokeIcon>
+);
+
+export const IconClosedCaptionBox = IconClosedCaption;

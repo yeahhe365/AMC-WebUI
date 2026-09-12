@@ -18,6 +18,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { GEMINI_PROVIDER_ID, type ThirdPartyConnection } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
+import { useProviderUiStore } from '@/stores/providerUiStore';
 import { ProviderAvatar } from './ProviderAvatar';
 
 interface ProviderListProps {
@@ -193,8 +194,10 @@ export const ProviderList: React.FC<ProviderListProps> = ({
   geminiStatus,
 }) => {
   const { t } = useI18n();
-  const [search, setSearch] = useState('');
-  const [filterMode, setFilterMode] = useState<'all' | 'enabled' | 'disabled'>('all');
+  const search = useProviderUiStore((s) => s.listSearchQuery);
+  const setSearch = useProviderUiStore((s) => s.setListSearchQuery);
+  const filterMode = useProviderUiStore((s) => s.listFilterMode);
+  const setFilterMode = useProviderUiStore((s) => s.setListFilterMode);
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
 
   const sensors = useSensors(

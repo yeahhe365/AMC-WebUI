@@ -4,11 +4,13 @@ import type { ModelOption } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
 import { formatContextWindow } from '@/utils/model/knownModelsCatalog';
 import { reconcileModels, applyModelReconcile } from '@/utils/model/modelReconcile';
+import { ProviderAvatar } from './ProviderAvatar';
 
 export interface ModelSyncModalProps {
   isOpen: boolean;
   onClose: () => void;
   connectionName: string;
+  templateId?: string;
   remoteModels: ModelOption[];
   existingModels: ModelOption[];
   onApply: (reconciledModels: ModelOption[]) => void;
@@ -20,6 +22,7 @@ export const ModelSyncModal: React.FC<ModelSyncModalProps> = ({
   isOpen,
   onClose,
   connectionName,
+  templateId,
   remoteModels,
   existingModels,
   onApply,
@@ -344,6 +347,15 @@ export const ModelSyncModal: React.FC<ModelSyncModalProps> = ({
                         </div>
                       )}
                     </div>
+
+                    <ProviderAvatar
+                      modelId={model.id}
+                      modelName={model.name}
+                      templateId={templateId}
+                      name={model.name || model.id}
+                      size={24}
+                      className="text-[11px]"
+                    />
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">

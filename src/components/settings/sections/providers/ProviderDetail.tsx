@@ -52,6 +52,10 @@ import { ProviderEndpointPreview } from './ProviderEndpointPreview';
 import { ModelParameterModal } from './ModelParameterModal';
 import { ProviderEditDialog } from './ProviderEditDialog';
 import { ModelSyncModal } from './ModelSyncModal';
+import { useProviderUiStore } from '@/stores/providerUiStore';
+
+const EMPTY_GROUPS_COLLAPSED: Record<string, boolean> = {};
+const EMPTY_PROBE_RESULTS: Record<string, ConnectionHealthProbeResult> = {};
 
 interface ProviderDetailProps {
   connection: ThirdPartyConnection;
@@ -76,8 +80,10 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
   const [showApiKey, setShowApiKey] = useState(false);
 
   // Health testing
-  const [healthStatus, setHealthStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
-  const [healthResult, setHealthResult] = useState<ConnectionHealthProbeResult | null>(null);
+  const [isTestingHealth, setIsTestingHealth] = useState(false);
+  const healthResult = useProviderUiStore((s) => s.healthResultByConnection[connection.id] ?? null);
+  const setConnectionHealthResult = useProviderUiStore((s) => s.setConnectionHealthResult);
+  const healthStatus = isTestingHealth ? 'testing' : (healthResult?.status ?? 'idle');
 
   // Sync models
   const [isSyncingModels, setIsSyncingModels] = useState(false);
@@ -85,12 +91,20 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
   const [syncRemoteModels, setSyncRemoteModels] = useState<ModelOption[]>([]);
 
   // Models filtering and search
-  const [modelSearch, setModelSearch] = useState('');
-  const [isModelSearchOpen, setIsModelSearchOpen] = useState(false);
-  const [groupsCollapsed, setGroupsCollapsed] = useState<Record<string, boolean>>({});
+  const modelSearch = useProviderUiStore((s) => s.modelSearchByConnection[connection.id] ?? '');
+  const setModelSearch = (search: string) => useProviderUiStore.getState().setModelSearch(connection.id, search);
+  const isModelSearchOpenStored = useProviderUiStore((s) => s.isModelSearchOpenByConnection[connection.id] ?? false);
+  const setIsModelSearchOpen = (isOpen: boolean) =>
+    useProviderUiStore.getState().setIsModelSearchOpen(connection.id, isOpen);
+  const isModelSearchOpen = isModelSearchOpenStored || Boolean(modelSearch);
+
+  const groupsCollapsed = useProviderUiStore(
+    (s) => s.groupsCollapsedByConnection[connection.id] ?? EMPTY_GROUPS_COLLAPSED,
+  );
 
   // Batch model selection
-  const [isBatchMode, setIsBatchMode] = useState(false);
+  const isBatchMode = useProviderUiStore((s) => s.isBatchModeByConnection[connection.id] ?? false);
+  const setIsBatchMode = (isBatch: boolean) => useProviderUiStore.getState().setIsBatchMode(connection.id, isBatch);
   const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(new Set());
 
   // Add custom model inline
@@ -99,7 +113,9 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
   const [newModelName, setNewModelName] = useState('');
 
   // Model health check states
-  const [modelProbeResults, setModelProbeResults] = useState<Record<string, ConnectionHealthProbeResult>>({});
+  const modelProbeResults = useProviderUiStore(
+    (s) => s.modelProbeResultsByConnection[connection.id] ?? EMPTY_PROBE_RESULTS,
+  );
   const [isCheckingBatch, setIsCheckingBatch] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ completed: number; total: number } | null>(null);
   const [batchSummary, setBatchSummary] = useState<BatchHealthCheckSummary | null>(null);
@@ -126,10 +142,9 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
         signal: controller.signal,
         onProgress: (progress) => {
           setBatchProgress({ completed: progress.completed, total: progress.total });
-          setModelProbeResults((prev) => ({
-            ...prev,
-            [progress.currentModelId]: progress.latestResult,
-          }));
+          useProviderUiStore
+            .getState()
+            .setModelProbeResult(connection.id, progress.currentModelId, progress.latestResult);
         },
       });
 
@@ -174,7 +189,7 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
 
     try {
       const res = await probeSingleModel(connection, modelId);
-      setModelProbeResults((prev) => ({ ...prev, [modelId]: res }));
+      useProviderUiStore.getState().setModelProbeResult(connection.id, modelId, res);
       if (res.status === 'success') {
         toastSuccess(t('thirdPartyToastSingleProbeSuccess', { modelId, latency: formatLatency(res.latencyMs) }));
       } else {
@@ -209,13 +224,12 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
 
   // Handle test API key connection
   const handleTestConnection = async () => {
-    setHealthStatus('testing');
+    setIsTestingHealth(true);
     try {
       const result = await probeThirdPartyConnection(connection, {
         modelId: connection.modelId || connection.models[0]?.id,
       });
-      setHealthResult(result);
-      setHealthStatus(result.status);
+      setConnectionHealthResult(connection.id, result);
       if (result.status === 'success') {
         toastSuccess(`${connection.name}: ${t('apiConfigTestSuccess')} (${formatLatency(result.latencyMs)})`);
       } else {
@@ -224,8 +238,18 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
         );
       }
     } catch (testError) {
-      setHealthStatus('error');
+      setConnectionHealthResult(connection.id, {
+        connectionId: connection.id,
+        status: 'error',
+        latencyMs: 0,
+        modelId: connection.modelId || connection.models[0]?.id || '',
+        timestamp: Date.now(),
+        grade: 'error',
+        errorMessage: getErrorMessage(testError),
+      });
       toastError(getErrorMessage(testError));
+    } finally {
+      setIsTestingHealth(false);
     }
   };
 
@@ -366,7 +390,7 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
   }, [connection.name, filteredModels]);
 
   const toggleGroupCollapse = (key: string) => {
-    setGroupsCollapsed((prev: Record<string, boolean>) => ({ ...prev, [key]: !prev[key] }));
+    useProviderUiStore.getState().toggleGroupCollapse(connection.id, key);
   };
 
   const toggleAllGroups = () => {
@@ -376,7 +400,7 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
     allKeys.forEach((k) => {
       next[k] = anyExpanded;
     });
-    setGroupsCollapsed(next);
+    useProviderUiStore.getState().setAllGroupsCollapsed(connection.id, next);
   };
 
   // Batch selection derived states
@@ -479,10 +503,9 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
         signal: controller.signal,
         onProgress: (progress) => {
           setBatchProgress({ completed: progress.completed, total: progress.total });
-          setModelProbeResults((prev) => ({
-            ...prev,
-            [progress.currentModelId]: progress.latestResult,
-          }));
+          useProviderUiStore
+            .getState()
+            .setModelProbeResult(connection.id, progress.currentModelId, progress.latestResult);
         },
       });
 
@@ -1030,7 +1053,14 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
                                     />
                                   )}
                                 </button>
-                                <ProviderAvatar name={model.name || model.id} size={24} className="text-[11px]" />
+                                <ProviderAvatar
+                                  name={model.name || model.id}
+                                  modelId={model.id}
+                                  modelName={model.name}
+                                  templateId={connection.templateId}
+                                  size={24}
+                                  className="text-[11px]"
+                                />
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span
@@ -1227,6 +1257,7 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
         isOpen={isSyncModalOpen}
         onClose={() => setIsSyncModalOpen(false)}
         connectionName={connection.name}
+        templateId={connection.templateId}
         remoteModels={syncRemoteModels}
         existingModels={connection.models}
         onApply={handleApplySyncModels}

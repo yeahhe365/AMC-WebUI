@@ -1,20 +1,32 @@
 import React, { useState } from 'react';
-import { getThirdPartyTemplateLogo } from '@/components/shared/ModelIcon';
+import { resolveIconRef } from '@/components/shared/modelIconRegistry';
 import type { ThirdPartyTemplateId } from '@/types';
 import { generateColorFromChar, getFirstCharacter } from '@/utils/thirdPartyApiProviders';
 
 interface ProviderAvatarProps {
   name: string;
   templateId?: ThirdPartyTemplateId | string;
+  modelId?: string;
+  modelName?: string;
   size?: number;
   className?: string;
 }
 
-export const ProviderAvatar: React.FC<ProviderAvatarProps> = ({ name, templateId, size = 28, className = '' }) => {
+export const ProviderAvatar: React.FC<ProviderAvatarProps> = ({
+  name,
+  templateId,
+  modelId,
+  modelName,
+  size = 28,
+  className = '',
+}) => {
   const [imageError, setImageError] = useState(false);
-  const logoUrl = templateId ? getThirdPartyTemplateLogo(templateId as ThirdPartyTemplateId) : null;
-  const isCustomOrGeneric =
-    !templateId || templateId === 'custom-openai' || templateId === 'custom-anthropic' || templateId === 'custom';
+  const {
+    key: logoKey,
+    url: logoUrl,
+    darkUrl,
+  } = resolveIconRef(modelId, undefined, templateId, modelName || (modelId ? name : undefined));
+  const isCustomOrGeneric = logoKey === 'custom';
 
   if (logoUrl && !isCustomOrGeneric && !imageError) {
     return (
@@ -22,16 +34,41 @@ export const ProviderAvatar: React.FC<ProviderAvatarProps> = ({ name, templateId
         className={`flex-shrink-0 flex items-center justify-center rounded-full overflow-hidden bg-[var(--theme-bg-tertiary)]/50 ${className}`}
         style={{ width: size, height: size }}
       >
-        <img
-          src={logoUrl}
-          alt={name}
-          width={size * 0.75}
-          height={size * 0.75}
-          draggable={false}
-          onError={() => setImageError(true)}
-          className="object-contain"
-          style={{ width: size * 0.75, height: size * 0.75 }}
-        />
+        {darkUrl ? (
+          <>
+            <img
+              src={logoUrl}
+              alt={name}
+              width={size * 0.75}
+              height={size * 0.75}
+              draggable={false}
+              onError={() => setImageError(true)}
+              className="object-contain dark:hidden"
+              style={{ width: size * 0.75, height: size * 0.75 }}
+            />
+            <img
+              src={darkUrl}
+              alt={name}
+              width={size * 0.75}
+              height={size * 0.75}
+              draggable={false}
+              onError={() => setImageError(true)}
+              className="object-contain hidden dark:block"
+              style={{ width: size * 0.75, height: size * 0.75 }}
+            />
+          </>
+        ) : (
+          <img
+            src={logoUrl}
+            alt={name}
+            width={size * 0.75}
+            height={size * 0.75}
+            draggable={false}
+            onError={() => setImageError(true)}
+            className="object-contain"
+            style={{ width: size * 0.75, height: size * 0.75 }}
+          />
+        )}
       </div>
     );
   }

@@ -7,6 +7,7 @@ import * as modelHealthCheck from '@/utils/model/modelHealthCheck';
 import * as anthropicApi from '@/services/api/anthropicApi';
 import * as openaiCompatibleApi from '@/services/api/openaiCompatibleApi';
 import * as openaiResponsesApi from '@/services/api/openaiResponsesApi';
+import { useProviderUiStore } from '@/stores/providerUiStore';
 import { ProviderDetail } from './ProviderDetail';
 
 describe('ProviderDetail', () => {
@@ -427,6 +428,54 @@ describe('ProviderDetail', () => {
 
       expect(responsesFetch).toHaveBeenCalledTimes(1);
       expect(compatibleFetch).not.toHaveBeenCalled();
+    });
+
+    it('persists and restores groupsCollapsed state in providerUiStore', () => {
+      // Pre-collapse group "deepseek" in providerUiStore
+      useProviderUiStore.getState().setGroupCollapsed('conn-deepseek', 'deepseek', true);
+
+      act(() => {
+        renderer.root.render(
+          <ProviderDetail connection={baseConnection} onUpdateConnection={vi.fn()} onDeleteConnection={vi.fn()} />,
+        );
+      });
+
+      // Since deepseek group is collapsed, the models inside (DeepSeek V3, DeepSeek R1) should not be rendered
+      expect(renderer.container.textContent).toContain('deepseek');
+      expect(renderer.container.textContent).not.toContain('DeepSeek V3');
+
+      // Click group toggle button to expand
+      const groupBtn = Array.from(renderer.container.querySelectorAll('button')).find((b) =>
+        b.textContent?.includes('deepseek'),
+      );
+      expect(groupBtn).toBeDefined();
+
+      act(() => {
+        groupBtn?.click();
+      });
+
+      expect(useProviderUiStore.getState().groupsCollapsedByConnection['conn-deepseek']?.['deepseek']).toBe(false);
+      expect(renderer.container.textContent).toContain('DeepSeek V3');
+    });
+
+    it('restores persisted model probe results on render', () => {
+      // Pre-populate probe results in store
+      useProviderUiStore.getState().setModelProbeResult('conn-deepseek', 'deepseek-chat', {
+        connectionId: 'conn-deepseek',
+        status: 'success',
+        latencyMs: 142,
+        modelId: 'deepseek-chat',
+        timestamp: Date.now(),
+        grade: 'fast',
+      });
+
+      act(() => {
+        renderer.root.render(
+          <ProviderDetail connection={baseConnection} onUpdateConnection={vi.fn()} onDeleteConnection={vi.fn()} />,
+        );
+      });
+
+      expect(renderer.container.textContent).toContain('142ms');
     });
   });
 });

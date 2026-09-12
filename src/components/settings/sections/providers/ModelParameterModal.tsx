@@ -7,6 +7,7 @@ import {
   SETTINGS_PRIMARY_ACTION_BUTTON_CLASS,
   SETTINGS_SECONDARY_ACTION_BUTTON_CLASS,
 } from '@/constants/buttonClasses';
+import { ProviderAvatar } from './ProviderAvatar';
 
 interface ModelParameterModalProps {
   isOpen: boolean;
@@ -76,9 +77,18 @@ export const ModelParameterModal: React.FC<ModelParameterModalProps> = ({ isOpen
           </button>
         </div>
 
-        <div className="text-xs text-[var(--theme-text-secondary)] bg-[var(--theme-bg-secondary)]/60 px-3 py-2 rounded-lg border border-[var(--theme-border-secondary)]/30">
-          <span className="font-semibold text-[var(--theme-text-primary)]">{model.name}</span>
-          <span className="ml-1.5 font-mono opacity-80">({model.id})</span>
+        <div className="text-xs text-[var(--theme-text-secondary)] bg-[var(--theme-bg-secondary)]/60 px-3 py-2 rounded-lg border border-[var(--theme-border-secondary)]/30 flex items-center gap-2.5">
+          <ProviderAvatar
+            modelId={model.id}
+            modelName={model.name}
+            name={model.name || model.id}
+            size={22}
+            className="text-[10px]"
+          />
+          <div className="min-w-0 flex-1">
+            <span className="font-semibold text-[var(--theme-text-primary)]">{model.name}</span>
+            <span className="ml-1.5 font-mono opacity-80 truncate">({model.id})</span>
+          </div>
         </div>
 
         <div className="space-y-4">

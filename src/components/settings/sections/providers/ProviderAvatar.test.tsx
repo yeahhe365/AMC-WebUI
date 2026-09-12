@@ -27,4 +27,33 @@ describe('ProviderAvatar', () => {
       expect(img.getAttribute('alt')).toBe('DeepSeek');
     }
   });
+
+  it('renders model logo when modelId matches a known model under custom provider', () => {
+    render(
+      <ProviderAvatar
+        name="DeepSeek-V4-Flash-0731"
+        modelId="deepseek-v4-flash-0731"
+        templateId="custom-openai"
+        size={24}
+      />,
+    );
+    const img = screen.queryByRole('img');
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute('alt')).toBe('DeepSeek-V4-Flash-0731');
+  });
+
+  it('renders model logo when modelName matches a known model under custom provider', () => {
+    render(
+      <ProviderAvatar
+        name="Qwen3.8-Flash (Alias)"
+        modelId="custom-id"
+        modelName="Qwen3.8-Flash (Alias)"
+        templateId="custom-openai"
+        size={24}
+      />,
+    );
+    const img = screen.queryByRole('img');
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute('alt')).toBe('Qwen3.8-Flash (Alias)');
+  });
 });
