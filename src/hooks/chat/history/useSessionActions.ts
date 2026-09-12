@@ -4,6 +4,7 @@ import { logService } from '@/services/logService';
 import { cloneMessagesWithFreshIds, createNewSession } from '@/utils/chat/session';
 import { cleanupFilePreviewUrls } from '@/utils/file/filePreviewUrls';
 import { dbService } from '@/services/db/dbService';
+import { placeSessionAfter } from '@/stores/sessionOrder';
 import { removeSessionScopedLocalStorageEntries } from '@/utils/sessionLocalStorage';
 import { useI18n } from '@/contexts/I18nContext';
 import { interpolate } from '@/i18n/interpolate';
@@ -90,7 +91,7 @@ export const useSessionActions = ({ updateAndPersistSessions, activeJobs }: UseS
           null,
           'manual',
         );
-        return [newSession, ...prev];
+        return placeSessionAfter(prev, newSession, sessionId);
       });
     },
     [updateAndPersistSessions, t],

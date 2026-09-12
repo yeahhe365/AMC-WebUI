@@ -81,9 +81,12 @@ describe('useSessionActions', () => {
     });
 
     expect(sessions).toHaveLength(2);
-    expect(sessions[0].id).not.toBe('session-1');
-    expect(sessions[0].messages[0].id).not.toBe(sessions[1].messages[0].id);
-    expect(sessions[0].messages[0].files?.[0].id).not.toBe(sessions[1].messages[0].files?.[0].id);
+    // 新契约：副本紧随源会话，而不是插到列表最前。
+    expect(sessions[0].id).toBe('session-1');
+    const duplicated = sessions[1];
+    expect(duplicated.id).not.toBe('session-1');
+    expect(duplicated.messages[0].id).not.toBe(sessions[0].messages[0].id);
+    expect(duplicated.messages[0].files?.[0].id).not.toBe(sessions[0].messages[0].files?.[0].id);
 
     unmount();
   });
@@ -125,8 +128,8 @@ describe('useSessionActions', () => {
       await result.current.handleDuplicateSession('session-1');
     });
 
-    const duplicatedToolMessage = sessions[0].messages.find((message) => message.isInternalToolMessage);
-    const duplicatedModelMessage = sessions[0].messages.find((message) => message.content === 'The answer is 42.');
+    const duplicatedToolMessage = sessions[1].messages.find((message) => message.isInternalToolMessage);
+    const duplicatedModelMessage = sessions[1].messages.find((message) => message.content === 'The answer is 42.');
     expect(duplicatedToolMessage?.toolParentMessageId).toBe(duplicatedModelMessage?.id);
     expect(duplicatedToolMessage?.toolParentMessageId).not.toBe('model-1');
 
@@ -158,9 +161,9 @@ describe('useSessionActions', () => {
     });
 
     expect(sessions).toHaveLength(2);
-    expect(sessions[0].title).toBe('Persisted (Copy)');
-    expect(sessions[0].messages).toHaveLength(1);
-    expect(sessions[0].messages[0].content).toBe('hello');
+    expect(sessions[1].title).toBe('Persisted (Copy)');
+    expect(sessions[1].messages).toHaveLength(1);
+    expect(sessions[1].messages[0].content).toBe('hello');
 
     unmount();
   });
@@ -184,7 +187,7 @@ describe('useSessionActions', () => {
       await result.current.handleDuplicateSession('session-1');
     });
 
-    expect(sessions[0].title).toBe('新聊天（副本）');
+    expect(sessions[1].title).toBe('新聊天（副本）');
     unmount();
   });
 });

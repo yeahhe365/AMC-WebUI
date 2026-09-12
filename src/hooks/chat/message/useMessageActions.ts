@@ -5,6 +5,7 @@ import { CHAT_INPUT_TEXTAREA_SELECTOR } from '@/constants/layout';
 import { cleanupFilePreviewUrls } from '@/utils/file/filePreviewUrls';
 import { getVisibleChatMessages } from '@/utils/chat/visibility';
 import { cloneMessagesWithFreshIds, createNewSession } from '@/utils/chat/session';
+import { placeSessionAfter } from '@/stores/sessionOrder';
 import { updateSessionById } from '@/utils/chat/sessionMutations';
 import { INVALID_FILE_API_KEY_FINGERPRINT } from '@/utils/chat/geminiFilesApi';
 import { resolveUploadableFile } from '@/features/message-sender/fileApiReference';
@@ -354,7 +355,7 @@ export const useMessageActions = ({
           'manual',
         );
         forkedSessionId = forkedSession.id;
-        return [forkedSession, ...prev];
+        return placeSessionAfter(prev, forkedSession, sourceSession.id);
       });
 
       if (forkedSessionId) {
