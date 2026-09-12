@@ -29,6 +29,7 @@ import { interpolate } from '@/i18n/interpolate';
 import { ProviderList } from './ProviderList';
 import { ProviderDetail } from './ProviderDetail';
 import { ProviderAddModal } from './ProviderAddModal';
+import { ProviderAssistantPanel } from './assistant/ProviderAssistantPanel';
 import { ApiConfigSection } from '@/components/settings/sections/ApiConfigSection';
 import {
   ThirdPartyBackupDialog,
@@ -198,6 +199,7 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
           }
         }}
       />
+      <ProviderAssistantPanel />
       <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--theme-border-secondary)]/30 bg-[var(--theme-bg-secondary)]/40 text-xs flex-shrink-0">
         <div className="flex items-center gap-2">
           <Server size={14} className="text-[var(--theme-text-secondary)]" />
