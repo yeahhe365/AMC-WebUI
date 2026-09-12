@@ -513,7 +513,7 @@ git commit -m "feat(settings-assistant): add provider patch verdict planner"
 
 **Interfaces:**
 
-- Consumes: `THIRD_PARTY_TEMPLATE_IDS` / `THIRD_PARTY_TEMPLATE_LABELS` / `getThirdPartyTemplateDefaults`（`@/utils/thirdPartyApiProviders`）；`createThirdPartyConnection`（测试工厂）
+- Consumes: `THIRD_PARTY_TEMPLATE_IDS`（`@/types`）、`THIRD_PARTY_TEMPLATE_LABELS` / `getThirdPartyTemplateDefaults`（`@/utils/thirdPartyApiProviders`）；`createThirdPartyConnection`（测试工厂）
 - Produces:
   - `const MODEL_IDS_PER_CONNECTION_LIMIT = 50`
   - `interface ConnectionSummary { id: string; name: string; templateId: string; protocol: string; baseUrl: string | null; hasApiKey: boolean; headerNames: string[]; modelCount: number; modelIds: string[]; enabled: boolean }`
@@ -596,12 +596,8 @@ Expected: FAIL —— 模块不存在。
 - [ ] **Step 3: 实现 `providerRedaction.ts`**
 
 ```ts
-import {
-  THIRD_PARTY_TEMPLATE_IDS,
-  THIRD_PARTY_TEMPLATE_LABELS,
-  getThirdPartyTemplateDefaults,
-} from '@/utils/thirdPartyApiProviders';
-import type { ThirdPartyConnection, ThirdPartyTemplateId } from '@/types';
+import { THIRD_PARTY_TEMPLATE_LABELS, getThirdPartyTemplateDefaults } from '@/utils/thirdPartyApiProviders';
+import { THIRD_PARTY_TEMPLATE_IDS, type ThirdPartyConnection, type ThirdPartyTemplateId } from '@/types';
 
 /**
  * Caps how many model ids travel to the model. Catalogs on gateways like
