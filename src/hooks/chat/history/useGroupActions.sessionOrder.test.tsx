@@ -18,8 +18,7 @@ const session = (id: string, sortOrder: number): SavedChatSession => ({
  * action 层只负责改写 sortOrder，最终数组顺序由 chatStore 的 sortSessionsInPlace 决定
  * （见 chatStore.updateAndPersistSessions），所以这里必须按同一个比较器还原显示顺序。
  */
-const displayOrder = (sessions: SavedChatSession[]) =>
-  [...sessions].sort(compareSessionOrder).map((item) => item.id);
+const displayOrder = (sessions: SavedChatSession[]) => [...sessions].sort(compareSessionOrder).map((item) => item.id);
 
 const renderActions = (sessions: SavedChatSession[]) => {
   const updates: SavedChatSession[][] = [];

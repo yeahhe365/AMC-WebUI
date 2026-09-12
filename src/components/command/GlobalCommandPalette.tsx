@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useUIStore } from '@/stores/uiStore';
 import { useChatStore } from '@/stores/chatStore';
+import { sortSessionsByRecency } from './sessionRecency';
 import { toast } from 'sonner';
 import {
   CommandDialog,
@@ -111,7 +112,7 @@ export const GlobalCommandPalette: React.FC<GlobalCommandPaletteProps> = ({
     });
   };
 
-  const recentSessions = savedSessions.slice(0, 8);
+  const recentSessions = sortSessionsByRecency(savedSessions).slice(0, 8);
   const activeSession = savedSessions.find((s) => s.id === activeSessionId);
   const activeModelId = activeSession?.settings?.modelId || '';
 

@@ -26,11 +26,13 @@
 ### Task 1: `sortOrder` 字段与权威比较器
 
 **Files:**
+
 - Modify: `src/types/chat.ts:120-137`
 - Modify: `src/stores/sessionModels.ts:5-12`
 - Test: `src/stores/sessionModels.order.test.ts` (create)
 
 **Interfaces:**
+
 - Consumes: 无（本任务是地基）
 - Produces:
   - `SavedChatSession.sortOrder?: number`
@@ -71,7 +73,10 @@ describe('compareSessionOrder', () => {
   });
 
   it('sortOrder 压过 timestamp', () => {
-    const sessions = [session('newer-but-lower', { timestamp: 9, sortOrder: 2 }), session('older-but-higher', { timestamp: 1, sortOrder: 1 })];
+    const sessions = [
+      session('newer-but-lower', { timestamp: 9, sortOrder: 2 }),
+      session('older-but-higher', { timestamp: 1, sortOrder: 1 }),
+    ];
 
     sortSessionsInPlace(sessions);
 
@@ -79,7 +84,10 @@ describe('compareSessionOrder', () => {
   });
 
   it('pinned 仍是第一级，压过 sortOrder', () => {
-    const sessions = [session('unpinned-first', { sortOrder: 1 }), session('pinned-last', { isPinned: true, sortOrder: 99 })];
+    const sessions = [
+      session('unpinned-first', { sortOrder: 1 }),
+      session('pinned-last', { isPinned: true, sortOrder: 99 }),
+    ];
 
     sortSessionsInPlace(sessions);
 
@@ -175,10 +183,12 @@ git commit -m "feat(sidebar): add session sortOrder field and authoritative orde
 ### Task 2: `sessionOrder` 纯函数模块
 
 **Files:**
+
 - Create: `src/stores/sessionOrder.ts`
 - Test: `src/stores/sessionOrder.test.ts` (create)
 
 **Interfaces:**
+
 - Consumes: `compareSessionOrder`（Task 1）
 - Produces（后续所有任务只准用这些函数改顺序）：
   - `SESSION_ORDER_SPACING = 2 ** 20`
@@ -224,13 +234,15 @@ const session = (
 const ids = (sessions: SavedChatSession[]) => sessions.map((item) => item.id);
 
 const ordered = (sessions: SavedChatSession[], groupId: string | null = null) =>
-  sessions
-    .filter((item) => (item.groupId ?? null) === groupId)
-    .sort(compareSessionOrder);
+  sessions.filter((item) => (item.groupId ?? null) === groupId).sort(compareSessionOrder);
 
 describe('assignAllBucketsOrder', () => {
   it('给缺键的桶按 pinned → timestamp 编号，视觉零突变', () => {
-    const sessions = [session('a', { timestamp: 1 }), session('b', { timestamp: 9 }), session('c', { isPinned: true, timestamp: 5 })];
+    const sessions = [
+      session('a', { timestamp: 1 }),
+      session('b', { timestamp: 9 }),
+      session('c', { isPinned: true, timestamp: 5 }),
+    ];
 
     const result = assignAllBucketsOrder(sessions);
 
@@ -263,7 +275,11 @@ describe('assignAllBucketsOrder', () => {
 
 describe('placeSessionAtBucketTop', () => {
   it('新建的普通会话落在未置顶区最前', () => {
-    const sessions = [session('pinned', { isPinned: true, sortOrder: 1 }), session('top', { sortOrder: 2 }), session('older', { sortOrder: 3 })];
+    const sessions = [
+      session('pinned', { isPinned: true, sortOrder: 1 }),
+      session('top', { sortOrder: 2 }),
+      session('older', { sortOrder: 3 }),
+    ];
 
     const result = placeSessionAtBucketTop(sessions, session('fresh'));
 
@@ -325,7 +341,10 @@ describe('placeNewSessionsAtBucketTop', () => {
 
 describe('moveSessionToBucket', () => {
   it('placement=top 落在目标桶同区段最前', () => {
-    const sessions = [session('moved', { groupId: 'g1', sortOrder: 1 }), session('target', { groupId: 'g2', sortOrder: 1 })];
+    const sessions = [
+      session('moved', { groupId: 'g1', sortOrder: 1 }),
+      session('target', { groupId: 'g2', sortOrder: 1 }),
+    ];
 
     const result = moveSessionToBucket(sessions, 'moved', 'g2', 'top');
 
@@ -333,7 +352,10 @@ describe('moveSessionToBucket', () => {
   });
 
   it('placement=end 落在目标桶同区段末尾', () => {
-    const sessions = [session('moved', { groupId: 'g1', sortOrder: 1 }), session('target', { groupId: 'g2', sortOrder: 1 })];
+    const sessions = [
+      session('moved', { groupId: 'g1', sortOrder: 1 }),
+      session('target', { groupId: 'g2', sortOrder: 1 }),
+    ];
 
     const result = moveSessionToBucket(sessions, 'moved', null, 'end');
 
@@ -381,7 +403,11 @@ describe('reorderSession', () => {
   });
 
   it('跨桶拖动会改写 groupId 并落在目标位置', () => {
-    const sessions = [session('moved', { sortOrder: 1 }), session('g1a', { groupId: 'g1', sortOrder: 1 }), session('g1b', { groupId: 'g1', sortOrder: 2 })];
+    const sessions = [
+      session('moved', { sortOrder: 1 }),
+      session('g1a', { groupId: 'g1', sortOrder: 1 }),
+      session('g1b', { groupId: 'g1', sortOrder: 2 }),
+    ];
 
     const result = reorderSession(sessions, 'moved', 'g1a', 'after');
 
@@ -451,7 +477,8 @@ type OrderableSession = Pick<SavedChatSession, 'id' | 'groupId' | 'isPinned' | '
 
 const bucketKeyOf = (session: Pick<SavedChatSession, 'groupId'>): string | null => session.groupId ?? null;
 
-const isSameSection = (left: OrderableSession, right: OrderableSession): boolean => !!left.isPinned === !!right.isPinned;
+const isSameSection = (left: OrderableSession, right: OrderableSession): boolean =>
+  !!left.isPinned === !!right.isPinned;
 
 const makeOrderKey = (position: number): number => position * SESSION_ORDER_SPACING;
 
@@ -497,7 +524,8 @@ const ensureBucketOrder = (sessions: SavedChatSession[], bucketKey: string | nul
     ? assignBucketOrder(sessions, bucketKey)
     : sessions;
 
-const midpoint = (previous: number, next: number): number | null => (next - previous > 1 ? (previous + next) / 2 : null);
+const midpoint = (previous: number, next: number): number | null =>
+  next - previous > 1 ? (previous + next) / 2 : null;
 
 /** 求"插到 ordered 的第 index 位"应使用的键；返回 null 表示该缝隙的中点空间已耗尽。 */
 const orderKeyForIndex = (ordered: SavedChatSession[], index: number): number | null => {
@@ -664,11 +692,13 @@ git commit -m "feat(sidebar): add session order pure module with midpoint insert
 ### Task 3: store 收口点 + 加载期回填
 
 **Files:**
+
 - Modify: `src/stores/chatStore.ts:370-378`
 - Modify: `src/hooks/chat/history/sessionInitialLoad.ts:171-173`
 - Test: `src/hooks/chat/history/sessionInitialLoad.test.ts` (modify, append a case)
 
 **Interfaces:**
+
 - Consumes: `placeNewSessionsAtBucketTop`、`assignAllBucketsOrder`（Task 2）
 - Produces: 新建会话自动落到所属桶顶部；旧数据在加载后被一次性回填 `sortOrder`
 
@@ -677,36 +707,36 @@ git commit -m "feat(sidebar): add session order pure module with midpoint insert
 在 `src/hooks/chat/history/sessionInitialLoad.test.ts` 的 `describe('loadInitialSessionData', ...)` 内追加：
 
 ```ts
-  it('backfills legacy sessions with bucket-scoped manual order', async () => {
-    stubPathname('/');
-    mockGetAllSessionMetadata.mockResolvedValue([
-      createSavedChatSession({ id: 'legacy-newer', title: 'newer', timestamp: 2_000, messages: [] }),
-      createSavedChatSession({ id: 'legacy-older', title: 'older', timestamp: 1_000, messages: [] }),
-    ]);
-    mockGetAllGroups.mockResolvedValue([]);
+it('backfills legacy sessions with bucket-scoped manual order', async () => {
+  stubPathname('/');
+  mockGetAllSessionMetadata.mockResolvedValue([
+    createSavedChatSession({ id: 'legacy-newer', title: 'newer', timestamp: 2_000, messages: [] }),
+    createSavedChatSession({ id: 'legacy-older', title: 'older', timestamp: 1_000, messages: [] }),
+  ]);
+  mockGetAllGroups.mockResolvedValue([]);
 
-    const updateAndPersistSessions = vi.fn();
-    await loadInitialSessionData({
-      appSettings: {} as never,
-      setSavedSessions: vi.fn(),
-      setSavedGroups: vi.fn(),
-      setActiveSessionId: vi.fn(),
-      setActiveMessages: vi.fn(),
-      restoreDraftFiles: vi.fn(),
-      updateAndPersistSessions,
-      startNewChat: vi.fn(),
-    });
-
-    expect(updateAndPersistSessions).toHaveBeenCalledTimes(1);
-    const updater = updateAndPersistSessions.mock.calls[0][0] as (prev: SavedChatSession[]) => SavedChatSession[];
-    const result = updater([
-      createSavedChatSession({ id: 'legacy-newer', title: 'newer', timestamp: 2_000, messages: [] }),
-      createSavedChatSession({ id: 'legacy-older', title: 'older', timestamp: 1_000, messages: [] }),
-    ]);
-
-    expect(result.map((session) => session.id)).toEqual(['legacy-newer', 'legacy-older']);
-    expect(result.map((session) => session.sortOrder)).toEqual([1_048_576, 2_097_152]);
+  const updateAndPersistSessions = vi.fn();
+  await loadInitialSessionData({
+    appSettings: {} as never,
+    setSavedSessions: vi.fn(),
+    setSavedGroups: vi.fn(),
+    setActiveSessionId: vi.fn(),
+    setActiveMessages: vi.fn(),
+    restoreDraftFiles: vi.fn(),
+    updateAndPersistSessions,
+    startNewChat: vi.fn(),
   });
+
+  expect(updateAndPersistSessions).toHaveBeenCalledTimes(1);
+  const updater = updateAndPersistSessions.mock.calls[0][0] as (prev: SavedChatSession[]) => SavedChatSession[];
+  const result = updater([
+    createSavedChatSession({ id: 'legacy-newer', title: 'newer', timestamp: 2_000, messages: [] }),
+    createSavedChatSession({ id: 'legacy-older', title: 'older', timestamp: 1_000, messages: [] }),
+  ]);
+
+  expect(result.map((session) => session.id)).toEqual(['legacy-newer', 'legacy-older']);
+  expect(result.map((session) => session.sortOrder)).toEqual([1_048_576, 2_097_152]);
+});
 ```
 
 在该文件顶部 import 中补上 `SavedChatSession` 类型：
@@ -725,9 +755,9 @@ Expected: FAIL —— `expected [] to deeply equal [ 1048576, 2097152 ]`（`upda
 `src/hooks/chat/history/sessionInitialLoad.ts`，在 `setSavedSessions((prev) => mergeLoadedSessionMetadata(prev, sortedList));` 之后插入：
 
 ```ts
-    // 旧数据一次性回填手动顺序：桶内按 (pinned, timestamp) 编号，升级后视觉零突变。
-    // 已经完整编号的数据会原样返回（同一个数组引用），不会产生任何写入。
-    updateAndPersistSessions((prev) => assignAllBucketsOrder(prev));
+// 旧数据一次性回填手动顺序：桶内按 (pinned, timestamp) 编号，升级后视觉零突变。
+// 已经完整编号的数据会原样返回（同一个数组引用），不会产生任何写入。
+updateAndPersistSessions((prev) => assignAllBucketsOrder(prev));
 ```
 
 并在文件顶部 import 中补上：
@@ -843,6 +873,7 @@ git commit -m "feat(sidebar): backfill and maintain session sortOrder at load an
 ### Task 4: action 层与接线
 
 **Files:**
+
 - Modify: `src/hooks/chat/history/useGroupActions.ts`（`handleMoveSessionToGroup` 加 placement，新增 `handleReorderSession`）
 - Modify: `src/hooks/chat/useChatHistory.ts`
 - Modify: `src/hooks/chat/useChat.ts:295`
@@ -851,6 +882,7 @@ git commit -m "feat(sidebar): backfill and maintain session sortOrder at load an
 - Test: `src/hooks/chat/history/useGroupActions.sessionOrder.test.tsx` (create)
 
 **Interfaces:**
+
 - Consumes: `reorderSession`、`moveSessionToBucket`（Task 2）
 - Produces:
   - `handleMoveSessionToGroup(sessionId: string, groupId: string | null, placement?: 'top' | 'end'): void`（默认 `'top'`）
@@ -925,22 +957,22 @@ Expected: FAIL —— `handleReorderSession is not a function`。
 `src/hooks/chat/history/useGroupActions.ts`，把现有 `handleMoveSessionToGroup`（第 58-68 行）替换为下面两个函数：
 
 ```ts
-  const handleMoveSessionToGroup = useCallback(
-    (sessionId: string, groupId: string | null, placement: 'top' | 'end' = 'top') => {
-      logService.info(`Moving session ${sessionId} to group ${groupId}`);
-      updateAndPersistSessions((prev) => moveSessionToBucket(prev, sessionId, groupId, placement));
-    },
-    [updateAndPersistSessions],
-  );
+const handleMoveSessionToGroup = useCallback(
+  (sessionId: string, groupId: string | null, placement: 'top' | 'end' = 'top') => {
+    logService.info(`Moving session ${sessionId} to group ${groupId}`);
+    updateAndPersistSessions((prev) => moveSessionToBucket(prev, sessionId, groupId, placement));
+  },
+  [updateAndPersistSessions],
+);
 
-  const handleReorderSession = useCallback(
-    (activeId: string, overId: string, position: 'before' | 'after') => {
-      if (activeId === overId) return;
-      logService.info(`Reordering session ${activeId} ${position} ${overId}`);
-      updateAndPersistSessions((prev) => reorderSession(prev, activeId, overId, position));
-    },
-    [updateAndPersistSessions],
-  );
+const handleReorderSession = useCallback(
+  (activeId: string, overId: string, position: 'before' | 'after') => {
+    if (activeId === overId) return;
+    logService.info(`Reordering session ${activeId} ${position} ${overId}`);
+    updateAndPersistSessions((prev) => reorderSession(prev, activeId, overId, position));
+  },
+  [updateAndPersistSessions],
+);
 ```
 
 在文件顶部补 import：
@@ -1001,11 +1033,13 @@ git commit -m "feat(sidebar): expose session reorder action through the chat sta
 ### Task 5: 侧边栏逻辑层
 
 **Files:**
+
 - Modify: `src/components/sidebar/sidebarDragTypes.ts`（新增 `resolveDropPosition`）
 - Modify: `src/components/sidebar/useHistorySidebarLogic.ts`
 - Test: `src/components/sidebar/useHistorySidebarLogic.test.ts`（改两个既有用例 + 追加新用例）
 
 **Interfaces:**
+
 - Consumes: Task 4 的 `onReorderSession`；`compareSessionOrder`（Task 1）
 - Produces:
   - `resolveDropPosition(event): 'before' | 'after'`（`sidebarDragTypes.ts`）
@@ -1150,68 +1184,68 @@ import { compareSessionOrder } from '@/stores/sessionModels';
 (d) `sessionDropIndicator` 的 state 类型改为：
 
 ```ts
-  const [sessionDropIndicator, setSessionDropIndicator] = useState<{
-    id: string;
-    position: 'before' | 'after';
-    willPin: boolean;
-  } | null>(null);
+const [sessionDropIndicator, setSessionDropIndicator] = useState<{
+  id: string;
+  position: 'before' | 'after';
+  willPin: boolean;
+} | null>(null);
 ```
 
 (e) `sessionsByGroupId` 的排序回调（第 281-287 行）替换为：
 
 ```ts
-    map.forEach((sessionList) => sessionList.sort(compareSessionOrder));
+map.forEach((sessionList) => sessionList.sort(compareSessionOrder));
 ```
 
 (f) `categorizedUngroupedSessions`（第 304-312 行）替换为下面两段：
 
 ```ts
-  const categorizedUngroupedSessions = useMemo(() => {
-    // 分组模式的未分组区改成平铺手动列表（见 unpinnedUngroupedSessions），
-    // 日期分类从此只服务时间视图。
-    if (displayMode !== 'time') return { categories: {}, categoryOrder: [] as string[] };
-    const allUnpinned = filteredSessions.filter((session) => !session.isPinned);
-    return categorizeSessionsByDate(allUnpinned, language, t);
-  }, [filteredSessions, displayMode, t, language]);
+const categorizedUngroupedSessions = useMemo(() => {
+  // 分组模式的未分组区改成平铺手动列表（见 unpinnedUngroupedSessions），
+  // 日期分类从此只服务时间视图。
+  if (displayMode !== 'time') return { categories: {}, categoryOrder: [] as string[] };
+  const allUnpinned = filteredSessions.filter((session) => !session.isPinned);
+  return categorizeSessionsByDate(allUnpinned, language, t);
+}, [filteredSessions, displayMode, t, language]);
 
-  const unpinnedUngroupedSessions = useMemo(() => {
-    if (displayMode === 'time') return [];
-    return (sessionsByGroupId.get(null) || []).filter((session) => !session.isPinned);
-  }, [sessionsByGroupId, displayMode]);
+const unpinnedUngroupedSessions = useMemo(() => {
+  if (displayMode === 'time') return [];
+  return (sessionsByGroupId.get(null) || []).filter((session) => !session.isPinned);
+}, [sessionsByGroupId, displayMode]);
 ```
 
 (g) `handleDrop`（第 358-366 行）替换为：
 
 ```ts
-  const handleDrop = (event: React.DragEvent, groupId: string | null) => {
-    if (!isSessionDrag(event)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const sessionId = event.dataTransfer.getData(SESSION_DRAG_TYPE);
-    const isContainerDrop = groupId === 'all-conversations';
-    const targetGroupId = isContainerDrop ? null : groupId;
-    if (sessionId) onMoveSessionToGroup(sessionId, targetGroupId, isContainerDrop ? 'end' : 'top');
-    setDragOverId(null);
-  };
+const handleDrop = (event: React.DragEvent, groupId: string | null) => {
+  if (!isSessionDrag(event)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const sessionId = event.dataTransfer.getData(SESSION_DRAG_TYPE);
+  const isContainerDrop = groupId === 'all-conversations';
+  const targetGroupId = isContainerDrop ? null : groupId;
+  if (sessionId) onMoveSessionToGroup(sessionId, targetGroupId, isContainerDrop ? 'end' : 'top');
+  setDragOverId(null);
+};
 ```
 
 (h) `handleSessionDragOver`（第 390-399 行）替换为：
 
 ```ts
-  const handleSessionDragOver = (event: React.DragEvent, sessionId: string) => {
-    if (!isSessionDrag(event)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    event.dataTransfer.dropEffect = 'move';
-    const target = sessions.find((session) => session.id === sessionId);
-    const dragging = draggingSessionId ? sessions.find((session) => session.id === draggingSessionId) : undefined;
-    setSessionDropIndicator({
-      id: sessionId,
-      position: resolveDropPosition(event),
-      willPin: !!target?.isPinned && !dragging?.isPinned,
-    });
-    setDragOverId(null);
-  };
+const handleSessionDragOver = (event: React.DragEvent, sessionId: string) => {
+  if (!isSessionDrag(event)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.dataTransfer.dropEffect = 'move';
+  const target = sessions.find((session) => session.id === sessionId);
+  const dragging = draggingSessionId ? sessions.find((session) => session.id === draggingSessionId) : undefined;
+  setSessionDropIndicator({
+    id: sessionId,
+    position: resolveDropPosition(event),
+    willPin: !!target?.isPinned && !dragging?.isPinned,
+  });
+  setDragOverId(null);
+};
 ```
 
 (i) return 对象里在 `categorizedUngroupedSessions,` 之后加：
@@ -1237,6 +1271,7 @@ git commit -m "feat(sidebar): resolve drop position, flat ungrouped list, pin-zo
 ### Task 6: 组件层（拖拽落点、置顶提示、平铺渲染、时间视图禁用）
 
 **Files:**
+
 - Modify: `src/components/sidebar/SessionItem.tsx`
 - Modify: `src/components/sidebar/HistorySidebar.tsx`
 - Modify: `src/components/sidebar/GroupItem.tsx:22`（`sessionDropIndicator` 类型补 `willPin`）
@@ -1244,6 +1279,7 @@ git commit -m "feat(sidebar): resolve drop position, flat ungrouped list, pin-zo
 - Test: `src/components/sidebar/SessionItem.drop.test.tsx` (create)
 
 **Interfaces:**
+
 - Consumes: Task 5 的 `resolveDropPosition`、`unpinnedUngroupedSessions`
 - Produces:
   - `SessionItemProps.onReorderSession?: (activeId: string, overId: string, position: 'before' | 'after') => void`
@@ -1488,15 +1524,15 @@ import { SESSION_DRAG_TYPE, isSessionDrag, resolveDropPosition } from './sidebar
 (d) 把 `handleItemDrop`（第 162-171 行）替换为：
 
 ```ts
-  const handleItemDrop = (e: React.DragEvent) => {
-    onSessionDropIndicatorClear?.();
-    if (!isSessionDrag(e)) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const draggedId = e.dataTransfer.getData(SESSION_DRAG_TYPE) || e.dataTransfer.getData('text/plain');
-    if (!draggedId || draggedId === session.id) return;
-    onReorderSession?.(draggedId, session.id, resolveDropPosition(e));
-  };
+const handleItemDrop = (e: React.DragEvent) => {
+  onSessionDropIndicatorClear?.();
+  if (!isSessionDrag(e)) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const draggedId = e.dataTransfer.getData(SESSION_DRAG_TYPE) || e.dataTransfer.getData('text/plain');
+  if (!draggedId || draggedId === session.id) return;
+  onReorderSession?.(draggedId, session.id, resolveDropPosition(e));
+};
 ```
 
 (e) `li` 上的拖拽监听改为（时间视图整体禁用）：
@@ -1516,18 +1552,20 @@ import { SESSION_DRAG_TYPE, isSessionDrag, resolveDropPosition } from './sidebar
 (f) 在 `showAfter` 之后加"将置顶"提示：
 
 ```tsx
-  const showPinHint = !!dropIndicator?.willPin && dropIndicator.id === session.id;
+const showPinHint = !!dropIndicator?.willPin && dropIndicator.id === session.id;
 ```
 
 并在 `{showAfter && (...)}` 那个块之后插入：
 
 ```tsx
-          {showPinHint && (showBefore || showAfter) && (
-            <div className="pointer-events-none absolute right-1 top-0 z-10 flex items-center gap-1 rounded-md bg-[var(--theme-bg-accent)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--theme-bg-primary)] shadow-sm">
-              <Pin size={10} strokeWidth={2.4} />
-              <span>{t('historyDropToPin')}</span>
-            </div>
-          )}
+{
+  showPinHint && (showBefore || showAfter) && (
+    <div className="pointer-events-none absolute right-1 top-0 z-10 flex items-center gap-1 rounded-md bg-[var(--theme-bg-accent)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--theme-bg-primary)] shadow-sm">
+      <Pin size={10} strokeWidth={2.4} />
+      <span>{t('historyDropToPin')}</span>
+    </div>
+  );
+}
 ```
 
 - [ ] **Step 4: 改 GroupItem 的 dropIndicator 类型**
@@ -1587,16 +1625,22 @@ const SessionListGroup = ({
 (e) 分组模式下的未分组渲染（第 629-637 行 `categoryOrder.map(...)` 那段）替换为平铺列表：
 
 ```tsx
-              {pinnedUngrouped.length > 0 && (
-                <SessionListGroup
-                  title={t('historyPinned')}
-                  sessions={pinnedUngrouped}
-                  sessionItemProps={sessionItemSharedProps}
-                  isDragging={isDragging}
-                />
-              )}
+{
+  pinnedUngrouped.length > 0 && (
+    <SessionListGroup
+      title={t('historyPinned')}
+      sessions={pinnedUngrouped}
+      sessionItemProps={sessionItemSharedProps}
+      isDragging={isDragging}
+    />
+  );
+}
 
-              <SessionListGroup sessions={unpinnedUngroupedSessions} sessionItemProps={sessionItemSharedProps} isDragging={isDragging} />
+<SessionListGroup
+  sessions={unpinnedUngroupedSessions}
+  sessionItemProps={sessionItemSharedProps}
+  isDragging={isDragging}
+/>;
 ```
 
 注意：上面第 (e) 步要替换的是 `displayMode !== 'time'` 那个分支里的 `pinnedUngrouped` + `categoryOrder.map` 两块，时间视图分支（第 537-556 行）保持原样不动。
@@ -1640,11 +1684,13 @@ git commit -m "feat(sidebar): position-aware session drop, pin-zone hint, flat u
 ### Task 7: 复制 / fork 锚点插入
 
 **Files:**
+
 - Modify: `src/hooks/chat/history/useSessionActions.ts:76-94`
 - Modify: `src/hooks/chat/message/useMessageActions.ts:343-358`
 - Test: `src/hooks/chat/history/useSessionActions.sessionOrder.test.tsx` (create)
 
 **Interfaces:**
+
 - Consumes: `placeSessionAfter`（Task 2）
 - Produces: 复制与 fork 出来的会话紧跟源会话；其余新建路径继续由 Task 3 的 store 收口点自动置顶
 
@@ -1686,9 +1732,7 @@ describe('handleDuplicateSession ordering', () => {
       result = updater(sessions);
     });
 
-    const hook = renderHook(() =>
-      useSessionActions({ updateAndPersistSessions, activeJobs: { current: new Map() } }),
-    );
+    const hook = renderHook(() => useSessionActions({ updateAndPersistSessions, activeJobs: { current: new Map() } }));
 
     await hook.result.current.handleDuplicateSession('a');
 
@@ -1714,7 +1758,7 @@ import { placeSessionAfter } from '@/stores/sessionOrder';
 把 `handleDuplicateSession` 里最后一行 `return [newSession, ...prev];` 改为：
 
 ```ts
-        return placeSessionAfter(prev, newSession, sessionId);
+return placeSessionAfter(prev, newSession, sessionId);
 ```
 
 - [ ] **Step 5: 改 fork**
@@ -1742,8 +1786,8 @@ import { placeSessionAfter } from '@/stores/sessionOrder';
 ```
 
 - [ ] **Step 6: 跑测试确认通过**
-Run: `node scripts/run-vitest.mjs run src/hooks/chat/history/useSessionActions.sessionOrder.test.tsx src/hooks/chat`
-Expected: PASS
+      Run: `node scripts/run-vitest.mjs run src/hooks/chat/history/useSessionActions.sessionOrder.test.tsx src/hooks/chat`
+      Expected: PASS
 
 - [ ] **Step 7: 提交**
 
@@ -1757,11 +1801,13 @@ git commit -m "feat(sidebar): insert duplicated and forked sessions after their 
 ### Task 8: 「最近」语义与全量校验
 
 **Files:**
+
 - Modify: `src/components/command/GlobalCommandPalette.tsx:114`
 - Create: `src/components/command/sessionRecency.ts`
 - Test: `src/components/command/GlobalCommandPalette.order.test.tsx` (create)
 
 **Interfaces:**
+
 - Consumes: 前 7 个任务的全部产物
 - Produces: `sortSessionsByRecency(sessions: SavedChatSession[]): SavedChatSession[]`；命令面板的"最近 8 条"不再被手动顺序污染
 
@@ -1821,7 +1867,7 @@ import { sortSessionsByRecency } from './sessionRecency';
 把第 114 行 `const recentSessions = savedSessions.slice(0, 8);` 改为：
 
 ```ts
-  const recentSessions = sortSessionsByRecency(savedSessions).slice(0, 8);
+const recentSessions = sortSessionsByRecency(savedSessions).slice(0, 8);
 ```
 
 - [ ] **Step 4: 跑测试确认通过**
@@ -1848,6 +1894,7 @@ Run: `npm run dev`，在浏览器里逐条确认：
 8. 新建会话出现在未分组桶顶部；复制会话紧随源会话
 
 另外两项已核对过、确认**无需改动**，验收时只需确认行为没退化：
+
 - `CollapsedRecentChatsButton`（折叠态「最近会话」）本来就显式 `.sort((a, b) => b.timestamp - a.timestamp)`（`src/components/sidebar/CollapsedRecentChatsButton.tsx:43-46`），不受手动顺序影响。
 - 虚拟列表（>50 条走 `Virtuoso`）与边缘自动滚动只依赖可见 DOM 事件，与排序键无关。
 

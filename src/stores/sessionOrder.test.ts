@@ -145,10 +145,7 @@ describe('moveSessionToBucket', () => {
   });
 
   it('placement=end 落在目标桶同区段末尾', () => {
-    const sessions = [
-      session('moved', { groupId: 'g1', sortOrder: 1 }),
-      session('target', { sortOrder: 1 }),
-    ];
+    const sessions = [session('moved', { groupId: 'g1', sortOrder: 1 }), session('target', { sortOrder: 1 })];
 
     const result = moveSessionToBucket(sessions, 'moved', null, 'end');
 

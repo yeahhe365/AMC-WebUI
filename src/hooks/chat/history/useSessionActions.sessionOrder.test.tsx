@@ -28,11 +28,9 @@ describe('handleDuplicateSession ordering', () => {
 
     await hook.result.current.handleDuplicateSession('a');
 
-    expect([...result].sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0)).map((item) => item.title)).toEqual([
-      'a',
-      'a (Copy)',
-      'b',
-    ]);
+    expect(
+      [...result].sort((left, right) => (left.sortOrder ?? 0) - (right.sortOrder ?? 0)).map((item) => item.title),
+    ).toEqual(['a', 'a (Copy)', 'b']);
     hook.unmount();
   });
 });

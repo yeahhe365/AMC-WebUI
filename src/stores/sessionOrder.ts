@@ -23,7 +23,7 @@ const orderedBucket = (sessions: SavedChatSession[], bucketKey: string | null): 
  * 桶内全部会话按显示顺序重新编号。只有真正变化的会话才生成新对象——持久化层的比较是按引用
  * 做的（src/stores/sessionPersistence.ts），保持引用才能避免全量落盘。
  */
-export function assignBucketOrder(sessions: SavedChatSession[], bucketKey: string | null): SavedChatSession[] {
+function assignBucketOrder(sessions: SavedChatSession[], bucketKey: string | null): SavedChatSession[] {
   const patched = new Map<string, SavedChatSession>();
 
   orderedBucket(sessions, bucketKey).forEach((session, index) => {
