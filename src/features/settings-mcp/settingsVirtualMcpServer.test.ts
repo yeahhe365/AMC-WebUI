@@ -70,6 +70,7 @@ describe('settingsVirtualMcpServer', () => {
       expect(server.id).toBe(SETTINGS_VIRTUAL_MCP_ID);
       expect(server.name).toBe('AMC Settings Manager');
       expect(server.disabledAutoApproveTools).toContain('reset_settings');
+      expect(server.disabledAutoApproveTools).toContain('delete_mcp_server');
 
       const tools = await server.listTools();
       const toolNames = tools.map((t) => t.name);
@@ -80,6 +81,13 @@ describe('settingsVirtualMcpServer', () => {
         'update_appearance_settings',
         'update_generation_settings',
         'update_language_voice_settings',
+        'list_mcp_servers',
+        'add_mcp_server',
+        'update_mcp_server',
+        'delete_mcp_server',
+        'toggle_mcp_server',
+        'import_mcp_config',
+        'test_mcp_server',
         'reset_settings',
       ]);
     });
@@ -418,6 +426,175 @@ describe('settingsVirtualMcpServer', () => {
       expect(current.themeId).toBe('pearl');
       expect(current.temperature).toBe(DEFAULT_APP_SETTINGS.temperature);
       expect(current.topP).toBe(DEFAULT_APP_SETTINGS.topP);
+    });
+  });
+
+  describe('MCP management tools', () => {
+    it('returns sanitized MCP server information via get_settings with domain: mcp', async () => {
+      useSettingsStore.setState({
+        appSettings: {
+          ...DEFAULT_APP_SETTINGS,
+          mcpServers: [
+            {
+              id: 'srv-1',
+              name: 'Remote MCP',
+              transport: 'http',
+              url: 'https://mcp.test.com',
+              enabled: true,
+              auth: { type: 'bearer', token: 'secret-token-12345' },
+              headers: { Authorization: 'Bearer xxx' },
+            },
+          ],
+        },
+      });
+
+      const server = createSettingsVirtualMcpServer();
+      const res = await callTool(server, 'get_settings', { domain: 'mcp', scope: 'global' });
+      const mcpData = res.structuredContent.global;
+
+      expect(mcpData.externalServers).toHaveLength(1);
+      expect(mcpData.externalServers[0].name).toBe('Remote MCP');
+      expect(mcpData.externalServers[0].hasAuth).toBe(true);
+      expect(mcpData.externalServers[0].maskedToken).toBe('sec****345');
+      expect(mcpData.externalServers[0].headerNames).toEqual(['Authorization']);
+      expect(mcpData.virtualServers.length).toBeGreaterThanOrEqual(0);
+    });
+
+    it('lists mcp_transports via list_options', async () => {
+      const server = createSettingsVirtualMcpServer();
+      const res = await callTool(server, 'list_options', { category: 'mcp_transports' });
+      expect(res.structuredContent.availableTransports).toEqual(['http', 'sse', 'stdio']);
+    });
+
+    it('lists external and virtual MCP servers with list_mcp_servers', async () => {
+      useSettingsStore.setState({
+        appSettings: {
+          ...DEFAULT_APP_SETTINGS,
+          mcpServers: [
+            { id: 'ext-1', name: 'External 1', transport: 'http', url: 'https://ext.com', enabled: true },
+            { id: 'ext-2', name: 'External 2', transport: 'stdio', command: 'node', enabled: false },
+          ],
+        },
+      });
+
+      const server = createSettingsVirtualMcpServer();
+      const res = await callTool(server, 'list_mcp_servers', { filter: 'enabled' });
+      const structured = res.structuredContent;
+
+      expect(structured.totalExternalCount).toBe(2);
+      expect(structured.externalServers).toHaveLength(1);
+      expect(structured.externalServers[0].id).toBe('ext-1');
+    });
+
+    it('adds a new external MCP server with add_mcp_server', async () => {
+      const server = createSettingsVirtualMcpServer();
+      const res = await callTool(server, 'add_mcp_server', {
+        name: 'GitHub Tools',
+        transport: 'http',
+        url: 'https://github-mcp.test.com/api',
+        bearerToken: 'ghp_secretTokenHere123',
+        timeout: 45,
+      });
+
+      expect(res.structuredContent.status).toBe('created');
+      expect(res.structuredContent.server.name).toBe('GitHub Tools');
+      expect(res.structuredContent.server.hasAuth).toBe(true);
+      expect(res.structuredContent.server.maskedToken).toBe('ghp****123');
+
+      const saved = useSettingsStore.getState().appSettings.mcpServers;
+      expect(saved.some((s) => s.name === 'GitHub Tools')).toBe(true);
+    });
+
+    it('updates an existing MCP server with update_mcp_server', async () => {
+      useSettingsStore.setState({
+        appSettings: {
+          ...DEFAULT_APP_SETTINGS,
+          mcpServers: [{ id: 'srv-up', name: 'Old Name', transport: 'http', url: 'https://old.com', enabled: true }],
+        },
+      });
+
+      const server = createSettingsVirtualMcpServer();
+      const res = await callTool(server, 'update_mcp_server', {
+        id: 'srv-up',
+        name: 'New Updated Name',
+        url: 'https://new.com',
+        enabled: false,
+      });
+
+      expect(res.structuredContent.status).toBe('updated');
+      expect(res.structuredContent.server.name).toBe('New Updated Name');
+      expect(res.structuredContent.server.enabled).toBe(false);
+
+      const saved = useSettingsStore.getState().appSettings.mcpServers;
+      const target = saved.find((s) => s.id === 'srv-up');
+      expect(target?.name).toBe('New Updated Name');
+      expect(target?.url).toBe('https://new.com');
+      expect(target?.enabled).toBe(false);
+    });
+
+    it('deletes an external MCP server with delete_mcp_server', async () => {
+      useSettingsStore.setState({
+        appSettings: {
+          ...DEFAULT_APP_SETTINGS,
+          mcpServers: [{ id: 'srv-del', name: 'Delete Me', transport: 'stdio', command: 'echo', enabled: true }],
+        },
+      });
+
+      const server = createSettingsVirtualMcpServer();
+      const res = await callTool(server, 'delete_mcp_server', { id: 'srv-del' });
+
+      expect(res.structuredContent.status).toBe('deleted');
+      expect(res.structuredContent.id).toBe('srv-del');
+
+      const saved = useSettingsStore.getState().appSettings.mcpServers;
+      expect(saved.some((s) => s.id === 'srv-del')).toBe(false);
+    });
+
+    it('toggles an external or virtual MCP server with toggle_mcp_server', async () => {
+      useSettingsStore.setState({
+        appSettings: {
+          ...DEFAULT_APP_SETTINGS,
+          mcpServers: [
+            { id: 'srv-toggle', name: 'Toggle Target', transport: 'http', url: 'https://tog.com', enabled: true },
+          ],
+        },
+      });
+
+      const server = createSettingsVirtualMcpServer();
+      const res1 = await callTool(server, 'toggle_mcp_server', { id: 'srv-toggle' });
+      expect(res1.structuredContent.enabled).toBe(false);
+
+      const res2 = await callTool(server, 'toggle_mcp_server', { id: 'srv-toggle', enabled: true });
+      expect(res2.structuredContent.enabled).toBe(true);
+    });
+
+    it('imports MCP servers from JSON with import_mcp_config', async () => {
+      const server = createSettingsVirtualMcpServer();
+      const sampleJson = JSON.stringify({
+        mcpServers: {
+          braveSearch: {
+            command: 'npx',
+            args: ['-y', '@modelcontextprotocol/server-brave-search'],
+            env: { BRAVE_API_KEY: 'test-key' },
+          },
+        },
+      });
+
+      const res = await callTool(server, 'import_mcp_config', { jsonContent: sampleJson });
+      expect(res.structuredContent.status).toBe('imported');
+      expect(res.structuredContent.importedCount).toBe(1);
+
+      const saved = useSettingsStore.getState().appSettings.mcpServers;
+      expect(saved.some((s) => s.name === 'braveSearch')).toBe(true);
+    });
+
+    it('tests virtual MCP server connectivity with test_mcp_server', async () => {
+      const server = createSettingsVirtualMcpServer();
+      const res = await callTool(server, 'test_mcp_server', { id: SETTINGS_VIRTUAL_MCP_ID });
+
+      expect(res.structuredContent.status).toBe('connected');
+      expect(res.structuredContent.isVirtual).toBe(true);
+      expect(res.structuredContent.toolsCount).toBeGreaterThan(0);
     });
   });
 

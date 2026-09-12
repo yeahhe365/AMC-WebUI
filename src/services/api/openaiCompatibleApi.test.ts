@@ -3,6 +3,7 @@ import {
   fetchOpenAICompatibleModels,
   sendOpenAICompatibleMessageNonStream,
   sendOpenAICompatibleMessageStream,
+  generateOpenAICompatibleTurnApi,
 } from './openaiCompatibleApi';
 import { AUTH_OPTIONAL_API_KEY } from '../../../shared/serverManagedApiKey';
 
@@ -709,5 +710,96 @@ describe('openaiCompatibleApi', () => {
     expect(onError).toHaveBeenCalledTimes(1);
     expect((onError.mock.calls[0][0] as Error).message).toBe('upstream exploded');
     expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  describe('generateOpenAICompatibleTurnApi', () => {
+    it('returns functionCalls and modelContent when tool_calls are returned by model', async () => {
+      const fetchMock = vi.fn<typeof fetch>(async () => {
+        return new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: 'Checking templates...',
+                  tool_calls: [
+                    {
+                      id: 'call_123',
+                      type: 'function',
+                      function: {
+                        name: 'amc_provider_manager_list_templates',
+                        arguments: JSON.stringify({ active: true }),
+                      },
+                    },
+                  ],
+                },
+                finish_reason: 'tool_calls',
+              },
+            ],
+            usage: { prompt_tokens: 10, completion_tokens: 20, total_tokens: 30 },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await generateOpenAICompatibleTurnApi(
+        'test-key',
+        'qwen3.8-flash',
+        [{ role: 'user', parts: [{ text: 'List templates' }] }],
+        { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+        new AbortController().signal,
+      );
+
+      expect(result.functionCalls).toEqual([
+        {
+          id: 'call_123',
+          name: 'amc_provider_manager_list_templates',
+          args: { active: true },
+        },
+      ]);
+      expect(result.parts).toEqual([
+        { text: 'Checking templates...' },
+        {
+          functionCall: {
+            id: 'call_123',
+            name: 'amc_provider_manager_list_templates',
+            args: { active: true },
+          },
+        },
+      ]);
+      expect(result.modelContent.role).toBe('model');
+    });
+
+    it('returns text parts without functionCalls when model provides final answer', async () => {
+      const fetchMock = vi.fn<typeof fetch>(async () => {
+        return new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: 'All done!',
+                },
+                finish_reason: 'stop',
+              },
+            ],
+            usage: { prompt_tokens: 15, completion_tokens: 5, total_tokens: 20 },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await generateOpenAICompatibleTurnApi(
+        'test-key',
+        'qwen3.8-flash',
+        [{ role: 'user', parts: [{ text: 'List templates' }] }],
+        { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+        new AbortController().signal,
+      );
+
+      expect(result.functionCalls).toEqual([]);
+      expect(result.parts).toEqual([{ text: 'All done!' }]);
+      expect(result.usage?.totalTokenCount).toBe(20);
+    });
   });
 });

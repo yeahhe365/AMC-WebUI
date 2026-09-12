@@ -29,8 +29,25 @@ export const isFalsePositiveTimestampContext = (preceding: string, succeeding: s
     return true;
   }
 
-  // 3. Explicit clock times of day (e.g., "上午 10:30", "下午 02:30", "晚上 08:00", "09:30 am", "04:15 pm")
-  if (/(?:上午|下午|晚上|早晨|清晨|中午|凌晨)\s*$/i.test(preceding) || /^\s*(?:am|pm)\b/i.test(succeeding)) {
+  // 3. Explicit clock times of day, weekdays, dates, or clock/quota status contexts
+  if (
+    /(?:上午|下午|晚上|早晨|清晨|中午|凌晨|当前|现在)\s*(?:时间|时刻)?\s*[（([【]?\s*$/i.test(preceding) ||
+    /(?:周|星期|礼拜)[一二三四五六日天]\s*[（([【]?\s*$/i.test(preceding) ||
+    /(?:\d{1,2}月\d{1,2}[日号]|\d{4}[-/.]\d{1,2}[-/.]\d{1,2})\s*(?:(?:周|星期|礼拜)[一二三四五六日天])?\s*[（([【]?\s*$/i.test(
+      preceding,
+    ) ||
+    /(?:时间|时刻|刷新|重置|解封|到期|截止|准时|打卡|提醒|预计|当前)\s*(?:为|是|：|:|at)?\s*[（([【]?\s*$/i.test(
+      preceding,
+    ) ||
+    /^\s*(?:am|pm|点|分|整)\b/i.test(succeeding)
+  ) {
+    return true;
+  }
+
+  // 4. HTML tag / attribute context (e.g., inside <...>)
+  const lastOpenTag = preceding.lastIndexOf('<');
+  const lastCloseTag = preceding.lastIndexOf('>');
+  if (lastOpenTag !== -1 && lastOpenTag > lastCloseTag) {
     return true;
   }
 
@@ -321,8 +338,8 @@ export const linkifyTimestamps = (text: string): string => {
             offset: number,
             fullContent: string,
           ) => {
-            const preceding = fullContent.slice(Math.max(0, offset - 20), offset);
-            const succeeding = fullContent.slice(offset + fullMatch.length, offset + fullMatch.length + 20);
+            const preceding = fullContent.slice(Math.max(0, offset - 40), offset);
+            const succeeding = fullContent.slice(offset + fullMatch.length, offset + fullMatch.length + 40);
             if (isFalsePositiveTimestampContext(preceding, succeeding)) {
               return fullMatch;
             }

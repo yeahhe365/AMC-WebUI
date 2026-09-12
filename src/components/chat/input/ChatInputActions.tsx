@@ -44,8 +44,9 @@ const ChatInputActionsComponent: React.FC = () => {
   const { canQueueMessage } = useChatInputComposerStatusContext();
   const isGemma = isGemmaModel(currentModelId);
   const isGeminiNative = providerId === undefined || providerId === GEMINI_PROVIDER_ID;
+  const isThirdPartyChatModel = !isGeminiNative && !isImageGenerationModel;
   const isMcpSupported =
-    isGeminiNative &&
+    (isGeminiNative || isThirdPartyChatModel) &&
     !isTtsModel &&
     !isLiveTranslate &&
     !isLiveTranscribe &&

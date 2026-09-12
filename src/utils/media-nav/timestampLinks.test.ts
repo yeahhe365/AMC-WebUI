@@ -295,4 +295,16 @@ describe('linkifyTimestamps', () => {
     const output = linkifyTimestamps(input);
     expect(output).toBe(input);
   });
+
+  it('does not linkify clock times with weekdays or dates', () => {
+    const input = '基于系统当前时间（9月13日 周日 02:11）测算，周额度将于9月16日 周三 20:05 完全重置。';
+    const output = linkifyTimestamps(input);
+    expect(output).toBe(input);
+  });
+
+  it('does not linkify clock times in refresh, reset, or current time contexts', () => {
+    const input = '当前时间 02:11，精准刷新时间 05:59，到期重置时间 20:05。';
+    const output = linkifyTimestamps(input);
+    expect(output).toBe(input);
+  });
 });

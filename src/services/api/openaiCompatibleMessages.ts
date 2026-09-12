@@ -127,6 +127,50 @@ const buildOpenAICompatibleMessages = (
   }
 
   for (const item of history) {
+    const functionCalls = item.parts
+      .filter((p) => Boolean(p.functionCall))
+      .map((p, idx) => ({
+        id: p.functionCall?.id || `call_${idx}`,
+        type: 'function' as const,
+        function: {
+          name: p.functionCall?.name || '',
+          arguments:
+            typeof p.functionCall?.args === 'string' ? p.functionCall.args : JSON.stringify(p.functionCall?.args ?? {}),
+        },
+      }));
+
+    const functionResponses = item.parts.filter((p) => Boolean(p.functionResponse));
+
+    if (item.role === 'model' && functionCalls.length > 0) {
+      const nonCallParts = item.parts.filter((p) => !p.functionCall);
+      const textContent = partsToOpenAIContent(nonCallParts);
+      messages.push({
+        role: 'assistant',
+        content: hasNonEmptyMessageContent(textContent) ? textContent : null,
+        tool_calls: functionCalls,
+      });
+      continue;
+    }
+
+    if (functionResponses.length > 0) {
+      for (let idx = 0; idx < functionResponses.length; idx++) {
+        const resp = functionResponses[idx].functionResponse!;
+        const rawContent = resp.response;
+        const contentStr =
+          typeof rawContent === 'string'
+            ? rawContent
+            : typeof (rawContent as any)?.response === 'string'
+              ? (rawContent as any).response
+              : JSON.stringify(rawContent ?? {});
+        messages.push({
+          role: 'tool',
+          tool_call_id: resp.id || `call_${idx}`,
+          content: contentStr,
+        });
+      }
+      continue;
+    }
+
     const content = partsToOpenAIContent(item.parts);
     if (!hasNonEmptyMessageContent(content)) {
       continue;
@@ -138,12 +182,31 @@ const buildOpenAICompatibleMessages = (
     });
   }
 
-  const currentContent = partsToOpenAIContent(parts);
-  if (hasNonEmptyMessageContent(currentContent)) {
-    messages.push({
-      role: role === 'model' ? 'assistant' : 'user',
-      content: currentContent,
-    });
+  const currentFunctionResponses = parts.filter((p) => Boolean(p.functionResponse));
+  if (currentFunctionResponses.length > 0) {
+    for (let idx = 0; idx < currentFunctionResponses.length; idx++) {
+      const resp = currentFunctionResponses[idx].functionResponse!;
+      const rawContent = resp.response;
+      const contentStr =
+        typeof rawContent === 'string'
+          ? rawContent
+          : typeof (rawContent as any)?.response === 'string'
+            ? (rawContent as any).response
+            : JSON.stringify(rawContent ?? {});
+      messages.push({
+        role: 'tool',
+        tool_call_id: resp.id || `call_${idx}`,
+        content: contentStr,
+      });
+    }
+  } else {
+    const currentContent = partsToOpenAIContent(parts);
+    if (hasNonEmptyMessageContent(currentContent)) {
+      messages.push({
+        role: role === 'model' ? 'assistant' : 'user',
+        content: currentContent,
+      });
+    }
   }
 
   return messages;
@@ -162,6 +225,10 @@ export const buildOpenAICompatibleRequestBody = (
     messages: buildOpenAICompatibleMessages(history, parts, role, config),
     stream,
   };
+
+  if (Array.isArray(config.tools) && config.tools.length > 0) {
+    body.tools = config.tools;
+  }
 
   appendSamplingParameters(body, config);
 

@@ -35,11 +35,17 @@ import {
   sendStatelessMessageStreamApi,
 } from '@/services/api/chatApi';
 import {
+  generateOpenAICompatibleTurnApi,
   sendOpenAICompatibleMessageNonStream,
   sendOpenAICompatibleMessageStream,
 } from '@/services/api/openaiCompatibleApi';
 import { sendOpenAIResponsesNonStream, sendOpenAIResponsesStream } from '@/services/api/openaiResponsesApi';
-import { sendAnthropicMessageNonStream, sendAnthropicMessageStream } from '@/services/api/anthropicApi';
+import {
+  generateAnthropicTurnApi,
+  sendAnthropicMessageNonStream,
+  sendAnthropicMessageStream,
+} from '@/services/api/anthropicApi';
+import { toOpenAITools, toAnthropicTools } from '@/features/chat-tools/toolSchemaAdapters';
 import { createMcpClientFunctions } from '@/features/mcp/mcpClientFunctions';
 import { requestToolApproval } from '@/stores/mcpApprovalStore';
 import { selectServersForTurn, useMcpRuntimeStore } from '@/stores/mcpRuntimeStore';
@@ -251,7 +257,7 @@ export const performStandardChatApiCall = async ({
     customLiveArtifactsPrompt: getLiveArtifactsSystemPromptOverride(appSettings, appSettings.liveArtifactsPromptMode),
     visionPromptMode: sessionToUpdate.visionPromptMode,
     isDeepSearchEnabled: !activeProvider && Boolean(sessionToUpdate.isDeepSearchEnabled),
-    isLocalPythonEnabled: !activeProvider && Boolean(sessionToUpdate.isLocalPythonEnabled),
+    isLocalPythonEnabled: Boolean(sessionToUpdate.isLocalPythonEnabled),
     isGemmaModel: isGemmaModel(apiModelId),
     locateDirectives,
     language: resolveAppLanguage(appSettings.language),
@@ -287,6 +293,86 @@ export const performStandardChatApiCall = async ({
     source: activeProvider ? 'third-party' : 'gemini',
   });
 
+  const localPythonContextMessages =
+    finalRole === 'user'
+      ? [
+          ...baseMessagesForApi,
+          {
+            id: 'temp-standard-user',
+            role: 'user' as const,
+            content: textToUse.trim(),
+            files: enrichedFiles,
+            timestamp: new Date(),
+          },
+        ]
+      : baseMessagesForApi;
+  const standardClientFunctions = !activeProvider
+    ? createStandardClientFunctions({
+        isLocalPythonEnabled:
+          !!sessionToUpdate.isLocalPythonEnabled &&
+          finalRole === 'user' &&
+          !isRawMode &&
+          !isImageGenerationModel(apiModelId),
+        inputFiles: collectLocalPythonInputFiles(
+          [
+            ...localPythonContextMessages,
+            {
+              id: 'temp-standard-tool-target',
+              role: 'model',
+              content: '',
+              timestamp: new Date(),
+            },
+          ],
+          'temp-standard-tool-target',
+        ),
+        runPython: async (code, options) => {
+          const pyodideService = await getPyodideService();
+          return pyodideService.runPython(code, options);
+        },
+      })
+    : {};
+  const runtimeSelection = useMcpRuntimeStore.getState();
+  const enabledMcpServers = selectServersForTurn(appSettings.mcpServers ?? [], runtimeSelection);
+  const virtualMcpStore = useVirtualMcpStore.getState();
+  const activeVirtualServers = virtualMcpStore
+    .getEnabledVirtualServers()
+    .filter((vs) => isVirtualServerActiveForTurn(vs.id, runtimeSelection));
+  const isMcpEnabledForTurn =
+    finalRole === 'user' &&
+    !isRawMode &&
+    !isImageGenerationModel(apiModelId) &&
+    (enabledMcpServers.length > 0 || activeVirtualServers.length > 0);
+  // Discovery is resilient: failures log and yield {} so chat continues without MCP tools.
+  const mcpClientFunctions = isMcpEnabledForTurn
+    ? await createMcpClientFunctions({
+        servers: enabledMcpServers,
+        virtualServers: activeVirtualServers,
+        abortSignal: newAbortController.signal,
+        requestApproval: (request) => requestToolApproval(request, newAbortController.signal),
+        // Discovery is cached for 30s; re-check disables at call time.
+        resolveLatestServers: () => useSettingsStore.getState().appSettings.mcpServers,
+      })
+    : {};
+  const combinedClientFunctions = {
+    ...standardClientFunctions,
+    ...mcpClientFunctions,
+  };
+  const insertInternalToolMessages = (messages: ChatMessage[]) => {
+    updateAndPersistSessions(
+      (prev) =>
+        updateSessionById(prev, finalSessionId, (session) => ({
+          ...session,
+          messages: session.messages.flatMap((message) => {
+            if (message.id !== generationId) {
+              return [message];
+            }
+            return [...messages, { ...message }];
+          }),
+        })),
+      { persist: false },
+    );
+  };
+
   if (activeProvider) {
     const activeModel = activeProvider.models?.find((m) => m.id === apiModelId);
     const providerConfig = {
@@ -309,6 +395,69 @@ export const performStandardChatApiCall = async ({
     const isOpenAIResponses = activeProvider.protocol === 'openai-responses';
     // Docker THIRD_PARTY_ROUTES is keyed by template, not connection UUID.
     const providerId = getProxyProviderHeader(activeProvider.templateId);
+
+    const hasClientFunctions = Object.keys(combinedClientFunctions).length > 0;
+    if (hasClientFunctions) {
+      try {
+        const toolLoopResult = await runStandardToolLoop({
+          initialContents: appendTurnToHistory(historyForChat, finalRole, finalParts),
+          clientFunctions: combinedClientFunctions,
+          abortSignal: newAbortController.signal,
+          onToolCallsStarted: (modelContent) => {
+            insertInternalToolMessages([
+              createMessage('model', '', {
+                apiParts: modelContent.parts,
+                isInternalToolMessage: true,
+                toolParentMessageId: generationId,
+              }),
+            ]);
+          },
+          onToolResponsesSettled: (functionResponseParts) => {
+            insertInternalToolMessages([
+              createMessage('user', '', {
+                apiParts: functionResponseParts,
+                isInternalToolMessage: true,
+                toolParentMessageId: generationId,
+              }),
+            ]);
+          },
+          runTurn: (contents) =>
+            isAnthropic
+              ? generateAnthropicTurnApi(
+                  keyToUse,
+                  apiModelId,
+                  contents,
+                  { ...providerConfig, tools: toAnthropicTools(combinedClientFunctions) },
+                  newAbortController.signal,
+                  providerId,
+                )
+              : generateOpenAICompatibleTurnApi(
+                  keyToUse,
+                  apiModelId,
+                  contents,
+                  { ...providerConfig, tools: toOpenAITools(combinedClientFunctions) },
+                  newAbortController.signal,
+                  providerId,
+                ),
+        });
+
+        for (const part of toolLoopResult.finalTurn.parts) {
+          streamOnPart(part, { recordFirstToken: false, source: 'third-party' });
+        }
+        if (toolLoopResult.finalTurn.thoughts) {
+          onThoughtChunk(toolLoopResult.finalTurn.thoughts, { recordFirstToken: false, source: 'third-party' });
+        }
+        wrappedStreamOnComplete(
+          toolLoopResult.finalTurn.usage,
+          toolLoopResult.finalTurn.grounding,
+          toolLoopResult.finalTurn.urlContext,
+          toolLoopResult.generatedFiles,
+        );
+      } catch (toolLoopError) {
+        streamOnError(toError(toolLoopError));
+      }
+      return;
+    }
 
     if (appSettings.isStreamingEnabled) {
       // Stamp thinking provenance on every third-party streaming callback; the
@@ -412,68 +561,6 @@ export const performStandardChatApiCall = async ({
     return;
   }
 
-  const localPythonContextMessages =
-    finalRole === 'user'
-      ? [
-          ...baseMessagesForApi,
-          {
-            id: 'temp-standard-user',
-            role: 'user' as const,
-            content: textToUse.trim(),
-            files: enrichedFiles,
-            timestamp: new Date(),
-          },
-        ]
-      : baseMessagesForApi;
-  const standardClientFunctions = createStandardClientFunctions({
-    isLocalPythonEnabled:
-      !!sessionToUpdate.isLocalPythonEnabled &&
-      finalRole === 'user' &&
-      !isRawMode &&
-      !isImageGenerationModel(apiModelId),
-    inputFiles: collectLocalPythonInputFiles(
-      [
-        ...localPythonContextMessages,
-        {
-          id: 'temp-standard-tool-target',
-          role: 'model',
-          content: '',
-          timestamp: new Date(),
-        },
-      ],
-      'temp-standard-tool-target',
-    ),
-    runPython: async (code, options) => {
-      const pyodideService = await getPyodideService();
-      return pyodideService.runPython(code, options);
-    },
-  });
-  const runtimeSelection = useMcpRuntimeStore.getState();
-  const enabledMcpServers = selectServersForTurn(appSettings.mcpServers ?? [], runtimeSelection);
-  const virtualMcpStore = useVirtualMcpStore.getState();
-  const activeVirtualServers = virtualMcpStore
-    .getEnabledVirtualServers()
-    .filter((vs) => isVirtualServerActiveForTurn(vs.id, runtimeSelection));
-  const isMcpEnabledForTurn =
-    finalRole === 'user' &&
-    !isRawMode &&
-    !isImageGenerationModel(apiModelId) &&
-    (enabledMcpServers.length > 0 || activeVirtualServers.length > 0);
-  // Discovery is resilient: failures log and yield {} so chat continues without MCP tools.
-  const mcpClientFunctions = isMcpEnabledForTurn
-    ? await createMcpClientFunctions({
-        servers: enabledMcpServers,
-        virtualServers: activeVirtualServers,
-        abortSignal: newAbortController.signal,
-        requestApproval: (request) => requestToolApproval(request, newAbortController.signal),
-        // Discovery is cached for 30s; re-check disables at call time.
-        resolveLatestServers: () => useSettingsStore.getState().appSettings.mcpServers,
-      })
-    : {};
-  const combinedClientFunctions = {
-    ...standardClientFunctions,
-    ...mcpClientFunctions,
-  };
   const localPythonFunctionDeclarations = Object.values(standardClientFunctions).map(({ declaration }) => declaration);
   const mcpFunctionDeclarations = Object.values(mcpClientFunctions).map(({ declaration }) => declaration);
   const hasRequestedServerSideToolThatNeedsCombination =
@@ -500,22 +587,6 @@ export const performStandardChatApiCall = async ({
     ...mcpFunctionDeclarations,
   ]);
   const hasFunctionDeclarationsInRequest = !!requestConfig.tools?.some((tool) => 'functionDeclarations' in tool);
-
-  const insertInternalToolMessages = (messages: ChatMessage[]) => {
-    updateAndPersistSessions(
-      (prev) =>
-        updateSessionById(prev, finalSessionId, (session) => ({
-          ...session,
-          messages: session.messages.flatMap((message) => {
-            if (message.id !== generationId) {
-              return [message];
-            }
-            return [...messages, { ...message }];
-          }),
-        })),
-      { persist: false },
-    );
-  };
 
   const canJournalStream =
     !activeProvider && isGeminiProxyRelativePath(appSettings) && finalRole === 'user' && !isContinueMode;

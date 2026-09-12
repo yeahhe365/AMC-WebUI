@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { setupProviderTestRenderer } from '@/test/render/providerRenderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useSettingsStore } from '@/stores/settingsStore';
 import {
   createChatInputActionsContextValue,
   createChatInputComposerStatusContextValue,
@@ -271,11 +272,16 @@ describe('ChatInputActions', () => {
     expect(audioBtn).toHaveAttribute('title', 'Current model does not support MCP tools');
   });
 
-  it('disables MCP picker and hides Live controls on third-party provider routes', () => {
+  it('enables MCP picker and hides Live controls on third-party provider routes', () => {
+    useSettingsStore.setState({
+      appSettings: {
+        ...useSettingsStore.getState().appSettings,
+        mcpServers: [{ id: 's1', name: 'Server 1', enabled: true, transport: 'stdio' }],
+      } as never,
+    });
     renderActions({ providerId: 'openai' });
     const mcpBtn = renderer.container.querySelector('[data-testid="mcp-picker-button"]');
-    expect(mcpBtn).toBeDisabled();
-    expect(mcpBtn).toHaveAttribute('title', 'Current model does not support MCP tools');
+    expect(mcpBtn).not.toBeDisabled();
 
     mockCapabilities.value = {
       ...mockCapabilities.value,

@@ -309,5 +309,77 @@ describe('openaiCompatibleMessages', () => {
       );
       expect(qwqProxyBody.reasoning_effort).toBe('high');
     });
+
+    it('maps functionCall in model history to assistant message with tool_calls and preserves text', () => {
+      const body = buildOpenAICompatibleRequestBody(
+        'qwen3.8-flash',
+        [
+          {
+            role: 'model',
+            parts: [
+              { text: 'Let me check that.' },
+              {
+                functionCall: {
+                  id: 'call_abc123',
+                  name: 'amc_provider_manager_list_templates',
+                  args: { filter: 'active' },
+                },
+              },
+            ],
+          },
+        ],
+        [
+          {
+            functionResponse: {
+              id: 'call_abc123',
+              name: 'amc_provider_manager_list_templates',
+              response: { templates: ['gemini', 'openai'] },
+            },
+          },
+        ],
+        {},
+        'user',
+        false,
+      );
+
+      expect(body.messages).toEqual([
+        {
+          role: 'assistant',
+          content: 'Let me check that.',
+          tool_calls: [
+            {
+              id: 'call_abc123',
+              type: 'function',
+              function: {
+                name: 'amc_provider_manager_list_templates',
+                arguments: '{"filter":"active"}',
+              },
+            },
+          ],
+        },
+        {
+          role: 'tool',
+          tool_call_id: 'call_abc123',
+          content: '{"templates":["gemini","openai"]}',
+        },
+      ]);
+    });
+
+    it('attaches tools to body when config.tools is provided', () => {
+      const tools = [
+        {
+          type: 'function' as const,
+          function: {
+            name: 'test_tool',
+            description: 'Test description',
+            parameters: { type: 'object', properties: {} },
+          },
+        },
+      ];
+
+      const body = buildOpenAICompatibleRequestBody('qwen3.8-flash', [], [{ text: 'hello' }], { tools }, 'user', false);
+
+      expect(body.tools).toEqual(tools);
+    });
   });
 });

@@ -18,6 +18,34 @@ const partToAnthropicContentItems = (part: Part): AnthropicContentBlock[] => {
     return part.text ? [{ type: 'text', text: part.text }] : [];
   }
 
+  if (part.functionCall) {
+    return [
+      {
+        type: 'tool_use',
+        id: part.functionCall.id || 'toolu_0',
+        name: part.functionCall.name || '',
+        input: (part.functionCall.args as Record<string, unknown>) ?? {},
+      },
+    ];
+  }
+
+  if (part.functionResponse) {
+    const raw = part.functionResponse.response;
+    const content =
+      typeof raw === 'string'
+        ? raw
+        : typeof (raw as any)?.response === 'string'
+          ? (raw as any).response
+          : JSON.stringify(raw ?? {});
+    return [
+      {
+        type: 'tool_result',
+        tool_use_id: part.functionResponse.id || 'toolu_0',
+        content,
+      },
+    ];
+  }
+
   if (partWithMedia.fileData) {
     throw new Error(ANTHROPIC_FILE_DATA_ERROR);
   }
@@ -123,6 +151,10 @@ export const buildAnthropicRequestBody = (
     stream,
     max_tokens: customMaxTokens,
   };
+
+  if (Array.isArray(config.tools) && config.tools.length > 0) {
+    body.tools = config.tools;
+  }
 
   const systemInstruction = config.systemInstruction?.trim();
   if (systemInstruction) {

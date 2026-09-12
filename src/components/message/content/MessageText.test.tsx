@@ -568,6 +568,94 @@ describe('MessageText', () => {
     expect(renderedContent).toContain('box=100%2C200%2C300%2C400');
   });
 
+  it('does not perform locate or timestamp link conversions when Live Artifacts mode is enabled', () => {
+    const content =
+      '<div style="color:var(--amc-live-artifact-text)">' +
+      '时间为 05:59，<image-locate image="chart.png" box_2d="[100,200,300,400]">关键图表</image-locate>' +
+      '</div>';
+
+    act(() => {
+      renderer.render(
+        <MessageText
+          message={{
+            id: 'message-la-no-locate',
+            role: 'model',
+            content,
+            timestamp: new Date('2026-04-21T00:00:00.000Z'),
+          }}
+          showThoughts={false}
+          appSettings={createAppSettings({
+            isLiveArtifactsEnabled: true,
+            autoOpenHtmlPreview: false,
+            hideThinkingInContext: false,
+          })}
+          themeId="pearl"
+          baseFontSize={16}
+          onImageClick={vi.fn()}
+          onOpenHtmlPreview={vi.fn()}
+          expandCodeBlocksByDefault={false}
+          isMermaidRenderingEnabled={true}
+          isGraphvizRenderingEnabled={true}
+          onOpenSidePanel={vi.fn()}
+        />,
+      );
+    });
+
+    const renderedContent = renderer.container.querySelector('[data-testid="markdown-renderer"]')?.textContent;
+    // Live Artifacts must not contain #video-seek or #image-seek
+    expect(renderedContent).not.toContain('#video-seek');
+    expect(renderedContent).not.toContain('#image-seek');
+    expect(renderedContent).toContain('05:59');
+  });
+
+  it('does not convert timestamps to #video-seek links when only images are present in session', () => {
+    useChatStore.setState({
+      selectedFiles: [
+        {
+          id: 'img-1',
+          name: 'screenshot.png',
+          type: 'image/png',
+          size: 1024,
+          uploadState: 'active',
+        },
+      ],
+      activeMessages: [],
+    });
+
+    const content = '清算将在 05:59 进行。';
+
+    act(() => {
+      renderer.render(
+        <MessageText
+          message={{
+            id: 'message-image-only-timestamp',
+            role: 'model',
+            content,
+            timestamp: new Date('2026-04-21T00:00:00.000Z'),
+          }}
+          showThoughts={false}
+          appSettings={createAppSettings({
+            isLiveArtifactsEnabled: false,
+            autoOpenHtmlPreview: false,
+            hideThinkingInContext: false,
+          })}
+          themeId="pearl"
+          baseFontSize={16}
+          onImageClick={vi.fn()}
+          onOpenHtmlPreview={vi.fn()}
+          expandCodeBlocksByDefault={false}
+          isMermaidRenderingEnabled={true}
+          isGraphvizRenderingEnabled={true}
+          onOpenSidePanel={vi.fn()}
+        />,
+      );
+    });
+
+    const renderedContent = renderer.container.querySelector('[data-testid="markdown-renderer"]')?.textContent;
+    expect(renderedContent).not.toContain('#video-seek');
+    expect(renderedContent).toBe('清算将在 05:59 进行。');
+  });
+
   it('collapses long user messages by default and expands them on request', () => {
     const content = Array.from(
       { length: 10 },

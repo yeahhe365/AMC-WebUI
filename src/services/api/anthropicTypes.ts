@@ -1,6 +1,8 @@
 import type { UsageMetadata } from '@google/genai';
 import type { ThinkingLevel } from '@/types';
 
+import type { AnthropicToolDefinition } from '@/features/chat-tools/toolSchemaAdapters';
+
 export interface AnthropicChatConfig {
   baseUrl?: string | null;
   systemInstruction?: string;
@@ -13,10 +15,14 @@ export interface AnthropicChatConfig {
   /** Maps to output_config.effort on adaptive Claude models (Fable 5 / Opus 5 / Sonnet 5, …). */
   thinkingLevel?: ThinkingLevel;
   extraHeaders?: Record<string, string> | null;
+  tools?: AnthropicToolDefinition[];
 }
 
 export type AnthropicContentBlock =
-  { type: 'text'; text: string } | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } };
+  | { type: 'text'; text: string }
+  | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }
+  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
+  | { type: 'tool_result'; tool_use_id: string; content: string };
 
 export interface AnthropicMessage {
   role: 'user' | 'assistant';
@@ -32,7 +38,14 @@ export type AnthropicUsage = {
 export type AnthropicResponsePayload = {
   id?: string;
   role?: string;
-  content?: Array<{ type?: string; text?: string; thinking?: string }>;
+  content?: Array<{
+    type?: string;
+    text?: string;
+    thinking?: string;
+    id?: string;
+    name?: string;
+    input?: Record<string, unknown>;
+  }>;
   model?: string;
   usage?: AnthropicUsage;
   error?: { message?: string };

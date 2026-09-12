@@ -1,6 +1,17 @@
 import type { UsageMetadata } from '@google/genai';
 import type { ThinkingLevel } from '@/types';
 
+import type { OpenAIToolDefinition } from '@/features/chat-tools/toolSchemaAdapters';
+
+export interface OpenAIToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
 export interface OpenAICompatibleChatConfig {
   baseUrl?: string | null;
   templateId?: string | null;
@@ -16,6 +27,7 @@ export interface OpenAICompatibleChatConfig {
   thinkingLevel?: ThinkingLevel;
   thinkingBudget?: number;
   extraHeaders?: Record<string, string> | null;
+  tools?: OpenAIToolDefinition[];
 }
 
 export type OpenAIMessageContent =
@@ -26,10 +38,21 @@ export type OpenAIMessageContent =
       | { type: 'input_audio'; input_audio: { data: string; format: string } }
     >;
 
-export type OpenAIMessage = {
-  role: 'system' | 'user' | 'assistant';
-  content: OpenAIMessageContent;
-};
+export type OpenAIMessage =
+  | {
+      role: 'system' | 'user';
+      content: OpenAIMessageContent;
+    }
+  | {
+      role: 'assistant';
+      content: OpenAIMessageContent | null;
+      tool_calls?: OpenAIToolCall[];
+    }
+  | {
+      role: 'tool';
+      tool_call_id: string;
+      content: string;
+    };
 
 export type OpenAIUsage = {
   prompt_tokens?: number;
@@ -45,12 +68,22 @@ export type OpenAIChoice = {
     reasoning_content?: string;
     reasoning?: string;
     reasoning_details?: Array<{ text?: string }>;
+    tool_calls?: OpenAIToolCall[];
   };
   delta?: {
     content?: string;
     reasoning_content?: string;
     reasoning?: string;
     reasoning_details?: Array<{ text?: string }>;
+    tool_calls?: Array<{
+      index?: number;
+      id?: string;
+      type?: 'function';
+      function?: {
+        name?: string;
+        arguments?: string;
+      };
+    }>;
   };
 };
 

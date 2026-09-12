@@ -85,73 +85,6 @@ export const MessageText: React.FC<MessageTextProps> = ({
           },
     [rawThinkingExtraction.content, message.role],
   );
-  const hasMediaInSession = useMemo(() => {
-    if (message.role !== 'model') return false;
-    if (
-      locateExtraction.videoLocates.length > 0 ||
-      locateExtraction.audioLocates.length > 0 ||
-      locateExtraction.pdfLocates.length > 0 ||
-      locateExtraction.imageLocates.length > 0
-    ) {
-      return true;
-    }
-    const { selectedFiles, activeMessages } = useChatStore.getState();
-    const { videos, audios, pdfs, images } = collectSessionMediaFiles(selectedFiles, activeMessages);
-    return videos.length > 0 || audios.length > 0 || pdfs.length > 0 || images.length > 0;
-  }, [
-    locateExtraction.videoLocates.length,
-    locateExtraction.audioLocates.length,
-    locateExtraction.pdfLocates.length,
-    locateExtraction.imageLocates.length,
-    message.role,
-  ]);
-
-  const effectiveContent = useMemo(() => {
-    if (!hasMediaInSession) {
-      return locateExtraction.cleanContent;
-    }
-    const withPdfLinks = linkifyPdfLocates(rawThinkingExtraction.content);
-    const withImageLinks = linkifyImageLocates(withPdfLinks);
-    return linkifyTimestamps(withImageLinks);
-  }, [hasMediaInSession, locateExtraction.cleanContent, rawThinkingExtraction.content]);
-  const effectiveThoughts = useMemo(
-    () => [thoughts, streamThoughts, rawThinkingExtraction.thoughts].filter(Boolean).join('\n\n'),
-    [thoughts, streamThoughts, rawThinkingExtraction.thoughts],
-  );
-
-  const shouldSmooth = isLoading && message.role === 'model';
-  const displayedContent = useSmoothStreaming(effectiveContent, shouldSmooth);
-  const markdownContent = useMemo(
-    () =>
-      normalizePreviewableMarkdownContent(displayedContent, {
-        isStreaming: shouldSmooth,
-        unwrapMislabeledHtmlBlocks: appSettings.unwrapMislabeledHtmlBlocks ?? true,
-      }),
-    [displayedContent, shouldSmooth, appSettings.unwrapMislabeledHtmlBlocks],
-  );
-  // The sandbox round-trip has no tokens to show while Google executes, so the
-  // code-exec card would sit silently. The content itself carries the signal:
-  // an executableCode block with no following tool-result block means the
-  // sandbox is still running (streaming only — completed messages resolve it).
-  const hasPendingCodeExecution = useMemo(
-    () => isLoading && message.role === 'model' && isCodeExecutionPendingInContent(markdownContent),
-    [markdownContent, isLoading, message.role],
-  );
-  const shouldOfferUserMessageCollapse =
-    Boolean(userMessageCollapse) &&
-    message.role === 'user' &&
-    !isLoading &&
-    shouldCollapseUserMessageContent(displayedContent);
-  const userMessageCollapseKey = getUserMessageCollapseKey(message.id, displayedContent);
-  const isUserMessageExpanded = userMessageCollapse?.expandedUserMessageKeys.has(userMessageCollapseKey) ?? false;
-  const isUserMessageCollapsed = shouldOfferUserMessageCollapse && !isUserMessageExpanded;
-  const userMessageCollapseRegionId = `${message.id}-message-text`;
-  const collapsedMaxHeight = baseFontSize * USER_MESSAGE_COLLAPSED_LINE_HEIGHT * USER_MESSAGE_COLLAPSE_LINE_THRESHOLD;
-  const liveArtifactsCustomFontSize = appSettings.liveArtifactsCustomFontSize;
-  const liveArtifactFontSize = useMemo(
-    () => resolveLiveArtifactsFontSize({ liveArtifactsCustomFontSize }),
-    [liveArtifactsCustomFontSize],
-  );
   // LA mode must match the header button, which tracks the ACTIVE session's
   // systemInstruction (currentChatSettings), not the global default. The
   // message list only renders the active session's messages, so reading the
@@ -190,6 +123,94 @@ export const MessageText: React.FC<MessageTextProps> = ({
       appSettings.liveArtifactsSystemPrompts,
       currentChatSettingsSystemInstruction,
     ],
+  );
+
+  const { hasNavigableVideoOrAudio, hasPdfInSession, hasImageInSession } = useMemo(() => {
+    // Live Artifacts must NEVER execute locate conversions or timestamp link rewrites.
+    if (message.role !== 'model' || liveArtifactsMode) {
+      return { hasNavigableVideoOrAudio: false, hasPdfInSession: false, hasImageInSession: false };
+    }
+    const hasVideoOrAudioLocate = locateExtraction.videoLocates.length > 0 || locateExtraction.audioLocates.length > 0;
+    const hasPdfLocate = locateExtraction.pdfLocates.length > 0;
+    const hasImageLocate = locateExtraction.imageLocates.length > 0;
+
+    const { selectedFiles, activeMessages } = useChatStore.getState();
+    const { videos, audios, pdfs, images } = collectSessionMediaFiles(selectedFiles, activeMessages);
+
+    return {
+      hasNavigableVideoOrAudio: hasVideoOrAudioLocate || videos.length > 0 || audios.length > 0,
+      hasPdfInSession: hasPdfLocate || pdfs.length > 0,
+      hasImageInSession: hasImageLocate || images.length > 0,
+    };
+  }, [
+    liveArtifactsMode,
+    locateExtraction.audioLocates.length,
+    locateExtraction.imageLocates.length,
+    locateExtraction.pdfLocates.length,
+    locateExtraction.videoLocates.length,
+    message.role,
+  ]);
+
+  const effectiveContent = useMemo(() => {
+    if (liveArtifactsMode || (!hasNavigableVideoOrAudio && !hasPdfInSession && !hasImageInSession)) {
+      return locateExtraction.cleanContent;
+    }
+    let result = rawThinkingExtraction.content;
+    if (hasPdfInSession) {
+      result = linkifyPdfLocates(result);
+    }
+    if (hasImageInSession) {
+      result = linkifyImageLocates(result);
+    }
+    if (hasNavigableVideoOrAudio) {
+      result = linkifyTimestamps(result);
+    }
+    return result;
+  }, [
+    hasImageInSession,
+    hasNavigableVideoOrAudio,
+    hasPdfInSession,
+    liveArtifactsMode,
+    locateExtraction.cleanContent,
+    rawThinkingExtraction.content,
+  ]);
+  const effectiveThoughts = useMemo(
+    () => [thoughts, streamThoughts, rawThinkingExtraction.thoughts].filter(Boolean).join('\n\n'),
+    [thoughts, streamThoughts, rawThinkingExtraction.thoughts],
+  );
+
+  const shouldSmooth = isLoading && message.role === 'model';
+  const displayedContent = useSmoothStreaming(effectiveContent, shouldSmooth);
+  const markdownContent = useMemo(
+    () =>
+      normalizePreviewableMarkdownContent(displayedContent, {
+        isStreaming: shouldSmooth,
+        unwrapMislabeledHtmlBlocks: appSettings.unwrapMislabeledHtmlBlocks ?? true,
+      }),
+    [displayedContent, shouldSmooth, appSettings.unwrapMislabeledHtmlBlocks],
+  );
+  // The sandbox round-trip has no tokens to show while Google executes, so the
+  // code-exec card would sit silently. The content itself carries the signal:
+  // an executableCode block with no following tool-result block means the
+  // sandbox is still running (streaming only — completed messages resolve it).
+  const hasPendingCodeExecution = useMemo(
+    () => isLoading && message.role === 'model' && isCodeExecutionPendingInContent(markdownContent),
+    [markdownContent, isLoading, message.role],
+  );
+  const shouldOfferUserMessageCollapse =
+    Boolean(userMessageCollapse) &&
+    message.role === 'user' &&
+    !isLoading &&
+    shouldCollapseUserMessageContent(displayedContent);
+  const userMessageCollapseKey = getUserMessageCollapseKey(message.id, displayedContent);
+  const isUserMessageExpanded = userMessageCollapse?.expandedUserMessageKeys.has(userMessageCollapseKey) ?? false;
+  const isUserMessageCollapsed = shouldOfferUserMessageCollapse && !isUserMessageExpanded;
+  const userMessageCollapseRegionId = `${message.id}-message-text`;
+  const collapsedMaxHeight = baseFontSize * USER_MESSAGE_COLLAPSED_LINE_HEIGHT * USER_MESSAGE_COLLAPSE_LINE_THRESHOLD;
+  const liveArtifactsCustomFontSize = appSettings.liveArtifactsCustomFontSize;
+  const liveArtifactFontSize = useMemo(
+    () => resolveLiveArtifactsFontSize({ liveArtifactsCustomFontSize }),
+    [liveArtifactsCustomFontSize],
   );
 
   const prevIsLoadingRef = useRef(isLoading);

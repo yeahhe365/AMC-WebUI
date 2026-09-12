@@ -13,10 +13,12 @@ const mocks = vi.hoisted(() => ({
   generateContentTurnApi: vi.fn(),
   sendStatelessMessageNonStreamApi: vi.fn(),
   sendStatelessMessageStreamApi: vi.fn(),
+  generateOpenAICompatibleTurnApi: vi.fn(),
   sendOpenAICompatibleMessageNonStream: vi.fn(),
   sendOpenAICompatibleMessageStream: vi.fn(),
   sendOpenAIResponsesNonStream: vi.fn(),
   sendOpenAIResponsesStream: vi.fn(),
+  generateAnthropicTurnApi: vi.fn(),
   sendAnthropicMessageNonStream: vi.fn(),
   sendAnthropicMessageStream: vi.fn(),
   createMcpClientFunctions: vi.fn(),
@@ -60,6 +62,7 @@ vi.mock('@/services/api/chatApi', () => ({
   sendStatelessMessageStreamApi: mocks.sendStatelessMessageStreamApi,
 }));
 vi.mock('@/services/api/openaiCompatibleApi', () => ({
+  generateOpenAICompatibleTurnApi: mocks.generateOpenAICompatibleTurnApi,
   sendOpenAICompatibleMessageNonStream: mocks.sendOpenAICompatibleMessageNonStream,
   sendOpenAICompatibleMessageStream: mocks.sendOpenAICompatibleMessageStream,
 }));
@@ -68,6 +71,7 @@ vi.mock('@/services/api/openaiResponsesApi', () => ({
   sendOpenAIResponsesStream: mocks.sendOpenAIResponsesStream,
 }));
 vi.mock('@/services/api/anthropicApi', () => ({
+  generateAnthropicTurnApi: mocks.generateAnthropicTurnApi,
   sendAnthropicMessageNonStream: mocks.sendAnthropicMessageNonStream,
   sendAnthropicMessageStream: mocks.sendAnthropicMessageStream,
 }));
@@ -504,6 +508,66 @@ describe('performStandardChatApiCall', () => {
       expect.objectContaining({
         systemInstruction: expect.not.stringContaining('Live Artifacts Protocol'),
       }),
+    );
+  });
+
+  it('executes runStandardToolLoop when third-party provider route has enabled MCP tools', async () => {
+    mocks.resolveChatApiRoute.mockReturnValue({
+      provider: {
+        id: 'conn-1',
+        templateId: 'dashscope',
+        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        protocol: 'openai-compatible',
+        models: [{ id: 'qwen3.8-flash' }],
+      },
+    });
+
+    mocks.createChatHistoryForApi.mockResolvedValue([]);
+    mocks.createMcpClientFunctions.mockResolvedValue({
+      mcp_test_tool: {
+        declaration: { name: 'mcp_test_tool', parameters: { type: 'OBJECT', properties: {} } },
+        handler: vi.fn(),
+      },
+    });
+    mocks.runStandardToolLoop.mockResolvedValue({
+      finalTurn: {
+        modelContent: { role: 'model', parts: [{ text: 'Result from third party tool loop' }] },
+        parts: [{ text: 'Result from third party tool loop' }],
+        usage: { totalTokenCount: 42 },
+      },
+      toolMessages: [],
+      generatedFiles: [],
+    });
+
+    const mcpServer = {
+      id: 'srv-1',
+      name: 'Server 1',
+      enabled: true,
+      transport: 'stdio' as const,
+    };
+    useMcpRuntimeStore.setState({ masterEnabled: true, selectedServerIds: null });
+
+    const params = baseParams({
+      appSettings: {
+        ...DEFAULT_APP_SETTINGS,
+        mcpServers: [mcpServer],
+      },
+      text: 'Check via tool',
+      activeModelId: 'qwen3.8-flash',
+    });
+
+    await performStandardChatApiCall(params as never);
+
+    expect(mocks.runStandardToolLoop).toHaveBeenCalledTimes(1);
+    expect(mocks.sendOpenAICompatibleMessageStream).not.toHaveBeenCalled();
+    expect(handlers.streamOnPart).toHaveBeenCalledWith(
+      { text: 'Result from third party tool loop' },
+      expect.objectContaining({ source: 'third-party' }),
+    );
+    expect(handlers.streamOnComplete).toHaveBeenCalledWith(
+      expect.objectContaining({ totalTokenCount: 42 }),
+      undefined,
+      undefined,
     );
   });
 });

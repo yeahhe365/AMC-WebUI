@@ -237,4 +237,83 @@ describe('buildAnthropicRequestBody', () => {
     expect(body.max_tokens).toBe(2048);
     expect(body.stop_sequences).toEqual(['Human:', 'Assistant:']);
   });
+
+  it('maps functionCall in history to tool_use block and functionResponse to tool_result block', () => {
+    const body = buildAnthropicRequestBody(
+      'claude-3-5-sonnet-20241022',
+      [
+        {
+          role: 'model',
+          parts: [
+            { text: 'Checking connection...' },
+            {
+              functionCall: {
+                id: 'toolu_123',
+                name: 'test_tool',
+                args: { query: 'test' },
+              },
+            },
+          ],
+        },
+      ],
+      [
+        {
+          functionResponse: {
+            id: 'toolu_123',
+            name: 'test_tool',
+            response: { success: true },
+          },
+        },
+      ],
+      {},
+      'user',
+      false,
+    ) as { messages: Array<{ role: string; content: any }> };
+
+    expect(body.messages).toEqual([
+      {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Checking connection...' },
+          {
+            type: 'tool_use',
+            id: 'toolu_123',
+            name: 'test_tool',
+            input: { query: 'test' },
+          },
+        ],
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'tool_result',
+            tool_use_id: 'toolu_123',
+            content: '{"success":true}',
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('attaches tools to body when config.tools is provided', () => {
+    const tools = [
+      {
+        name: 'test_tool',
+        description: 'Test description',
+        input_schema: { type: 'object', properties: {} },
+      },
+    ];
+
+    const body = buildAnthropicRequestBody(
+      'claude-3-5-sonnet-20241022',
+      [],
+      [{ text: 'hello' }],
+      { tools },
+      'user',
+      false,
+    );
+
+    expect(body.tools).toEqual(tools);
+  });
 });
