@@ -1,12 +1,12 @@
 import { Type, type FunctionDeclaration } from '@google/genai';
-import type {
-  ModelOption,
-  StandardClientFunctions,
-  ThirdPartyApiProtocol,
-  ThirdPartyConnection,
-  ThirdPartyTemplateId,
+import {
+  THIRD_PARTY_TEMPLATE_IDS,
+  type ModelOption,
+  type StandardClientFunctions,
+  type ThirdPartyApiProtocol,
+  type ThirdPartyConnection,
+  type ThirdPartyTemplateId,
 } from '@/types';
-import { THIRD_PARTY_TEMPLATE_IDS } from '@/types';
 import { updateThirdPartyConnection } from '@/utils/thirdPartyApiProviders';
 import { isRecord } from '../../../shared/predicates';
 import { listTemplateSummaries, toConnectionSummary } from './providerRedaction';

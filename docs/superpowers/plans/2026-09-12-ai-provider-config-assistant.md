@@ -214,8 +214,13 @@ Expected: FAIL —— `Failed to resolve import "./providerPatch"`。
 - [ ] **Step 3: 实现 `providerPatch.ts`**
 
 ```ts
-import type { ModelOption, ThirdPartyApiProtocol, ThirdPartyConnection, ThirdPartyTemplateId } from '@/types';
-import { THIRD_PARTY_TEMPLATE_IDS } from '@/types';
+import {
+  THIRD_PARTY_TEMPLATE_IDS,
+  type ModelOption,
+  type ThirdPartyApiProtocol,
+  type ThirdPartyConnection,
+  type ThirdPartyTemplateId,
+} from '@/types';
 import {
   addThirdPartyConnection,
   createConnectionFromTemplate,
@@ -1038,14 +1043,14 @@ Expected: FAIL —— 模块不存在。
 
 ```ts
 import { Type, type FunctionDeclaration } from '@google/genai';
-import type {
-  ModelOption,
-  StandardClientFunctions,
-  ThirdPartyApiProtocol,
-  ThirdPartyConnection,
-  ThirdPartyTemplateId,
+import {
+  THIRD_PARTY_TEMPLATE_IDS,
+  type ModelOption,
+  type StandardClientFunctions,
+  type ThirdPartyApiProtocol,
+  type ThirdPartyConnection,
+  type ThirdPartyTemplateId,
 } from '@/types';
-import { THIRD_PARTY_TEMPLATE_IDS } from '@/types';
 import { updateThirdPartyConnection } from '@/utils/thirdPartyApiProviders';
 import { isRecord } from '../../../shared/predicates';
 import { listTemplateSummaries, toConnectionSummary } from './providerRedaction';
@@ -2520,7 +2525,7 @@ Expected: 0 error、0 warning（`--max-warnings=0`）。
 - [ ] **Step 3: 架构与全量测试**
 
 Run: `pnpm test`  
-Expected: 全绿，特别是 `src/test/architecture/*`。若 `projectStructureBoundaries` / `namingStructureOptimizations` 对新目录有额外要求（例如禁止 `src/features` 直接 import `src/components`），把违反的那处依赖改为经 props 注入：`useSettingsAssistant`（feature 层）已经只依赖 store 与 `useSettingsAssistantStore`，组件层依赖 feature 层是允许方向。
+Expected: 全绿，特别是 `src/test/architecture/*`。注意 `codeStyleBoundaries.test.ts` 的 "does not repeat static import declarations from the same module"：同一文件对 `@/types` 只能有一条 import，值导入与 `type` 导入必须合并（`import { THIRD_PARTY_TEMPLATE_IDS, type ModelOption } from '@/types'`）。若 `projectStructureBoundaries` / `namingStructureOptimizations` 对新目录有额外要求（例如禁止 `src/features` 直接 import `src/components`），把违反的那处依赖改为经 props 注入：`useSettingsAssistant`（feature 层）已经只依赖 store 与 `useSettingsAssistantStore`，组件层依赖 feature 层是允许方向。
 
 - [ ] **Step 4: 构建产物检查**
 

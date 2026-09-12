@@ -1,5 +1,10 @@
-import type { ModelOption, ThirdPartyApiProtocol, ThirdPartyConnection, ThirdPartyTemplateId } from '@/types';
-import { THIRD_PARTY_TEMPLATE_IDS } from '@/types';
+import {
+  THIRD_PARTY_TEMPLATE_IDS,
+  type ModelOption,
+  type ThirdPartyApiProtocol,
+  type ThirdPartyConnection,
+  type ThirdPartyTemplateId,
+} from '@/types';
 import {
   addThirdPartyConnection,
   createConnectionFromTemplate,
