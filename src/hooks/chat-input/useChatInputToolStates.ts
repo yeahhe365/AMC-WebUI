@@ -15,7 +15,6 @@ const TOOL_SETTING_KEYS: Record<ToggleableChatToolId, ChatToolSettingKey> = {
   googleSearch: 'isGoogleSearchEnabled',
   googleMaps: 'isGoogleMapsEnabled',
   codeExecution: 'isCodeExecutionEnabled',
-  localPython: 'isLocalPythonEnabled',
   urlContext: 'isUrlContextEnabled',
   alwaysKeepThinking: 'alwaysKeepThinkingInContext',
 };
@@ -25,15 +24,6 @@ export const getNextSettingsForToolToggle = (settings: ChatSettings, toolId: Tog
     return {
       ...settings,
       isCodeExecutionEnabled: !settings.isCodeExecutionEnabled,
-      isLocalPythonEnabled: !settings.isCodeExecutionEnabled ? false : settings.isLocalPythonEnabled,
-    };
-  }
-
-  if (toolId === 'localPython') {
-    return {
-      ...settings,
-      isLocalPythonEnabled: !settings.isLocalPythonEnabled,
-      isCodeExecutionEnabled: !settings.isLocalPythonEnabled ? false : settings.isCodeExecutionEnabled,
     };
   }
 
@@ -131,10 +121,6 @@ export const useChatInputToolStates = ({
       codeExecution: {
         isEnabled: !isThirdPartyChat && !!currentChatSettings.isCodeExecutionEnabled,
         onToggle: createToggle('codeExecution'),
-      },
-      localPython: {
-        isEnabled: !isThirdPartyChat && !!currentChatSettings.isLocalPythonEnabled,
-        onToggle: createToggle('localPython'),
       },
       urlContext: {
         isEnabled: !isThirdPartyChat && !!currentChatSettings.isUrlContextEnabled,

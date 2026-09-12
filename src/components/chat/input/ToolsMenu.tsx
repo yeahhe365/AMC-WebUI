@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Globe, Check, Terminal, Link, X, Telescope, Calculator, AlertTriangle, MapPinned, Wrench } from 'lucide-react';
+import { Globe, Check, Terminal, Link, X, Telescope, Calculator, MapPinned, Wrench } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import { IconPyodide, IconThinking } from '@/components/icons';
 import { CHAT_INPUT_BUTTON_CLASS } from '@/constants/buttonClasses';
@@ -94,20 +94,11 @@ const ActiveToolBadge: React.FC<{
   </>
 );
 
-const BUILT_IN_TOOL_IDS = new Set<ChatToolId>([
-  'deepSearch',
-  'googleSearch',
-  'googleMaps',
-  'codeExecution',
-  'urlContext',
-]);
-
 const isToggleableToolId = (id: ChatToolId): id is ToggleableChatToolId =>
   id === 'deepSearch' ||
   id === 'googleSearch' ||
   id === 'googleMaps' ||
   id === 'codeExecution' ||
-  id === 'localPython' ||
   id === 'urlContext' ||
   id === 'alwaysKeepThinking';
 
@@ -199,17 +190,7 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({
     surface: 'tools-menu',
     capabilities,
     providerId,
-    hasLocalPythonHandler: !!toolStates.localPython?.onToggle,
   }).filter((tool) => !isToggleableToolId(tool.id) || !!toolStates[tool.id]?.onToggle);
-
-  const hasBuiltInToolEnabled = filteredItems.some(
-    (tool) => BUILT_IN_TOOL_IDS.has(tool.id) && isToggleableToolId(tool.id) && toolStates[tool.id]?.isEnabled,
-  );
-  const showBuiltInCustomToolNotice =
-    !capabilities.supportsBuiltInCustomToolCombination &&
-    !capabilities.permissions.canUseLiveControls &&
-    !!toolStates.localPython?.isEnabled &&
-    hasBuiltInToolEnabled;
 
   if (filteredItems.length === 0) return null;
 
@@ -302,14 +283,7 @@ export const ToolsMenu: React.FC<ToolsMenuProps> = ({
             );
           })}
       </div>
-      {showBuiltInCustomToolNotice && (
-        <div className="max-w-sm rounded-xl border border-[var(--theme-bg-danger)]/20 bg-[var(--theme-bg-danger)]/8 px-3 py-2 text-xs text-[var(--theme-text-secondary)]">
-          <div className="flex items-start gap-2">
-            <AlertTriangle size={14} className="mt-0.5 flex-shrink-0 text-[var(--theme-text-danger)]" strokeWidth={2} />
-            <span>{t('toolsLocalPythonCombinationNotice')}</span>
-          </div>
-        </div>
-      )}
+
       {isLocationModalOpen && (
         <GoogleMapsLocationModal
           isOpen={isLocationModalOpen}

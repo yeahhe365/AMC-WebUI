@@ -209,8 +209,7 @@ export const useProviderUiStore = create<ProviderUiState & ProviderUiActions>()(
             isBatchModeByConnection: nextBatchMode,
             modelProbeResultsByConnection: nextProbeResults,
             healthResultByConnection: nextHealthResult,
-            selectedConnectionId:
-              state.selectedConnectionId === connectionId ? null : state.selectedConnectionId,
+            selectedConnectionId: state.selectedConnectionId === connectionId ? null : state.selectedConnectionId,
           };
         }),
 

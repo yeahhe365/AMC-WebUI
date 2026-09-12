@@ -7,6 +7,7 @@ import type { McpToolDefinition } from '@/services/api/mcpApi';
 import { useMcpToolRun } from '@/stores/mcpToolRuntimeStore';
 import { createMcpClientFunctions } from './mcpClientFunctions';
 import { toMcpFunctionName } from './mcpToolNames';
+import type { VirtualMcpServer } from './virtualMcpRegistry';
 
 describe('createMcpClientFunctions', () => {
   const filesystemServer: McpServerConfig = {
@@ -666,5 +667,36 @@ describe('createMcpClientFunctions virtual servers', () => {
     const callResult = await fns[expectedName].handler({ msg: 'hello' }, undefined);
     expect(virtualServer.callTool).toHaveBeenCalledWith('ping', { msg: 'hello' }, undefined, expect.any(Function));
     expect(callResult).toEqual({ response: { content: [{ type: 'text', text: 'pong' }] } });
+  });
+
+  it('passes generatedFiles through when returned by virtual servers', async () => {
+    const mockFile = { id: 'file-1', name: 'plot.png', type: 'image/png' } as any;
+    const virtualServer: VirtualMcpServer = {
+      id: 'internal_files',
+      name: 'Files Server',
+      description: 'Test files server',
+      listTools: async () => [
+        {
+          name: 'generate',
+          description: 'Generates a file',
+          inputSchema: { type: 'object' },
+        },
+      ],
+      callTool: vi.fn().mockResolvedValue({
+        content: [{ type: 'text', text: 'Generated plot' }],
+        generatedFiles: [mockFile],
+      }),
+    };
+
+    const fns = await createMcpClientFunctions({
+      servers: [],
+      virtualServers: [virtualServer],
+    });
+
+    const toolName = toMcpFunctionName('internal_files', 'generate');
+    const result = await fns[toolName].handler({}, undefined);
+
+    expect(result.response).toMatchObject({ content: [{ type: 'text', text: 'Generated plot' }] });
+    expect(result.generatedFiles).toEqual([mockFile]);
   });
 });

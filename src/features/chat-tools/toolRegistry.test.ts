@@ -43,7 +43,7 @@ describe('chat tool registry', () => {
         capabilities: liveCapabilities,
         hasLocalPythonHandler: true,
       }).map((tool) => tool.id),
-    ).toEqual(['localPython']);
+    ).toEqual([]);
 
     expect(
       getChatToolsForSurface({
@@ -81,7 +81,6 @@ describe('chat tool registry', () => {
       'googleSearch',
       'googleMaps',
       'codeExecution',
-      'localPython',
       'urlContext',
       'alwaysKeepThinking',
       'tokenCount',

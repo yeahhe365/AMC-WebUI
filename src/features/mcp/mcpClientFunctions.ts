@@ -1,5 +1,5 @@
 import { Type, type Schema } from '@google/genai';
-import type { McpServerConfig, StandardClientFunctions } from '@/types';
+import type { McpServerConfig, StandardClientFunctions, UploadedFile } from '@/types';
 import {
   callMcpTool,
   fetchMcpTools,
@@ -386,6 +386,10 @@ export const createMcpClientFunctions = async ({
               finishMcpToolRun(runId, 'success');
               return {
                 response: summarizeMcpResultForModel(rawResult),
+                generatedFiles:
+                  isRecord(rawResult) && Array.isArray(rawResult.generatedFiles)
+                    ? (rawResult.generatedFiles as UploadedFile[])
+                    : undefined,
               };
             } catch (error) {
               finishMcpToolRun(runId, options?.abortSignal?.aborted ? 'cancelled' : 'error');
@@ -496,6 +500,10 @@ export const createMcpClientFunctions = async ({
                 finishMcpToolRun(runId, 'success');
                 return {
                   response: summarizeMcpResultForModel(rawResult),
+                  generatedFiles:
+                    isRecord(rawResult) && Array.isArray(rawResult.generatedFiles)
+                      ? (rawResult.generatedFiles as UploadedFile[])
+                      : undefined,
                 };
               } catch (error) {
                 finishMcpToolRun(runId, options?.abortSignal?.aborted ? 'cancelled' : 'error');

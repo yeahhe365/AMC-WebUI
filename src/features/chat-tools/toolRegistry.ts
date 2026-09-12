@@ -84,17 +84,6 @@ const CHAT_TOOL_REGISTRY: ChatToolDefinition[] = [
     isAvailable: (context) => isGeminiNativeRoute(context) && context.capabilities.permissions.canUseCodeExecution,
   },
   {
-    id: 'localPython',
-    labelKey: 'localPythonLabel',
-    shortLabelKey: 'localPythonShort',
-    icon: 'pyodide',
-    settingKey: 'isLocalPythonEnabled',
-    isAvailable: (context) =>
-      isGeminiNativeRoute(context) &&
-      context.capabilities.permissions.canUseLocalPython &&
-      !!context.hasLocalPythonHandler,
-  },
-  {
     id: 'urlContext',
     labelKey: 'urlContextLabel',
     shortLabelKey: 'urlContextShort',

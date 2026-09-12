@@ -67,12 +67,6 @@ const ChatInputActionsComponent: React.FC = () => {
           ? () => onToggleToolAndFocus(toolStates.codeExecution!.onToggle!)
           : undefined,
       },
-      localPython: {
-        isEnabled: !!toolStates.localPython?.isEnabled,
-        onToggle: toolStates.localPython?.onToggle
-          ? () => onToggleToolAndFocus(toolStates.localPython!.onToggle!)
-          : undefined,
-      },
       urlContext: {
         isEnabled: !!toolStates.urlContext?.isEnabled,
         onToggle: toolStates.urlContext?.onToggle

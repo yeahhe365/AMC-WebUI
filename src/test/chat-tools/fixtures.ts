@@ -7,7 +7,6 @@ const TOGGLEABLE_CHAT_TOOL_IDS = [
   'googleMaps',
   'deepSearch',
   'codeExecution',
-  'localPython',
   'urlContext',
   'alwaysKeepThinking',
 ] as const;
@@ -19,7 +18,6 @@ export const createChatToolToggleStates = (overrides: ChatToolToggleStates = {})
   googleMaps: { isEnabled: false, onToggle: vi.fn() },
   deepSearch: { isEnabled: false, onToggle: vi.fn() },
   codeExecution: { isEnabled: false, onToggle: vi.fn() },
-  localPython: { isEnabled: false, onToggle: vi.fn() },
   urlContext: { isEnabled: false, onToggle: vi.fn() },
   alwaysKeepThinking: { isEnabled: false, onToggle: vi.fn() },
   ...overrides,

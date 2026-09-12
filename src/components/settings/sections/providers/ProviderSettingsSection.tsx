@@ -175,11 +175,7 @@ export const ProviderSettingsSection: React.FC<ProviderSettingsSectionProps> = (
             geminiStatus={geminiStatus}
           />
         </div>
-        <div
-          className={`flex-1 min-w-0 h-full flex flex-col ${
-            isDetailVisibleOnMobile ? 'flex' : 'hidden md:flex'
-          }`}
-        >
+        <div className={`flex-1 min-w-0 h-full flex flex-col ${isDetailVisibleOnMobile ? 'flex' : 'hidden md:flex'}`}>
           {isGeminiSelected ? (
             <div className="flex-1 flex flex-col h-full min-h-0">
               <div className="md:hidden p-2 border-b border-[var(--theme-border-secondary)]/30 flex-shrink-0">

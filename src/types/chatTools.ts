@@ -1,18 +1,11 @@
 import type { ChatSettings } from './settings';
 
 export type ChatToolId =
-  | 'deepSearch'
-  | 'googleSearch'
-  | 'googleMaps'
-  | 'codeExecution'
-  | 'localPython'
-  | 'urlContext'
-  | 'alwaysKeepThinking'
-  | 'tokenCount';
+  'deepSearch' | 'googleSearch' | 'googleMaps' | 'codeExecution' | 'urlContext' | 'alwaysKeepThinking' | 'tokenCount';
 
 export type ToggleableChatToolId = Extract<
   ChatToolId,
-  'deepSearch' | 'googleSearch' | 'googleMaps' | 'codeExecution' | 'localPython' | 'urlContext' | 'alwaysKeepThinking'
+  'deepSearch' | 'googleSearch' | 'googleMaps' | 'codeExecution' | 'urlContext' | 'alwaysKeepThinking'
 >;
 
 export interface ChatToolToggleState {
@@ -32,7 +25,6 @@ export type ChatToolSettingKey = Extract<
   | 'isGoogleSearchEnabled'
   | 'isGoogleMapsEnabled'
   | 'isCodeExecutionEnabled'
-  | 'isLocalPythonEnabled'
   | 'isUrlContextEnabled'
   | 'alwaysKeepThinkingInContext'
 >;

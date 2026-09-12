@@ -13,30 +13,6 @@ describe('ToolsMenu', () => {
   const renderer = setupTestRenderer({ providers: { language: 'en' } });
   setupStoreStateReset();
 
-  it('keeps local Python available for native audio models', () => {
-    act(() => {
-      renderer.root.render(
-        <ToolsMenu
-          currentModelId="gemini-3.1-flash-live-preview"
-          toolStates={createChatToolToggleStatesFromFlags({ localPython: true })}
-          toolUtilityActions={toolUtilityActions}
-          disabled={false}
-        />,
-      );
-    });
-
-    const toolsButton = document.querySelector('button[aria-label="Tools"]') as HTMLButtonElement | null;
-    expect(toolsButton).not.toBeNull();
-
-    act(() => {
-      toolsButton?.click();
-    });
-
-    expect(document.body.textContent).toContain('Pyodide');
-    expect(document.body.textContent).not.toContain('Code Execution');
-    expect(document.body.textContent).not.toContain('Deep Search');
-  });
-
   it('hides code execution tooling for Gemini image-generation models', () => {
     act(() => {
       renderer.root.render(
@@ -70,7 +46,7 @@ describe('ToolsMenu', () => {
       renderer.root.render(
         <ToolsMenu
           currentModelId="gemma-3-27b-it"
-          toolStates={createChatToolToggleStatesFromFlags({ localPython: true })}
+          toolStates={createChatToolToggleStatesFromFlags({ googleSearch: true })}
           toolUtilityActions={toolUtilityActions}
           disabled={false}
         />,
@@ -124,38 +100,6 @@ describe('ToolsMenu', () => {
     expect(document.body.textContent).not.toContain('URL Context');
     expect(document.body.textContent).not.toContain('Pyodide');
     expect(document.body.textContent).not.toContain('Token Calculator');
-  });
-
-  it('shows a combination notice when local Python and built-in tools are enabled on non-Gemini-3 models', () => {
-    act(() => {
-      renderer.root.render(
-        <ToolsMenu
-          currentModelId="gemini-2.5-pro"
-          toolStates={createChatToolToggleStatesFromFlags({ googleSearch: true, localPython: true })}
-          toolUtilityActions={toolUtilityActions}
-          disabled={false}
-        />,
-      );
-    });
-
-    expect(document.body.textContent).toContain("This model can't combine built-in tools with Pyodide in one request.");
-  });
-
-  it('does not show a combination notice for Gemini 3 models', () => {
-    act(() => {
-      renderer.root.render(
-        <ToolsMenu
-          currentModelId="gemini-3.1-pro-preview"
-          toolStates={createChatToolToggleStatesFromFlags({ googleSearch: true, localPython: true })}
-          toolUtilityActions={toolUtilityActions}
-          disabled={false}
-        />,
-      );
-    });
-
-    expect(document.body.textContent).not.toContain(
-      "This model can't combine built-in tools with Pyodide in one request.",
-    );
   });
 
   it('renders enabled tool badges as native buttons', () => {

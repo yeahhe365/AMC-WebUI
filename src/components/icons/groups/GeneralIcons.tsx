@@ -178,5 +178,3 @@ export const IconClosedCaption: React.FC<IconProps> = ({
     <path d="M18 9.5a2 2 0 0 0-2-2 2 2 0 0 0-2 2v5a2 2 0 0 0 2 2 2 2 0 0 0 2-2" />
   </StrokeIcon>
 );
-
-export const IconClosedCaptionBox = IconClosedCaption;
