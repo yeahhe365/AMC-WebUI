@@ -145,7 +145,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
         </div>
       ) : (
         <nav
-          className="flex flex-1 gap-1 overflow-x-auto px-4 pb-2 pt-1 md:flex-col md:gap-3 md:overflow-x-hidden md:overflow-y-auto md:px-3 md:pb-3 md:pt-1 custom-scrollbar"
+          className="flex flex-1 gap-1 overflow-x-auto px-4 pb-2 pt-1 md:flex-col md:gap-3 md:overflow-x-hidden md:overflow-y-auto md:px-3 md:pb-3 md:pt-1 no-scrollbar md:custom-scrollbar"
           role="tablist"
         >
           {groupedTabs.map((group, idx) => (

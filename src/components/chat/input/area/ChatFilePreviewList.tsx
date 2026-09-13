@@ -30,7 +30,10 @@ const ChatFilePreviewListComponent: React.FC<ChatFilePreviewListProps> = ({
   if (selectedFiles.length === 0) return null;
 
   return (
-    <div ref={parent} className="flex gap-2 overflow-x-auto pb-2 mb-1 custom-scrollbar px-1 items-start">
+    <div
+      ref={parent}
+      className="flex gap-2 overflow-x-auto pb-2 mb-1 no-scrollbar md:custom-scrollbar px-1 items-start"
+    >
       {selectedFiles.map((file) => (
         <SelectedFileDisplay
           key={file.id}

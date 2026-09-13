@@ -19,7 +19,7 @@ interface MainContentProps {
 const HistorySidebarFallback: React.FC<{ isOpen: boolean; themeId?: string }> = ({ isOpen }) => (
   <aside
     aria-hidden="true"
-    className={`h-full flex-shrink-0 bg-[var(--theme-bg-secondary)] absolute md:static top-0 left-0 z-50 overflow-hidden border-r border-[var(--theme-border-primary)] ${
+    className={`h-full flex-shrink-0 bg-[var(--theme-bg-secondary)] absolute md:relative top-0 left-0 z-50 overflow-hidden border-r border-[var(--theme-border-primary)] ${
       isOpen ? 'w-64 md:w-[16.2rem] translate-x-0' : 'w-64 md:w-[52.2px] -translate-x-full md:translate-x-0'
     }`}
   />

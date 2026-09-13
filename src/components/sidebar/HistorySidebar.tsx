@@ -12,6 +12,7 @@ import { useHistorySidebarLogic, type HistoryDisplayMode } from './useHistorySid
 import { SIDEBAR_CLICKABLE_ICON_BUTTON_CLASS, SIDEBAR_ICON_LINK_BUTTON_CLASS } from './sidebarStyles';
 import { LimitedSessionList } from './LimitedSessionList';
 import { DESKTOP_BREAKPOINT_PX } from '@/constants/layout';
+import { useIsMobile } from '@/hooks/useDevice';
 import { useUIStore } from '@/stores/uiStore';
 import { isGroupDrag, isSessionDrag } from './sidebarDragTypes';
 import {
@@ -160,6 +161,7 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
   const { t } = useI18n();
   const activeView = useUIStore((state) => state.activeView);
   const setActiveView = useUIStore((state) => state.setActiveView);
+  const isMobile = useIsMobile();
   const {
     isOpen,
     onToggle,
@@ -472,12 +474,12 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
       data-history-sidebar-root="true"
       className={`h-full flex flex-col bg-[var(--theme-bg-secondary)] flex-shrink-0
                  transition-transform duration-300 ease-[cubic-bezier(0.19,1,0.22,1)] ${isResizingSidebar ? 'transition-none' : 'md:transition-[width]'} transform-gpu
-                 absolute md:static top-0 left-0 z-50
+                 absolute md:relative top-0 left-0 z-50
                  overflow-hidden
                  ${isOpen ? 'w-64 md:w-[16.2rem] translate-x-0' : 'w-64 md:w-[52.2px] -translate-x-full md:translate-x-0'}
-                 border-r border-[var(--theme-border-primary)] relative`}
+                 border-r border-[var(--theme-border-primary)]`}
       style={{
-        width: isOpen ? `${sidebarWidth}px` : undefined,
+        width: isOpen ? (isMobile ? undefined : `${sidebarWidth}px`) : undefined,
       }}
       role="complementary"
       aria-label={t('historyTitle')}
@@ -490,8 +492,8 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-100 pointer-events-none md:opacity-0'
         }`}
         style={{
-          width: isOpen ? `${sidebarWidth}px` : undefined,
-          minWidth: isOpen ? `${sidebarWidth}px` : undefined,
+          width: isOpen ? (isMobile ? undefined : `${sidebarWidth}px`) : undefined,
+          minWidth: isOpen ? (isMobile ? undefined : `${sidebarWidth}px`) : undefined,
         }}
       >
         <SidebarHeader

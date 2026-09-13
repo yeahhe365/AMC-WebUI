@@ -101,7 +101,7 @@ export const ChatInputArea: React.FC = () => {
   });
 
   const fontSize = chatInput.appSettings?.baseFontSize ?? 14;
-  const minHeightProp = isMobile ? 26 : undefined;
+  const minHeightProp = isMobile ? 28 : undefined;
 
   const {
     frameRef,
@@ -258,7 +258,7 @@ export const ChatInputArea: React.FC = () => {
             onClick={handleInputShellClick}
             data-composer-inputbar=""
           >
-            {!isCompact && (
+            {!isCompact && !isMobile && (
               <div
                 data-composer-resize-handle=""
                 data-resizing={isResizing || undefined}
@@ -277,7 +277,7 @@ export const ChatInputArea: React.FC = () => {
                 <div className="mx-auto w-10 h-0.5 rounded-full bg-[var(--theme-border-secondary)] opacity-0 transition-all duration-200 group-hover/composer-resize-handle:opacity-100 group-hover/composer-resize-handle:w-16 group-hover/composer-resize-handle:bg-[var(--theme-bg-accent)] group-focus/composer-resize-handle:opacity-100 group-focus/composer-resize-handle:bg-[var(--theme-bg-accent)] group-data-[resizing=true]/composer-resize-handle:bg-[var(--theme-bg-accent)] group-data-[resizing=true]/composer-resize-handle:opacity-100 group-data-[resizing=true]/composer-resize-handle:w-20" />
               </div>
             )}
-            {!isCompact && (
+            {!isCompact && !isMobile && (
               <ChatInputExpandCorner hasCustomHeight={hasCustomHeight} onToggle={handleExpandControlClick} />
             )}
             <ChatFilePreviewList

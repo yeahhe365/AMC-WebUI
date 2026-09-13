@@ -66,8 +66,10 @@ function getEditorContentStyle(
   isExpanded: boolean,
   manual: number | null,
   compact = false,
+  minHeightOverride?: number,
 ): ChatInputEditorContentStyle {
-  const minHeight = compact ? getCompactChatInputMinHeight(fontSize) : getChatInputMinHeight(fontSize);
+  const minHeight =
+    minHeightOverride ?? (compact ? getCompactChatInputMinHeight(fontSize) : getChatInputMinHeight(fontSize));
   const hasCustom = isExpanded || manual !== null;
   const isFixed = compact || hasCustom;
   const maxHeight = compact
@@ -80,7 +82,7 @@ function getEditorContentStyle(
   return {
     height: compact ? minHeight : hasCustom ? '100%' : undefined,
     minHeight,
-    '--composer-editor-padding': compact ? '3px 0' : '6px 44px 0 15px',
+    '--composer-editor-padding': compact ? '3px 0' : minHeightOverride !== undefined ? '2px 0' : '6px 44px 0 15px',
     '--composer-editor-min-height': `${minHeight}px`,
     '--composer-editor-font-size': `${fontSize}px`,
     '--composer-editor-line-height': '1.4',
@@ -255,8 +257,8 @@ export function useChatInputExpandSizing({
     [compactMinHeight],
   );
   const editorContentStyle = useMemo(
-    () => getEditorContentStyle(fontSize, isExpanded || isAnimating, manualHeight),
-    [fontSize, isExpanded, isAnimating, manualHeight],
+    () => getEditorContentStyle(fontSize, isExpanded || isAnimating, manualHeight, false, minHeightProp),
+    [fontSize, isExpanded, isAnimating, manualHeight, minHeightProp],
   );
   const compactEditorContentStyle = useMemo(() => getEditorContentStyle(fontSize, false, null, true), [fontSize]);
   return {

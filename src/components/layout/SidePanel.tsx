@@ -260,8 +260,8 @@ export const SidePanel: React.FC<SidePanelProps> = ({ content, onClose, themeId 
       <div
         ref={sidebarRef}
         className={`
-                    h-full flex flex-col bg-[var(--theme-bg-secondary)] border-l border-[var(--theme-border-primary)] shadow-2xl relative transition-none flex-shrink-0 z-40 slide-in-right-animate
-                    ${isMobile ? `fixed inset-0 w-full ${Z_INDEX_SIDE_PANEL_MOBILE}` : ''}
+                    h-full flex flex-col bg-[var(--theme-bg-secondary)] border-l border-[var(--theme-border-primary)] shadow-2xl transition-none flex-shrink-0 z-40 slide-in-right-animate
+                    ${isMobile ? `fixed inset-0 w-full ${Z_INDEX_SIDE_PANEL_MOBILE}` : 'relative'}
                 `}
         style={{ width: isMobile ? '100%' : `${width}px` }}
       >

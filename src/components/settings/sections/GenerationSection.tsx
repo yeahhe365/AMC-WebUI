@@ -163,7 +163,7 @@ export const GenerationSection: React.FC<GenerationSectionProps> = ({
             commitPromptIfNeeded();
           }}
           rows={3}
-          className={`${inputBaseClasses} ${SETTINGS_INPUT_CLASS} resize-none font-mono text-xs sm:text-sm leading-relaxed min-h-[112px] custom-scrollbar bg-[var(--theme-bg-input)]/50`}
+          className={`${inputBaseClasses} ${SETTINGS_INPUT_CLASS} resize-none font-mono text-xs sm:text-sm leading-relaxed min-h-[112px] no-scrollbar md:custom-scrollbar bg-[var(--theme-bg-input)]/50`}
           placeholder={t('chatBehaviorSystemPromptPlaceholder')}
           aria-label={t('settingsSystemPromptAria')}
         />

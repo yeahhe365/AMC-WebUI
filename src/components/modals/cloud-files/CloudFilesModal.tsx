@@ -7,6 +7,7 @@ import { interpolate } from '@/i18n/interpolate';
 import { formatFileSize } from '@/utils/file/fileSize';
 import { listFilesApi, deleteFileApi } from '@/services/api/fileApi';
 import { getGeminiKeyForRequest } from '@/utils/apiKeySelection';
+import { copyTextToClipboard } from '@/utils/clipboard';
 import { logService } from '@/services/logService';
 import { MODAL_CLOSE_BUTTON_CLASS } from '@/constants/buttonClasses';
 import type { AppSettings, ChatSettings } from '@/types';
@@ -222,7 +223,7 @@ export const CloudFilesModal: React.FC<CloudFilesModalProps> = ({
 
   const handleCopyId = useCallback((name: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    void navigator.clipboard.writeText(name);
+    void copyTextToClipboard(name);
     setCopiedFileName(name);
     setTimeout(() => {
       setCopiedFileName((cur) => (cur === name ? null : cur));

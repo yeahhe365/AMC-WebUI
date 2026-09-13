@@ -25,7 +25,7 @@ export const ApiProxySettings: React.FC<ApiProxySettingsProps> = ({
 }) => {
   const { t } = useI18n();
   const inputBaseClasses =
-    'w-full p-3 rounded-lg border transition-all duration-200 focus:ring-2 focus:ring-offset-0 text-sm custom-scrollbar font-mono';
+    'w-full p-3 rounded-lg border transition-all duration-200 focus:ring-2 focus:ring-offset-0 text-sm font-mono';
 
   const handleResetProxy = () => {
     setApiProxyUrl(DEFAULT_GEMINI_PROXY_URL);

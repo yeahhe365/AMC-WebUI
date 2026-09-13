@@ -46,6 +46,7 @@ import { fetchAnthropicModels } from '@/services/api/anthropicApi';
 import { AUTH_OPTIONAL_API_KEY, parseApiKeys } from '@/utils/apiKeySelection';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { toastError, toastSuccess, toastWarning } from '@/stores/toastStore';
+import { copyTextToClipboard } from '@/utils/clipboard';
 import { enrichModelMetadata, formatContextWindow } from '@/utils/model/knownModelsCatalog';
 import { ProviderAvatar } from './ProviderAvatar';
 import { ProviderEndpointPreview } from './ProviderEndpointPreview';
@@ -619,9 +620,9 @@ export const ProviderDetail: React.FC<ProviderDetailProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 if (connection.apiKey) {
-                  navigator.clipboard.writeText(connection.apiKey);
+                  await copyTextToClipboard(connection.apiKey);
                   toastSuccess(t('thirdPartyToastKeyCopied'));
                 }
               }}

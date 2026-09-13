@@ -16,8 +16,15 @@ interface ScenarioEditorProps {
   readOnly?: boolean;
 }
 
+const generateScenarioId = (prefix: string) => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+};
+
 const createEmptyScenario = (): SavedScenario => ({
-  id: `scenario-${crypto.randomUUID()}`,
+  id: generateScenarioId('scenario'),
   title: '',
   messages: [],
   systemInstruction: '',
@@ -40,7 +47,7 @@ export const ScenarioEditor: React.FC<ScenarioEditorProps> = ({ initialScenario,
       ...prev,
       messages: [
         ...prev.messages,
-        { id: `scenario-message-${crypto.randomUUID()}`, role: newMessageRole, content: newMessageContent },
+        { id: generateScenarioId('scenario-message'), role: newMessageRole, content: newMessageContent },
       ],
     }));
     setNewMessageContent('');

@@ -11,6 +11,7 @@ import { Copy, Check, AlertTriangle, X } from 'lucide-react';
 import { interpolate } from '@/i18n/interpolate';
 import type { LiveArtifactFollowupPayload } from '@/utils/live-artifacts/liveArtifactFollowup';
 import { DEFAULT_HTML_PREVIEW_PRIVILEGE, type HtmlPreviewPrivilege } from '@/utils/html-preview/previewPrivilege';
+import { copyTextToClipboard } from '@/utils/clipboard';
 
 import { type UploadedFile } from '@/types';
 
@@ -83,7 +84,7 @@ export const HtmlPreviewModal: React.FC<HtmlPreviewModalProps> = ({
   const handleCopyCode = useCallback(async () => {
     if (!htmlContent) return;
     try {
-      await navigator.clipboard.writeText(htmlContent);
+      await copyTextToClipboard(htmlContent);
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2000);
     } catch {

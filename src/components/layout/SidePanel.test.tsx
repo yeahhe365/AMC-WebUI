@@ -103,4 +103,34 @@ describe('SidePanel resize functionality', () => {
     expect(handle?.getAttribute('aria-valuenow')).toBe('600');
     expect(localStorage.getItem('amc-sidepanel-width')).toBeNull();
   });
+
+  it('renders fixed full-screen without relative class on mobile', async () => {
+    const useDeviceModule = await import('@/hooks/useDevice');
+    const isMobileSpy = vi.spyOn(useDeviceModule, 'useIsMobile').mockReturnValue(true);
+
+    try {
+      act(() => {
+        renderer.root.render(
+          <SidePanel
+            content={{
+              type: 'html',
+              content: 'console.log("hello");',
+              language: 'javascript',
+              title: 'Test Code',
+            }}
+            onClose={vi.fn()}
+            themeId="light"
+          />,
+        );
+      });
+
+      const panel = renderer.container.querySelector<HTMLElement>('.slide-in-right-animate');
+      expect(panel).not.toBeNull();
+      expect(panel?.className).toContain('fixed');
+      expect(panel?.className).toContain('inset-0');
+      expect(panel?.className).not.toContain('relative');
+    } finally {
+      isMobileSpy.mockRestore();
+    }
+  });
 });

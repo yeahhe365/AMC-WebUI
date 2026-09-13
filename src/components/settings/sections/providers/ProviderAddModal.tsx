@@ -144,7 +144,7 @@ export const ProviderAddModal: React.FC<ProviderAddModalProps> = ({ isOpen, onCl
               autoFocus
             />
           </div>
-          <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar md:custom-scrollbar pb-1">
             {categories.map((cat) => (
               <button
                 key={cat.id}

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback, forwardRef } from 're
 import { TableVirtuoso, type TableComponents } from 'react-virtuoso';
 import type { UploadedFile } from '@/types';
 import * as XLSX from 'xlsx';
+import { copyTextToClipboard } from '@/utils/clipboard';
 import { GoogleSpinner } from '@/components/icons/GoogleSpinner';
 import {
   AlertCircle,
@@ -159,7 +160,7 @@ export const SpreadsheetViewer: React.FC<SpreadsheetViewerProps> = ({ file }) =>
     if (!sheet) return;
     const csv = XLSX.utils.sheet_to_csv(sheet);
     try {
-      await navigator.clipboard.writeText(csv);
+      await copyTextToClipboard(csv);
       setIsCopiedCsv(true);
       setTimeout(() => setIsCopiedCsv(false), 2000);
     } catch {
@@ -327,7 +328,7 @@ export const SpreadsheetViewer: React.FC<SpreadsheetViewerProps> = ({ file }) =>
   return (
     <div className="w-full h-full flex flex-col bg-[var(--theme-bg-primary)] select-text">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-b border-[var(--theme-border-secondary)] bg-[var(--theme-bg-secondary)]/70 backdrop-blur-sm z-20 flex-shrink-0">
-        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-0.5 custom-scrollbar">
+        <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-0.5 no-scrollbar md:custom-scrollbar">
           <Table size={15} className="text-[var(--theme-text-tertiary)] shrink-0 mr-1" />
           {workbook.SheetNames.map((sheetName) => (
             <button

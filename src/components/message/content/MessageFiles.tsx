@@ -73,7 +73,7 @@ export const MessageFiles: React.FC<MessageFilesProps> = ({
             ))}
           </div>
         ) : (
-          <div className="flex flex-row gap-2 overflow-x-auto pb-2 -mx-1 px-1 custom-scrollbar">
+          <div className="flex flex-row gap-2 overflow-x-auto pb-2 -mx-1 px-1 no-scrollbar md:custom-scrollbar">
             {imageFiles.map((file) => (
               <div key={file.id} className={isStripImageView ? 'flex-shrink-0 h-40 w-40 sm:w-48' : 'flex-shrink-0'}>
                 <FileDisplay
@@ -91,7 +91,7 @@ export const MessageFiles: React.FC<MessageFilesProps> = ({
 
       {documentFiles.length > 0 && (
         <div
-          className={`grid grid-flow-col gap-2 ${showDocScroll ? 'overflow-x-auto pb-2' : ''} -mx-1 px-1 custom-scrollbar w-fit max-w-full`}
+          className={`grid grid-flow-col gap-2 ${showDocScroll ? 'overflow-x-auto pb-2' : ''} -mx-1 px-1 no-scrollbar md:custom-scrollbar w-fit max-w-full`}
           style={{
             // Limit to 4 rows max, or fewer if not enough files to fill 4 rows
             gridTemplateRows: `repeat(${Math.min(documentFiles.length, 4)}, min-content)`,

@@ -29,7 +29,7 @@ export const ApiKeyInput: React.FC<ApiKeyInputProps> = ({
   const apiKeyBlurClass =
     !isFocused && apiKey ? 'text-transparent [text-shadow:0_0_6px_var(--theme-text-primary)] tracking-widest' : '';
   const inputBaseClasses =
-    'w-full py-2 px-3 rounded-lg border transition-all duration-200 focus:ring-2 focus:ring-offset-0 text-sm custom-scrollbar font-mono';
+    'w-full py-2 px-3 rounded-lg border transition-all duration-200 focus:ring-2 focus:ring-offset-0 text-sm no-scrollbar md:custom-scrollbar font-mono';
 
   const lineCount = (apiKey || '').split('\n').length;
   const rows = Math.min(Math.max(lineCount, 1), 4);

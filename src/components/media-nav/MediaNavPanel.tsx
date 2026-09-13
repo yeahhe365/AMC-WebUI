@@ -160,8 +160,8 @@ const MediaNavPanelComponent: React.FC = () => {
 
       <aside
         data-testid="media-nav-panel"
-        className={`h-full flex flex-col bg-[var(--theme-bg-secondary)] border-l border-[var(--theme-border-primary)] shadow-2xl relative flex-shrink-0 z-40 slide-in-right-animate ${
-          isMobile ? `fixed inset-0 w-full ${Z_INDEX_SIDE_PANEL_MOBILE}` : ''
+        className={`h-full flex flex-col bg-[var(--theme-bg-secondary)] border-l border-[var(--theme-border-primary)] shadow-2xl flex-shrink-0 z-40 slide-in-right-animate ${
+          isMobile ? `fixed inset-0 w-full ${Z_INDEX_SIDE_PANEL_MOBILE}` : 'relative'
         }`}
         style={{ width: isMobile ? '100%' : `${width}px` }}
       >

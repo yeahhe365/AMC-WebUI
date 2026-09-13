@@ -47,7 +47,7 @@ export const ChatArea: React.FC = () => {
 
   return (
     <div
-      className="flex flex-col flex-grow h-full overflow-hidden relative chat-bg-enhancement"
+      className="flex flex-col flex-grow min-w-0 h-full overflow-hidden relative chat-bg-enhancement"
       onDragEnter={handleAppDragEnter}
       onDragOver={handleAppDragOver}
       onDragLeave={handleAppDragLeave}

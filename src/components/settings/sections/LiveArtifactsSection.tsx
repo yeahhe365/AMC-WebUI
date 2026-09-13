@@ -113,7 +113,7 @@ export const LiveArtifactsSection: React.FC<LiveArtifactsSectionProps> = ({ curr
                 value={displayedLiveArtifactsSystemPrompt}
                 onChange={(event) => handlePromptChange(event.target.value)}
                 rows={10}
-                className={`w-full min-h-[144px] resize-y rounded-lg border p-2.5 text-sm transition-all duration-200 focus:ring-2 focus:ring-offset-0 custom-scrollbar ${SETTINGS_INPUT_CLASS}`}
+                className={`w-full min-h-[144px] resize-y rounded-lg border p-2.5 text-sm transition-all duration-200 focus:ring-2 focus:ring-offset-0 no-scrollbar md:custom-scrollbar ${SETTINGS_INPUT_CLASS}`}
                 placeholder={t('settingsLiveArtifactsSystemPromptPlaceholder')}
                 aria-label={t('settingsLiveArtifactsSystemPromptLabel')}
               />

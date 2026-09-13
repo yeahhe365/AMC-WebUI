@@ -6,7 +6,7 @@ import { GoogleSpinner } from '@/components/icons/GoogleSpinner';
 import { ModelPicker } from '@/components/shared/ModelPicker';
 import { FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS } from '@/constants/focusClasses';
 
-const MODEL_TRIGGER_BUTTON_CLASS = `min-h-9 flex items-center gap-2 rounded-xl px-2 sm:px-3 bg-transparent hover:bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-primary)] font-medium text-base transition-all duration-200 ease-out ${FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS} disabled:opacity-70 disabled:cursor-not-allowed border border-transparent hover:border-[var(--theme-border-secondary)] active:bg-[var(--theme-bg-tertiary)]`;
+const MODEL_TRIGGER_BUTTON_CLASS = `min-h-9 flex items-center gap-2 rounded-xl px-2 sm:px-3 bg-transparent hover:bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-primary)] font-medium text-base transition-all duration-200 ease-out ${FOCUS_VISIBLE_RING_PRIMARY_OFFSET_CLASS} disabled:opacity-70 disabled:cursor-not-allowed border border-transparent hover:border-[var(--theme-border-secondary)] active:bg-[var(--theme-bg-tertiary)] min-w-0 flex-shrink`;
 
 interface HeaderModelSelectorProps {
   currentModelName?: string;
@@ -48,7 +48,7 @@ export const HeaderModelSelector: FC<HeaderModelSelectorProps> = ({
       onSelect={onSelectModel}
       dropdownClassName="w-[calc(100vw-2rem)] max-w-[320px] sm:w-[320px] sm:max-w-none max-h-96"
       renderTrigger={({ isOpen, setIsOpen, listboxId, activeDescendantId }) => (
-        <div className="relative flex items-center gap-1">
+        <div className="relative flex items-center gap-1 min-w-0">
           <button
             onClick={() => setIsOpen(!isOpen)}
             disabled={isSelectorDisabled}
@@ -66,7 +66,9 @@ export const HeaderModelSelector: FC<HeaderModelSelectorProps> = ({
               </div>
             )}
 
-            <span className="truncate max-w-[180px] font-semibold sm:max-w-[220px]">{abbreviatedModelName}</span>
+            <span className="truncate min-w-0 max-w-[130px] xs:max-w-[180px] sm:max-w-[220px] font-semibold">
+              {abbreviatedModelName}
+            </span>
             <ChevronDown
               size={15}
               strokeWidth={2}

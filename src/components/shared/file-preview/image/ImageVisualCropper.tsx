@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Check, Copy, X, Sparkles } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
+import { copyTextToClipboard } from '@/utils/clipboard';
 
 export interface ImageVisualCropperProps {
   fileName: string;
@@ -195,7 +196,7 @@ export const ImageVisualCropper: React.FC<ImageVisualCropperProps> = ({
     e.stopPropagation();
     if (!confirmedBox) return;
     const tag = `<image-locate file="${fileName}" box="[${confirmedBox.join(',')}]">请问这里的具体情况是？</image-locate>`;
-    navigator.clipboard?.writeText?.(tag);
+    void copyTextToClipboard(tag);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

@@ -155,4 +155,30 @@ describe('MediaNavPanel', () => {
     ).toBeDefined();
     expect(useMediaNavStore.getState().activeFileId).toBeNull();
   });
+
+  it('renders fixed full-screen without relative class on mobile', async () => {
+    const useDeviceModule = await import('@/hooks/useDevice');
+    const isMobileSpy = vi.spyOn(useDeviceModule, 'useIsMobile').mockReturnValue(true);
+
+    try {
+      useMediaNavStore.setState({
+        isOpen: true,
+        openKind: 'video',
+        activeFileId: 'vid-1',
+      });
+      useChatStore.setState({
+        selectedFiles: [mockVideoFile],
+        activeMessages: [],
+      });
+
+      renderer.render(<MediaNavPanel />);
+
+      const panel = screen.getByTestId('media-nav-panel');
+      expect(panel.className).toContain('fixed');
+      expect(panel.className).toContain('inset-0');
+      expect(panel.className).not.toContain('relative');
+    } finally {
+      isMobileSpy.mockRestore();
+    }
+  });
 });
