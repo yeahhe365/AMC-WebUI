@@ -53,6 +53,22 @@ export const THIRD_PARTY_PROVIDER_LOGO: Record<string, string> = {
   opencode: CHERRY_PROVIDER_LOGOS['opencode'] || customLogoUrl,
   hunyuan: CHERRY_PROVIDER_LOGOS['hunyuan'] || customLogoUrl,
   huggingface: CHERRY_PROVIDER_LOGOS['huggingface'] || customLogoUrl,
+  atlascloud: CHERRY_PROVIDER_LOGOS['atlascloud'] || customLogoUrl,
+};
+
+const resolveThirdPartyLogoKey = (templateId?: string, providerId?: string, modelId?: string): string => {
+  const raw = (templateId || providerId || modelId || '').toLowerCase();
+  if (!raw) return 'custom';
+  if (raw.startsWith('custom')) return 'custom';
+  return raw;
+};
+
+export const getThirdPartyTemplateLogo = (templateId?: string, providerId?: string, modelId?: string): string => {
+  const key = resolveThirdPartyLogoKey(templateId, providerId, modelId);
+  if (key in THIRD_PARTY_PROVIDER_LOGO) {
+    return THIRD_PARTY_PROVIDER_LOGO[key];
+  }
+  return customLogoUrl;
 };
 
 type ModelBrandIconKey = 'gemini' | 'gemma' | 'nanobanana';

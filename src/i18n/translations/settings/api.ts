@@ -525,6 +525,15 @@ const apiSettings = {
     fr: 'Ne sera pas envoyé : seuls les en-têtes « x-* », « Referer » et « X-Title » sont transmis.',
     de: "Wird nicht gesendet: Nur 'x-*'-, 'Referer'- und 'X-Title'-Header werden weitergeleitet.",
   },
+  thirdPartyTemplateAtlascloud: {
+    en: 'Atlas Cloud',
+    zh: 'Atlas Cloud',
+    ja: 'Atlas Cloud',
+    ko: 'Atlas Cloud',
+    es: 'Atlas Cloud',
+    fr: 'Atlas Cloud',
+    de: 'Atlas Cloud',
+  },
   apiRuntimeThirdPartyConnectionMissing: {
     en: 'This chat’s third-party connection was removed. Pick another model to continue.',
     zh: '此对话使用的第三方连接已被删除。请选择其他模型后再发送。',

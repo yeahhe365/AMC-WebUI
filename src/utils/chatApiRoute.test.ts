@@ -197,4 +197,36 @@ describe('resolveChatApiRoute', () => {
       { apiMode: 'third-party', providerId: 'kimi', provider: expect.objectContaining({ apiKey: 'kimi-key' }) },
     );
   });
+
+  it('routes the built-in Atlas Cloud template through the OpenAI-compatible path', () => {
+    const atlasApp = createAppSettings({
+      thirdPartyApi: {
+        connections: [
+          createThirdPartyConnection({
+            id: 'atlascloud',
+            templateId: 'atlascloud',
+            apiKey: 'atlascloud-key',
+            enabled: true,
+          }),
+        ],
+      },
+    });
+
+    expect(
+      resolveChatApiRoute(
+        atlasApp,
+        createChatSettings({ modelId: 'deepseek-ai/deepseek-v4-pro', providerId: 'atlascloud' }),
+      ),
+    ).toMatchObject({
+      apiMode: 'third-party',
+      modelId: 'deepseek-ai/deepseek-v4-pro',
+      providerId: 'atlascloud',
+      provider: expect.objectContaining({
+        apiKey: 'atlascloud-key',
+        baseUrl: 'https://api.atlascloud.ai/v1',
+        protocol: 'openai-compatible',
+      }),
+    });
+  });
+
 });
