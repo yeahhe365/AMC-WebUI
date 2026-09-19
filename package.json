@@ -140,7 +140,7 @@
     "unified": "^11.0.5",
     "vite": "^7.3.2",
     "vite-plugin-pwa": "^1.2.0",
-    "vite-plugin-static-copy": "^3.4.0",
+    "vite-plugin-static-copy": "^4.1.1",
     "vitest": "^4.1.5",
     "workbox-core": "^7.4.0",
     "workbox-precaching": "^7.4.0",
