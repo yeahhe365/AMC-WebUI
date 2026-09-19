@@ -152,6 +152,7 @@ export const THIRD_PARTY_TEMPLATE_IDS = [
   'opencode',
   'hunyuan',
   'huggingface',
+  'atlascloud',
   'custom-openai',
   'custom-anthropic',
 ] as const;
