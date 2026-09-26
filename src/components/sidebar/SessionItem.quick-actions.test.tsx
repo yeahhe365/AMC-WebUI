@@ -55,15 +55,16 @@ describe('SessionItem quick actions and title mask', () => {
     expect(onTogglePinSession).toHaveBeenCalledWith('s-2');
   });
 
-  it('applies fade-mask-x-r to the title for smooth edge fading', () => {
+  it('renders marquee-title cleanly without static fade-mask-x-r so short titles are not clipped', () => {
     const session = makeSession('s-3', false);
 
     act(() => {
       renderer.render(<SessionItem session={session} />);
     });
 
-    const titleEl = renderer.container.querySelector('.fade-mask-x-r');
+    const titleEl = renderer.container.querySelector('.marquee-title');
     expect(titleEl).not.toBeNull();
+    expect(titleEl?.className).not.toContain('fade-mask-x-r');
     expect(titleEl?.textContent).toBe('Chat s-3');
   });
 

@@ -308,7 +308,7 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
                       <div className="flex items-center min-w-0">
                         <span
                           ref={titleRef}
-                          className="truncate marquee-title fade-mask-x-r font-medium text-[var(--theme-text-primary)]"
+                          className="truncate marquee-title font-medium text-[var(--theme-text-primary)]"
                         >
                           {generatingTitleSessionIds.has(session.id) ? (
                             <div className="flex items-center gap-2 text-xs text-[var(--theme-text-secondary)]">
