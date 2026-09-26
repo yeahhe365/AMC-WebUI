@@ -18,6 +18,7 @@ export const ChatArea: React.FC = () => {
   const themeId = useSettingsStore((state) => state.currentTheme.id);
   const { isLoading } = useChatState(appSettings);
   const isSwitchingModel = useChatStore((state) => state.isSwitchingModel);
+  const hasActiveMessages = useChatStore((state) => state.activeMessages.some((msg) => !msg.isInternalToolMessage));
   const isHistorySidebarOpen = useUIStore((state) => state.isHistorySidebarOpen);
   const {
     isAppDraggingOver,
@@ -85,7 +86,7 @@ export const ChatArea: React.FC = () => {
 
       <MessageList />
 
-      <ChatWidthControls containerRef={chatAreaRef} />
+      <ChatWidthControls containerRef={chatAreaRef} enabled={hasActiveMessages && !isPipActive} />
 
       <div ref={chatInputContainerRef} className="absolute bottom-0 left-0 right-0 z-30 pointer-events-none">
         <div

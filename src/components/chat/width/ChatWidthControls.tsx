@@ -1,5 +1,4 @@
 import React, { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { useI18n } from '@/contexts/I18nContext';
 import {
   CHAT_DEFAULT_MIN,
   CHAT_WIDTH_PREF_KEY,
@@ -10,7 +9,6 @@ import {
 
 interface WidthHandleProps {
   side: 'left' | 'right';
-  title?: string;
   onStart: () => number;
   onDrag: (width: number) => void;
   onCommit: (width: number) => void;
@@ -128,19 +126,17 @@ const WidthHandle: React.FC<WidthHandleProps> = (props) => {
       onLostPointerCapture={onPointerCancel}
       onWheel={onWheel}
       onDoubleClick={onDoubleClick}
-      title={props.title}
     />
   );
 };
 
 export interface ChatWidthControlsProps {
   containerRef?: RefObject<HTMLElement | null>;
+  enabled?: boolean;
 }
 
-export const ChatWidthControls: React.FC<ChatWidthControlsProps> = ({ containerRef }) => {
-  const { t } = useI18n();
+export const ChatWidthControls: React.FC<ChatWidthControlsProps> = ({ containerRef, enabled = true }) => {
   const markerRef = useRef<HTMLSpanElement>(null);
-  const handleTitle = t('chatWidthResizeHint');
 
   const getContainer = useCallback((): HTMLElement | null => {
     return containerRef?.current ?? (markerRef.current?.parentElement as HTMLElement | null);
@@ -222,12 +218,15 @@ export const ChatWidthControls: React.FC<ChatWidthControlsProps> = ({ containerR
     if (container) publishWidths(container);
   }, [getContainer, publishWidths]);
 
+  if (!enabled) {
+    return <span ref={markerRef} style={{ display: 'none' }} aria-hidden="true" />;
+  }
+
   return (
     <>
       <span ref={markerRef} style={{ display: 'none' }} aria-hidden="true" />
       <WidthHandle
         side="left"
-        title={handleTitle}
         onStart={onStart}
         onDrag={onDrag}
         onCommit={onCommit}
@@ -236,7 +235,6 @@ export const ChatWidthControls: React.FC<ChatWidthControlsProps> = ({ containerR
       />
       <WidthHandle
         side="right"
-        title={handleTitle}
         onStart={onStart}
         onDrag={onDrag}
         onCommit={onCommit}

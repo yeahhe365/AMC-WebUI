@@ -94,9 +94,8 @@ describe('ChatArea', () => {
   });
 
   const renderChatArea = (providerValue = createChatAreaProviderValue()) => {
-    applyChatAreaProviderValue(providerValue);
-
     act(() => {
+      applyChatAreaProviderValue(providerValue);
       renderer.root.render(
         <ChatRuntimeTestProvider value={providerValue}>
           <ChatArea />
@@ -141,6 +140,31 @@ describe('ChatArea', () => {
     expect(pointerLayer?.className).toContain('pointer-events-auto');
     expect(pointerLayer?.className).toContain('max-w-[var(--chat-content-width,44.35rem)]');
     expect(pointerLayer?.className).toContain('mx-auto');
+  });
+
+  it('hides width handles on empty welcome page and shows them when messages exist', () => {
+    // 1. Empty messages -> blank welcome page -> width handles hidden
+    renderChatArea();
+    expect(renderer.container.querySelector('[data-width-handle="left"]')).toBeNull();
+    expect(renderer.container.querySelector('[data-width-handle="right"]')).toBeNull();
+
+    // 2. Active messages -> width handles rendered
+    renderChatArea(
+      createChatAreaProviderValue({
+        messageList: {
+          messages: [
+            {
+              id: 'message-1',
+              role: 'user',
+              content: 'hello',
+              timestamp: new Date('2026-04-12T00:00:00.000Z'),
+            },
+          ],
+        },
+      }),
+    );
+    expect(renderer.container.querySelector('[data-width-handle="left"]')).not.toBeNull();
+    expect(renderer.container.querySelector('[data-width-handle="right"]')).not.toBeNull();
   });
 
   it('does not focus the composer after a downward swipe in the chat area on mobile', () => {
