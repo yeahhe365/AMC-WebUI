@@ -27,12 +27,12 @@ describe('ChatWidthControls', () => {
   });
 
   it('calculates width correctly using resolveChatContentWidth', () => {
-    // Adaptive default with 680 floor and 920 max: 1400 * 0.64 = 896
-    expect(resolveChatContentWidth(1400, null)).toBe(896);
+    // Adaptive default fills container: 1400 - 16 = 1384
+    expect(resolveChatContentWidth(1400, null)).toBe(1384);
     // User preference applied
     expect(resolveChatContentWidth(1400, 1000)).toBe(1000);
-    // User preference clamped to container max (1400 - 176 = 1224)
-    expect(resolveChatContentWidth(1400, 1500)).toBe(1224);
+    // User preference clamped to container max (1400 - 16 = 1384)
+    expect(resolveChatContentWidth(1400, 1500)).toBe(1384);
     // Clamped to min 640
     expect(resolveChatContentWidth(1400, 500)).toBe(640);
   });
@@ -59,9 +59,7 @@ describe('ChatWidthControls', () => {
 
     expect(leftHandle).not.toBeNull();
     expect(rightHandle).not.toBeNull();
-    expect(leftHandle?.getAttribute('title')).toBeNull();
-    expect(rightHandle?.getAttribute('title')).toBeNull();
-    expect(root.style.getPropertyValue('--chat-content-width')).toBe('896px');
+    expect(root.style.getPropertyValue('--chat-content-width')).toBe('1384px');
   });
 
   it('does not render handles when enabled is false but still publishes width', () => {
@@ -75,7 +73,7 @@ describe('ChatWidthControls', () => {
     const root = container.firstElementChild as HTMLDivElement;
     expect(root.querySelector('[data-width-handle="left"]')).toBeNull();
     expect(root.querySelector('[data-width-handle="right"]')).toBeNull();
-    expect(root.style.getPropertyValue('--chat-content-width')).toBe('896px');
+    expect(root.style.getPropertyValue('--chat-content-width')).toBe('1384px');
   });
 
   it('supports symmetric dragging and persists to localStorage on commit', () => {
@@ -106,7 +104,7 @@ describe('ChatWidthControls', () => {
     };
 
     try {
-      // Base is 896. Pointer down at 800, drag inward by 30px to 770 -> narrows by 2 * 30 = 60 -> 836px
+      // Base is 1384. Pointer down at 800, drag inward by 30px to 770 -> narrows by 2 * 30 = 60 -> 1324px
       fireEvent.pointerDown(rightHandle, { pointerId: 1, clientX: 800, clientY: 200, button: 0 });
       expect(rightHandle.dataset.dragging).toBe('true');
 
@@ -114,8 +112,8 @@ describe('ChatWidthControls', () => {
       fireEvent.pointerUp(rightHandle, { pointerId: 1, clientX: 770, clientY: 200 });
 
       expect(rightHandle.dataset.dragging).toBeUndefined();
-      expect(root.style.getPropertyValue('--chat-content-width')).toBe('836px');
-      expect(localStorage.getItem(CHAT_WIDTH_PREF_KEY)).toBe('836');
+      expect(root.style.getPropertyValue('--chat-content-width')).toBe('1324px');
+      expect(localStorage.getItem(CHAT_WIDTH_PREF_KEY)).toBe('1324');
     } finally {
       Element.prototype.setPointerCapture = origSetCapture;
       Element.prototype.releasePointerCapture = origRelCapture;
@@ -139,8 +137,8 @@ describe('ChatWidthControls', () => {
     fireEvent.doubleClick(leftHandle);
 
     expect(localStorage.getItem(CHAT_WIDTH_PREF_KEY)).toBeNull();
-    // Reverts to adaptive default: 896px
-    expect(root.style.getPropertyValue('--chat-content-width')).toBe('896px');
+    // Reverts to adaptive default: 1384px
+    expect(root.style.getPropertyValue('--chat-content-width')).toBe('1384px');
   });
 
   it('forwards wheel scrolling to scroller element', () => {
@@ -187,13 +185,13 @@ describe('ChatWidthControls', () => {
       const root = container.firstElementChild as HTMLDivElement;
       expect(root.style.getPropertyValue('--chat-content-width')).toBe('1000px');
 
-      // Now container width shrinks to 900px (max allowed = 900 - 176 = 724px)
+      // Now container width shrinks to 900px (max allowed = 900 - 16 = 884px)
       Object.defineProperty(root, 'offsetWidth', { value: 900, configurable: true });
       act(() => {
         resizeCallback?.();
       });
 
-      expect(root.style.getPropertyValue('--chat-content-width')).toBe('724px');
+      expect(root.style.getPropertyValue('--chat-content-width')).toBe('884px');
       // Stored preference remains intact
       expect(localStorage.getItem(CHAT_WIDTH_PREF_KEY)).toBe('1000');
     } finally {

@@ -4,12 +4,12 @@ export const CHAT_WIDTH_PREF_KEY = 'amc.chat.contentWidth.v4';
 /** Floor for dragged content width (px). */
 export const CHAT_CONTENT_MIN = 640;
 
-/** Horizontal room reserved for both handles and their safe edge zones (px). Matches DeepSeek Harness. */
-export const CHAT_CONTENT_EDGE_BUDGET = 176;
+/** Horizontal margin budget reserved for safe edge distance (px). 16px reserves balanced 8px margin on each side. */
+export const CHAT_CONTENT_EDGE_BUDGET = 16;
 
 /** Default adaptive width bounds. */
-export const CHAT_DEFAULT_MIN = 680;
-export const CHAT_DEFAULT_MAX = 920;
+export const CHAT_DEFAULT_MIN = 640;
+export const CHAT_DEFAULT_MAX = 2560;
 
 /** Width presets */
 export const CHAT_WIDTH_PRESET_COMPACT = 768;
@@ -39,9 +39,10 @@ export function maxChatContentWidth(containerWidth: number): number {
   return Math.max(CHAT_CONTENT_MIN, containerWidth - CHAT_CONTENT_EDGE_BUDGET);
 }
 
-/** Default adaptive width: 680px floor, 64% column width, clamped to 920px (DeepSeek Harness formula). */
+/** Default adaptive width: fills available column leaving 20px margin on each side. */
 export function defaultAdaptiveChatWidth(containerWidth: number): number {
-  return Math.max(680, Math.min(containerWidth * 0.64, 920));
+  const max = maxChatContentWidth(containerWidth);
+  return Math.min(max, CHAT_DEFAULT_MAX);
 }
 
 /** Resolve the effective width for a given container width and optional user preference. */

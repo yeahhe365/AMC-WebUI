@@ -488,60 +488,79 @@ video::cue {
   position: absolute;
   top: 3.5rem;
   bottom: 0;
-  z-index: 0;
-  width: min(
-    10px,
-    calc((100% - var(--chat-content-width, 710px)) / 2 - 24px - 24px)
-  );
+  width: 24px;
   cursor: col-resize;
   user-select: none;
   touch-action: none;
+  z-index: 20;
 }
 
 .chat-width-handle[data-side='left'] {
-  right: calc(50% + var(--chat-content-width, 710px) / 2 + 24px);
+  right: calc(50% + var(--chat-content-width, 710px) / 2 - 54px);
 }
 
 .chat-width-handle[data-side='right'] {
-  left: calc(50% + var(--chat-content-width, 710px) / 2 + 24px);
+  right: calc(50% - var(--chat-content-width, 710px) / 2);
+  width: 36px;
 }
 
-/* Vertical indicator riding pointer Y (DeepSeek Harness 72px subtle indicator) */
+/* Vertical indicator riding pointer Y (DeepSeek Harness 104px fluid pill geometry) */
 .chat-width-handle::after {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 2px;
-  border-radius: 2px;
+  width: 3px;
+  border-radius: 3px;
   background: linear-gradient(
     to bottom,
-    transparent calc(var(--chat-width-handle-pointer-y, 50%) - 36px),
-    var(--theme-scrollbar-thumb, rgba(140, 140, 145, 0.4)) calc(var(--chat-width-handle-pointer-y, 50%) - 8px),
-    var(--theme-scrollbar-thumb, rgba(140, 140, 145, 0.4)) calc(var(--chat-width-handle-pointer-y, 50%) + 8px),
-    transparent calc(var(--chat-width-handle-pointer-y, 50%) + 36px)
+    transparent calc(var(--chat-width-handle-pointer-y, 50%) - 52px),
+    rgba(140, 140, 145, 0.4) calc(var(--chat-width-handle-pointer-y, 50%) - 12px),
+    rgba(140, 140, 145, 0.4) calc(var(--chat-width-handle-pointer-y, 50%) + 12px),
+    transparent calc(var(--chat-width-handle-pointer-y, 50%) + 52px)
   );
   opacity: 0;
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   pointer-events: none;
 }
 
+:where(.dark, .dark *) .chat-width-handle::after,
+.theme-onyx .chat-width-handle::after,
+.theme-graphite .chat-width-handle::after {
+  background: linear-gradient(
+    to bottom,
+    transparent calc(var(--chat-width-handle-pointer-y, 50%) - 52px),
+    #545557 calc(var(--chat-width-handle-pointer-y, 50%) - 12px),
+    #545557 calc(var(--chat-width-handle-pointer-y, 50%) + 12px),
+    transparent calc(var(--chat-width-handle-pointer-y, 50%) + 52px)
+  );
+}
+
 .chat-width-handle[data-side='left']::after {
-  right: 4px;
+  right: 11px;
 }
 
 .chat-width-handle[data-side='right']::after {
-  left: 4px;
+  right: 16px;
 }
 
-.chat-width-handle:hover::after,
-.chat-width-handle[data-dragging]::after,
-.chat-width-handle[data-dragging='true']::after {
+.chat-width-handle:hover::after {
   opacity: 1;
 }
 
-.chat-width-handle[data-dragging],
 .chat-width-handle[data-dragging='true'] {
-  z-index: 8;
+  z-index: 35;
+}
+
+.chat-width-handle[data-dragging='true']::after {
+  opacity: 1;
+  background: linear-gradient(
+    to bottom,
+    transparent calc(var(--chat-width-handle-pointer-y, 50%) - 52px),
+    #679efe calc(var(--chat-width-handle-pointer-y, 50%) - 12px),
+    #679efe calc(var(--chat-width-handle-pointer-y, 50%) + 12px),
+    transparent calc(var(--chat-width-handle-pointer-y, 50%) + 52px)
+  );
 }
 
 /* Hide handles on small mobile viewports */
