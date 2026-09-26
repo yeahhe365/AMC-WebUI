@@ -5,7 +5,6 @@ import React, {
   useRef,
   useState,
   type ReactNode,
-  type CSSProperties,
 } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -94,6 +93,44 @@ export const HoverCard: React.FC<HoverCardProps> = ({
     };
   }, []);
 
+  const calculatePosition = useCallback(() => {
+    const wrapper = rootRef.current;
+    if (!wrapper) return null;
+    const target =
+      wrapper.closest('li') ||
+      (wrapper.firstElementChild as HTMLElement) ||
+      wrapper;
+    let r = target.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0 && wrapper.firstElementChild) {
+      r = (wrapper.firstElementChild as HTMLElement).getBoundingClientRect();
+    }
+    if (r.width === 0 && r.height === 0 && wrapper.parentElement) {
+      r = wrapper.parentElement.getBoundingClientRect();
+    }
+
+    const card = cardRef.current;
+    const h = card?.offsetHeight ?? 90;
+    const w = card?.offsetWidth ?? 260;
+
+    let left = r.right + ANCHOR_GAP;
+    if (left + w > window.innerWidth - VIEWPORT_MARGIN) {
+      if (r.left - w - ANCHOR_GAP >= VIEWPORT_MARGIN) {
+        left = r.left - w - ANCHOR_GAP;
+      } else {
+        left = Math.max(VIEWPORT_MARGIN, window.innerWidth - w - VIEWPORT_MARGIN);
+      }
+    }
+
+    let top = r.top;
+    if (top + h > window.innerHeight - VIEWPORT_MARGIN) {
+      top = Math.max(VIEWPORT_MARGIN, window.innerHeight - h - VIEWPORT_MARGIN);
+    } else {
+      top = Math.max(VIEWPORT_MARGIN, top);
+    }
+
+    return { left, top, maxWidth: Math.min(360, window.innerWidth - 32) };
+  }, []);
+
   useLayoutEffect(() => {
     if (!isOpen) {
       setPos(null);
@@ -101,41 +138,10 @@ export const HoverCard: React.FC<HoverCardProps> = ({
     }
 
     const updatePosition = () => {
-      const wrapper = rootRef.current;
-      if (!wrapper) return;
-      const target =
-        wrapper.closest('li') ||
-        (wrapper.firstElementChild as HTMLElement) ||
-        wrapper;
-      let r = target.getBoundingClientRect();
-      if (r.width === 0 && r.height === 0 && wrapper.firstElementChild) {
-        r = (wrapper.firstElementChild as HTMLElement).getBoundingClientRect();
+      const nextPos = calculatePosition();
+      if (nextPos) {
+        setPos(nextPos);
       }
-      if (r.width === 0 && r.height === 0 && wrapper.parentElement) {
-        r = wrapper.parentElement.getBoundingClientRect();
-      }
-
-      const card = cardRef.current;
-      const h = card?.offsetHeight ?? 90;
-      const w = card?.offsetWidth ?? 260;
-
-      let left = r.right + ANCHOR_GAP;
-      if (left + w > window.innerWidth - VIEWPORT_MARGIN) {
-        if (r.left - w - ANCHOR_GAP >= VIEWPORT_MARGIN) {
-          left = r.left - w - ANCHOR_GAP;
-        } else {
-          left = Math.max(VIEWPORT_MARGIN, window.innerWidth - w - VIEWPORT_MARGIN);
-        }
-      }
-
-      let top = r.top;
-      if (top + h > window.innerHeight - VIEWPORT_MARGIN) {
-        top = Math.max(VIEWPORT_MARGIN, window.innerHeight - h - VIEWPORT_MARGIN);
-      } else {
-        top = Math.max(VIEWPORT_MARGIN, top);
-      }
-
-      setPos({ left, top, maxWidth: Math.min(360, window.innerWidth - 32) });
     };
 
     updatePosition();
@@ -145,7 +151,7 @@ export const HoverCard: React.FC<HoverCardProps> = ({
       window.removeEventListener('scroll', updatePosition, true);
       window.removeEventListener('resize', updatePosition);
     };
-  }, [isOpen]);
+  }, [isOpen, calculatePosition]);
 
   useLayoutEffect(() => {
     if (!isOpen || pos === null) return;
@@ -153,14 +159,10 @@ export const HoverCard: React.FC<HoverCardProps> = ({
     if (!card) return;
     const h = card.offsetHeight;
     if (pos.top + h > window.innerHeight - VIEWPORT_MARGIN) {
-      setPos((prev) =>
-        prev
-          ? {
-              ...prev,
-              top: Math.max(VIEWPORT_MARGIN, window.innerHeight - h - VIEWPORT_MARGIN),
-            }
-          : null,
-      );
+      const adjustedTop = Math.max(VIEWPORT_MARGIN, window.innerHeight - h - VIEWPORT_MARGIN);
+      if (adjustedTop !== pos.top) {
+        setPos((prev) => (prev ? { ...prev, top: adjustedTop } : null));
+      }
     }
   }, [isOpen, pos]);
 
@@ -185,7 +187,7 @@ export const HoverCard: React.FC<HoverCardProps> = ({
 
   const copyable = Boolean(copyText);
 
-  const cardNode = isOpen && !disabled && (
+  const cardNode = isOpen && pos !== null && !disabled && (
     <div
       ref={cardRef}
       role={copyable ? 'button' : 'tooltip'}
@@ -204,17 +206,14 @@ export const HoverCard: React.FC<HoverCardProps> = ({
             }
           : undefined
       }
-      style={
-        {
-          position: 'fixed',
-          left: pos?.left ?? 0,
-          top: pos?.top ?? 0,
-          maxWidth: pos?.maxWidth ?? 360,
-          zIndex: 9999,
-          visibility: pos ? 'visible' : 'hidden',
-        } as CSSProperties
-      }
-      className={`rounded-xl border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] p-3 text-xs text-[var(--theme-text-primary)] shadow-2xl backdrop-blur-md transition-all duration-150 animate-in fade-in zoom-in-95 cursor-pointer select-none group ${className}`}
+      style={{
+        position: 'fixed',
+        left: pos.left,
+        top: pos.top,
+        maxWidth: pos.maxWidth ?? 360,
+        zIndex: 9999,
+      }}
+      className={`rounded-xl border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-primary)] p-3 text-xs text-[var(--theme-text-primary)] shadow-2xl backdrop-blur-md transition-opacity duration-100 animate-in fade-in cursor-pointer select-none group ${className}`}
     >
       {copied ? (
         <div className="flex items-center gap-1.5 py-1 text-center justify-center font-medium text-[var(--theme-text-link)]">
@@ -235,6 +234,10 @@ export const HoverCard: React.FC<HoverCardProps> = ({
         clearCloseTimer();
         clearOpenTimer();
         openTimerRef.current = setTimeout(() => {
+          const initialPos = calculatePosition();
+          if (initialPos) {
+            setPos(initialPos);
+          }
           setIsOpen(true);
         }, openDelayMs);
       }}

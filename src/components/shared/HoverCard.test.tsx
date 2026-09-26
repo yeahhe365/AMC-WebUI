@@ -160,5 +160,9 @@ describe('HoverCard', () => {
     // 260 + ANCHOR_GAP (8) = 268
     expect(card.style.left).toBe('268px');
     expect(card.style.top).toBe('150px');
+    expect(card.className).not.toContain('transition-all');
+    expect(card.className).not.toContain('zoom-in-95');
+    expect(card.className).toContain('transition-opacity');
   });
 });
+
