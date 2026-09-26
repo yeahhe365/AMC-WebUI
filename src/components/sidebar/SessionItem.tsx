@@ -79,8 +79,26 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
   const displayTitle = session.title === 'New Chat' ? t('newChat') : session.title;
   const isBeingDragged = draggingSessionId === session.id;
   const completedOutcome = useChatStore((state) => state.completedSessions[session.id]);
+  const activeMessages = useChatStore((state) => state.activeMessages);
   const titleRef = useRef<HTMLSpanElement>(null);
   const marquee = useTitleMarquee(titleRef);
+
+  const isBlank = React.useMemo(() => {
+    if (session.blank !== undefined) {
+      if (!session.blank) return false;
+      if (session.id === activeSessionId && activeMessages && activeMessages.some((m) => !m.isInternalToolMessage)) {
+        return false;
+      }
+      return true;
+    }
+    const isNewChatTitle = session.title === 'New Chat' || session.titleSource === 'default';
+    if (!isNewChatTitle) return false;
+
+    if (session.id === activeSessionId) {
+      return !activeMessages || activeMessages.length === 0 || !activeMessages.some((m) => !m.isInternalToolMessage);
+    }
+    return !session.messages || session.messages.length === 0 || !session.messages.some((m) => !m.isInternalToolMessage);
+  }, [session.blank, session.title, session.titleSource, session.id, activeSessionId, activeMessages, session.messages]);
 
   const dragLifecycleRef = useRef({ isBeingDragged, onSessionDragEnd });
 
@@ -206,6 +224,7 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
   return (
     <ContextMenu
       onOpenChange={(open) => {
+        if (isBlank) return;
         setIsContextMenuOpen(open);
         if (open) {
           setIsRightClickAnimating(true);
@@ -216,9 +235,10 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
         }
       }}
     >
-      <ContextMenuTrigger asChild>
+      <ContextMenuTrigger asChild disabled={isBlank}>
         <li
-          onContextMenu={handleContextMenu}
+          data-row-key={`session:${session.id}`}
+          onContextMenu={isBlank ? (event) => event.preventDefault() : handleContextMenu}
           onDragOver={
             disableNativeDrag
               ? undefined
@@ -294,11 +314,12 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
                       }
                     }}
                     onDoubleClick={(event) => {
+                      if (isBlank) return;
                       event.preventDefault();
                       event.stopPropagation();
                       handleStartEdit(session);
                     }}
-                    className="flex w-full min-w-0 items-center pr-14 no-underline text-inherit"
+                    className={`flex w-full min-w-0 items-center ${isBlank ? 'pr-2' : 'pr-14'} no-underline text-inherit`}
                     aria-current={session.id === activeSessionId ? 'page' : undefined}
                   >
                     {session.isPinned && (
@@ -340,7 +361,7 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
                 }
                 content={hoverCardContent}
                 openDelayMs={800}
-                disabled={isActive || isContextMenuOpen || isBeingDragged || isEditing || isBlockedByGroupDrag}
+                disabled={isBlank || isActive || isContextMenuOpen || isBeingDragged || isEditing || isBlockedByGroupDrag}
                 copyText={displayTitle}
                 copyLabel={t('historyCopyTitleAction')}
                 copiedLabel={t('historyTitleCopied')}
@@ -352,7 +373,7 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
               </span>
             ) : (
               <>
-                {!generatingTitleSessionIds.has(session.id) && (
+                {!isBlank && !generatingTitleSessionIds.has(session.id) && (
                   <div
                     data-testid="session-relative-time"
                     className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 transition-opacity duration-150 select-none pointer-events-none ${
@@ -375,7 +396,7 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
                     </span>
                   </div>
                 )}
-                {!generatingTitleSessionIds.has(session.id) && (
+                {!isBlank && !generatingTitleSessionIds.has(session.id) && (
                   <div
                     className={`absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 transition-opacity duration-150 ${
                       isActive || isContextMenuOpen

@@ -140,32 +140,38 @@ body {
 }
 
 /* Quiet Scrollbar (DeepSeek-style pointer affordance with linger) */
-.quiet-scrollbar {
+.quiet-scrollbar,
+.custom-scrollbar.quiet-scrollbar {
   scrollbar-width: thin;
   scrollbar-color: var(--sidebar-scrollbar-thumb, transparent) transparent;
 }
 
 @media (pointer: fine) {
-  .quiet-scrollbar::-webkit-scrollbar {
+  .quiet-scrollbar::-webkit-scrollbar,
+  .custom-scrollbar.quiet-scrollbar::-webkit-scrollbar {
     width: 5px;
     height: 5px;
   }
 
-  .quiet-scrollbar::-webkit-scrollbar-track {
+  .quiet-scrollbar::-webkit-scrollbar-track,
+  .custom-scrollbar.quiet-scrollbar::-webkit-scrollbar-track {
     background: transparent;
   }
 
-  .quiet-scrollbar::-webkit-scrollbar-thumb {
+  .quiet-scrollbar::-webkit-scrollbar-thumb,
+  .custom-scrollbar.quiet-scrollbar::-webkit-scrollbar-thumb {
     background-color: var(--sidebar-scrollbar-thumb, transparent);
     border-radius: 10px;
     transition: background-color 0.25s ease-out;
   }
 
-  .quiet-scrollbar::-webkit-scrollbar-thumb:hover {
+  .quiet-scrollbar::-webkit-scrollbar-thumb:hover,
+  .custom-scrollbar.quiet-scrollbar::-webkit-scrollbar-thumb:hover {
     background-color: var(--theme-border-focus);
   }
 
-  .quiet-scrollbar::-webkit-scrollbar-corner {
+  .quiet-scrollbar::-webkit-scrollbar-corner,
+  .custom-scrollbar.quiet-scrollbar::-webkit-scrollbar-corner {
     background: transparent;
   }
 }

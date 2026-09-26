@@ -472,6 +472,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         ...session,
         messages: [...session.messages, message],
         timestamp: Date.now(),
+        ...(session.blank ? { blank: false } : {}),
       }),
       options,
     );

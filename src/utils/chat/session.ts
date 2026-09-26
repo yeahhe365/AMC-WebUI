@@ -42,6 +42,7 @@ export const createNewSession = (
   title: string = 'New Chat',
   groupId: string | null = null,
   titleSource: SavedChatSession['titleSource'] = 'default',
+  blank?: boolean,
 ): SavedChatSession => ({
   id: generateUniqueId(),
   title,
@@ -51,6 +52,7 @@ export const createNewSession = (
   timestamp: Date.now(),
   groupId,
   createdTabId: TAB_ID,
+  blank: blank ?? (messages.length === 0 && (title === 'New Chat' || titleSource === 'default')),
 });
 
 export const cloneMessagesWithFreshIds = (messages: ChatMessage[]): ChatMessage[] => {

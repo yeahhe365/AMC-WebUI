@@ -253,42 +253,61 @@ export const HistorySidebar: React.FC<HistorySidebarProps> = (props) => {
       ? `${sidebarWidth}px`
       : `${lastWideWidth.current}px`;
 
-  // P3: Quiet Scrollbar with 2s linger (DeepSeek-style pointer affordance)
+  // P2: Quiet Scrollbar with 2s linger (DeepSeek-style pointer affordance)
   const SCROLLBAR_LINGER_MS = 2000;
+  const sidebarRootRef = React.useRef<HTMLElement | null>(null);
   const [pointerInsideSidebar, setPointerInsideSidebar] = React.useState(false);
   const scrollbarLingerTimerRef = React.useRef<number | null>(null);
 
-  const handlePointerEnterSidebar = React.useCallback(() => {
-    if (scrollbarLingerTimerRef.current !== null) {
-      window.clearTimeout(scrollbarLingerTimerRef.current);
-      scrollbarLingerTimerRef.current = null;
-    }
-    setPointerInsideSidebar(true);
-  }, []);
-
-  const handlePointerLeaveSidebar = React.useCallback(() => {
-    if (scrollbarLingerTimerRef.current !== null) {
-      window.clearTimeout(scrollbarLingerTimerRef.current);
-    }
+  const armLinger = React.useCallback(() => {
+    if (scrollbarLingerTimerRef.current !== null) return;
     scrollbarLingerTimerRef.current = window.setTimeout(() => {
       scrollbarLingerTimerRef.current = null;
       setPointerInsideSidebar(false);
     }, SCROLLBAR_LINGER_MS);
   }, []);
 
+  const cancelLinger = React.useCallback(() => {
+    if (scrollbarLingerTimerRef.current !== null) {
+      window.clearTimeout(scrollbarLingerTimerRef.current);
+      scrollbarLingerTimerRef.current = null;
+    }
+  }, []);
+
   React.useEffect(() => {
-    return () => {
-      if (scrollbarLingerTimerRef.current !== null) {
-        window.clearTimeout(scrollbarLingerTimerRef.current);
+    if (!pointerInsideSidebar) return;
+    const onMove = (event: PointerEvent) => {
+      const rect = sidebarRootRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const inside =
+        event.clientX >= rect.left &&
+        event.clientX < rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY < rect.bottom;
+      if (inside) {
+        cancelLinger();
+      } else {
+        armLinger();
       }
     };
-  }, []);
+    document.addEventListener('pointermove', onMove);
+    return () => {
+      document.removeEventListener('pointermove', onMove);
+      cancelLinger();
+    };
+  }, [pointerInsideSidebar, armLinger, cancelLinger]);
 
   return (
     <aside
+      ref={sidebarRootRef}
       data-history-sidebar-root="true"
-      onPointerEnter={handlePointerEnterSidebar}
-      onPointerLeave={handlePointerLeaveSidebar}
+      onPointerEnter={() => {
+        cancelLinger();
+        setPointerInsideSidebar(true);
+      }}
+      onPointerLeave={() => {
+        armLinger();
+      }}
       className={`h-full flex flex-col bg-[var(--theme-bg-secondary)] flex-shrink-0
                  transition-transform duration-300 ease-[cubic-bezier(0.19,1,0.22,1)] ${isResizingSidebar ? 'transition-none' : 'md:transition-[width]'} transform-gpu
                  absolute md:relative top-0 left-0 z-50

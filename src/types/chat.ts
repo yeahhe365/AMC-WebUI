@@ -141,6 +141,11 @@ export interface SavedChatSession {
    * - undefined: legacy session — eligibility inferred from the heuristic (see isSessionAutoTitleEligible)
    */
   titleSource?: 'default' | 'auto' | 'manual';
+  /**
+   * Blank provisional session placeholder (DeepSeek-style).
+   * True while no conversation prompt has been sent in this session yet.
+   */
+  blank?: boolean;
 }
 
 export interface PreloadedMessage {

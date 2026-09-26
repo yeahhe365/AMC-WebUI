@@ -1,10 +1,10 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { type SavedChatSession } from '@/types';
 import { SessionItem } from './SessionItem';
 import { type SessionItemPassedProps } from './sidebarTypes';
 import { useSidebarItemContext } from './SidebarItemContext';
+import { AnimatedRows } from './AnimatedRows';
 
 const VIRTUALIZATION_THRESHOLD = 50;
 const ESTIMATED_ITEM_HEIGHT = 38;
@@ -24,7 +24,6 @@ export const LimitedSessionList: React.FC<LimitedSessionListProps> = ({
   isDragging,
   scrollParent: propScrollParent,
 }) => {
-  const [animatedParent] = useAutoAnimate<HTMLUListElement>({ duration: 200 });
   const containerRef = useRef<HTMLDivElement>(null);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const context = useSidebarItemContext();
@@ -73,11 +72,15 @@ export const LimitedSessionList: React.FC<LimitedSessionListProps> = ({
 
   if (!isLargeList) {
     return (
-      <ul ref={isDragging ? undefined : animatedParent} className={className}>
+      <AnimatedRows
+        className={className}
+        rowKeys={sessions.map((session) => `session:${session.id}`)}
+        ready={!isDragging}
+      >
         {sessions.map((session) => (
           <SessionItem key={session.id} session={session} {...sessionItemProps} />
         ))}
-      </ul>
+      </AnimatedRows>
     );
   }
 
