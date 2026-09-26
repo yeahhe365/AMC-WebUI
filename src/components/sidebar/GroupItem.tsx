@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, type RefObject } from 'react';
-import { ChevronDown, GripVertical, MoreHorizontal } from 'lucide-react';
+import React, { useEffect, useRef, useState, type RefObject } from 'react';
+import { ChevronDown, ChevronUp, GripVertical, MoreHorizontal } from 'lucide-react';
 import { type ChatGroup, type SavedChatSession } from '@/types';
 import { GroupItemMenu } from './GroupItemMenu';
 import { DropdownMenu, DropdownMenuTrigger } from '@/components/shared/DropdownMenu';
@@ -16,6 +16,16 @@ import { useSidebarItemContext } from './SidebarItemContext';
 const DRAG_HOVER_EXPAND_MS = 600;
 const FALLBACK_INPUT_REF: RefObject<HTMLInputElement> = { current: null };
 const FALLBACK_MENU_REF: RefObject<HTMLDivElement> = { current: null };
+
+export const COLLAPSED_GROUP_SESSION_LIMIT = 5;
+
+const isProvisionalBlank = (s: SavedChatSession): boolean => {
+  return (
+    s.blank === true ||
+    ((!s.messages || s.messages.length === 0) &&
+      (!s.title || s.title === 'New Chat' || s.title === '新会话' || s.titleSource === 'default'))
+  );
+};
 
 export interface GroupItemProps {
   group: ChatGroup;
@@ -87,6 +97,44 @@ export const GroupItem: React.FC<GroupItemProps> = (props) => {
     menuRef = props.menuRef ?? context?.menuRef ?? FALLBACK_MENU_REF,
     setActiveMenu = context?.setActiveMenu ?? (() => {}),
   } = props;
+
+  const [sessionLimit, setSessionLimit] = useState<number>(COLLAPSED_GROUP_SESSION_LIMIT);
+
+  // When group collapses (isExpanded transitions from true to false), reset temporary expansion
+  const prevExpandedRef = useRef(group.isExpanded);
+  useEffect(() => {
+    if (prevExpandedRef.current && !group.isExpanded) {
+      setSessionLimit(COLLAPSED_GROUP_SESSION_LIMIT);
+    }
+    prevExpandedRef.current = group.isExpanded;
+  }, [group.isExpanded]);
+
+  const activeSessionId = props.sessionItemProps?.activeSessionId ?? context?.activeSessionId ?? null;
+  const loadingSessionIds = props.sessionItemProps?.loadingSessionIds ?? context?.loadingSessionIds;
+
+  const isQuotaExempt = (s: SavedChatSession) => {
+    if (isProvisionalBlank(s)) return true;
+    if (loadingSessionIds?.has(s.id)) return true;
+    return false;
+  };
+
+  let idleCount = 0;
+  const visibleSessions = (sessions ?? []).filter((session) => {
+    if (isQuotaExempt(session)) return true;
+    if (idleCount >= sessionLimit) return false;
+    idleCount += 1;
+    return true;
+  });
+
+  const hiddenCount = (sessions ?? []).length - visibleSessions.length;
+
+  useEffect(() => {
+    if (activeSessionId && sessions?.some((s) => s.id === activeSessionId)) {
+      if (!visibleSessions.some((s) => s.id === activeSessionId)) {
+        setSessionLimit(Infinity);
+      }
+    }
+  }, [activeSessionId, sessions, visibleSessions]);
 
   // Auto-expand: while a session is hovered over this group, start a timer that
   // expands a collapsed group after a short delay. Cancelled when the drag
@@ -213,7 +261,15 @@ export const GroupItem: React.FC<GroupItemProps> = (props) => {
           <div className="h-1.5 w-1.5 -ml-0.5 rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_6px_var(--theme-bg-accent)]" />
         </div>
       )}
-      <details open={group.isExpanded ?? true} className="group/details">
+      <details
+        open={group.isExpanded ?? true}
+        className="group/details"
+        onToggle={(e) => {
+          if (!e.currentTarget.open) {
+            setSessionLimit(COLLAPSED_GROUP_SESSION_LIMIT);
+          }
+        }}
+      >
         <summary
           className={`list-none flex items-center justify-between px-2 py-2 rounded-lg cursor-pointer transition-colors duration-150 ${
             dragOverId === group.id
@@ -319,11 +375,41 @@ export const GroupItem: React.FC<GroupItemProps> = (props) => {
           </DropdownMenu>
         </summary>
         <LimitedSessionList
-          sessions={sessions ?? []}
+          sessions={visibleSessions}
           sessionItemProps={props.sessionItemProps}
           className="pl-1 pb-1"
           isDragging={!!isDragging || !!props.draggingSessionId || !!context?.draggingSessionId || !!draggingGroupId}
         />
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setSessionLimit((prev) =>
+                hiddenCount <= COLLAPSED_GROUP_SESSION_LIMIT ? Infinity : prev + COLLAPSED_GROUP_SESSION_LIMIT,
+              );
+            }}
+            className="w-full flex items-center justify-center gap-1.5 py-1 text-xs text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] rounded-md transition-colors my-0.5 cursor-pointer select-none"
+            aria-label={interpolate(t('historyExpandRemainingSessions'), { count: hiddenCount })}
+          >
+            <span>{interpolate(t('historyExpandRemainingSessions'), { count: hiddenCount })}</span>
+            <ChevronDown size={12} strokeWidth={2.2} />
+          </button>
+        )}
+        {sessionLimit > COLLAPSED_GROUP_SESSION_LIMIT && (sessions?.length ?? 0) > COLLAPSED_GROUP_SESSION_LIMIT && hiddenCount === 0 && (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setSessionLimit(COLLAPSED_GROUP_SESSION_LIMIT);
+            }}
+            className="w-full flex items-center justify-center gap-1.5 py-1 text-xs text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] rounded-md transition-colors my-0.5 cursor-pointer select-none"
+            aria-label={t('historyCollapseRemainingSessions')}
+          >
+            <span>{t('historyCollapseRemainingSessions')}</span>
+            <ChevronUp size={12} strokeWidth={2.2} />
+          </button>
+        )}
       </details>
     </div>
   );

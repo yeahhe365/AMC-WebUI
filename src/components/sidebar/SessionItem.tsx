@@ -179,6 +179,7 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
       dragStartRef.current = null;
     } else if (isMicroDrag(event)) {
       dragStartRef.current = null;
+      useChatStore.getState().markSessionViewed(session.id);
       onSelectSession(session.id);
     }
     onSessionDragEnd();
@@ -310,6 +311,7 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
                         if (isDoubleClickDrag(event)) {
                           return;
                         }
+                        useChatStore.getState().markSessionViewed(session.id);
                         onSelectSession(session.id);
                       }
                     }}
@@ -322,9 +324,6 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
                     className={`flex w-full min-w-0 items-center ${isBlank ? 'pr-2' : 'pr-14'} no-underline text-inherit`}
                     aria-current={session.id === activeSessionId ? 'page' : undefined}
                   >
-                    {session.isPinned && (
-                      <Pin size={12} className="mr-2 text-[var(--theme-text-link)] flex-shrink-0" strokeWidth={2} />
-                    )}
                     <div className="flex flex-col min-w-0 flex-grow py-0.5">
                       <div className="flex items-center min-w-0">
                         <span
@@ -368,43 +367,69 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
               />
             )}
             {loadingSessionIds.has(session.id) ? (
-              <span className="absolute right-1 top-1/2 -translate-y-1/2">
-                <LoadingDots />
-              </span>
+              isSelected ? (
+                <span className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <LoadingDots />
+                </span>
+              ) : (
+                <span
+                  data-testid="session-running-dot"
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none transition-opacity duration-150 ${
+                    isContextMenuOpen ? 'opacity-0' : 'opacity-100 group-hover:opacity-0 group-focus-within:opacity-0'
+                  }`}
+                  title={t('sessionRunning')}
+                  aria-label={t('sessionRunning')}
+                >
+                  <span className="relative flex h-2.5 w-2.5 items-center justify-center">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]" />
+                  </span>
+                </span>
+              )
             ) : (
-              <>
-                {!isBlank && !generatingTitleSessionIds.has(session.id) && (
-                  <div
-                    data-testid="session-relative-time"
-                    className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 transition-opacity duration-150 select-none pointer-events-none ${
-                      isActive || isContextMenuOpen
-                        ? 'opacity-0'
-                        : 'opacity-100 group-hover:opacity-0 group-focus-within:opacity-0'
-                    }`}
-                  >
-                    {completedOutcome && (
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          completedOutcome === 'error' ? 'bg-[#ef4444]' : 'bg-[#22c55e]'
-                        }`}
-                        title={t(completedOutcome === 'error' ? 'sessionCompletedWithError' : 'sessionCompleted')}
-                        aria-label={t(completedOutcome === 'error' ? 'sessionCompletedWithError' : 'sessionCompleted')}
-                      />
-                    )}
-                    <span className="text-[10px] text-[var(--theme-text-secondary)]">
-                      {formatRelativeTime(session.timestamp, t)}
+              !isBlank && !generatingTitleSessionIds.has(session.id) && (
+                <div
+                  data-testid="session-relative-time"
+                  className={`absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 transition-opacity duration-150 select-none pointer-events-none ${
+                    isActive || isContextMenuOpen
+                      ? 'opacity-0'
+                      : 'opacity-100 group-hover:opacity-0 group-focus-within:opacity-0'
+                  }`}
+                >
+                  {completedOutcome && (
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        completedOutcome === 'error' ? 'bg-[#ef4444]' : 'bg-[#22c55e]'
+                      }`}
+                      title={t(completedOutcome === 'error' ? 'sessionCompletedWithError' : 'sessionCompleted')}
+                      aria-label={t(completedOutcome === 'error' ? 'sessionCompletedWithError' : 'sessionCompleted')}
+                    />
+                  )}
+                  <span className="text-[10px] text-[var(--theme-text-secondary)]">
+                    {formatRelativeTime(session.timestamp, t)}
+                  </span>
+                  {session.isPinned && (
+                    <span
+                      data-testid="session-pinned-indicator"
+                      className="inline-flex items-center justify-center text-[var(--theme-text-secondary)] ml-0.5"
+                      title={t('historyPinned')}
+                      aria-label={t('historyPinned')}
+                    >
+                      <Pin size={11} strokeWidth={2.2} />
                     </span>
-                  </div>
-                )}
-                {!isBlank && !generatingTitleSessionIds.has(session.id) && (
-                  <div
-                    className={`absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 transition-opacity duration-150 ${
-                      isActive || isContextMenuOpen
-                        ? 'opacity-100 pointer-events-auto'
-                        : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'
-                    }`}
-                    onClick={(event) => event.stopPropagation()}
-                  >
+                  )}
+                </div>
+              )
+            )}
+            {!isBlank && !generatingTitleSessionIds.has(session.id) && (
+              <div
+                className={`absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 transition-opacity duration-150 ${
+                  isActive || isContextMenuOpen
+                    ? 'opacity-100 pointer-events-auto'
+                    : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'
+                }`}
+                onClick={(event) => event.stopPropagation()}
+              >
                     <button
                       type="button"
                       title={session.isPinned ? t('historyUnpin') : t('historyPin')}
@@ -473,8 +498,6 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
                     </DropdownMenu>
                   </div>
                 )}
-              </>
-            )}
           </div>
           {showAfter && (
             <div className="absolute -bottom-[1px] left-1 right-1 h-0.5 rounded-full bg-[var(--theme-bg-accent)] pointer-events-none z-10" />
