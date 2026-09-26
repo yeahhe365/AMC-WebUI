@@ -103,19 +103,36 @@ export const HoverCard: React.FC<HoverCardProps> = ({
     const updatePosition = () => {
       const wrapper = rootRef.current;
       if (!wrapper) return;
-      const r = wrapper.getBoundingClientRect();
+      const target =
+        wrapper.closest('li') ||
+        (wrapper.firstElementChild as HTMLElement) ||
+        wrapper;
+      let r = target.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0 && wrapper.firstElementChild) {
+        r = (wrapper.firstElementChild as HTMLElement).getBoundingClientRect();
+      }
+      if (r.width === 0 && r.height === 0 && wrapper.parentElement) {
+        r = wrapper.parentElement.getBoundingClientRect();
+      }
+
       const card = cardRef.current;
-      const h = card?.offsetHeight ?? 60;
+      const h = card?.offsetHeight ?? 90;
       const w = card?.offsetWidth ?? 260;
 
       let left = r.right + ANCHOR_GAP;
       if (left + w > window.innerWidth - VIEWPORT_MARGIN) {
-        left = Math.max(VIEWPORT_MARGIN, window.innerWidth - w - VIEWPORT_MARGIN);
+        if (r.left - w - ANCHOR_GAP >= VIEWPORT_MARGIN) {
+          left = r.left - w - ANCHOR_GAP;
+        } else {
+          left = Math.max(VIEWPORT_MARGIN, window.innerWidth - w - VIEWPORT_MARGIN);
+        }
       }
 
       let top = r.top;
       if (top + h > window.innerHeight - VIEWPORT_MARGIN) {
         top = Math.max(VIEWPORT_MARGIN, window.innerHeight - h - VIEWPORT_MARGIN);
+      } else {
+        top = Math.max(VIEWPORT_MARGIN, top);
       }
 
       setPos({ left, top, maxWidth: Math.min(360, window.innerWidth - 32) });
@@ -129,6 +146,23 @@ export const HoverCard: React.FC<HoverCardProps> = ({
       window.removeEventListener('resize', updatePosition);
     };
   }, [isOpen]);
+
+  useLayoutEffect(() => {
+    if (!isOpen || pos === null) return;
+    const card = cardRef.current;
+    if (!card) return;
+    const h = card.offsetHeight;
+    if (pos.top + h > window.innerHeight - VIEWPORT_MARGIN) {
+      setPos((prev) =>
+        prev
+          ? {
+              ...prev,
+              top: Math.max(VIEWPORT_MARGIN, window.innerHeight - h - VIEWPORT_MARGIN),
+            }
+          : null,
+      );
+    }
+  }, [isOpen, pos]);
 
   const handleCopy = async (e: React.MouseEvent | React.KeyboardEvent) => {
     if (!copyText || copied) return;
@@ -195,7 +229,7 @@ export const HoverCard: React.FC<HoverCardProps> = ({
   return (
     <div
       ref={rootRef}
-      className="contents"
+      className="block w-full min-w-0"
       onPointerEnter={() => {
         if (disabled) return;
         clearCloseTimer();

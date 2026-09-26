@@ -121,4 +121,44 @@ describe('HoverCard', () => {
     expect(screen.queryByText('Copied!')).toBeNull();
     expect(screen.getByText('Card Body')).not.toBeNull();
   });
+
+  it('positions card adjacent to the row on the right side using bounding client rect', () => {
+    const { container } = render(
+      <ul>
+        <li>
+          <HoverCard
+            anchor={<button>Row Anchor</button>}
+            content={<div>Card Body</div>}
+            openDelayMs={800}
+          />
+        </li>
+      </ul>,
+    );
+
+    const li = container.querySelector('li') as HTMLElement;
+    vi.spyOn(li, 'getBoundingClientRect').mockReturnValue({
+      top: 150,
+      left: 10,
+      right: 260,
+      bottom: 186,
+      width: 250,
+      height: 36,
+      x: 10,
+      y: 150,
+      toJSON: () => {},
+    });
+
+    const root = container.querySelector('.block') as HTMLElement;
+    fireEvent.pointerEnter(root);
+
+    act(() => {
+      vi.advanceTimersByTime(800);
+    });
+
+    const card = document.querySelector('[role="tooltip"]') as HTMLElement;
+    expect(card).not.toBeNull();
+    // 260 + ANCHOR_GAP (8) = 268
+    expect(card.style.left).toBe('268px');
+    expect(card.style.top).toBe('150px');
+  });
 });

@@ -189,15 +189,15 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
     : t('historyMoveToUngrouped');
 
   const hoverCardContent = (
-    <div className="flex flex-col gap-1.5 min-w-[200px] max-w-[280px]">
-      <div className="font-semibold text-xs leading-snug break-words text-[var(--theme-text-primary)]">
+    <div className="flex flex-col gap-2 min-w-[220px] max-w-[290px]">
+      <div className="font-semibold text-sm leading-snug break-words text-[var(--theme-text-primary)]">
         {displayTitle}
       </div>
-      <div className="flex items-center justify-between text-[10px] text-[var(--theme-text-secondary)] border-t border-[var(--theme-border-secondary)] pt-1.5 mt-0.5">
+      <div className="flex items-center justify-between text-xs text-[var(--theme-text-secondary)] border-t border-[var(--theme-border-secondary)]/70 pt-2 mt-0.5">
         <span className="truncate max-w-[130px]">{groupName}</span>
-        <span>{formatDateTime(session.timestamp)}</span>
+        <span className="shrink-0">{formatDateTime(session.timestamp)}</span>
       </div>
-      <div className="text-[10px] text-[var(--theme-text-link)] opacity-80 pt-0.5 text-right font-medium">
+      <div className="text-[11px] text-[var(--theme-text-link)] opacity-90 pt-0.5 text-right font-medium">
         {t('historyCopyTitleAction')}
       </div>
     </div>
@@ -320,7 +320,6 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
                               ? 'font-semibold text-[var(--theme-text-primary)]'
                               : 'font-medium text-[var(--theme-text-primary)]/90 group-hover:text-[var(--theme-text-primary)]'
                           }`}
-                          title={displayTitle}
                         >
                           {generatingTitleSessionIds.has(session.id) ? (
                             <div className="flex items-center gap-2 text-xs text-[var(--theme-text-secondary)]">
