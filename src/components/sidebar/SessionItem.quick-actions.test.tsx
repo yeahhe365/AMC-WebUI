@@ -108,7 +108,7 @@ describe('SessionItem quick actions and title mask', () => {
     expect(renderer.container.textContent).toContain('state persistence across');
   });
 
-  it('renders active session with left indicator pill, aria-selected=true, and active styling', () => {
+  it('renders active session matching DeepSeek Harness: bg-tertiary, aria-selected=true, and no indicator pill', () => {
     const session = makeSession('s-active', false);
 
     act(() => {
@@ -118,16 +118,17 @@ describe('SessionItem quick actions and title mask', () => {
     const li = renderer.container.querySelector('li');
     expect(li).not.toBeNull();
     expect(li?.getAttribute('aria-selected')).toBe('true');
-    expect(li?.className).toContain('bg-[var(--theme-bg-accent)]/12');
+    expect(li?.className).toContain('bg-[var(--theme-bg-tertiary)]');
+    expect(li?.className).not.toContain('bg-[var(--theme-bg-accent)]');
 
     const indicator = renderer.container.querySelector('[data-testid="session-active-indicator"]');
-    expect(indicator).not.toBeNull();
+    expect(indicator).toBeNull();
 
     const titleEl = renderer.container.querySelector('.marquee-title');
-    expect(titleEl?.className).toContain('font-semibold');
+    expect(titleEl?.className).toContain('font-medium');
   });
 
-  it('renders unselected session with aria-selected=false, no indicator, and resting styling', () => {
+  it('renders unselected session with aria-selected=false, hover:bg-tertiary, and no indicator', () => {
     const session = makeSession('s-inactive', false);
 
     act(() => {

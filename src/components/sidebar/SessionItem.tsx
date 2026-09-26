@@ -231,19 +231,12 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
           role="treeitem"
           aria-selected={isSelected}
           data-selected={isSelected ? 'true' : undefined}
-          className={`group relative rounded-lg my-0.5 transition-all duration-150 ease-out ${
+          className={`group relative rounded-lg my-0.5 transition-colors duration-150 ease-out border border-transparent ${
             isSelected || isRightClickAnimating || isContextMenuOpen
-              ? 'bg-[var(--theme-bg-accent)]/12 hover:bg-[var(--theme-bg-accent)]/18 border border-[var(--theme-bg-accent)]/25 shadow-xs'
-              : 'hover:bg-[var(--theme-bg-tertiary)] border border-transparent'
+              ? 'bg-[var(--theme-bg-tertiary)]'
+              : 'hover:bg-[var(--theme-bg-tertiary)]'
           } ${newlyTitledSessionIds.has(session.id) ? 'title-update-animate' : ''} ${isSelected || isActive || isContextMenuOpen ? 'z-20' : ''} ${isBlockedByGroupDrag ? 'opacity-50 pointer-events-none' : ''}`}
         >
-          {isSelected && (
-            <span
-              data-testid="session-active-indicator"
-              className="absolute left-1 top-2.5 bottom-2.5 w-[3px] rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_8px_var(--theme-bg-accent)] pointer-events-none z-10 animate-in fade-in zoom-in-95 duration-150"
-              aria-hidden="true"
-            />
-          )}
           {showBefore && (
             <div className="absolute -top-[1px] left-1 right-1 h-0.5 rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_8px_var(--theme-bg-accent)] pointer-events-none z-10 animate-in fade-in duration-100 flex items-center">
               <div className="h-1.5 w-1.5 -ml-0.5 rounded-full bg-[var(--theme-bg-accent)] shadow-[0_0_6px_var(--theme-bg-accent)]" />
@@ -315,11 +308,7 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
                       <div className="flex items-center min-w-0">
                         <span
                           ref={titleRef}
-                          className={`truncate marquee-title fade-mask-x-r ${
-                            isSelected
-                              ? 'font-semibold text-[var(--theme-text-primary)]'
-                              : 'font-medium text-[var(--theme-text-primary)]/90 group-hover:text-[var(--theme-text-primary)]'
-                          }`}
+                          className="truncate marquee-title fade-mask-x-r font-medium text-[var(--theme-text-primary)]"
                         >
                           {generatingTitleSessionIds.has(session.id) ? (
                             <div className="flex items-center gap-2 text-xs text-[var(--theme-text-secondary)]">
@@ -404,11 +393,7 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
                         event.stopPropagation();
                         onTogglePinSession(session.id);
                       }}
-                      className={`rounded-full p-1 text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-border-focus)] cursor-pointer ${
-                        isSelected
-                          ? 'bg-[var(--theme-bg-accent)]/20 hover:bg-[var(--theme-bg-accent)]/30'
-                          : 'bg-[var(--theme-bg-secondary)] hover:bg-[var(--theme-bg-tertiary)]'
-                      }`}
+                      className="rounded-full p-1 text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] bg-[var(--theme-bg-secondary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-border-focus)] cursor-pointer"
                     >
                       {session.isPinned ? (
                         <PinOff size={14} strokeWidth={2.2} />
@@ -424,11 +409,7 @@ export const SessionItem: React.FC<SessionItemProps> = (props) => {
                         <button
                           title={t('sessionMoreOptions')}
                           aria-label={t('sessionMoreOptions')}
-                          className={`rounded-full p-1 text-[var(--theme-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-border-focus)] cursor-pointer ${
-                            isSelected
-                              ? 'bg-[var(--theme-bg-accent)]/20 hover:bg-[var(--theme-bg-accent)]/30'
-                              : 'bg-[var(--theme-bg-secondary)] hover:bg-[var(--theme-bg-tertiary)]'
-                          }`}
+                          className="rounded-full p-1 text-[var(--theme-text-primary)] bg-[var(--theme-bg-secondary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-border-focus)] cursor-pointer"
                         >
                           <MoreHorizontal size={16} strokeWidth={2.2} />
                         </button>
