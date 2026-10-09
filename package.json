@@ -81,7 +81,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",
-    "katex": "^0.16.44",
+    "katex": "^0.18.2",
     "lamejs": "^1.2.1",
     "lucide-react": "^0.417.0",
     "mammoth": "^1.12.0",

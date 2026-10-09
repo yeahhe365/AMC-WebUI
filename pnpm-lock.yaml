@@ -149,8 +149,8 @@ importers:
         specifier: ^3.10.1
         version: 3.10.1
       katex:
-        specifier: ^0.16.44
-        version: 0.16.47
+        specifier: ^0.18.2
+        version: 0.18.11
       lamejs:
         specifier: ^1.2.1
         version: 1.2.1
@@ -3516,6 +3516,10 @@ packages:
     resolution: {integrity: sha512-yPVavfyCcRhmorC7rWlkHn15b4wDVgVmBA7kV4QVBsF7kv/9TKJAbAXVTxvTnwP8HHKjRCJDClKbciiYS7p0DQ==}
     engines: {node: '>=16'}
 
+  commander@15.0.0:
+    resolution: {integrity: sha512-z67u4ZhzCL/Tydu1lJARtEZYWbWaN7oYLHbsuzocr6y4N6WZAagG3RQ4FW61V1/0+jImpj293XfrcYnd1qxtPg==}
+    engines: {node: '>=22.12.0'}
+
   commander@2.20.3:
     resolution: {integrity: sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==}
 
@@ -4867,6 +4871,11 @@ packages:
 
   katex@0.16.47:
     resolution: {integrity: sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg==}
+    hasBin: true
+
+  katex@0.18.11:
+    resolution: {integrity: sha512-yvyz/2VMKqoho/35Hat5w37wIEdWJ5ElVMidTAlWrxr5uW4aBGsEpveTmKh18/zw08v/7lGswCPon4OhqmqrTA==}
+    deprecated: Accidentally published with breaking changes. Use 0.19.0 instead.
     hasBin: true
 
   keyv@4.5.4:
@@ -10364,6 +10373,8 @@ snapshots:
 
   commander@11.1.0: {}
 
+  commander@15.0.0: {}
+
   commander@2.20.3: {}
 
   commander@7.2.0: {}
@@ -11961,6 +11972,10 @@ snapshots:
   katex@0.16.47:
     dependencies:
       commander: 8.3.0
+
+  katex@0.18.11:
+    dependencies:
+      commander: 15.0.0
 
   keyv@4.5.4:
     dependencies:
