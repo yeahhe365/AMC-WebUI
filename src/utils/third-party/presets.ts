@@ -40,6 +40,7 @@ export const THIRD_PARTY_TEMPLATE_LABELS: Record<ThirdPartyTemplateId, string> =
   opencode: 'OpenCode Go',
   hunyuan: 'Tencent Hunyuan (腾讯混元)',
   huggingface: 'Hugging Face',
+  atlascloud: 'Atlas Cloud',
   'custom-openai': 'Custom (OpenAI compatible)',
   'custom-anthropic': 'Custom (Anthropic)',
 };
@@ -76,6 +77,7 @@ export const TEMPLATE_PRESETS: TemplatePresetMeta[] = [
   { id: 'fireworks', name: 'Fireworks AI', category: 'recommended', description: '高并发低延迟生产级推理平台' },
   { id: 'opencode', name: 'OpenCode Go', category: 'recommended', description: 'Zen Go 开发者 AI 接口服务' },
   { id: 'huggingface', name: 'Hugging Face', category: 'recommended', description: '开源社区官方推理路由端点' },
+  { id: 'atlascloud', name: 'Atlas Cloud', category: 'recommended', description: 'OpenAI 兼容的多模型 API 网关' },
 
   // Domestic
   {
@@ -352,6 +354,13 @@ export const TEMPLATE_DEFAULTS: Record<ThirdPartyTemplateId, ThirdPartyTemplateD
     protocol: 'openai-compatible',
     apiKeyUrl: 'https://huggingface.co/settings/tokens',
     docUrl: 'https://huggingface.co/docs/inference-providers/',
+  },
+  atlascloud: {
+    name: 'Atlas Cloud',
+    baseUrl: 'https://api.atlascloud.ai/v1',
+    modelId: 'deepseek-ai/deepseek-v4-pro',
+    models: [{ id: 'deepseek-ai/deepseek-v4-pro', name: 'DeepSeek V4 Pro', isPinned: true }],
+    protocol: 'openai-compatible',
   },
   cerebras: {
     name: 'Cerebras',
