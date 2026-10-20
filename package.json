@@ -139,7 +139,7 @@
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.58.0",
     "unified": "^11.0.5",
-    "vite": "^7.3.2",
+    "vite": "^7.3.7",
     "vite-plugin-pwa": "^1.2.0",
     "vite-plugin-static-copy": "^3.4.0",
     "vitest": "^4.1.5",
