@@ -1,17 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/contexts/I18nContext';
 import { EASTER_EGG_QUOTES, getEasterEggTypingDelay } from './welcomeEasterEgg';
-import { FileText, Lightbulb, ListChecks, Settings2, ArrowUpRight } from 'lucide-react';
-import { useChatDraftStore } from '@/stores/chatDraftStore';
-import { useChatStore } from '@/stores/chatStore';
-import { useUIStore } from '@/stores/uiStore';
-import { useSettingsUiStore } from '@/stores/settingsUiStore';
-
-const STARTER_PROMPTS = [
-  { title: 'welcomeStarterExplain', prompt: 'welcomePromptExplain', icon: Lightbulb },
-  { title: 'welcomeStarterWrite', prompt: 'welcomePromptWrite', icon: FileText },
-  { title: 'welcomeStarterPlan', prompt: 'welcomePromptPlan', icon: ListChecks },
-] as const;
 
 const WelcomeEasterEggText: React.FC<{ text: string }> = ({ text }) => {
   const unusedQuotesRef = useRef<readonly string[]>(EASTER_EGG_QUOTES);
@@ -88,70 +77,14 @@ const WelcomeEasterEggText: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-interface WelcomeScreenProps {
-  activeSessionId?: string | null;
-  showStarterPrompts?: boolean;
-  onSelectPrompt?: (prompt: string) => void;
-}
-
-export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
-  activeSessionId,
-  showStarterPrompts = false,
-  onSelectPrompt,
-}) => {
+export const WelcomeScreen: React.FC = () => {
   const { t } = useI18n();
-  const hasDraft = useChatDraftStore((state) => !!(activeSessionId && state.drafts[activeSessionId]?.inputText.trim()));
-  const isEditing = useChatStore((state) => !!state.editingMessageId);
-  const fillPrompt = (prompt: string) => {
-    const current = useChatStore.getState();
-    if (!activeSessionId || current.activeSessionId !== activeSessionId || current.editingMessageId) return;
-    if (useChatDraftStore.getState().drafts[activeSessionId]?.inputText.trim()) return;
-    onSelectPrompt?.(prompt);
-  };
-  const openConnectionSettings = () => {
-    useSettingsUiStore.getState().setActiveTab('gemini');
-    useUIStore.getState().setIsSettingsModalOpen(true);
-  };
   return (
-    <div className="flex flex-col h-full w-full overflow-y-auto custom-scrollbar px-4 py-6 sm:py-10">
-      <div className="my-auto mx-auto w-full max-w-3xl shrink-0 flex flex-col items-center gap-3 sm:gap-4">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-center welcome-message-animate tracking-tight min-h-[3rem] flex items-center justify-center text-[var(--theme-text-primary)]">
+    <div className="flex flex-col items-center justify-center min-h-full w-full max-w-4xl mx-auto px-4 pb-20 sm:pb-28">
+      <div className="w-full flex flex-col items-center">
+        <h1 className="text-3xl md:text-4xl font-medium text-center welcome-message-animate tracking-tight min-h-[3rem] flex items-center justify-center text-[var(--theme-text-primary)]">
           <WelcomeEasterEggText text={t('welcomeGreeting')} />
         </h1>
-        <p className="max-w-md text-center text-sm leading-relaxed text-[var(--theme-text-secondary)]">
-          {t('welcomeSubtitle')}
-        </p>
-        {showStarterPrompts && onSelectPrompt && (
-          <div className="w-full max-w-xl space-y-2 mt-1 sm:mt-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              {STARTER_PROMPTS.map(({ title, prompt, icon: Icon }) => (
-                <button
-                  key={title}
-                  type="button"
-                  disabled={!activeSessionId || hasDraft || isEditing}
-                  onClick={() => fillPrompt(t(prompt))}
-                  className="flex items-center gap-3 rounded-xl border border-[var(--theme-border-secondary)] bg-[var(--theme-bg-secondary)]/40 px-3 py-2.5 sm:py-4 text-left text-sm text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] hover:border-[var(--theme-border-focus)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Icon size={18} className="shrink-0 text-[var(--theme-text-secondary)]" />
-                  <span className="min-w-0 flex-1">{t(title)}</span>
-                  <ArrowUpRight size={14} className="shrink-0 text-[var(--theme-text-tertiary)]" />
-                </button>
-              ))}
-            </div>
-            <p className="text-xs leading-relaxed text-center text-[var(--theme-text-tertiary)]">
-              {t(hasDraft ? 'welcomeDraftPreserved' : 'welcomeStarterHint')}
-            </p>
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={openConnectionSettings}
-          className="inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)]"
-        >
-          <Settings2 size={15} />
-          {t('welcomeConfigureConnection')}
-          <ArrowUpRight size={13} />
-        </button>
       </div>
     </div>
   );

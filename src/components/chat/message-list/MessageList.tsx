@@ -16,7 +16,6 @@ import { isGemini3Model } from '@/utils/model/modelCapabilities';
 import { getMcpToolPairs, getVisibleChatMessages } from '@/utils/chat/visibility';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useChatStore } from '@/stores/chatStore';
-import { getCachedModelCapabilities } from '@/stores/modelCapabilitiesStore';
 import { useUIStore } from '@/stores/uiStore';
 import { useChatState } from '@/hooks/chat/useChatState';
 import { useChatInputRuntime, useChatMessageListRuntime } from '@/components/layout/chat-runtime/ChatRuntimeContext';
@@ -209,15 +208,7 @@ const MessageListComponent: React.FC = () => {
     <>
       <div className="relative flex-1 min-h-0 bg-[var(--theme-bg-primary)]">
         {visibleMessages.length === 0 ? (
-          <div className="h-full" style={{ paddingBottom: chatInputHeight }}>
-            <WelcomeScreen
-              activeSessionId={activeSessionId}
-              showStarterPrompts={
-                !isLoading && getCachedModelCapabilities(currentChatSettings.modelId).permissions.canGenerateSuggestions
-              }
-              onSelectPrompt={onFollowUpSuggestionFill}
-            />
-          </div>
+          <WelcomeScreen />
         ) : (
           <Virtuoso
             ref={virtuosoRef}
