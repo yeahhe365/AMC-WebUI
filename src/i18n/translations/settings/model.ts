@@ -167,15 +167,7 @@ const modelSettings = {
     ko: '고급 매개변수',
     fr: 'Paramètres avancés',
   },
-  settingsThinkingMode: {
-    en: 'Reasoning Mode',
-    zh: '推理模式',
-    ja: '推論モード',
-    de: 'Reasoning-Modus',
-    es: 'Modo de razonamiento',
-    ko: '추론 모드',
-    fr: 'Mode de raisonnement',
-  },
+
   settingsMediaResolutionTooltip: {
     en: 'Controls the detail level for images, videos, and PDFs sent to the model. Higher detail uses more tokens but preserves more information. Ultra High is only available per file, for images.',
     zh: '控制发送给模型的图片、视频和 PDF 的细节等级。等级越高会消耗更多 Token，但保留更多细节。超高等级仅支持对单个图片文件设置。',

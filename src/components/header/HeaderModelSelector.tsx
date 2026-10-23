@@ -47,12 +47,13 @@ export const HeaderModelSelector: FC<HeaderModelSelectorProps> = ({
       selectedId={selectedModelId}
       onSelect={onSelectModel}
       dropdownClassName="w-[calc(100vw-2rem)] max-w-[320px] sm:w-[320px] sm:max-w-none max-h-96"
+      dropdownMaxHeight={384}
       renderTrigger={({ isOpen, setIsOpen, listboxId, activeDescendantId }) => (
-        <div className="relative flex items-center gap-1 min-w-0">
+        <div className="relative flex items-center gap-1 min-w-0 max-w-full">
           <button
             onClick={() => setIsOpen(!isOpen)}
             disabled={isSelectorDisabled}
-            className={`${MODEL_TRIGGER_BUTTON_CLASS} ${isSwitchingModel ? 'animate-pulse' : ''}`}
+            className={`${MODEL_TRIGGER_BUTTON_CLASS} max-w-full ${isSwitchingModel ? 'animate-pulse' : ''}`}
             title={`${t('headerModelSelectorTooltipCurrent')}: ${currentModelName}. ${t('headerModelSelectorTooltipAction')}`}
             aria-label={`${t('headerModelAriaLabelCurrent')}: ${currentModelName}. ${t('headerModelAriaLabelAction')}`}
             aria-haspopup="listbox"

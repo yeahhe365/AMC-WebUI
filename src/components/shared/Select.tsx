@@ -22,6 +22,7 @@ export interface SelectProps {
   size?: 'default' | 'compact';
   /** Optional class override for the trigger button (appended after size styles). */
   triggerClassName?: string;
+  triggerRef?: React.Ref<HTMLButtonElement>;
 }
 
 type SelectOption = {
@@ -46,6 +47,7 @@ export const Select: React.FC<SelectProps> = ({
   direction = 'down',
   size = 'default',
   triggerClassName,
+  triggerRef,
 }) => {
   const { t } = useI18n();
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -151,6 +153,7 @@ export const Select: React.FC<SelectProps> = ({
           disabled={disabled}
         >
           <SelectPrimitive.Trigger
+            ref={triggerRef}
             id={id}
             aria-label={label}
             aria-haspopup="listbox"

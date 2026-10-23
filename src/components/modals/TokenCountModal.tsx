@@ -104,6 +104,7 @@ export const TokenCountModal: React.FC<TokenCountModalProps> = (props) => {
             selectedId={selectedModelId}
             onSelect={handleModelSelect}
             dropdownClassName="w-full max-h-60"
+            dropdownMaxHeight={240}
             renderTrigger={({ isOpen, setIsOpen, selectedModel, listboxId, activeDescendantId }) => (
               <button
                 type="button"

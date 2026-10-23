@@ -5,6 +5,7 @@ import { type AppSettings, type AutoTitleLength } from '@/types';
 import { useI18n } from '@/contexts/I18nContext';
 import { Select } from '@/components/shared/Select';
 import { ToggleItem } from '@/components/shared/ToggleItem';
+import { Toggle } from '@/components/shared/Toggle';
 
 interface AutoTitleCardProps {
   currentSettings: AppSettings;
@@ -16,16 +17,18 @@ export const AutoTitleCard: React.FC<AutoTitleCardProps> = ({ currentSettings, o
 
   return (
     <div className={`${SETTINGS_SECTION_CARD_CLASS} space-y-4`} data-settings-item="models-auto-title">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h4 className={SETTINGS_SECTION_LABEL_CLASS}>{t('settingsAutoTitleCardTitle')}</h4>
-          <p className="mt-0.5 text-xs text-[var(--theme-text-secondary)]">{t('settingsAutoTitleCardDesc')}</p>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <h4 className={`${SETTINGS_SECTION_LABEL_CLASS} min-w-0`}>{t('settingsAutoTitleCardTitle')}</h4>
+          <div className="shrink-0">
+            <Toggle
+              ariaLabel={t('isAutoTitleEnabled')}
+              checked={currentSettings.isAutoTitleEnabled}
+              onChange={(enabled) => onUpdateSetting('isAutoTitleEnabled', enabled)}
+            />
+          </div>
         </div>
-        <ToggleItem
-          label={t('isAutoTitleEnabled')}
-          checked={currentSettings.isAutoTitleEnabled}
-          onChange={(enabled) => onUpdateSetting('isAutoTitleEnabled', enabled)}
-        />
+        <p className="text-xs leading-relaxed text-[var(--theme-text-secondary)]">{t('settingsAutoTitleCardDesc')}</p>
       </div>
 
       {currentSettings.isAutoTitleEnabled && (

@@ -77,7 +77,8 @@ export const SelectionAskModelSection: React.FC<{
               />
             </button>
           )}
-          dropdownClassName="w-full min-w-[320px] max-h-[360px]"
+          dropdownClassName="w-full min-w-0 max-h-[360px]"
+          dropdownMaxHeight={360}
         />
         {selectedModel && selectedModel.unavailable && (
           <p className="mt-2 text-xs text-[var(--theme-text-danger)]">{t('selectionAskModelUnavailable')}</p>

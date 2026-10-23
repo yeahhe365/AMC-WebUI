@@ -150,20 +150,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         <main
           data-settings-main-container="true"
-          className="flex-1 flex flex-col min-w-0 bg-[var(--theme-bg-primary)] relative overflow-hidden"
+          className="flex-1 flex flex-col min-w-0 min-h-0 bg-[var(--theme-bg-primary)] relative overflow-hidden"
         >
+          <SettingsModalHeader
+            activeTab={activeTab}
+            activeTabLabelKey={activeTabLabelKey}
+            isSearching={isSearching}
+            searchResultsCount={searchResults.length}
+            onClose={onClose}
+          />
           <div
             ref={scrollContainerRef}
             onScroll={handleContentScroll}
             className={`flex-1 ${activeTab === 'providers' && !isSearching ? 'overflow-hidden p-0 flex flex-col' : 'overflow-y-auto overflow-x-hidden custom-scrollbar px-4 py-4 sm:px-6 sm:py-6 md:px-8 md:pt-4 md:pb-8'}`}
           >
-            <SettingsModalHeader
-              activeTab={activeTab}
-              activeTabLabelKey={activeTabLabelKey}
-              isSearching={isSearching}
-              searchResultsCount={searchResults.length}
-              onClose={onClose}
-            />
             {isSearching ? (
               <div className="max-w-3xl mx-auto w-full">
                 <SettingsSearchResults

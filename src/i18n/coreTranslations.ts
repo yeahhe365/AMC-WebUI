@@ -24,6 +24,15 @@ export type { TranslationMap } from './translationTypes';
  * `src/i18n/translations/settings/*` and is loaded on demand.
  */
 const shellFeatureTranslations: TranslationMap = {
+  settingsThinkingMode: {
+    en: 'Reasoning Mode',
+    zh: '推理模式',
+    ja: '推論モード',
+    de: 'Reasoning-Modus',
+    es: 'Modo de razonamiento',
+    ko: '추론 모드',
+    fr: 'Mode de raisonnement',
+  },
   // Sidebar + settings modal chrome (modal also loads the full settings pack).
   settingsTitle: {
     en: 'Settings',

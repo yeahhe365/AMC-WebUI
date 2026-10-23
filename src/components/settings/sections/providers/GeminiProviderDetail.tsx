@@ -6,7 +6,6 @@ import { getDefaultModelOptions } from '@/utils/model/defaultModelOptions';
 import { useModelPreferencesStore } from '@/stores/modelPreferencesStore';
 import { useProviderUiStore } from '@/stores/providerUiStore';
 import { useSettingsUiStore } from '@/stores/settingsUiStore';
-import { ProviderAvatar } from './ProviderAvatar';
 import { ApiConfigSection } from '@/components/settings/sections/ApiConfigSection';
 import { ProviderModelListSection } from './models/ProviderModelListSection';
 import { SafetySection } from '@/components/settings/sections/SafetySection';
@@ -165,17 +164,8 @@ export const GeminiProviderDetail: React.FC<GeminiProviderDetailProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full min-w-0 bg-[var(--theme-bg-primary)] overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-6 py-3.5 border-b border-[var(--theme-border-secondary)]/30 flex-shrink-0 bg-[var(--theme-bg-primary)]">
-        <div className="flex items-center gap-3 min-w-0">
-          <ProviderAvatar name="Google Gemini" templateId="gemini" size={28} />
-          <div>
-            <h2 className="text-xl font-bold text-[var(--theme-text-primary)] truncate">Google Gemini</h2>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+    <div className="min-w-0 bg-[var(--theme-bg-primary)]">
+      <div className="space-y-6">
         <div className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border border-[var(--theme-border-secondary)]/40 bg-[var(--theme-bg-secondary)]/25 text-xs text-[var(--theme-text-secondary)]">
           <div className="flex items-center gap-2 min-w-0">
             <SlidersHorizontal size={14} className="text-[var(--theme-text-link)] shrink-0" />

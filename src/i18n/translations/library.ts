@@ -1,6 +1,34 @@
 import type { TranslationMap } from '@/i18n/translationTypes';
 
 export const libraryTranslations: TranslationMap = {
+  libraryFirstFileTitle: {
+    en: 'Add your first file',
+    zh: '添加第一个文件',
+    ja: '最初のファイルを追加',
+    ko: '첫 파일 추가하기',
+    es: 'Añade tu primer archivo',
+    fr: 'Ajoutez votre premier fichier',
+    de: 'Erste Datei hinzufügen',
+  },
+  libraryFilteredEmptyDesc: {
+    en: 'Try another keyword or clear the filters to see all your files.',
+    zh: '试试其他关键词，或清除筛选查看全部文件。',
+    ja: '別のキーワードを試すか、絞り込みを解除してすべてのファイルを表示してください。',
+    ko: '다른 검색어를 입력하거나 필터를 지워 모든 파일을 확인하세요.',
+    es: 'Prueba otra palabra clave o borra los filtros para ver todos tus archivos.',
+    fr: 'Essayez un autre mot-clé ou effacez les filtres pour voir tous vos fichiers.',
+    de: 'Versuche ein anderes Suchwort oder entferne die Filter, um alle Dateien zu sehen.',
+  },
+  libraryClearFilters: {
+    en: 'Clear filters',
+    zh: '清除筛选',
+    ja: '絞り込みを解除',
+    ko: '필터 지우기',
+    es: 'Borrar filtros',
+    fr: 'Effacer les filtres',
+    de: 'Filter entfernen',
+  },
+
   libraryTitle: {
     en: 'Library',
     zh: '资料库',

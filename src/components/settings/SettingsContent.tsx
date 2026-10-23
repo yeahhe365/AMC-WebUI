@@ -121,13 +121,13 @@ export const SettingsContent: React.FC<SettingsContentProps> = ({
   return (
     <div
       className={
-        activeTab === 'providers' || activeTab === 'gemini' || activeTab === 'api'
+        activeTab === 'providers'
           ? 'w-full h-full flex-1 flex flex-col min-h-0 overflow-hidden'
           : 'max-w-3xl mx-auto w-full'
       }
     >
       {(activeTab === 'gemini' || activeTab === 'api') && (
-        <div className="w-full h-full flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="w-full">
           <GeminiProviderDetail
             settings={currentSettings}
             onUpdateSettings={handleBatchUpdate}

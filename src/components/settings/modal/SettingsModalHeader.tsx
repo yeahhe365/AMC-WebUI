@@ -14,7 +14,7 @@ interface SettingsModalHeaderProps {
 }
 
 export const SettingsModalHeader: React.FC<SettingsModalHeaderProps> = ({
-  activeTab,
+  activeTab: _activeTab,
   activeTabLabelKey,
   isSearching,
   searchResultsCount,
@@ -24,11 +24,7 @@ export const SettingsModalHeader: React.FC<SettingsModalHeaderProps> = ({
 
   return (
     <div
-      className={`${
-        activeTab === 'providers' && !isSearching
-          ? 'w-full px-6 border-b border-[var(--theme-border-secondary)]/30 h-16 flex items-center justify-between flex-shrink-0 bg-[var(--theme-bg-primary)]'
-          : 'max-w-3xl mx-auto w-full pb-4 md:pb-6 md:min-h-[48px] flex flex-col justify-center'
-      }`}
+      className={`${isSearching ? 'flex' : 'hidden md:flex'} w-full shrink-0 items-center border-b border-[var(--theme-border-secondary)]/40 px-4 py-3 md:h-16 md:px-8 bg-[var(--theme-bg-primary)]`}
     >
       <div className="flex items-center justify-between gap-3 w-full">
         <h2

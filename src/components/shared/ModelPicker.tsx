@@ -1,5 +1,14 @@
 import { useI18n } from '@/contexts/I18nContext';
-import React, { useId, useMemo, useRef, useState, useCallback, useEffect, type RefObject } from 'react';
+import React, {
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  type RefObject,
+} from 'react';
 import { type ModelOption, type ChatProviderId } from '@/types';
 import { useClickOutside } from '@/hooks/ui/useClickOutside';
 import { useListboxNavigation } from '@/hooks/ui/useListboxNavigation';
@@ -28,6 +37,7 @@ interface ModelPickerProps {
   }) => React.ReactNode;
 
   dropdownClassName?: string;
+  dropdownMaxHeight?: number;
 }
 
 export const ModelPicker: React.FC<ModelPickerProps> = ({
@@ -36,17 +46,25 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   onSelect,
   renderTrigger,
   dropdownClassName,
+  dropdownMaxHeight = 300,
 }) => {
   const { t } = useI18n();
   const listboxId = useId();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState({
+    offset: 0,
+    width: 320,
+    above: false,
+    height: dropdownMaxHeight,
+  });
   // Bottom-edge fade while the list still has content below the fold — gone
   // once the user scrolls to the end, so the last row is never obscured.
   const [showBottomFade, setShowBottomFade] = useState(false);
   const [hoveredEntry, setHoveredEntry] = useState<ModelCatalogEntry | null>(null);
-  const [detailSide, setDetailSide] = useState<'right' | 'left'>('right');
+  const [detailSide, setDetailSide] = useState<'right' | 'left' | null>(null);
 
   const updateBottomFade = useCallback(() => {
     const listElement = listRef.current;
@@ -105,18 +123,58 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       return;
     }
     updateBottomFade();
-
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const dropdownWidth = 320;
-    const cardWidth = 320;
-    const rightSpace = window.innerWidth - (rect.left + dropdownWidth);
-    if (rightSpace < cardWidth + 24 && rect.left >= cardWidth + 24) {
-      setDetailSide('left');
-    } else {
-      setDetailSide('right');
-    }
   }, [isOpen, sections, updateBottomFade]);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+
+    const positionDropdown = () => {
+      const anchor = containerRef.current;
+      const dropdown = dropdownRef.current;
+      if (!anchor || !dropdown) return;
+
+      const padding = 8;
+      const anchorRect = anchor.getBoundingClientRect();
+      const anchorLeft = anchorRect.left;
+      const width = dropdown.offsetWidth;
+      const left = Math.max(padding, Math.min(anchorLeft, window.innerWidth - padding - width));
+      const offset = left - anchorLeft;
+      let visibleTop = padding;
+      let visibleBottom = window.innerHeight - padding;
+      for (let parent = anchor.parentElement; parent; parent = parent.parentElement) {
+        if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(parent).overflowY)) {
+          const bounds = parent.getBoundingClientRect();
+          visibleTop = Math.max(visibleTop, bounds.top);
+          visibleBottom = Math.min(visibleBottom, bounds.bottom);
+        }
+      }
+      const below = Math.max(0, visibleBottom - anchorRect.bottom - 4);
+      const aboveSpace = Math.max(0, anchorRect.top - visibleTop - 4);
+      const above = below < Math.min(dropdownMaxHeight, 240) && aboveSpace > below;
+      const height = Math.min(dropdownMaxHeight, above ? aboveSpace : below);
+      setDropdownPosition((current) =>
+        current.offset === offset && current.width === width && current.above === above && current.height === height
+          ? current
+          : { offset, width, above, height },
+      );
+      const detailWidth = 320;
+      setDetailSide(
+        window.innerWidth - (left + width) >= detailWidth + 16 ? 'right' : left >= detailWidth + 16 ? 'left' : null,
+      );
+    };
+
+    positionDropdown();
+    window.addEventListener('resize', positionDropdown);
+    window.addEventListener('scroll', positionDropdown, true);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(positionDropdown);
+    if (containerRef.current) observer?.observe(containerRef.current);
+    if (dropdownRef.current) observer?.observe(dropdownRef.current);
+    return () => {
+      window.removeEventListener('resize', positionDropdown);
+      window.removeEventListener('scroll', positionDropdown, true);
+      observer?.disconnect();
+    };
+  }, [isOpen, dropdownMaxHeight]);
 
   const handleSelectModel = (entry: ModelCatalogEntry) => {
     if (entry.model.unavailable) {
@@ -141,7 +199,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   };
 
   return (
-    <div className="relative" ref={containerRef} onKeyDown={handleKeyDown}>
+    <div className="relative min-w-0 max-w-full" ref={containerRef} onKeyDown={handleKeyDown}>
       {renderTrigger({
         isOpen,
         setIsOpen: (nextIsOpen) => (nextIsOpen ? navigation.open() : navigation.close()),
@@ -153,6 +211,16 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
       {isOpen && (
         <div
+          ref={dropdownRef}
+          style={{
+            left: dropdownPosition.offset,
+            maxWidth: 'calc(100vw - 16px)',
+            maxHeight: dropdownPosition.height,
+            top: dropdownPosition.above ? 'auto' : '100%',
+            bottom: dropdownPosition.above ? '100%' : 'auto',
+            marginTop: dropdownPosition.above ? 0 : 4,
+            marginBottom: dropdownPosition.above ? 4 : 0,
+          }}
           className={`absolute top-full left-0 mt-1 bg-[var(--theme-bg-secondary)] border border-[var(--theme-border-primary)] rounded-xl shadow-premium z-50 flex flex-col modal-enter-animation overflow-hidden ${dropdownClassName || 'w-full min-w-[280px] max-h-[300px]'}`}
         >
           {!models.length ? (
@@ -190,19 +258,28 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         </div>
       )}
 
-      {isOpen && (hoveredEntry?.model || activeEntry?.model || selectedModel) && (
-        <div
-          data-testid="model-picker-detail-hovercard"
-          className={`hidden sm:block absolute top-full mt-1 z-50 transition-all duration-150 animate-in fade-in zoom-in-95 pointer-events-none ${
-            detailSide === 'left' ? 'right-[calc(100%+8px)]' : 'left-[328px]'
-          }`}
-        >
-          <ModelDetailCard
-            model={(hoveredEntry?.model || activeEntry?.model || selectedModel)!}
-            renderModelIcon={getModelIcon}
-          />
-        </div>
-      )}
+      {isOpen &&
+        detailSide &&
+        !dropdownPosition.above &&
+        dropdownPosition.height >= dropdownMaxHeight &&
+        (hoveredEntry?.model || activeEntry?.model || selectedModel) && (
+          <div
+            data-testid="model-picker-detail-hovercard"
+            style={
+              detailSide === 'right'
+                ? { left: dropdownPosition.offset + dropdownPosition.width + 8 }
+                : { right: `calc(100% - ${dropdownPosition.offset}px + 8px)` }
+            }
+            className={`hidden sm:block absolute top-full mt-1 z-50 transition-all duration-150 animate-in fade-in zoom-in-95 pointer-events-none ${
+              detailSide === 'left' ? 'right-[calc(100%+8px)]' : 'left-[328px]'
+            }`}
+          >
+            <ModelDetailCard
+              model={(hoveredEntry?.model || activeEntry?.model || selectedModel)!}
+              renderModelIcon={getModelIcon}
+            />
+          </div>
+        )}
     </div>
   );
 };

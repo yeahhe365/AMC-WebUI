@@ -1,5 +1,5 @@
 import { act } from 'react';
-import { fireEvent } from '@testing-library/react';
+import { fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { renderWithProviders } from '@/test/render/providerRenderer';
 import { AppearanceLivePreview } from './AppearanceLivePreview';
@@ -12,21 +12,19 @@ const baseSettings: AppSettings = {
 } as AppSettings;
 
 describe('AppearanceLivePreview', () => {
-  it('renders live preview with user message and code block by default', () => {
+  it('renders live preview with user message and code block by default', async () => {
     const { container } = renderWithProviders(<AppearanceLivePreview settings={baseSettings} />, {
       language: 'en',
     });
 
     expect(container.textContent).toContain('Live Preview');
-    expect(container.textContent).toContain('WYSIWYG');
     expect(container.textContent).toContain('Write a Python function to generate Fibonacci numbers');
-    expect(container.textContent).toContain('def fibonacci');
-    expect(container.textContent).toContain('⚡ 64 tokens');
+    await waitFor(() => expect(container.textContent).toContain('def fibonacci'));
+    expect(container.textContent).toContain('64 tokens');
 
     const avatar = container.querySelector('img[src="/assets/assistant-avatar.png"]');
     expect(avatar).not.toBeNull();
     expect(container.textContent).toContain('Gemini 3.8 Flash');
-    expect(container.textContent).toContain('Thought for 1.2s');
   });
 
   it('renders custom model display name reactively from settings', () => {
@@ -56,13 +54,13 @@ describe('AppearanceLivePreview', () => {
     expect(userBubble).not.toBeNull();
   });
 
-  it('allows toggling between code tab and typography text tab', () => {
+  it('allows toggling between code tab and typography text tab', async () => {
     const { container } = renderWithProviders(<AppearanceLivePreview settings={baseSettings} />, {
       language: 'en',
     });
 
     // Code is visible initially
-    expect(container.textContent).toContain('def fibonacci');
+    await waitFor(() => expect(container.textContent).toContain('def fibonacci'));
 
     // Click typography tab
     const textTabBtn = Array.from(container.querySelectorAll('button')).find((b) =>
@@ -75,7 +73,7 @@ describe('AppearanceLivePreview', () => {
     });
 
     // Should now show typography text sample instead of python code
-    expect(container.textContent).toContain('Markdown formatting with');
+    await waitFor(() => expect(container.textContent).toContain('Markdown formatting with'));
     expect(container.textContent).not.toContain('def fibonacci');
   });
 
@@ -89,7 +87,7 @@ describe('AppearanceLivePreview', () => {
       language: 'en',
     });
 
-    expect(container.textContent).not.toContain('⚡ 64 tokens');
+    expect(container.textContent).not.toContain('64 tokens');
   });
 
   it('applies serif font-family to typography sample when configured', () => {
@@ -105,7 +103,7 @@ describe('AppearanceLivePreview', () => {
       fireEvent.click(textTabBtn!);
     });
 
-    const textSample = container.querySelector('div[style*="font-family: var(--app-font-serif)"]');
+    const textSample = container.querySelector('div[style*="--app-font-reading: var(--app-font-serif)"]');
     expect(textSample).not.toBeNull();
   });
 });

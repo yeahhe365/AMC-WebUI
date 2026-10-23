@@ -1,4 +1,32 @@
 const appearanceSettings = {
+  settingsLivePreviewTextUserSample: {
+    en: 'Show me how text, quotes and tables will look.',
+    zh: '看看正文、引用和表格的排版效果。',
+    ja: '本文、引用、表の表示を見せてください。',
+    ko: '본문, 인용문, 표의 표시 모습을 보여주세요.',
+    es: 'Muéstrame cómo se verán el texto, las citas y las tablas.',
+    fr: 'Montre-moi le rendu du texte, des citations et des tableaux.',
+    de: 'Zeige mir die Darstellung von Text, Zitaten und Tabellen.',
+  },
+  settingsLivePreviewQuoteSample: {
+    en: 'Good typography makes the important details easy to read.',
+    zh: '好的排版，让重要的信息更容易阅读。',
+    ja: '読みやすい組版は、大切な情報を伝えます。',
+    ko: '좋은 서식은 중요한 정보를 쉽게 읽게 합니다.',
+    es: 'Una buena tipografía facilita leer los detalles importantes.',
+    fr: 'Une bonne typographie facilite la lecture des informations importantes.',
+    de: 'Gute Typografie macht wichtige Informationen leicht lesbar.',
+  },
+  settingsLivePreviewTableSample: {
+    en: '| Format | Example |\n| --- | --- |\n| Emphasis | **Key point** |\n| Inline code | `user.name` |',
+    zh: '| 格式 | 示例 |\n| --- | --- |\n| 重点 | **关键信息** |\n| 行内代码 | `user.name` |',
+    ja: '| 書式 | 例 |\n| --- | --- |\n| 強調 | **重要な情報** |\n| インラインコード | `user.name` |',
+    ko: '| 서식 | 예시 |\n| --- | --- |\n| 강조 | **핵심 정보** |\n| 인라인 코드 | `user.name` |',
+    es: '| Formato | Ejemplo |\n| --- | --- |\n| Énfasis | **Punto clave** |\n| Código en línea | `user.name` |',
+    fr: '| Format | Exemple |\n| --- | --- |\n| Mise en valeur | **Point clé** |\n| Code en ligne | `user.name` |',
+    de: '| Format | Beispiel |\n| --- | --- |\n| Hervorhebung | **Kernaussage** |\n| Inline-Code | `user.name` |',
+  },
+
   settingsLivePreviewTitle: {
     en: 'Live Preview',
     zh: '实时效果预览',

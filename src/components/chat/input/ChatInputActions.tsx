@@ -142,12 +142,12 @@ const ChatInputActionsComponent: React.FC = () => {
     <div
       ref={rootRef}
       data-testid="chat-input-actions-root"
-      className={`flex w-full items-center justify-between ${COMPOSER_CLUSTER_SEPARATION_CLASS} overflow-visible`}
+      className={`flex w-full flex-col items-stretch sm:flex-row sm:items-center justify-between ${COMPOSER_CLUSTER_SEPARATION_CLASS} overflow-visible`}
     >
       <div
         ref={leftActionsRef}
         data-testid="chat-input-actions-left"
-        className={`flex min-w-0 items-center ${COMPOSER_CLUSTER_GAP_CLASS} overflow-x-auto p-1 -m-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden`}
+        className={`flex min-w-0 flex-wrap items-center ${COMPOSER_CLUSTER_GAP_CLASS}`}
       >
         <button
           type="button"
@@ -188,7 +188,7 @@ const ChatInputActionsComponent: React.FC = () => {
       <div
         ref={rightActionsRef}
         data-testid="chat-input-actions-right"
-        className={`flex min-w-0 flex-shrink-0 items-center ${COMPOSER_CLUSTER_GAP_CLASS}`}
+        className={`flex min-w-0 flex-shrink-0 flex-wrap items-center justify-end ${COMPOSER_CLUSTER_GAP_CLASS}`}
       >
         {showVoiceInputButton &&
           !isLiveConnected &&

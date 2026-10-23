@@ -78,8 +78,8 @@ export const ServerAccessPasswordInput: React.FC<ServerAccessPasswordInputProps>
             type="button"
             data-testid="toggle-show-password-button"
             onClick={() => setShowPassword((prev) => !prev)}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
-            title={showPassword ? 'Hide password' : 'Show password'}
+            aria-label={t(showPassword ? 'settingsHidePassword' : 'settingsShowPassword')}
+            title={t(showPassword ? 'settingsHidePassword' : 'settingsShowPassword')}
             className="p-1 text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] transition-colors rounded"
           >
             {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}

@@ -1,4 +1,23 @@
 const apiSettings = {
+  settingsShowPassword: {
+    en: 'Show password',
+    zh: '显示密码',
+    ja: 'パスワードを表示',
+    ko: '비밀번호 표시',
+    es: 'Mostrar contraseña',
+    fr: 'Afficher le mot de passe',
+    de: 'Passwort anzeigen',
+  },
+  settingsHidePassword: {
+    en: 'Hide password',
+    zh: '隐藏密码',
+    ja: 'パスワードを隠す',
+    ko: '비밀번호 숨기기',
+    es: 'Ocultar contraseña',
+    fr: 'Masquer le mot de passe',
+    de: 'Passwort ausblenden',
+  },
+
   settingsApiConfig: {
     en: 'API & Connections',
     zh: 'API 与连接',

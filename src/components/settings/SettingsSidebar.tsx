@@ -4,6 +4,8 @@ import { KeyRound, LayoutPanelLeft, SlidersHorizontal, X, Cloud, Sparkles } from
 import { type SettingsTab, type SettingsTabDescriptor, useSettingsUiStore } from '@/stores/settingsUiStore';
 import { IconAbout, IconData, IconKeyboard, IconMcp } from '@/components/icons';
 import { Toggle } from '@/components/shared/Toggle';
+import { Select } from '@/components/shared/Select';
+import { useResponsiveValue } from '@/hooks/ui/useDevice';
 import { SETTINGS_KBD_KEY_CLASS, SETTINGS_NAV_ACTIVE_CLASS, SETTINGS_NAV_IDLE_CLASS } from '@/constants/designTokens';
 import { SettingsSearchBar } from './SettingsSearchBar';
 import { interpolate } from '@/i18n/interpolate';
@@ -63,6 +65,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
   searchActiveOptionId,
 }) => {
   const { t } = useI18n();
+  const isCompact = useResponsiveValue(true, false, 767);
   const isAdvancedModeEnabled = useSettingsUiStore((state) => state.isAdvancedModeEnabled);
   const toggleAdvancedMode = useSettingsUiStore((state) => state.toggleAdvancedMode);
   const tabsById = React.useMemo(() => new Map(tabs.map((tab) => [tab.id, tab])), [tabs]);
@@ -82,7 +85,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
     return (
       <button
         key={tab.id}
-        ref={isActive ? activeTabRef : undefined}
+        ref={isActive && !isCompact ? activeTabRef : undefined}
         onClick={() => setActiveTab(tab.id)}
         className={`flex-shrink-0 flex items-center gap-3 px-3 py-2.5 md:px-3 md:py-2 text-sm rounded-xl transition-colors outline-none select-none w-auto md:w-full text-left focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] ${
           isActive ? SETTINGS_NAV_ACTIVE_CLASS : SETTINGS_NAV_IDLE_CLASS
@@ -98,21 +101,45 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
 
   return (
     <aside className="flex-shrink-0 w-full md:w-64 bg-[var(--theme-bg-secondary)] border-b md:border-b-0 md:border-r border-[var(--theme-border-primary)] flex flex-col">
-      {/* Mobile-only close row; desktop close lives in the content pane. */}
-      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0 md:hidden">
+      <div className="flex items-center gap-2 px-3 pt-3 pb-2 flex-shrink-0 md:hidden">
+        <Select
+          label={t('settingsTitle')}
+          hideLabel
+          size="compact"
+          className="flex-1 min-w-0"
+          wrapperClassName="min-w-0"
+          value={activeTab === 'api' ? 'gemini' : activeTab}
+          onChange={(event) => setActiveTab(event.target.value as SettingsTab)}
+          triggerRef={isCompact ? activeTabRef : undefined}
+        >
+          {visibleTabs.map((tab) => (
+            <option key={tab.id} value={tab.id}>
+              {t(tab.labelKey)}
+            </option>
+          ))}
+        </Select>
+        <button
+          type="button"
+          onClick={toggleAdvancedMode}
+          aria-label={t('settingsAdvancedMode')}
+          title={t('settingsAdvancedMode')}
+          aria-pressed={isAdvancedModeEnabled}
+          className={`h-9 w-9 shrink-0 flex items-center justify-center rounded-lg focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] ${isAdvancedModeEnabled ? SETTINGS_NAV_ACTIVE_CLASS : SETTINGS_NAV_IDLE_CLASS}`}
+        >
+          <SlidersHorizontal size={18} />
+        </button>
         <button
           type="button"
           onClick={onClose}
-          className="p-2 rounded-md hover:bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)]"
+          className="h-9 w-9 shrink-0 flex items-center justify-center rounded-lg hover:bg-[var(--theme-bg-tertiary)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--theme-border-focus)]"
           aria-label={t('close')}
         >
           <X size={20} strokeWidth={2} />
         </button>
-        <div className="w-8" aria-hidden="true" />
       </div>
 
       {/* Search container aligned with main header baseline */}
-      <div className="flex-shrink-0 px-4 pt-0 pb-1.5 md:h-16 md:px-3 md:py-0 md:flex md:items-center">
+      <div className="flex-shrink-0 px-3 pb-3 md:h-16 md:py-0 md:flex md:items-center">
         <SettingsSearchBar
           value={searchQuery}
           onChange={onSearchChange}
@@ -141,14 +168,14 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
         </div>
       ) : (
         <nav
-          className="flex flex-1 gap-1 overflow-x-auto px-4 pb-2 pt-1 md:flex-col md:gap-1 md:overflow-x-hidden md:overflow-y-auto md:px-3 md:pb-3 md:pt-1 no-scrollbar md:custom-scrollbar"
+          className="hidden md:flex flex-1 flex-col gap-1 overflow-x-hidden overflow-y-auto px-3 pb-3 pt-1 custom-scrollbar"
           role="tablist"
         >
           {visibleTabs.map(renderTabButton)}
         </nav>
       )}
 
-      <div className={`flex-shrink-0 px-4 py-2 md:p-3 ${isSearching ? 'hidden md:block' : ''}`}>
+      <div className="hidden md:block flex-shrink-0 p-3">
         <div
           className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 ${
             isAdvancedModeEnabled ? 'bg-[var(--theme-bg-accent)]/15' : ''
