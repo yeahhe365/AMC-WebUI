@@ -44,7 +44,13 @@ Distinguishing between sensitive server-only variables and public runtime config
 | `RUNTIME_API_PROXY_URL`| Frontend Gemini proxy endpoint | Public runtime | `/api/gemini` |
 | `RUNTIME_LIVE_API_BASE_URL`| Frontend Live WS endpoint | Public runtime | `/api/live` |
 | `RUNTIME_THIRD_PARTY_PROXY_URL`| Third-party proxy endpoint | Public runtime | `/api/openai` |
-| `RUNTIME_PYODIDE_BASE_URL` | Pyodide WASM runtime asset base URL (empty uses the default CDN) | Public runtime | empty |
+| `RUNTIME_PYODIDE_BASE_URL` | Pyodide WASM asset base URL (empty uses same-origin `/pyodide/`) | Public runtime | empty |
+
+Server-selected regular Gemini keys always use `GEMINI_API_BASE`; browser base URL overrides apply only to browser BYOK keys. The administrator's base URL is trusted and may point to a local proxy. Restricted proxies validate DNS at connection time. MCP rejects cross-origin and HTTPS downgrade redirects. The `198.18.0.0/15` Fake-IP allowance remains for Clash/Surge/Mihomo TUN compatibility.
+
+Stream jobs default to 32 active jobs, 256 retained jobs, 64 MiB of history overall, and 8 MiB per event and per job. Jobs terminate after 120 seconds without upstream activity or one hour of runtime; completed history expires after ten minutes. Compose exposes the `AMC_STREAM_JOB_*` settings. Expired or evicted replay history returns `409`; preserve existing output and start a new request. In-memory history does not survive process restarts.
+
+Default builds download scientific packages using the installed Pyodide integrity manifest and cache verified files. To use an external versioned asset host, run `PYODIDE_ASSETS_EXTERNAL=true pnpm run build` and set `RUNTIME_PYODIDE_BASE_URL` to the matching runtime version.
 
 ---
 

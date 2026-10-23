@@ -305,6 +305,9 @@ test('a drag cancelled by the virtual list leaves no dimmed row behind', async (
 
   const source = page.getByRole('link', { name: 'Newest chat', exact: true });
   await expect(source).toBeVisible();
+  // Wait for the virtual list's entrance animation before reading coordinates;
+  // visibility alone can leave the pointer aimed at the adjacent moving row.
+  await source.hover();
 
   const container = page.locator('[data-history-sidebar-root] .overflow-y-auto').first();
   const containerBox = await container.boundingBox();

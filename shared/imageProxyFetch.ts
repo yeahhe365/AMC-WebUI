@@ -1,5 +1,6 @@
 import { assertImageProxyHostResolvesPublic, type ImageProxyDnsLookup } from './imageProxyDns.js';
 import { isPrivateNetworkHostname } from './privateNetwork.js';
+import { createConnectionSafeFetch, getNetworkTargetError } from './connectionSafeFetch.js';
 
 /** Max redirects followed while re-validating each hop (CDN signed URLs often 302 once). */
 const IMAGE_PROXY_MAX_REDIRECTS = 3;
@@ -14,7 +15,7 @@ const IMAGE_PROXY_REQUEST_HEADERS = {
  * Guards against open redirects after the initial allowlist check passes.
  */
 export const isUnsafeImageProxyRedirect = (redirectUrl: URL): boolean => {
-  if (redirectUrl.username || redirectUrl.password) {
+  if (!['http:', 'https:'].includes(redirectUrl.protocol) || redirectUrl.username || redirectUrl.password) {
     return true;
   }
   try {
@@ -46,7 +47,7 @@ export async function fetchImageProxyWithSafeRedirects(
     lookup?: ImageProxyDnsLookup;
   } = {},
 ): Promise<ImageProxyFetchResult> {
-  const fetchImpl = options.fetchImpl ?? fetch;
+  const fetchImpl = createConnectionSafeFetch(options.fetchImpl ?? fetch, { lookup: options.lookup });
   const maxRedirects = options.maxRedirects ?? IMAGE_PROXY_MAX_REDIRECTS;
   let currentUrl = targetUrl;
 
@@ -66,6 +67,8 @@ export async function fetchImageProxyWithSafeRedirects(
         signal: options.signal,
       });
     } catch (upstreamFetchError) {
+      const blocked = getNetworkTargetError(upstreamFetchError);
+      if (blocked) return { ok: false, kind: 'blocked', message: blocked.message };
       return { ok: false, kind: 'fetch_error', error: upstreamFetchError };
     }
 
@@ -77,6 +80,9 @@ export async function fetchImageProxyWithSafeRedirects(
     if (!location) {
       return { ok: true, response: upstreamResponse };
     }
+
+    // Cancel unused bodies rather than buffering an untrusted redirect body.
+    await upstreamResponse.body?.cancel().catch(() => undefined);
 
     let redirectUrl: URL;
     try {
@@ -99,7 +105,11 @@ export async function fetchImageProxyWithSafeRedirects(
  * Safely reads response body up to maxBytes without buffering unbounded chunks
  * in memory. Returns null if body exceeds maxBytes or stream fails.
  */
-export async function readBoundedResponseBody(response: Response, maxBytes: number): Promise<Uint8Array | null> {
+export async function readBoundedResponseBody(
+  response: Response,
+  maxBytes: number,
+  signal?: AbortSignal,
+): Promise<Uint8Array | null> {
   if (!response.body || typeof response.body.getReader !== 'function') {
     const buffer = await response.arrayBuffer().catch(() => new ArrayBuffer(0));
     if (buffer.byteLength > maxBytes) return null;
@@ -107,6 +117,11 @@ export async function readBoundedResponseBody(response: Response, maxBytes: numb
   }
 
   const reader = response.body.getReader();
+  const abortReader = () => {
+    void reader.cancel(signal?.reason).catch(() => undefined);
+  };
+  signal?.addEventListener('abort', abortReader, { once: true });
+  if (signal?.aborted) abortReader();
   const chunks: Uint8Array[] = [];
   let totalBytes = 0;
 
@@ -127,7 +142,12 @@ export async function readBoundedResponseBody(response: Response, maxBytes: numb
     }
   } catch {
     return null;
+  } finally {
+    signal?.removeEventListener('abort', abortReader);
+    reader.releaseLock();
   }
+
+  if (signal?.aborted) return null;
 
   const merged = new Uint8Array(totalBytes);
   let offset = 0;

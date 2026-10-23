@@ -43,6 +43,8 @@ vi.mock('@/utils/model/modelSorting', () => ({
 }));
 
 import { useChatStore } from './chatStore';
+import { setupChatStoreSync } from './sync/chatStoreSync';
+import type { SyncMessage } from '@/types/sync';
 import { useChatDraftStore } from './chatDraftStore';
 import { dbService } from '@/services/db/dbService';
 import { type SavedChatSession, type ChatGroup } from '@/types';
@@ -345,6 +347,135 @@ describe('chatStore', () => {
 
       expect(useChatStore.getState().activeMessages).toEqual([localStreamingMessage]);
       expect(useChatStore.getState().savedSessions[0].messages).toEqual([localStreamingMessage]);
+    });
+
+    it.each(['switch', 'generation', 'newer-refresh'])('discards an active session read after %s', async (change) => {
+      const stale = makeSession({
+        id: 'a',
+        messages: [{ id: 'stale', role: 'model', content: 'old', timestamp: new Date() }],
+      });
+      const newer = makeSession({
+        id: 'a',
+        messages: [{ id: 'newer', role: 'model', content: 'new', timestamp: new Date() }],
+      });
+      let resolve!: (value: SavedChatSession) => void;
+      const pending = new Promise<SavedChatSession>((done) => {
+        resolve = done;
+      });
+      vi.mocked(dbService.getAllSessionMetadata).mockResolvedValue([{ ...stale, messages: [] }]);
+      vi.mocked(dbService.getSession).mockReturnValueOnce(pending).mockResolvedValue(newer);
+      useChatStore.getState().setActiveSessionId('a');
+      const refresh = useChatStore.getState().refreshSessions();
+      await Promise.resolve();
+      if (change === 'switch') {
+        useChatStore.getState().setActiveSessionId('b');
+        useChatStore.getState().setActiveMessages([{ ...newer.messages[0], id: 'b' }]);
+      } else if (change === 'generation') {
+        useChatStore.getState().setSessionLoading('a', true);
+        useChatStore.getState().setActiveMessages([{ ...newer.messages[0], id: 'generating', isLoading: true }]);
+      } else {
+        await useChatStore.getState().refreshSessions();
+      }
+      const expected = useChatStore.getState().activeMessages;
+      resolve(stale);
+      await refresh;
+      expect(useChatStore.getState().activeMessages).toBe(expected);
+    });
+
+    it('does not replace a new generation completed while metadata was loading', async () => {
+      const stale = makeSession({
+        id: 'a',
+        messages: [{ id: 'stale', role: 'model', content: 'old', timestamp: new Date() }],
+      });
+      let resolve!: (sessions: SavedChatSession[]) => void;
+      const pending = new Promise<SavedChatSession[]>((done) => {
+        resolve = done;
+      });
+      vi.mocked(dbService.getAllSessionMetadata).mockReturnValueOnce(pending);
+      vi.mocked(dbService.getSession).mockResolvedValue(stale);
+      useChatStore.getState().setActiveSessionId('a');
+      const refresh = useChatStore.getState().refreshSessions();
+      useChatStore.getState().setSessionLoading('a', true);
+      const newMessages = [{ ...stale.messages[0], id: 'new-generation', content: 'new result' }];
+      useChatStore.getState().setActiveMessages(newMessages);
+      useChatStore.getState().setSessionLoading('a', false);
+      resolve([{ ...stale, messages: [] }]);
+      await refresh;
+      expect(useChatStore.getState().activeMessages).toBe(newMessages);
+    });
+
+    it.each([
+      ['refresh', 'old-first'],
+      ['refresh', 'new-first'],
+      ['broadcast', 'old-first'],
+      ['broadcast', 'new-first'],
+    ])('keeps newer content when the older source is %s and resolves %s', async (olderSource, resolution) => {
+      const initial = makeSession({
+        id: 'overlap',
+        messages: [{ id: 'initial', role: 'model', content: 'initial', timestamp: new Date() }],
+      });
+      const older = { ...initial, messages: [{ ...initial.messages[0], id: 'older' }] };
+      const newer = { ...initial, messages: [{ ...initial.messages[0], id: 'newer' }] };
+      let resolveOlder!: (session: SavedChatSession) => void;
+      let resolveNewer!: (session: SavedChatSession) => void;
+      const olderRead = new Promise<SavedChatSession>((resolve) => {
+        resolveOlder = resolve;
+      });
+      const newerRead = new Promise<SavedChatSession>((resolve) => {
+        resolveNewer = resolve;
+      });
+      vi.mocked(dbService.getAllSessionMetadata).mockResolvedValue([{ ...initial, messages: [] }]);
+      vi.mocked(dbService.getSession).mockReturnValueOnce(olderRead).mockReturnValueOnce(newerRead);
+      useChatStore.getState().setSessionLoading('overlap', false);
+      useChatStore.getState().setActiveSessionId('overlap');
+      useChatStore.getState().setActiveMessages(initial.messages);
+      useChatStore.getState().setSavedSessions([initial]);
+      const channel = new EventTarget() as BroadcastChannel;
+      const dispose = setupChatStoreSync({
+        store: useChatStore,
+        localLoadingSessionIds: new Set(),
+        getChannel: () => channel,
+        rehydrateSession: (session) => session,
+        documentRef: document,
+      });
+      let refresh!: Promise<void>;
+      const trigger = (source: string) => {
+        if (source === 'refresh') refresh = useChatStore.getState().refreshSessions();
+        else
+          channel.dispatchEvent(
+            new MessageEvent<SyncMessage>('message', {
+              data: {
+                type: 'SESSION_CONTENT_UPDATED',
+                sessionId: 'overlap',
+              },
+            }),
+          );
+      };
+      try {
+        trigger(olderSource);
+        await Promise.resolve();
+        trigger(olderSource === 'refresh' ? 'broadcast' : 'refresh');
+        await Promise.resolve();
+        expect(dbService.getSession).toHaveBeenCalledTimes(2);
+        if (resolution === 'old-first') {
+          resolveOlder(older);
+          await olderRead;
+          await Promise.resolve();
+          expect(useChatStore.getState().activeMessages).toBe(initial.messages);
+          resolveNewer(newer);
+        } else {
+          resolveNewer(newer);
+          await newerRead;
+          await Promise.resolve();
+          resolveOlder(older);
+        }
+        await refresh;
+        await Promise.all([olderRead, newerRead]);
+        await Promise.resolve();
+        expect(useChatStore.getState().activeMessages).toBe(newer.messages);
+      } finally {
+        dispose();
+      }
     });
 
     it('handles DB errors gracefully', async () => {

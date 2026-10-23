@@ -1,6 +1,4 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { Readable } from 'node:stream';
-import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { getCorsHeaders, sendJson } from '../cors.js';
 
 // Request headers that gate stream journaling. Exported so every provider's
@@ -28,47 +26,104 @@ export interface StreamJob {
   createdAt: number;
   updatedAt: number;
   bufferedBytes: number;
+  pendingBytes: number;
+  subscribers: number;
+  hardTimer?: ReturnType<typeof setTimeout>;
+  idleTimer?: ReturnType<typeof setTimeout>;
   /** Client-generated secret bound at creation; undefined for legacy secret-less jobs. */
   secret?: string;
 }
 
 // ── Tuning constants ────────────────────────────────────────────────────────
 
-const JOB_TTL_MS = 10 * 60_000; // completed jobs retained for 10 min
-const JOB_HARD_LIMIT_MS = 60 * 60_000; // hard cap 60 min even while in flight
-const MAX_BUFFER_BYTES = 8 * 1024 * 1024;
-const MAX_DROP_RATIO = 0.25;
-
-// ── Shared job store ────────────────────────────────────────────────────────
+// Each budget is process-wide unless named per-job. Invalid environment values
+// fall back to bounded defaults rather than disabling a limit.
+const limit = (name: string, fallback: number): number => {
+  const value = Number(process.env[`AMC_STREAM_JOB_${name}`]);
+  return Number.isSafeInteger(value) && value > 0 && value <= 2_147_483_647 ? value : fallback;
+};
+const JOB_TTL_MS = limit('TTL_MS', 10 * 60_000);
+const JOB_HARD_LIMIT_MS = limit('HARD_MS', 60 * 60_000);
+const JOB_IDLE_MS = limit('IDLE_MS', 120_000);
+const MAX_EVENT_BYTES = limit('EVENT_BYTES', 8 * 1024 * 1024);
+const MAX_BUFFER_BYTES = limit('RETAINED_BYTES', 8 * 1024 * 1024);
+const MAX_TOTAL_BYTES = limit('TOTAL_RETAINED_BYTES', 64 * 1024 * 1024);
+const MAX_PENDING_BYTES = limit('TOTAL_PENDING_BYTES', 16 * 1024 * 1024);
+const MAX_JOBS = limit('MAX_JOBS', 256);
+const MAX_ACTIVE = limit('MAX_ACTIVE', 32);
+const MAX_SUBSCRIBERS = limit('MAX_SUBSCRIBERS', 4);
+const MAX_TOTAL_SUBSCRIBERS = limit('TOTAL_SUBSCRIBERS', 128);
+const DRAIN_TIMEOUT_MS = limit('DRAIN_MS', 30_000);
+const MAX_WRITE_BYTES = limit('WRITE_BYTES', 8 * 1024 * 1024 + 64 * 1024);
+const MAX_TOTAL_WRITE_BYTES = limit('TOTAL_WRITE_BYTES', 64 * 1024 * 1024);
+const MAX_CHUNKS = limit('MAX_CHUNKS', 8192);
+const MAX_TOTAL_CHUNKS = limit('TOTAL_CHUNKS', 65_536);
 
 const jobs = new Map<string, StreamJob>();
+let retainedBytes = 0;
+let retainedChunks = 0;
+let pendingBytes = 0;
+let subscribers = 0;
+let blockedWriteBytes = 0;
 
-// Periodically evict expired jobs. unref() so the timer never keeps the process
-// alive on its own (the HTTP server owns lifetime).
-const sweeper = setInterval(() => {
-  const now = Date.now();
-  for (const [id, job] of jobs) {
-    const expired = job.done && now - job.updatedAt > JOB_TTL_MS;
-    const tooOld = now - job.createdAt > JOB_HARD_LIMIT_MS;
-    if (expired || tooOld) {
-      // If a job is still in flight past the hard limit, abort the upstream so
-      // it cannot leak forever behind an orphaned listener.
-      if (!job.done) {
-        try {
-          job.abortController.abort();
-        } catch {
-          /* ignore */
-        }
-      }
-      jobs.delete(id);
+const setPendingBytes = (job: StreamJob, bytes: number): void => {
+  pendingBytes += bytes - job.pendingBytes;
+  job.pendingBytes = bytes;
+};
+
+const finishJob = (job: StreamJob, error?: string): void => {
+  if (job.done) return;
+  job.done = true;
+  if (error) job.error = error;
+  job.updatedAt = Date.now();
+  clearTimeout(job.hardTimer);
+  clearTimeout(job.idleTimer);
+  setPendingBytes(job, 0);
+  const listeners = [...job.listeners];
+  job.listeners.clear();
+  for (const notify of listeners) {
+    try {
+      notify();
+    } catch {
+      /* a broken subscriber must not break the producer */
     }
   }
-}, 60_000);
+};
+
+const failJob = (job: StreamJob, error: string): void => {
+  finishJob(job, error);
+  job.abortController.abort();
+};
+
+const touchJob = (job: StreamJob): void => {
+  if (job.done) return;
+  job.updatedAt = Date.now();
+  clearTimeout(job.idleTimer);
+  job.idleTimer = setTimeout(() => failJob(job, 'stream job idle timeout'), JOB_IDLE_MS);
+  job.idleTimer.unref();
+};
+
+const removeJob = (job: StreamJob): void => {
+  retainedBytes -= job.bufferedBytes;
+  retainedChunks -= job.chunks.length;
+  job.chunks = [];
+  job.bufferedBytes = 0;
+  jobs.delete(job.id);
+};
+
+const pruneJobs = (): void => {
+  const now = Date.now();
+  for (const job of jobs.values()) {
+    if (job.done && !job.subscribers && now - job.updatedAt >= JOB_TTL_MS) removeJob(job);
+  }
+};
+const sweeper = setInterval(pruneJobs, 60_000);
 sweeper.unref();
 
-// ── CRUD ────────────────────────────────────────────────────────────────────
-
-const getJob = (id: string): StreamJob | undefined => jobs.get(id);
+const getJob = (id: string): StreamJob | undefined => {
+  pruneJobs();
+  return jobs.get(id);
+};
 
 const createJob = (id: string): StreamJob => {
   const job: StreamJob = {
@@ -81,51 +136,45 @@ const createJob = (id: string): StreamJob => {
     createdAt: Date.now(),
     updatedAt: Date.now(),
     bufferedBytes: 0,
+    pendingBytes: 0,
+    subscribers: 0,
   };
   jobs.set(id, job);
+  job.hardTimer = setTimeout(() => failJob(job, 'stream job lifetime limit exceeded'), JOB_HARD_LIMIT_MS);
+  job.hardTimer.unref();
+  touchJob(job);
   return job;
 };
 
+const dropFirstChunk = (job: StreamJob): void => {
+  const removed = job.chunks.shift();
+  if (!removed) return;
+  const bytes = Buffer.byteLength(removed.data, 'utf8');
+  job.firstSeq = removed.seq + 1;
+  job.bufferedBytes -= bytes;
+  retainedBytes -= bytes;
+  retainedChunks -= 1;
+};
+
 const appendChunk = (job: StreamJob, data: string): void => {
+  if (job.done) return;
+  const bytes = Buffer.byteLength(data, 'utf8');
   const seq = job.firstSeq + job.chunks.length;
   job.chunks.push({ seq, data });
-  job.updatedAt = Date.now();
-  job.bufferedBytes += data.length;
-
-  // Bounded buffer: drop the oldest chunk bucket so a runaway stream cannot
-  // exhaust memory. Resume callers can only rejoin the tail after a drop.
-  if (job.bufferedBytes > MAX_BUFFER_BYTES) {
-    const drop = Math.max(1, Math.ceil(job.chunks.length * MAX_DROP_RATIO));
-    const removed = job.chunks.splice(0, drop);
-    job.firstSeq += removed.length;
-    job.bufferedBytes = job.chunks.reduce((sum, chunk) => sum + chunk.data.length, 0);
+  job.bufferedBytes += bytes;
+  retainedBytes += bytes;
+  retainedChunks += 1;
+  while (job.bufferedBytes > MAX_BUFFER_BYTES || job.chunks.length > MAX_CHUNKS) dropFirstChunk(job);
+  for (const oldest of jobs.values()) {
+    while ((retainedBytes > MAX_TOTAL_BYTES || retainedChunks > MAX_TOTAL_CHUNKS) && oldest.chunks.length)
+      dropFirstChunk(oldest);
+    if (retainedBytes <= MAX_TOTAL_BYTES && retainedChunks <= MAX_TOTAL_CHUNKS) break;
   }
-
   for (const notify of job.listeners) {
     try {
       notify();
     } catch {
-      /* a listener throwing must not break the producer */
-    }
-  }
-};
-
-const finishJob = (job: StreamJob, error?: string): void => {
-  if (job.done) {
-    return;
-  }
-  job.done = true;
-  if (error) {
-    job.error = error;
-  }
-  job.updatedAt = Date.now();
-  const listeners = job.listeners;
-  job.listeners = new Set();
-  for (const notify of listeners) {
-    try {
-      notify();
-    } catch {
-      /* ignore */
+      /* isolate subscribers */
     }
   }
 };
@@ -168,31 +217,39 @@ export const abortJob = (id: string, secret?: string): boolean => {
 // huge error page from a misbehaving upstream.
 const MAX_ERROR_BODY_BYTES = 64 * 1024;
 
-const readBoundedErrorBody = async (response: Response): Promise<string> => {
+const readBoundedErrorBody = async (job: StreamJob, response: Response): Promise<string> => {
   if (!response.body) {
     return '';
   }
   const reader = response.body.getReader();
+  const cancel = () => {
+    void reader.cancel().catch(() => {});
+  };
+  job.abortController.signal.addEventListener('abort', cancel, { once: true });
   const decoder = new TextDecoder('utf-8');
   let out = '';
   let received = 0;
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) {
-      break;
+  try {
+    if (job.abortController.signal.aborted) cancel();
+    while (!job.done) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      touchJob(job);
+      const allowed = value.subarray(0, MAX_ERROR_BODY_BYTES - received);
+      received += allowed.byteLength;
+      out += decoder.decode(allowed, { stream: true });
+      if (received >= MAX_ERROR_BODY_BYTES) {
+        await reader.cancel();
+        break;
+      }
     }
-    if (!value) {
-      continue;
-    }
-    received += value.byteLength;
-    out += decoder.decode(value, { stream: true });
-    if (received >= MAX_ERROR_BODY_BYTES) {
-      await reader.cancel();
-      break;
-    }
+    out += decoder.decode();
+    return out.trim();
+  } finally {
+    job.abortController.signal.removeEventListener('abort', cancel);
+    reader.releaseLock();
   }
-  out += decoder.decode();
-  return out.trim();
 };
 
 // Normalize an upstream error body into a compact, human-readable reason.
@@ -252,9 +309,14 @@ export async function runDetachedUpstream(
     }
 
     const upstreamResponse = await fetchImpl(upstreamUrl, requestInit);
+    if (job.done) {
+      await upstreamResponse.body?.cancel();
+      return;
+    }
+    touchJob(job);
 
     if (!upstreamResponse.ok || !upstreamResponse.body) {
-      const errorBody = await readBoundedErrorBody(upstreamResponse);
+      const errorBody = await readBoundedErrorBody(job, upstreamResponse);
       finishJob(job, summarizeUpstreamError(upstreamResponse, errorBody));
       return;
     }
@@ -277,60 +339,68 @@ export async function runDetachedUpstream(
  *
  * Works for any SSE-based stream (Gemini, OpenAI-compatible, Anthropic).
  */
-function pumpUpstreamBodyIntoJob(job: StreamJob, upstreamResponse: Response): Promise<void> {
-  return (async () => {
-    // Stream-safe decoding: a multi-byte UTF-8 sequence (e.g. a CJK character)
-    // can be split across two network chunks. Decoding each chunk independently
-    // would turn each half into a U+FFFD replacement char inside the journal.
-    // The streaming decoder holds incomplete sequences back until the next chunk
-    // completes them, and the final flush emits any tail.
-    const decoder = new TextDecoder('utf-8');
-    let buffer = '';
-    for await (const bytes of Readable.fromWeb(upstreamResponse.body as unknown as NodeReadableStream)) {
-      // Normalize CRLF/CR line endings to LF FIRST so \n\n splitting works
-      // for upstreams that send \r\n\r\n events (e.g. aistudio-to-api).
-      buffer += decoder.decode(bytes, { stream: true }).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-      let idx: number;
-      while ((idx = buffer.indexOf('\n\n')) !== -1) {
-        const rawEvent = buffer.slice(0, idx + 2);
-        buffer = buffer.slice(idx + 2);
-        if (rawEvent.trim()) {
-          appendChunk(job, rawEvent);
-        }
+async function pumpUpstreamBodyIntoJob(job: StreamJob, upstreamResponse: Response): Promise<void> {
+  const reader = upstreamResponse.body!.getReader();
+  const cancel = () => {
+    void reader.cancel().catch(() => {});
+  };
+  job.abortController.signal.addEventListener('abort', cancel, { once: true });
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  let pendingCr = false;
+  const consume = (decoded: string, final = false): void => {
+    // Delay a trailing CR so a CRLF split over network chunks is one newline.
+    let text = (pendingCr ? '\r' : '') + decoded;
+    pendingCr = !final && text.endsWith('\r');
+    if (pendingCr) text = text.slice(0, -1);
+    text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    let offset = 0;
+    while (offset < text.length && !job.done) {
+      const end = text.indexOf('\n', offset);
+      const piece = text.slice(offset, end === -1 ? text.length : end + 1);
+      const bytes = job.pendingBytes + Buffer.byteLength(piece, 'utf8');
+      if (bytes > MAX_EVENT_BYTES || pendingBytes - job.pendingBytes + bytes > MAX_PENDING_BYTES) {
+        failJob(job, 'stream event byte limit exceeded');
+        return;
+      }
+      buffer += piece;
+      setPendingBytes(job, bytes);
+      if (buffer.endsWith('\n\n')) {
+        const event = buffer;
+        buffer = '';
+        setPendingBytes(job, 0);
+        if (event.trim()) appendChunk(job, event);
+      }
+      offset += piece.length;
+    }
+  };
+  try {
+    if (job.abortController.signal.aborted) cancel();
+    while (!job.done) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      touchJob(job);
+      // Decode bounded slices so one large network read cannot create an
+      // unbounded pending string before the event budget is checked.
+      for (let offset = 0; offset < value.byteLength && !job.done; offset += 16_384) {
+        consume(decoder.decode(value.subarray(offset, offset + 16_384), { stream: true }));
       }
     }
-    buffer += decoder.decode();
-    if (buffer.trim()) {
-      appendChunk(job, buffer);
+    if (!job.done) {
+      consume(decoder.decode(), true);
+      if (!job.done && buffer.trim()) {
+        setPendingBytes(job, 0);
+        appendChunk(job, buffer);
+      }
+      finishJob(job);
     }
-    finishJob(job);
-  })().catch((error: unknown) => {
+  } catch (error) {
     finishJob(job, error instanceof Error ? error.message : String(error));
-  });
-}
-
-/**
- * Fan out the buffered chunks to the browser response, from `cursor + 1`
- * onward. Each call drains everything currently buffered. When the job is
- * done, the response is closed. Returns the new cursor.
- */
-function flushToResponse(job: StreamJob, response: ServerResponse, cursor: number): number {
-  let nextCursor = cursor;
-  for (const chunk of job.chunks) {
-    if (chunk.seq > nextCursor && chunk.seq >= job.firstSeq) {
-      // write() returns false when the socket's internal write buffer is full.
-      // The chunk is still accepted (queued for flush) — the return value only
-      // says "wait before writing MORE". So the cursor must advance past this
-      // chunk either way: re-writing it on the next flush would duplicate the
-      // event in the browser, and skipping past it would lose the tail. We stop
-      // here and let the caller register a 'drain' retry for the rest.
-      nextCursor = chunk.seq;
-      if (!response.write(chunk.data)) {
-        break;
-      }
-    }
+  } finally {
+    job.abortController.signal.removeEventListener('abort', cancel);
+    if (job.abortController.signal.aborted) await reader.cancel().catch(() => {});
+    reader.releaseLock();
   }
-  return nextCursor;
 }
 
 // ── Shared SSE attach helper ─────────────────────────────────────────────────
@@ -338,31 +408,6 @@ function flushToResponse(job: StreamJob, response: ServerResponse, cursor: numbe
 interface AttachJobStreamConfig {
   allowedOrigins: string[];
 }
-
-// ── Upstream error → SSE error event ────────────────────────────────────────
-
-// The browser's @google/genai SDK parses each raw network chunk as JSON before
-// splitting it into SSE events, and throws an ApiError for any chunk that is a
-// standalone {"error":{code,status,message}} object with a numeric code in
-// [400,600). We rely on that to surface an upstream failure to the browser once
-// the 200 SSE headers are already on the wire: emit the error as a raw JSON
-// chunk (NOT `data:`-prefixed — that form is treated as an ordinary event and
-// silently yields an empty chunk), then end the response cleanly. Ending clean
-// instead of destroying the socket also stops the web proxy from turning the
-// failure into a bare "socket hang up".
-const parseStreamErrorDetails = (raw: string): { code: number; status: string } => {
-  const codeMatch = /(?:upstream\s+)?(\d{3})/.exec(raw);
-  const statusMatch = /([A-Z][A-Z0-9_]{2,})/.exec(raw);
-  return {
-    code: codeMatch ? Number(codeMatch[1]) : 502,
-    status: statusMatch ? statusMatch[1] : 'INTERNAL',
-  };
-};
-
-const buildStreamErrorEvent = (raw: string): string => {
-  const { code, status } = parseStreamErrorDetails(raw);
-  return `${JSON.stringify({ error: { code, status, message: raw } })}\n\n`;
-};
 
 /**
  * Helper for a provider proxy that wants the full journal treatment: detect
@@ -395,8 +440,33 @@ export async function maybeStreamWithSharedJob(
   }
   const jobSecret = readJobSecret(request);
 
+  const lastSeqHeader = request.headers[LAST_SEQ_HEADER];
+  const lastSeqRaw = Array.isArray(lastSeqHeader) ? lastSeqHeader[0] : lastSeqHeader;
+  const lastSeq = Number(lastSeqRaw ?? 0);
+  if (!Number.isSafeInteger(lastSeq) || lastSeq < 0) {
+    sendJson(request, response, 400, { error: 'invalid stream cursor' }, config.allowedOrigins);
+    return true;
+  }
   let job = getJob(jobId);
   if (!job) {
+    if (lastSeq > 0) {
+      sendJson(request, response, 409, { error: 'stream history is unavailable' }, config.allowedOrigins);
+      return true;
+    }
+    if ([...jobs.values()].filter((existing) => !existing.done).length >= MAX_ACTIVE) {
+      sendJson(request, response, 429, { error: 'stream job active capacity exceeded' }, config.allowedOrigins);
+      return true;
+    }
+    if (jobs.size >= MAX_JOBS) {
+      for (const existing of jobs.values()) {
+        if (existing.done && !existing.subscribers) removeJob(existing);
+        if (jobs.size < MAX_JOBS) break;
+      }
+    }
+    if (jobs.size >= MAX_JOBS || subscribers >= MAX_TOTAL_SUBSCRIBERS) {
+      sendJson(request, response, 503, { error: 'stream job capacity exceeded' }, config.allowedOrigins);
+      return true;
+    }
     job = createJob(jobId);
     if (jobSecret) {
       job.secret = jobSecret;
@@ -405,7 +475,11 @@ export async function maybeStreamWithSharedJob(
     // browser disconnect does not cancel the upstream. The fetch reads the
     // request body lazily; if the browser never sent a body (e.g. an abort
     // probe) the upstream fetch will fail fast and finish the job.
-    startUpstream(job);
+    try {
+      startUpstream(job);
+    } catch (error) {
+      failJob(job, error instanceof Error ? error.message : String(error));
+    }
   } else if (job.secret && job.secret !== jobSecret) {
     // Secret-bound job: reject before any headers are written so a caller
     // without the secret can neither replay nor attach to the buffer.
@@ -430,7 +504,22 @@ async function attachJobStream(
 ): Promise<boolean> {
   const lastSeqHeader = request.headers[LAST_SEQ_HEADER];
   const lastSeqRaw = Array.isArray(lastSeqHeader) ? lastSeqHeader[0] : lastSeqHeader;
-  const lastSeq = Number(lastSeqRaw ?? 0) || 0;
+  const lastSeq = Number(lastSeqRaw ?? 0);
+  const latestSeq = job.firstSeq + job.chunks.length - 1;
+  if (lastSeq < job.firstSeq - 1 || lastSeq > latestSeq) {
+    sendJson(
+      request,
+      response,
+      409,
+      { error: 'stream history is unavailable for this cursor', firstSeq: job.firstSeq },
+      config.allowedOrigins,
+    );
+    return true;
+  }
+  if (job.subscribers >= MAX_SUBSCRIBERS || subscribers >= MAX_TOTAL_SUBSCRIBERS) {
+    sendJson(request, response, 429, { error: 'stream subscriber capacity exceeded' }, config.allowedOrigins);
+    return true;
+  }
 
   // Terminal-job short-circuit: if the upstream already finished with an error
   // (e.g. a 429/500 at the start, or a mid-stream failure that completed the
@@ -452,71 +541,89 @@ async function attachJobStream(
   });
 
   let cursor = lastSeq;
-  let drainScheduled = false;
-
-  const flush = () => {
-    if (response.writableEnded || response.destroyed) {
-      return;
-    }
-    drainScheduled = false;
-    cursor = flushToResponse(job, response, cursor);
-
-    // Some buffered chunks were not written because the socket's write buffer
-    // was full (write() returned false). Do NOT end the response even if the
-    // job is done — that would permanently drop the tail. Register a drain
-    // retry so the remaining chunks are delivered once the socket drains.
-    // (A write() that returned false is still queued for flush; chunks *after*
-    // the break live only in job.chunks, so end() alone would drop them.)
-    const hasPendingChunks = job.chunks.some((chunk) => chunk.seq > cursor && chunk.seq >= job.firstSeq);
-    if (hasPendingChunks) {
-      if (!drainScheduled) {
-        drainScheduled = true;
-        response.once('drain', flush);
-      }
-      return;
-    }
-
-    if (job?.done) {
-      job.listeners.delete(flush);
-      // If the upstream finished with an error after we already started
-      // streaming, we can no longer change the 200 status. Instead of
-      // destroying the socket (which loses the reason and surfaces upstream as
-      // a bare "socket hang up" through the web proxy), emit a raw-JSON Gemini
-      // error chunk and end cleanly: the SDK throws an ApiError on a standalone
-      // {"error":{...}} chunk and the frontend routes the real cause into the
-      // error bubble. A clean end also means the proxy never sees a broken
-      // connection, so "Bad Gateway: socket hang up" is gone entirely.
-      if (job.error) {
-        console.error('[stream-jobs] upstream finished with error after headers sent:', job.error);
-        // A client-initiated abort is already surfaced to the user by the
-        // frontend's AbortError path; emitting an SSE error event for it would
-        // render a spurious error bubble. Only genuine upstream failures get
-        // the error event. And a write to an already-destroyed response throws
-        // (browser went away); there's nothing left to send then.
-        if (!response.writableEnded && !response.destroyed) {
-          if (job.error !== ABORTED_BY_CLIENT_MESSAGE) {
-            response.write(buildStreamErrorEvent(job.error));
-          }
-          response.end();
-        }
-        return;
-      }
-      response.end();
+  let blocked = false;
+  let cleanedUp = false;
+  let queuedBytes = 0;
+  let drainTimer: ReturnType<typeof setTimeout> | undefined;
+  subscribers += 1;
+  job.subscribers += 1;
+  const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    subscribers -= 1;
+    job.subscribers -= 1;
+    blockedWriteBytes -= queuedBytes;
+    queuedBytes = 0;
+    job.listeners.delete(flush);
+    response.off('drain', drained);
+    response.off('close', cleanup);
+    response.off('finish', cleanup);
+    clearTimeout(drainTimer);
+  };
+  const endWithError = (message: string) => {
+    cleanup();
+    if (!response.destroyed && !response.writableEnded) {
+      // A JSON error appended to SSE can be coalesced with the preceding event
+      // and ignored by SDK parsers. Fail the HTTP body instead: all providers
+      // must observe an incomplete stream, never a successful truncated reply.
+      // The job retains its specific error for a later HTTP 502 replay.
+      if (message === ABORTED_BY_CLIENT_MESSAGE) response.end();
+      else response.destroy();
     }
   };
-
-  // Drain anything already buffered (covers the resume case where the job
-  // already has history, and the just-started case where the first events
-  // landed before this listener attached).
+  const drained = () => {
+    blocked = false;
+    blockedWriteBytes -= queuedBytes;
+    queuedBytes = 0;
+    clearTimeout(drainTimer);
+    flush();
+  };
+  const flush = () => {
+    if (response.writableEnded || response.destroyed) {
+      cleanup();
+      return;
+    }
+    if (blocked) return;
+    if (cursor < job.firstSeq - 1) {
+      endWithError('409 stream history gap: subscriber fell behind');
+      return;
+    }
+    for (const chunk of job.chunks) {
+      if (chunk.seq <= cursor) continue;
+      const bytes = Buffer.byteLength(chunk.data, 'utf8');
+      if (response.writableLength + bytes > MAX_WRITE_BYTES) {
+        endWithError('stream subscriber write byte limit exceeded');
+        return;
+      }
+      if (blockedWriteBytes + response.writableLength + bytes > MAX_TOTAL_WRITE_BYTES) {
+        endWithError('stream subscriber queued byte capacity exceeded');
+        return;
+      }
+      cursor = chunk.seq;
+      if (!response.write(chunk.data)) {
+        blocked = true;
+        queuedBytes = Math.max(bytes, response.writableLength);
+        blockedWriteBytes += queuedBytes;
+        response.once('drain', drained);
+        drainTimer = setTimeout(() => {
+          cleanup();
+          response.destroy();
+        }, DRAIN_TIMEOUT_MS);
+        drainTimer.unref();
+        return;
+      }
+    }
+    if (job.done) {
+      if (job.error) endWithError(job.error);
+      else {
+        cleanup();
+        response.end();
+      }
+    }
+  };
+  response.once('close', cleanup);
+  response.once('finish', cleanup);
+  if (!job.done) job.listeners.add(flush);
   flush();
-  if (job && !job.done) {
-    job.listeners.add(flush);
-    // Key difference vs. the normal proxy: a browser disconnect here only
-    // unsubscribes. The upstream keeps running so a refresh can resume.
-    response.on('close', () => {
-      job?.listeners.delete(flush);
-    });
-  }
-
   return true;
 }

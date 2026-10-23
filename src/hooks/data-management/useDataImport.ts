@@ -75,6 +75,7 @@ const normalizeImportedMessage = (message: ChatMessage): ChatMessage => ({
   timestamp: normalizeImportedDate(message.timestamp) ?? new Date(),
   generationStartTime: normalizeImportedDate(message.generationStartTime),
   generationEndTime: normalizeImportedDate(message.generationEndTime),
+  ...(Array.isArray(message.variants) ? { variants: message.variants.map(normalizeImportedMessage) } : {}),
 });
 
 const normalizeImportedSession = (session: SavedChatSession): SavedChatSession => ({

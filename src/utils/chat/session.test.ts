@@ -2,14 +2,19 @@ import { describe, it, expect } from 'vitest';
 import {
   attachPersistedSessionFiles,
   createMessage,
+  cloneMessagesWithFreshIds,
   createNewSession,
   extractPersistedSessionFileRecords,
   generateSessionTitle,
   performOptimisticSessionUpdate,
   serializeMessageForPortableExport,
+  serializeSessionForPortableExport,
+  rehydrateSessionFiles,
   stripSessionFilePayloads,
 } from './session';
 import { type ChatMessage, type SavedChatSession, type ChatSettings, type PersistedSessionFileRecord } from '@/types';
+import { appendModelVariant, switchMessageVariant } from './messageVariants';
+import { blobToBase64 } from '@/utils/file/fileEncoding';
 import { DEFAULT_CHAT_SETTINGS } from '@/constants/settingsDefaults';
 import { createSavedChatSessionMetadata, createUploadedFile } from '@/test/data/factories';
 
@@ -388,5 +393,83 @@ describe('session file persistence helpers', () => {
     const hydrated = attachPersistedSessionFiles(session, records);
 
     expect(hydrated.messages[0].files?.[0].rawFile).toBe(rawFile);
+  });
+});
+
+describe('variant attachment round trips', () => {
+  const makeVariantSession = () =>
+    makeSession({
+      messages: [
+        appendModelVariant(
+          makeMessage('model', 'old answer', {
+            id: 'old',
+            files: [
+              createUploadedFile({
+                id: 'old-file',
+                name: 'old.txt',
+                type: 'text/plain',
+                rawFile: new File(['old payload'], 'old.txt', { type: 'text/plain' }),
+                dataUrl: 'blob:old-page',
+                abortController: new AbortController(),
+              }),
+            ],
+          }),
+          makeMessage('model', 'new answer', {
+            id: 'new',
+            files: [
+              createUploadedFile({
+                id: 'new-file',
+                name: 'new.txt',
+                type: 'text/plain',
+                dataUrl: 'data:text/plain;base64,bmV3IHBheWxvYWQ=',
+              }),
+            ],
+          }),
+        ),
+      ],
+    });
+
+  it('exports and reimports every answer attachment using portable payloads', async () => {
+    const exported = await serializeSessionForPortableExport(makeVariantSession());
+    expect(exported.messages[0].variants?.[0].files?.[0].rawFile).toBeUndefined();
+    expect(exported.messages[0].variants?.[0].files?.[0].abortController).toBeUndefined();
+    expect(exported.messages[0].variants?.[0].files?.[0].dataUrl).toBe('data:text/plain;base64,b2xkIHBheWxvYWQ=');
+    const imported = rehydrateSessionFiles(JSON.parse(JSON.stringify(exported)) as SavedChatSession);
+    const switched = switchMessageVariant(imported, 'new', 0);
+    expect(switched.messages[0].files?.[0].rawFile).toBeInstanceOf(Blob);
+    expect(await blobToBase64(switched.messages[0].files![0].rawFile!)).toBe('b2xkIHBheWxvYWQ=');
+    expect(switched.messages[0].files?.[0].dataUrl).toMatch(/^blob:/);
+  });
+
+  it('extracts, strips, and reattaches the payload of inactive answer variants', async () => {
+    const original = makeVariantSession();
+    const records = extractPersistedSessionFileRecords(original);
+    expect(new Set(records.map(({ id }) => id))).toEqual(new Set(['old-file', 'new-file']));
+    const stripped = stripSessionFilePayloads(original);
+    expect(stripped.messages[0].variants?.[0].files?.[0].rawFile).toBeUndefined();
+    expect(stripped.messages[0].variants?.[0].files?.[0].dataUrl).toBeUndefined();
+    expect(stripped.messages[0].variants?.[0].files?.[0].abortController).toBeUndefined();
+    const attached = attachPersistedSessionFiles(stripped, new Map(records.map((record) => [record.id, record])));
+    const restored = rehydrateSessionFiles(attached);
+    const switched = switchMessageVariant(restored, 'new', 0);
+    expect(await blobToBase64(switched.messages[0].files![0].rawFile!)).toBe('b2xkIHBheWxvYWQ=');
+  });
+});
+
+describe('cloning reply variants', () => {
+  it('gives all variant messages and attachments fresh ids while preserving snapshot relationships', () => {
+    const file = createUploadedFile({ id: 'source-file' });
+    const previous = makeMessage('model', 'old', { id: 'old', files: [file], isLoading: true });
+    const current = appendModelVariant(previous, makeMessage('model', 'new', { id: 'current' }));
+    const original = [current, makeMessage('user', 'tool', { id: 'tool', toolParentMessageId: 'old' })];
+    const cloned = cloneMessagesWithFreshIds(original);
+    const oldClone = cloned[0].variants![0];
+    expect(oldClone.id).not.toBe('old');
+    expect(oldClone.files?.[0].id).not.toBe('source-file');
+    expect(oldClone.files?.[0].rawFile).toBe(file.rawFile);
+    expect(cloned[0].variants?.[1].id).toBe(cloned[0].id);
+    expect(oldClone.isLoading).toBe(false);
+    expect(cloned[1].toolParentMessageId).toBe(oldClone.id);
+    expect(current.variants?.[0].files?.[0].id).toBe('source-file');
   });
 });

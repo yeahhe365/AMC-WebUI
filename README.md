@@ -254,6 +254,7 @@ docker compose up -d --build
 
 - Docker 默认是 BYOK 自用模式：启动后在 **设置 -> 第三方服务商 (Third-Party Providers)** 填入 Gemini API Key 即可使用普通聊天、Live API 与第三方兼容接口，不需要在 `.env` 或 `docker-compose.yml` 里配置 `GEMINI_API_KEY` 或 `THIRD_PARTY_ROUTES`。服务端 Key 仅在浏览器未携带 Key 时兜底。
 - `web` 镜像默认直接打包宿主机已生成的 `dist/`，不再在容器内执行前端生产构建。
+- `api` 镜像使用固定版本 pnpm，通过 frozen `pnpm deploy --prod` 从仓库锁文件与安全 overrides 提取 API 运行依赖；构建和运行阶段均无需安装前端依赖。
 - 修改前端或后端 API 代码后，请先重新执行 `pnpm run build:docker`，再执行 `docker compose up -d --build`。
 
 > ⚠️ 安全边界说明
@@ -293,15 +294,18 @@ docker compose up -d --build
 
 - 上述 `RUNTIME_*` 会在容器启动时写入 `runtime-config.js`，可被浏览器读取，因此只能放“可公开”信息。
 - public/runtime-config.js 模板用于纯静态构建，默认不启用自定义 API 配置或代理；Docker 部署会由 `docker/web-server.js` 在容器启动时按上表默认值覆盖该文件。
-- Pyodide 产物会在生产构建时复制到 `dist/pyodide/`，运行时默认从同源 `/pyodide/` 加载；如需改用 CDN 或独立静态域，可将 `RUNTIME_PYODIDE_BASE_URL` 设置为完整目录 URL，例如 `https://cdn.jsdelivr.net/pyodide/v0.27.7/full/`。
+- 默认生产构建将 Pyodide 核心和科学计算包复制到 `dist/pyodide/`，运行时从同源 `/pyodide/` 按需加载。首次构建按运行时清单下载包并校验 SHA-256，后续复用本地缓存。若部署独立版本化资源源，可执行 `PYODIDE_ASSETS_EXTERNAL=true pnpm run build` 省略这些资源，并将 `RUNTIME_PYODIDE_BASE_URL` 设置为与安装版本匹配的完整目录 URL，例如 `https://cdn.jsdelivr.net/pyodide/v0.27.7/full/`；纯静态部署需在 `runtime-config.js` 设置对应值。
 - PWA 预缓存默认排除 `pyodide/` 大体积产物，首次执行本地 Python 时仍会按上述地址按需加载。
 - 默认 BYOK 模式只需要在设置界面填写 API Key：普通 Gemini 代理会使用浏览器请求携带的 key；Live API 走 `/api/live` 的 WebSocket 全代理，由 `api` 容器桥接到官方 `wss://generativelanguage…/BidiGenerateContent`，浏览器 Key 存在时优先透传（BYOK 兜底），否则回落服务端 `LIVE_GEMINI_API_KEY` 或 `GEMINI_API_KEY`。
 - 如需服务端统一托管普通 Gemini 请求的 key，可配置 `GEMINI_API_KEY` 并将 `RUNTIME_SERVER_MANAGED_API=true`；Live API 与第三方接口同样遵循「浏览器 Key 优先·服务端兜底」（除非显式设 `SERVER_KEY_PRIORITY=true`）。
+- 服务端普通 Gemini Key 始终发往管理员配置的 `GEMINI_API_BASE`；浏览器自定义地址只与浏览器 BYOK Key 一起生效。管理员地址属于受信任配置，可指向本地反代。
 - MCP 的 `stdio` 与内网/本机 HTTP 访问默认关闭；仅在可信自托管环境中按需设置 `ENABLE_MCP_STDIO=true` 或 `ENABLE_MCP_PRIVATE_HTTP=true`。
 - 第三方兼容接口（OpenAI / DeepSeek / Anthropic / OpenRouter / Qwen / Kimi / GLM / Custom）经 `/api/openai/*` 转发，按请求头 `x-third-party-provider` 在 `THIRD_PARTY_ROUTES` 路由表中查上游，仅接受 https、非私网 host；浏览器 Key 优先、缺失时回落路由表里的服务端 Key。静态部署（Pages）不注入 `RUNTIME_THIRD_PARTY_PROXY_URL`，前端自动回退浏览器直连 provider。
 - 浏览器本地 key 适合自用/可信部署。它不会因为“保存在本地”而变成服务器密钥，同一浏览器上下文中的脚本、扩展、XSS 或设备风险仍可能读取它。
 - 前端在 Docker 部署时依赖后端端点：`/api/gemini/*`、`/api/openai/*`、`/api/live`（WS）；静态部署（Pages）不注入这些 runtime 地址，前端自动回退浏览器直连官方 Live/第三方上游。
 - 全部新行为由 env 门控：置 `ENABLE_LIVE_WS_PROXY=false` 并清空 `RUNTIME_LIVE_API_BASE_URL` 即恢复 Live 浏览器直连；清空 `THIRD_PARTY_ROUTES` 与 `RUNTIME_THIRD_PARTY_PROXY_URL` 即恢复第三方直连，无需改代码重构建。
+
+流式任务的容量、超时、续传 `409` 和可选资源构建方式见 [优化与运维说明](docs/optimization-2026-10-23.md)。
 
 ### 方式三：Cloudflare Pages（静态前端）+ 独立 API 服务
 
@@ -499,14 +503,14 @@ AMC-WebUI/
 
 OpenAI 兼容模式使用独立模型列表，可在设置中手动维护或从兼容端点拉取；下表列出应用内置的 Gemini 原生默认模型。
 
-| 类型                | 模型                                                                                                                                                                     |
-| :------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 类型                | 模型                                                                                                                                             |
+| :------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Gemini 3.x**      | gemini-3.8-flash, gemini-3.7-flash, gemini-3.5-flash-lite, gemini-3.8-live, gemini-3.8-live-extended-thinking, gemini-3.5-live-translate-preview |
-| **Robotics**        | gemini-robotics-er-2-preview                                                                                                                                             |
-| **Gemma 4**         | gemma-4-31b-it, gemma-4-26b-a4b-it                                                                                                                                       |
-| **图片生成**        | gemini-3-pro-image, gemini-3.1-flash-image, gemini-3.1-flash-lite-image                                                                                                  |
-| **TTS**             | gemini-3.8-flash-tts (默认，30 种语音)；gemini-3.1-flash-tts-preview 为旧 ID，会自动迁移至前者                                                                           |
-| **转写 / 实时转写** | gemini-3.5-transcribe, gemini-3.5-transcribe-live                                                                                                                        |
+| **Robotics**        | gemini-robotics-er-2-preview                                                                                                                     |
+| **Gemma 4**         | gemma-4-31b-it, gemma-4-26b-a4b-it                                                                                                               |
+| **图片生成**        | gemini-3-pro-image, gemini-3.1-flash-image, gemini-3.1-flash-lite-image                                                                          |
+| **TTS**             | gemini-3.8-flash-tts (默认，30 种语音)；gemini-3.1-flash-tts-preview 为旧 ID，会自动迁移至前者                                                   |
+| **转写 / 实时转写** | gemini-3.5-transcribe, gemini-3.5-transcribe-live                                                                                                |
 
 ---
 

@@ -24,9 +24,10 @@ export function getSessionPersistenceChanges(
   previousSessions: SavedChatSession[],
   nextSessions: SavedChatSession[],
 ): SessionPersistenceChanges {
+  const previousSessionsById = new Map(previousSessions.map((session) => [session.id, session]));
   const nextSessionsById = new Map(nextSessions.map((session) => [session.id, session]));
   const modifiedSessions = nextSessions.filter((session) => {
-    const previousSession = previousSessions.find((candidate) => candidate.id === session.id);
+    const previousSession = previousSessionsById.get(session.id);
     return previousSession !== session;
   });
   const deletedSessionIds = previousSessions

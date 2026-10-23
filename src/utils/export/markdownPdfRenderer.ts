@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 
-import { CJK_FONT_FILE, CJK_FONT_NAME, loadCjkFontBase64 } from './markdownPdfFonts';
+import { CJK_FONT_FILE, CJK_FONT_NAME, loadCjkFontData } from './markdownPdfFonts';
 import { ensurePdfEmbeddableImage, fetchImageAsDataUrl, getImageFormat, getImageSize } from './markdownPdfImages';
 import type { MarkdownNode } from './markdownPdfTypes';
 import { isDarkThemeId } from '@/utils/theme/themeMode';
@@ -110,12 +110,12 @@ export class MarkdownPdfRenderer {
       return;
     }
 
-    const fontBase64 = await loadCjkFontBase64();
-    if (!fontBase64) {
+    const fontData = await loadCjkFontData();
+    if (!fontData) {
       return;
     }
 
-    this.doc.addFileToVFS(CJK_FONT_FILE, fontBase64);
+    this.doc.addFileToVFS(CJK_FONT_FILE, fontData);
     this.doc.addFont(CJK_FONT_FILE, CJK_FONT_NAME, 'normal', 'Identity-H');
     this.bodyFontFamily = CJK_FONT_NAME;
   }

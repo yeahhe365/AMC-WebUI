@@ -330,55 +330,30 @@ describe('stream journal (job-id gated)', () => {
     expect(errorString).toContain('The caller does not have permission');
   });
 
-  it('emits a raw-JSON Gemini error chunk when the upstream fails mid-stream', async () => {
-    // The upstream starts a 200 SSE stream, then its socket dies (a real
-    // mid-stream failure). The browser already got 200 + SSE headers, so the
-    // terminal error must be delivered as a raw JSON {"error":{...}} chunk
-    // (which the genai SDK turns into an ApiError) instead of a socket destroy
-    // (which becomes "socket hang up" through the web proxy). Note: `data:`-
-    // prefixed error events are silently swallowed by the SDK as empty chunks,
-    // so the chunk must NOT be SSE-formatted.
+  it('fails the HTTP body when the upstream fails after partial content', async () => {
+    let failUpstream: (() => void) | undefined;
     const upstream = serverCleanup.track(
       await startHttpServer(
         http.createServer((_request, response) => {
           response.writeHead(200, { 'content-type': 'text/event-stream' });
           response.write('data: {"text":"partial"}\n\n');
-          setTimeout(() => {
-            response.socket?.destroy();
-          }, 15);
+          failUpstream = () => response.socket?.destroy();
         }),
       ),
     );
-
-    const app = createServer({
-      geminiApiBase: upstream.baseUrl,
-      geminiApiKey: 'server-key',
-    });
+    const app = createServer({ geminiApiBase: upstream.baseUrl, geminiApiKey: 'server-key' });
     const appStarted = serverCleanup.track(await startHttpServer(app));
-
     const res = await fetch(`${appStarted.baseUrl}${STREAM_PATH}`, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        [JOB_ID_HEADER]: 'job-midstream-err',
-      },
+      headers: { 'content-type': 'application/json', [JOB_ID_HEADER]: 'job-midstream-err' },
       body: JSON.stringify({ contents: [] }),
     });
-
     expect(res.status).toBe(200);
-    const body = await readStream(res);
-
-    // Partial content first, then a standalone JSON error chunk with a real
-    // cause (the upstream's read failure, e.g. "terminated"). The error chunk
-    // is raw JSON (not `data:`-prefixed), so it parses as a standalone object.
-    expect(body).toContain('partial');
-    const blocks = body.split('\n\n').filter((b) => b.trim().length > 0);
-    const lastBlock = blocks[blocks.length - 1];
-    expect(lastBlock.startsWith('{')).toBe(true);
-    const parsed = JSON.parse(lastBlock) as { error: { code?: number; status?: string; message?: string } };
-    expect(parsed.error.code).toBeGreaterThanOrEqual(400);
-    expect(parsed.error.code).toBeLessThan(600);
-    expect(parsed.error.message?.length).toBeGreaterThan(0);
+    const reader = res.body!.getReader();
+    const partial = await reader.read();
+    expect(new TextDecoder().decode(partial.value)).toContain('partial');
+    failUpstream!();
+    await expect(reader.read()).rejects.toThrow();
   });
 
   it('does not emit an SSE error event for a client abort', async () => {

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import type { ChatMessage } from '@/types';
 
 const PROMPT_PREVIEW_LIMIT = 50;
@@ -32,7 +32,19 @@ function normalizeSnippet(text: string, maxLength: number = 140): string {
   return `${cleaned.slice(0, maxLength).trimEnd()}…`;
 }
 
-export function extractTurnNavigationItems(messages: readonly ChatMessage[]): TurnNavigationItem[] {
+type SnippetCache = Map<string, { text: string; limit: number; snippet: string }>;
+
+function buildTurnNavigationItems(messages: readonly ChatMessage[], cache: SnippetCache): TurnNavigationItem[] {
+  const nextCache: SnippetCache = new Map();
+  const snippetFor = (message: ChatMessage, text: string, limit: number) => {
+    const cached = cache.get(message.id);
+    const entry =
+      cached?.text === text && cached.limit === limit
+        ? cached
+        : { text, limit, snippet: normalizeSnippet(text, limit) };
+    nextCache.set(message.id, entry);
+    return entry.snippet;
+  };
   const items: TurnNavigationItem[] = [];
   let currentItem: {
     turn: number;
@@ -52,7 +64,7 @@ export function extractTurnNavigationItems(messages: readonly ChatMessage[]): Tu
         turn: turnNumber,
         messageIndex: index,
         messageId: message.id,
-        prompt: normalizeSnippet(message.content, PROMPT_PREVIEW_LIMIT),
+        prompt: snippetFor(message, message.content, PROMPT_PREVIEW_LIMIT),
         response: '',
         anchor: { kind: 'loaded', key: message.id },
       };
@@ -60,14 +72,21 @@ export function extractTurnNavigationItems(messages: readonly ChatMessage[]): Tu
     } else if (message.role === 'model' && currentItem !== null) {
       if (currentItem.response === '') {
         const text = message.content || message.thoughts || '';
-        currentItem.response = normalizeSnippet(text, RESPONSE_PREVIEW_LIMIT);
+        currentItem.response = snippetFor(message, text, RESPONSE_PREVIEW_LIMIT);
       }
     }
   }
 
+  cache.clear();
+  nextCache.forEach((value, key) => cache.set(key, value));
   return items;
 }
 
+export function extractTurnNavigationItems(messages: readonly ChatMessage[]): TurnNavigationItem[] {
+  return buildTurnNavigationItems(messages, new Map());
+}
+
 export function useTurnNavigationItems(messages: readonly ChatMessage[]): TurnNavigationItem[] {
-  return useMemo(() => extractTurnNavigationItems(messages), [messages]);
+  const cache = useRef<SnippetCache>(new Map());
+  return useMemo(() => buildTurnNavigationItems(messages, cache.current), [messages]);
 }

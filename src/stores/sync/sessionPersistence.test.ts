@@ -90,4 +90,17 @@ describe('sessionPersistence', () => {
     expect(stored.find((session) => session.id === 'loading')?.messages).toEqual([loadingMessage]);
     expect(stored.find((session) => session.id === 'inactive')?.messages).toEqual([]);
   });
+  it('does a bounded number of id reads when comparing a large unchanged history', () => {
+    let idReads = 0;
+    const sessions = Array.from({ length: 1000 }, (_, index) => ({
+      ...createSavedChatSessionMetadata(),
+      get id() {
+        idReads += 1;
+        return `session-${index}`;
+      },
+    }));
+    const changes = getSessionPersistenceChanges(sessions, [...sessions]);
+    expect(changes).toEqual({ modifiedSessions: [], deletedSessionIds: [] });
+    expect(idReads).toBeLessThanOrEqual(sessions.length * 8);
+  });
 });

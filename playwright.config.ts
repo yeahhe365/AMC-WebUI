@@ -9,10 +9,11 @@ export default defineConfig({
     timeout: 10_000,
   },
   fullyParallel: true,
+  workers: process.env.CI ? 2 : undefined,
   reporter: [['list'], ['html', { outputFolder: 'playwright-report', open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:4173',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
   },
   projects: [
     {

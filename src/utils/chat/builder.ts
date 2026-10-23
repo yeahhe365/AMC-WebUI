@@ -1,5 +1,5 @@
 import { type ChatMessage, type ContentPart, type UploadedFile, type ChatHistoryItem, MediaResolution } from '@/types';
-import { PartMediaResolutionLevel } from '@google/genai';
+import type { PartMediaResolutionLevel } from '@google/genai';
 import { logService } from '@/services/logService';
 import { isGemini3ImageModel, isGemini3Model } from '@/utils/model/modelCapabilities';
 import { blobToBase64, fileToString } from '@/utils/file/fileEncoding';
@@ -17,15 +17,15 @@ const isGeminiImageHistoryTarget = (modelId?: string): boolean => Boolean(modelI
 
 // Maps the local MediaResolution enum to @google/genai's PartMediaResolutionLevel enum.
 const MEDIA_RESOLUTION_MAP: Record<MediaResolution, PartMediaResolutionLevel> = {
-  [MediaResolution.MEDIA_RESOLUTION_LOW]: PartMediaResolutionLevel.MEDIA_RESOLUTION_LOW,
-  [MediaResolution.MEDIA_RESOLUTION_MEDIUM]: PartMediaResolutionLevel.MEDIA_RESOLUTION_MEDIUM,
-  [MediaResolution.MEDIA_RESOLUTION_HIGH]: PartMediaResolutionLevel.MEDIA_RESOLUTION_HIGH,
-  [MediaResolution.MEDIA_RESOLUTION_ULTRA_HIGH]: PartMediaResolutionLevel.MEDIA_RESOLUTION_ULTRA_HIGH,
-  [MediaResolution.MEDIA_RESOLUTION_UNSPECIFIED]: PartMediaResolutionLevel.MEDIA_RESOLUTION_UNSPECIFIED,
+  [MediaResolution.MEDIA_RESOLUTION_LOW]: 'MEDIA_RESOLUTION_LOW' as PartMediaResolutionLevel,
+  [MediaResolution.MEDIA_RESOLUTION_MEDIUM]: 'MEDIA_RESOLUTION_MEDIUM' as PartMediaResolutionLevel,
+  [MediaResolution.MEDIA_RESOLUTION_HIGH]: 'MEDIA_RESOLUTION_HIGH' as PartMediaResolutionLevel,
+  [MediaResolution.MEDIA_RESOLUTION_ULTRA_HIGH]: 'MEDIA_RESOLUTION_ULTRA_HIGH' as PartMediaResolutionLevel,
+  [MediaResolution.MEDIA_RESOLUTION_UNSPECIFIED]: 'MEDIA_RESOLUTION_UNSPECIFIED' as PartMediaResolutionLevel,
 };
 
 const toPartMediaResolutionLevel = (resolution: MediaResolution): PartMediaResolutionLevel =>
-  MEDIA_RESOLUTION_MAP[resolution] ?? PartMediaResolutionLevel.MEDIA_RESOLUTION_UNSPECIFIED;
+  MEDIA_RESOLUTION_MAP[resolution] ?? ('MEDIA_RESOLUTION_UNSPECIFIED' as PartMediaResolutionLevel);
 
 const normalizePartMediaResolution = (resolution: MediaResolution, isImage: boolean): MediaResolution => {
   if (resolution === MediaResolution.MEDIA_RESOLUTION_ULTRA_HIGH && !isImage) {

@@ -60,7 +60,7 @@ export const LibraryPickerList: React.FC<LibraryPickerListProps> = ({
                 onClick={(event) => toggleSelectItem(item.id, event)}
                 onDoubleClick={() => handleItemDoubleClick(item)}
                 onKeyDown={(event) => {
-                  if (event.key === ' ' || event.key === 'Enter') {
+                  if (event.target === event.currentTarget && (event.key === ' ' || event.key === 'Enter')) {
                     event.preventDefault();
                     toggleSelectItem(item.id, event);
                   }
@@ -120,7 +120,7 @@ export const LibraryPickerList: React.FC<LibraryPickerListProps> = ({
                     }}
                     title={t('libraryPreview')}
                     aria-label={t('libraryPreview')}
-                    className="p-1 rounded-lg text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                    className="p-1 rounded-lg text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] transition-colors opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 cursor-pointer"
                   >
                     <Eye size={14} strokeWidth={2} />
                   </button>

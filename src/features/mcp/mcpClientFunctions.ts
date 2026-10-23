@@ -1,4 +1,4 @@
-import { Type, type Schema } from '@google/genai';
+import type { Type, Schema } from '@google/genai';
 import type { McpServerConfig, StandardClientFunctions, UploadedFile } from '@/types';
 import {
   callMcpTool,
@@ -78,19 +78,19 @@ const readCachedTools = (lister: McpToolsLister, configKey: string): McpToolsRes
 const toSchemaType = (value: unknown): Type | undefined => {
   switch (value) {
     case 'object':
-      return Type.OBJECT;
+      return 'OBJECT' as Type;
     case 'array':
-      return Type.ARRAY;
+      return 'ARRAY' as Type;
     case 'string':
-      return Type.STRING;
+      return 'STRING' as Type;
     case 'number':
-      return Type.NUMBER;
+      return 'NUMBER' as Type;
     case 'integer':
-      return Type.INTEGER;
+      return 'INTEGER' as Type;
     case 'boolean':
-      return Type.BOOLEAN;
+      return 'BOOLEAN' as Type;
     case 'null':
-      return Type.NULL;
+      return 'NULL' as Type;
     default:
       return undefined;
   }
@@ -99,17 +99,17 @@ const toSchemaType = (value: unknown): Type | undefined => {
 /** Pick the primary JSON Schema type when `type` is a string or array (e.g. ["string","null"]). */
 const resolvePrimaryType = (schema: Record<string, unknown>): Type => {
   if (typeof schema.type === 'string') {
-    return toSchemaType(schema.type) ?? Type.OBJECT;
+    return toSchemaType(schema.type) ?? ('OBJECT' as Type);
   }
 
   if (Array.isArray(schema.type)) {
     const types = schema.type.filter((item): item is string => typeof item === 'string');
     const nonNull = types.find((item) => item !== 'null');
     if (nonNull) {
-      return toSchemaType(nonNull) ?? Type.OBJECT;
+      return toSchemaType(nonNull) ?? ('OBJECT' as Type);
     }
     if (types.includes('null')) {
-      return Type.NULL;
+      return 'NULL' as Type;
     }
   }
 
@@ -130,18 +130,18 @@ const resolvePrimaryType = (schema: Record<string, unknown>): Type => {
 
   // $ref without a resolved target — treat as opaque object.
   if (typeof schema.$ref === 'string') {
-    return Type.OBJECT;
+    return 'OBJECT' as Type;
   }
 
   // Infer from structural keywords when type is missing.
   if (isRecord(schema.properties) || schema.additionalProperties !== undefined) {
-    return Type.OBJECT;
+    return 'OBJECT' as Type;
   }
   if (schema.items !== undefined) {
-    return Type.ARRAY;
+    return 'ARRAY' as Type;
   }
 
-  return Type.OBJECT;
+  return 'OBJECT' as Type;
 };
 
 const pickUnionBranch = (schema: Record<string, unknown>): Record<string, unknown> | undefined => {
@@ -199,7 +199,7 @@ const copyConstraintKeywords = (source: Record<string, unknown>, target: Schema)
 
 const toGeminiSchema = (schema: unknown): Schema => {
   if (!isRecord(schema)) {
-    return { type: Type.OBJECT };
+    return { type: 'OBJECT' as Type };
   }
 
   // Unwrap a bare anyOf/oneOf when the parent has no own type.
@@ -233,7 +233,7 @@ const toGeminiSchema = (schema: unknown): Schema => {
 
   copyConstraintKeywords(effective, geminiSchema);
 
-  if (type === Type.OBJECT) {
+  if (type === ('OBJECT' as Type)) {
     if (isRecord(effective.properties)) {
       geminiSchema.properties = Object.fromEntries(
         Object.entries(effective.properties).map(([key, value]) => [key, toGeminiSchema(value)]),
@@ -252,13 +252,13 @@ const toGeminiSchema = (schema: unknown): Schema => {
     }
   }
 
-  if (type === Type.ARRAY && effective.items !== undefined) {
+  if (type === ('ARRAY' as Type) && effective.items !== undefined) {
     geminiSchema.items = toGeminiSchema(effective.items);
   }
 
   // JSON Schema unions like ["string","null"] become the primary type plus
   // Gemini's native nullable flag (v1beta Schema supports it).
-  if (Array.isArray(effective.type) && effective.type.includes('null') && type !== Type.NULL) {
+  if (Array.isArray(effective.type) && effective.type.includes('null') && type !== ('NULL' as Type)) {
     geminiSchema.nullable = true;
   }
 

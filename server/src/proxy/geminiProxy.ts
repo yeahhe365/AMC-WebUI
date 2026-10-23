@@ -2,7 +2,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { sendJson } from '../cors.js';
 import { maybeStreamWithJob } from '../stream-jobs/streamJobs.js';
 import { forwardUpstream, guardPublicHttpsUrl } from './proxyForward.js';
-import { buildGeminiProxyHeaders, resolveGeminiRequestApiKey } from './proxyHeaders.js';
+import { buildGeminiProxyHeaders } from './proxyHeaders.js';
+import { resolveApiKeyPrecedence } from './apiKeyPrecedence.js';
+import { createConnectionSafeFetch } from '../../../shared/connectionSafeFetch.js';
 
 export const GEMINI_PROXY_PREFIX = '/api/gemini';
 const GEMINI_UPSTREAM_BASE_HEADER = 'x-gemini-upstream-base-url';
@@ -45,7 +47,13 @@ export async function proxyGeminiRequest(
   config: GeminiProxyConfig,
   fetchImpl: typeof fetch,
 ): Promise<void> {
-  const apiKeyForProxy = resolveGeminiRequestApiKey(request, config.geminiApiKey, config.serverKeyPriority);
+  const rawBrowserKey = request.headers['x-goog-api-key'];
+  const selectedKey = resolveApiKeyPrecedence({
+    browserKey: (Array.isArray(rawBrowserKey) ? rawBrowserKey[0] : rawBrowserKey)?.trim(),
+    serverKey: config.geminiApiKey,
+    serverKeyPriority: config.serverKeyPriority,
+  });
+  const apiKeyForProxy = selectedKey?.apiKey;
 
   if (!apiKeyForProxy) {
     sendJson(request, response, 500, { error: 'GEMINI_API_KEY is not configured.' }, config.allowedOrigins);
@@ -55,12 +63,14 @@ export async function proxyGeminiRequest(
   const requestUrl = new URL(request.url || '/', 'http://localhost');
   const upstreamPath = requestUrl.pathname.slice(GEMINI_PROXY_PREFIX.length) || '/';
 
-  // Override the upstream target when the browser sends a validated
-  // x-gemini-upstream-base-url header (e.g. a user-configured proxy address).
-  // When absent or invalid, falls back to config.geminiApiBase (the default).
-  const upstreamBaseOverride = resolveUpstreamBaseOverride(request);
+  // A browser-selected target may receive only browser-selected credentials.
+  // Server credentials always stay on the administrator-configured target.
+  const upstreamBaseOverride = selectedKey?.isBrowserKey ? resolveUpstreamBaseOverride(request) : null;
   const targetBase = upstreamBaseOverride ?? config.geminiApiBase.replace(/\/$/, '');
   const upstreamUrl = `${targetBase}${upstreamPath}${requestUrl.search}`;
+  // Administrator-configured Gemini endpoints may be private (self-hosted
+  // gateways); browser-selected endpoints always use the public policy.
+  const safeFetch = createConnectionSafeFetch(fetchImpl, { allowPrivate: !upstreamBaseOverride });
 
   // Stream journal: when the browser sends an x-amc-job-id header on a
   // streamGenerateContent request, the upstream is buffered independently of
@@ -72,7 +82,7 @@ export async function proxyGeminiRequest(
       geminiApiKey: config.geminiApiKey,
       allowedOrigins: config.allowedOrigins,
       serverKeyPriority: config.serverKeyPriority,
-      fetchImpl,
+      fetchImpl: safeFetch,
     })
   ) {
     return;
@@ -81,7 +91,7 @@ export async function proxyGeminiRequest(
   await forwardUpstream(request, response, {
     upstreamUrl,
     allowedOrigins: config.allowedOrigins,
-    fetchImpl,
+    fetchImpl: safeFetch,
     buildHeaders: () => buildGeminiProxyHeaders(request, apiKeyForProxy),
     logTag: '[gemini]',
     errorLabel: 'Gemini',

@@ -1,14 +1,23 @@
-FROM node:24-slim AS runtime
+FROM node:24-slim AS dependencies
 
 WORKDIR /app
 ENV NODE_ENV=production
 
 ARG NPM_REGISTRY=https://registry.npmjs.org
 
-RUN echo '{"type":"module"}' > /app/package.json && \
-    npm config set registry ${NPM_REGISTRY} && \
-    npm install --no-package-lock --no-audit --no-fund @modelcontextprotocol/sdk@^1.31.0 ws@^8.18.0 && \
-    chown -R node:node /app
+RUN npm install --global --no-audit --no-fund pnpm@11.22.0 --registry=${NPM_REGISTRY}
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+COPY server/package.json ./server/package.json
+COPY docs-site/package.json ./docs-site/package.json
+RUN pnpm --filter amc-webui-api deploy --prod --frozen-lockfile /runtime --registry=${NPM_REGISTRY}
+
+FROM node:24-slim AS runtime
+
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=dependencies --chown=node:node /runtime /app
 
 COPY --chown=node:node server/dist /app/server/dist
 

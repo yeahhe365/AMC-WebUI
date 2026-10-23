@@ -1,0 +1,14 @@
+{
+  "name": "amc-webui-api",
+  "private": true,
+  "version": "1.23.0",
+  "type": "module",
+  "engines": {
+    "node": ">=24 <27"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "undici": "^7.29.1",
+    "ws": "^8.20.2"
+  }
+}

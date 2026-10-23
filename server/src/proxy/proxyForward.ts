@@ -48,9 +48,6 @@ export type UpstreamUrlGuard =
 export interface UpstreamUrlGuardOptions {
   /**
    * Also reject URLs that embed userinfo credentials (https://user:pass@host).
-   * The Gemini upstream-base override enables this; the third-party route
-   * path has never rejected embedded credentials, so it keeps the flag off to
-   * preserve its behavior exactly.
    */
   rejectEmbeddedCredentials?: boolean;
   /**
@@ -104,6 +101,10 @@ export interface ForwardUpstreamOptions {
   logTag: string;
   /** Human-facing label inside 502 JSON error bodies, e.g. 'Gemini'. */
   errorLabel: string;
+  /** Applies while waiting for headers and between response chunks. */
+  idleTimeoutMs?: number;
+  /** Caps the complete request, including a continuously active stream. */
+  totalTimeoutMs?: number;
 }
 
 /**
@@ -127,7 +128,23 @@ export async function forwardUpstream(
 
   const method = request.method || 'GET';
   const hasBody = !['GET', 'HEAD'].includes(method);
+  const requestHeaders = buildHeaders();
   const abortController = new AbortController();
+  let timedOut = false;
+  const expire = () => {
+    timedOut = true;
+    abortController.abort(new Error('Upstream request timed out.'));
+  };
+  const idleTimer = setTimeout(expire, options.idleTimeoutMs ?? 300_000);
+  const totalTimer = setTimeout(expire, options.totalTimeoutMs ?? 1_800_000);
+  idleTimer.unref();
+  totalTimer.unref();
+  const cleanup = () => {
+    clearTimeout(idleTimer);
+    clearTimeout(totalTimer);
+    request.off('aborted', abortUpstream);
+    response.off('close', handleClientClose);
+  };
   const abortUpstream = () => {
     if (!abortController.signal.aborted) {
       abortController.abort();
@@ -141,7 +158,7 @@ export async function forwardUpstream(
 
   const requestInit: RequestInit & { duplex?: 'half' } = {
     method,
-    headers: buildHeaders(),
+    headers: requestHeaders,
     signal: abortController.signal,
     // redirect: 'manual' so a public upstream base cannot 302 into a private
     // network host after the input URL passed validation.
@@ -155,59 +172,60 @@ export async function forwardUpstream(
 
   request.once('aborted', abortUpstream);
   response.once('close', handleClientClose);
+  if (request.aborted || response.destroyed) abortUpstream();
 
-  let upstreamResponse: Response;
   try {
-    upstreamResponse = await fetchImpl(upstreamUrl, requestInit);
-  } catch (upstreamFetchError) {
-    request.off('aborted', abortUpstream);
-    response.off('close', handleClientClose);
-    if (abortController.signal.aborted) {
-      if (!response.destroyed) {
-        response.destroy();
+    let upstreamResponse: Response;
+    try {
+      upstreamResponse = await fetchImpl(upstreamUrl, requestInit);
+    } catch (upstreamFetchError) {
+      if (timedOut && !response.destroyed) {
+        sendJson(request, response, 504, { error: `${errorLabel} upstream request timed out.` }, allowedOrigins);
+        return;
       }
+      if (abortController.signal.aborted) {
+        if (!response.destroyed) {
+          response.destroy();
+        }
+        return;
+      }
+
+      console.error(`${logTag} upstream request failed:`, upstreamFetchError);
+      sendJson(request, response, 502, { error: `${errorLabel} upstream request failed.` }, allowedOrigins);
       return;
     }
 
-    console.error(`${logTag} upstream request failed:`, upstreamFetchError);
-    sendJson(request, response, 502, { error: `${errorLabel} upstream request failed.` }, allowedOrigins);
-    return;
-  }
+    // Block redirects: the API base should not legitimately redirect, and a 3xx
+    // here would mean we did not follow it (good) but the upstream attempted to
+    // point us elsewhere.
+    if (upstreamResponse.status >= 300 && upstreamResponse.status < 400) {
+      await upstreamResponse.body?.cancel().catch(() => undefined);
+      console.error(`${logTag} upstream returned redirect:`, upstreamResponse.status);
+      sendJson(
+        request,
+        response,
+        502,
+        { error: `${errorLabel} upstream returned an unexpected redirect.` },
+        allowedOrigins,
+      );
+      return;
+    }
 
-  // Block redirects: the API base should not legitimately redirect, and a 3xx
-  // here would mean we did not follow it (good) but the upstream attempted to
-  // point us elsewhere.
-  if (upstreamResponse.status >= 300 && upstreamResponse.status < 400) {
-    request.off('aborted', abortUpstream);
-    response.off('close', handleClientClose);
-    console.error(`${logTag} upstream returned redirect:`, upstreamResponse.status);
-    sendJson(
-      request,
-      response,
-      502,
-      { error: `${errorLabel} upstream returned an unexpected redirect.` },
-      allowedOrigins,
-    );
-    return;
-  }
-
-  response.writeHead(upstreamResponse.status, buildProxyResponseHeaders(request, upstreamResponse, allowedOrigins));
-
-  if (!upstreamResponse.body) {
-    request.off('aborted', abortUpstream);
-    response.off('close', handleClientClose);
-    response.end();
-    return;
-  }
-
-  try {
-    await pipeline(Readable.fromWeb(upstreamResponse.body as unknown as NodeReadableStream), response);
-  } catch (pipelineError) {
-    if (!abortController.signal.aborted && !response.destroyed) {
-      response.destroy(pipelineError instanceof Error ? pipelineError : undefined);
+    try {
+      response.writeHead(upstreamResponse.status, buildProxyResponseHeaders(request, upstreamResponse, allowedOrigins));
+      if (!upstreamResponse.body) {
+        response.end();
+        return;
+      }
+      const source = Readable.fromWeb(upstreamResponse.body as unknown as NodeReadableStream);
+      source.on('data', () => idleTimer.refresh());
+      await pipeline(source, response, { signal: abortController.signal });
+    } catch (pipelineError) {
+      if (!abortController.signal.aborted && !response.destroyed) {
+        response.destroy(pipelineError instanceof Error ? pipelineError : undefined);
+      }
     }
   } finally {
-    request.off('aborted', abortUpstream);
-    response.off('close', handleClientClose);
+    cleanup();
   }
 }

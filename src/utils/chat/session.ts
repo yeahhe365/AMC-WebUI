@@ -5,6 +5,7 @@ import {
   type PersistedSessionFileRecord,
   type UploadedFile,
 } from '@/types';
+import { mapMessageFiles } from './messageVariants';
 import { generateUniqueId } from './ids';
 import { base64ToBlob, blobToBase64 } from '@/utils/file/fileEncoding';
 import { getVisibleChatMessages } from './visibility';
@@ -56,28 +57,32 @@ export const createNewSession = (
 });
 
 export const cloneMessagesWithFreshIds = (messages: ChatMessage[]): ChatMessage[] => {
-  const idMap = new Map<string, string>();
-  const clonedMessages = messages.map((message) => {
-    const nextMessageId = generateUniqueId();
-    idMap.set(message.id, nextMessageId);
-
-    return {
-      ...message,
-      id: nextMessageId,
-      files: message.files?.map((file) => ({
-        ...file,
-        id: generateUniqueId(),
-      })),
-      isLoading: false,
-      generationStartTime: undefined,
-      generationEndTime: undefined,
-    };
-  });
-
-  return clonedMessages.map((message) => ({
+  const messageIds = new Map<string, string>();
+  const fileIds = new Map<string, string>();
+  const freshId = (ids: Map<string, string>, id: string) => {
+    let nextId = ids.get(id);
+    if (!nextId) {
+      nextId = generateUniqueId();
+      ids.set(id, nextId);
+    }
+    return nextId;
+  };
+  const clone = (message: ChatMessage): ChatMessage => ({
     ...message,
-    toolParentMessageId: message.toolParentMessageId ? idMap.get(message.toolParentMessageId) : undefined,
-  }));
+    id: freshId(messageIds, message.id),
+    files: message.files?.map((file) => ({ ...file, id: freshId(fileIds, file.id) })),
+    ...(message.variants ? { variants: message.variants.map(clone) } : {}),
+    isLoading: false,
+    generationStartTime: undefined,
+    generationEndTime: undefined,
+  });
+  const cloned = messages.map(clone);
+  const remapParent = (message: ChatMessage): ChatMessage => ({
+    ...message,
+    toolParentMessageId: message.toolParentMessageId ? messageIds.get(message.toolParentMessageId) : undefined,
+    ...(message.variants ? { variants: message.variants.map(remapParent) } : {}),
+  });
+  return cloned.map(remapParent);
 };
 
 const TITLE_MAX_WORDS = 7;
@@ -123,59 +128,57 @@ export const rehydrateSessionFiles = (session: SavedChatSession): SavedChatSessi
   const sessionResourceOwner = `session:${session.id}`;
   releaseManagedObjectUrlsByOwner(sessionResourceOwner);
 
-  const newMessages = session.messages.map((message) => {
-    if (!message.files?.length) return message;
+  const newMessages = session.messages.map((root) =>
+    mapMessageFiles(root, (files, message) => {
+      return files.map((file) => {
+        // Migrate inline base64 dataUrl values into managed blob URLs.
+        // dataUrl values that are not blob/http are treated as inline base64 payloads.
+        if (file.dataUrl && !file.dataUrl.startsWith('blob:') && !file.dataUrl.startsWith('http')) {
+          // Convert base64 payloads to Blob objects to keep preview memory bounded.
+          try {
+            // Strip optional data URL prefix if present (data:image/png;base64,...).
+            const base64Clean = file.dataUrl.includes(',') ? file.dataUrl.split(',')[1] : file.dataUrl;
+            const blob = base64ToBlob(base64Clean, file.type);
+            const newFile = new File([blob], file.name, { type: file.type });
+            const newUrl = createManagedObjectUrl(newFile, {
+              key: `session-file:${session.id}:${message.id}:${file.id}`,
+              ownerId: sessionResourceOwner,
+            });
 
-    const newFiles = message.files.map((file) => {
-      // Migrate inline base64 dataUrl values into managed blob URLs.
-      // dataUrl values that are not blob/http are treated as inline base64 payloads.
-      if (file.dataUrl && !file.dataUrl.startsWith('blob:') && !file.dataUrl.startsWith('http')) {
-        // Convert base64 payloads to Blob objects to keep preview memory bounded.
-        try {
-          // Strip optional data URL prefix if present (data:image/png;base64,...).
-          const base64Clean = file.dataUrl.includes(',') ? file.dataUrl.split(',')[1] : file.dataUrl;
-          const blob = base64ToBlob(base64Clean, file.type);
-          const newFile = new File([blob], file.name, { type: file.type });
-          const newUrl = createManagedObjectUrl(newFile, {
-            key: `session-file:${session.id}:${message.id}:${file.id}`,
-            ownerId: sessionResourceOwner,
-          });
-
-          return { ...file, rawFile: newFile, dataUrl: newUrl };
-        } catch {
-          logSessionWarning(`Failed to migrate legacy Base64 file: ${file.name}`);
-          // Keep the original payload when migration fails so existing sessions remain readable.
+            return { ...file, rawFile: newFile, dataUrl: newUrl };
+          } catch {
+            logSessionWarning(`Failed to migrate legacy Base64 file: ${file.name}`);
+            // Keep the original payload when migration fails so existing sessions remain readable.
+          }
         }
-      }
 
-      // Rehydrate previews from IndexedDB Blob records.
-      const isValidRawFile = file.rawFile instanceof Blob;
+        // Rehydrate previews from IndexedDB Blob records.
+        const isValidRawFile = file.rawFile instanceof Blob;
 
-      // Blob-backed files need fresh object URLs for previews after reload.
-      if (isValidRawFile) {
-        try {
-          // Managed object URLs keep preview cleanup tied to the session owner.
-          const dataUrl = createManagedObjectUrl(file.rawFile as Blob, {
-            key: `session-file:${session.id}:${message.id}:${file.id}`,
-            ownerId: sessionResourceOwner,
-          });
-          return { ...file, dataUrl };
-        } catch (objectUrlError) {
-          logSessionError('Failed to create object URL for file on load', { fileId: file.id, error: objectUrlError });
-          return { ...file, dataUrl: undefined, error: 'Preview failed to load' };
+        // Blob-backed files need fresh object URLs for previews after reload.
+        if (isValidRawFile) {
+          try {
+            // Managed object URLs keep preview cleanup tied to the session owner.
+            const dataUrl = createManagedObjectUrl(file.rawFile as Blob, {
+              key: `session-file:${session.id}:${message.id}:${file.id}`,
+              ownerId: sessionResourceOwner,
+            });
+            return { ...file, dataUrl };
+          } catch (objectUrlError) {
+            logSessionError('Failed to create object URL for file on load', { fileId: file.id, error: objectUrlError });
+            return { ...file, dataUrl: undefined, error: 'Preview failed to load' };
+          }
+        } else if (file.rawFile && !isValidRawFile) {
+          // It has a rawFile property but it's not a Blob (e.g. {} from JSON or bad persistence). Strip it.
+          const fileWithoutRaw = { ...file };
+          delete fileWithoutRaw.rawFile;
+          return fileWithoutRaw;
         }
-      } else if (file.rawFile && !isValidRawFile) {
-        // It has a rawFile property but it's not a Blob (e.g. {} from JSON or bad persistence). Strip it.
-        const fileWithoutRaw = { ...file };
-        delete fileWithoutRaw.rawFile;
-        return fileWithoutRaw;
-      }
 
-      return file;
-    });
-
-    return { ...message, files: newFiles };
-  });
+        return file;
+      });
+    }),
+  );
 
   return { ...session, messages: newMessages };
 };
@@ -198,7 +201,7 @@ const sanitizeStoredFileMetadata = (file: UploadedFile): UploadedFile => {
 export const extractPersistedSessionFileRecords = (session: SavedChatSession): PersistedSessionFileRecord[] => {
   const records: PersistedSessionFileRecord[] = [];
 
-  session.messages.forEach((message) => {
+  const visit = (message: ChatMessage) => {
     message.files?.forEach((file) => {
       let rawFile: Blob | undefined;
 
@@ -228,23 +231,20 @@ export const extractPersistedSessionFileRecords = (session: SavedChatSession): P
         rawFile,
       });
     });
-  });
+    message.variants?.forEach(visit);
+  };
+  session.messages.forEach(visit);
 
-  return records;
+  // Active replies and their snapshots commonly share the same attachment id.
+  // Keep the active payload first and avoid writing duplicate file records.
+  return [...new Map(records.reverse().map((record) => [record.id, record])).values()];
 };
 
 export const stripSessionFilePayloads = (session: SavedChatSession): SavedChatSession => ({
   ...session,
-  messages: session.messages.map((message) => {
-    if (!message.files) {
-      return message;
-    }
-
-    return {
-      ...message,
-      files: message.files.map(sanitizeStoredFileMetadata),
-    };
-  }),
+  messages: session.messages.map((message) =>
+    mapMessageFiles(message, (files) => files.map(sanitizeStoredFileMetadata)),
+  ),
 });
 
 export const attachPersistedSessionFiles = (
@@ -252,26 +252,14 @@ export const attachPersistedSessionFiles = (
   fileRecords: Map<string, PersistedSessionFileRecord>,
 ): SavedChatSession => ({
   ...session,
-  messages: session.messages.map((message) => {
-    if (!message.files) {
-      return message;
-    }
-
-    return {
-      ...message,
-      files: message.files.map((file) => {
+  messages: session.messages.map((message) =>
+    mapMessageFiles(message, (files) =>
+      files.map((file) => {
         const record = fileRecords.get(file.id);
-        if (!record) {
-          return file;
-        }
-
-        return {
-          ...file,
-          rawFile: record.rawFile,
-        };
+        return record ? { ...file, rawFile: record.rawFile } : file;
       }),
-    };
-  }),
+    ),
+  ),
 });
 
 const buildPortableDataUrl = async (file: UploadedFile): Promise<string | undefined> => {
@@ -308,6 +296,7 @@ export const serializeSessionForPortableExport = async (session: SavedChatSessio
 export const serializeMessageForPortableExport = async (message: ChatMessage): Promise<ChatMessage> => ({
   ...message,
   files: message.files ? await Promise.all(message.files.map(serializeFileForPortableExport)) : undefined,
+  ...(message.variants ? { variants: await Promise.all(message.variants.map(serializeMessageForPortableExport)) } : {}),
 });
 
 /**

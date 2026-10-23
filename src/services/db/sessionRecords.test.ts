@@ -183,6 +183,23 @@ describe('sessionRecords.deleteFilesFromSessions', () => {
     expect(mockEmbeddings['f-2']).toBeUndefined();
   });
 
+  it('removes deleted attachments from inactive variants without changing other variant files', async () => {
+    const original = mockSessions['session-1'].messages[0];
+    mockSessions['session-1'].messages = [
+      {
+        ...original,
+        id: 'current',
+        files: undefined,
+        variants: [{ ...original, id: 'old' }],
+        currentVariantIndex: 0,
+      },
+    ];
+    await deleteFilesFromSessions(['f-1']);
+    expect(mockSessions['session-1'].messages[0].variants?.[0].files?.map(({ id }) => id)).toEqual(['f-2']);
+    expect(mockFiles['f-1']).toBeUndefined();
+    expect(mockFiles['f-2']).toBeDefined();
+  });
+
   it('bails out early if fileIds is empty', async () => {
     await deleteFilesFromSessions([]);
     expect(mockFiles['f-1']).toBeDefined();

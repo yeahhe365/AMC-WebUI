@@ -83,26 +83,29 @@ class ObjectUrlManager {
     this.revokeObjectUrl(url);
   }
 
-  releaseOwner(ownerId: string): void {
-    const ownerUrls = this.urlsByOwner.get(ownerId);
-    if (!ownerUrls) {
-      return;
-    }
-
-    const urls = [...ownerUrls];
+  /** Release acquisitions recorded for this owner, independent of the current
+   * message/variant tree. Fallback upload URLs are deduplicated and must not
+   * release references held by another owner.
+   */
+  releaseOwner(ownerId: string, unownedUrls: Iterable<string> = []): void {
+    const ownerUrls = new Set(this.urlsByOwner.get(ownerId));
     this.urlsByOwner.delete(ownerId);
 
-    urls.forEach((url) => {
+    ownerUrls.forEach((url) => {
       const entry = this.entries.get(url);
-      const ownerRefs = entry?.owners.get(ownerId) ?? 1;
-      if (entry) {
-        entry.owners.delete(ownerId);
-      }
-
+      if (!entry) return;
+      const ownerRefs = entry.owners.get(ownerId) ?? 0;
+      entry.owners.delete(ownerId);
       for (let refIndex = 0; refIndex < ownerRefs; refIndex += 1) {
         this.release(url);
       }
     });
+
+    for (const url of new Set(unownedUrls)) {
+      if (!ownerUrls.has(url) && !this.entries.get(url)?.owners.size) {
+        this.release(url);
+      }
+    }
   }
 
   has(url: string): boolean {
@@ -141,4 +144,5 @@ export const createManagedObjectUrl = (blob: Blob, options?: AcquireObjectUrlOpt
 
 export const releaseManagedObjectUrl = (url: string | null | undefined): void => objectUrlManager.release(url);
 
-export const releaseManagedObjectUrlsByOwner = (ownerId: string): void => objectUrlManager.releaseOwner(ownerId);
+export const releaseManagedObjectUrlsByOwner = (ownerId: string, unownedUrls?: Iterable<string>): void =>
+  objectUrlManager.releaseOwner(ownerId, unownedUrls);

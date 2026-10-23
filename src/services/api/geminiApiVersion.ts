@@ -2,7 +2,7 @@ import type { HttpOptions, Part } from '@google/genai';
 
 export type GeminiClientHttpOptions = Pick<HttpOptions, 'apiVersion' | 'baseUrl' | 'headers' | 'timeout'>;
 
-export const GEMINI_4_ARGON_REQUEST_TIMEOUT_MS = 20 * 60 * 1000;
+const GEMINI_4_ARGON_REQUEST_TIMEOUT_MS = 20 * 60 * 1000;
 
 export const getModelRequestTimeoutMs = (modelId: string): number | undefined =>
   modelId.toLowerCase().includes('gemini-4-argon') ? GEMINI_4_ARGON_REQUEST_TIMEOUT_MS : undefined;

@@ -16,6 +16,9 @@ const SESSION_LOADING_STALE_CHECK_MS = 30_000;
 interface ChatSyncStore {
   getState: () => {
     activeSessionId: string | null;
+    activeMessages?: SavedChatSession['messages'];
+    beginSessionContentLoad?: () => number;
+    getSessionLoadVersion?: () => number;
     refreshSessions: () => Promise<void>;
     refreshGroups: () => Promise<void>;
     setActiveMessages: (messages: SavedChatSession['messages']) => void;
@@ -59,6 +62,8 @@ export function setupChatStoreSync({
   }
 
   let isDirty = false;
+  let contentLoadVersion = 0;
+  let disposed = false;
   const channel = getChannel();
 
   const clearStaleRemoteLoading = () => {
@@ -113,10 +118,24 @@ export function setupChatStoreSync({
           return;
         }
 
-        const { activeSessionId } = store.getState();
+        const stateAtStart = store.getState();
+        const { activeSessionId } = stateAtStart;
+        const requestVersion = ++contentLoadVersion;
+        const initialActiveMessages = stateAtStart.activeMessages;
         if (syncMessage.sessionId === activeSessionId) {
+          const sessionLoadVersion = stateAtStart.beginSessionContentLoad?.() ?? stateAtStart.getSessionLoadVersion?.();
           getSession(syncMessage.sessionId)
             .then((session) => {
+              const current = store.getState();
+              if (
+                disposed ||
+                requestVersion !== contentLoadVersion ||
+                current.activeSessionId !== syncMessage.sessionId ||
+                localLoadingSessionIds.has(syncMessage.sessionId) ||
+                current.activeMessages !== initialActiveMessages ||
+                current.getSessionLoadVersion?.() !== sessionLoadVersion
+              )
+                return;
               if (session) {
                 const rehydrated = rehydrateSession(session);
                 store.getState().setActiveMessages(rehydrated.messages);
@@ -215,6 +234,7 @@ export function setupChatStoreSync({
   resolvedDocument.addEventListener('visibilitychange', handleVisibilityChange);
 
   return () => {
+    disposed = true;
     channel.removeEventListener('message', handleMessage);
     resolvedDocument.removeEventListener('visibilitychange', handleVisibilityChange);
     if (staleCheckTimer !== null) {

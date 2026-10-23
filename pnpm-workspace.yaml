@@ -1,6 +1,10 @@
 packages:
   - '.'
   - 'docs-site'
+  - 'server'
+
+# pnpm deploy derives a frozen, isolated runtime graph from the shared lockfile.
+injectWorkspacePackages: true
 
 allowBuilds:
   '@google/genai': true
@@ -18,7 +22,7 @@ minimumReleaseAgeExclude:
 # fast-uri 上限锁在 ^3：唯一消费方 ajv@8 声明 ^3，强制 4.x 会破坏其依赖声明。
 overrides:
   argparse: ^2.0.1
-  dompurify: 3.4.16
+  dompurify: 3.4.17
   brace-expansion@>=2.0.0 <2.1.7: ^2.1.7
   brace-expansion@>=4.0.0 <5.0.12: ^5.0.12
   devalue: ^5.9.3
@@ -41,4 +45,4 @@ overrides:
   pdfjs-dist: 4.8.69
   qs: ^6.16.0
   '@xmldom/xmldom': ^0.8.15
-  hono: ^4.13.5
+  hono: ^4.13.11

@@ -7,6 +7,7 @@ import {
 import { EMBEDDINGS_STORE, FILES_STORE, KEY_VALUE_STORE, SESSIONS_STORE, SESSION_METADATA_STORE } from './dbSchema';
 import { getAll, getDb, getItem, transactionToPromise, withWriteLock } from './indexedDbAccess';
 import { getDraftFilesKey } from './draftFileRecords';
+import { mapMessageFiles } from '@/utils/chat/messageVariants';
 import { releaseManagedObjectUrlsByOwner } from '@/services/objectUrlManager';
 
 const getSessionFileRecords = async (sessionId: string): Promise<PersistedSessionFileRecord[]> => {
@@ -174,6 +175,7 @@ export const setAllSessions = async (sessions: SavedChatSession[]): Promise<void
 export const deleteSession = async (id: string): Promise<void> => {
   return withWriteLock(async () => {
     releaseManagedObjectUrlsByOwner(`draft:${id}`);
+    releaseManagedObjectUrlsByOwner(`session:${id}`);
     const db = await getDb();
     const hasEmbeddings = db.objectStoreNames.contains(EMBEDDINGS_STORE);
     const hasMetadata = db.objectStoreNames.contains(SESSION_METADATA_STORE);
@@ -371,16 +373,13 @@ export const deleteFilesFromSessions = async (fileIds: string[]): Promise<void> 
         const session = cursor.value as SavedChatSession;
         if (session.messages && session.messages.length > 0) {
           let sessionChanged = false;
-          const updatedMessages = session.messages.map((msg) => {
-            if (msg.files && msg.files.some((file) => targetIds.has(file.id))) {
-              sessionChanged = true;
-              const remainingFiles = msg.files.filter((file) => !targetIds.has(file.id));
-              return {
-                ...msg,
-                files: remainingFiles.length > 0 ? remainingFiles : undefined,
-              };
-            }
-            return msg;
+          const updatedMessages = session.messages.map((message) => {
+            const updated = mapMessageFiles(message, (files) => {
+              const remaining = files.filter((file) => !targetIds.has(file.id));
+              return remaining.length === files.length ? files : remaining.length > 0 ? remaining : undefined;
+            });
+            if (updated !== message) sessionChanged = true;
+            return updated;
           });
 
           if (sessionChanged) {

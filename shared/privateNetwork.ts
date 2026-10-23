@@ -1,55 +1,62 @@
 import net from 'node:net';
 
 const isPrivateIpv4 = (ip: string): boolean => {
-  const [first, second] = ip.split('.').map((part) => Number(part));
+  const [first, second, third, fourth] = ip.split('.').map(Number);
   return (
+    first === 0 ||
     first === 10 ||
     first === 127 ||
+    first >= 224 ||
+    (first === 100 && second >= 64 && second <= 127) ||
+    (first === 169 && second === 254) ||
     (first === 172 && second >= 16 && second <= 31) ||
     (first === 192 && second === 168) ||
-    (first === 169 && second === 254) ||
-    first === 0 ||
-    // Carrier-grade NAT (RFC 6598) — reachable on many networks and must be treated as private.
-    (first === 100 && second >= 64 && second <= 127) ||
-    // Note: 198.18.0.0/15 (RFC 2544 benchmark range) is intentionally excluded from private IPs
-    // because TUN mode proxy clients (Clash, Surge, Mihomo, Sing-box) use it as the Fake-IP DNS pool.
-    // Documentation ranges (RFC 5737) — not private per se, but not real upstreams.
-    (first === 192 && second === 0 && Number(ip.split('.')[2]) === 2) ||
-    (first === 203 && second === 0 && Number(ip.split('.')[2]) === 113)
+    (first === 192 && second === 0 && third === 0 && fourth !== 9 && fourth !== 10) ||
+    (first === 192 && second === 0 && third === 2) ||
+    (first === 192 && second === 88 && third === 99) ||
+    (first === 198 && second === 51 && third === 100) ||
+    (first === 203 && second === 0 && third === 113)
+    // 198.18.0.0/15 intentionally remains allowed: supported TUN clients
+    // (Clash, Surge, Mihomo, Sing-box) use it as their Fake-IP DNS pool.
   );
 };
 
-// Extract the embedded IPv4 from an IPv4-mapped IPv6 address like "::ffff:127.0.0.1".
-const extractMappedIpv4 = (lower: string): string | null => {
-  const match = lower.match(/::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
-  return match ? match[1] : null;
-};
+/** Expand a valid IPv6 literal after URL canonicalization, including mapped IPv4. */
+function ipv6Words(address: string): number[] {
+  const canonical = new URL(`http://[${address}]/`).hostname.slice(1, -1);
+  const [left, right] = canonical.split('::');
+  const head = left ? left.split(':') : [];
+  const tail = right ? right.split(':') : [];
+  const words =
+    right === undefined ? head : [...head, ...Array<string>(8 - head.length - tail.length).fill('0'), ...tail];
+  return words.map((word) => parseInt(word, 16));
+}
 
-/**
- * True when the hostname must not be contacted by SSRF-sensitive proxies
- * (image proxy, MCP HTTP, etc.). Shared by the production API server and the
- * Vite dev plugin so both enforce the same rules.
- */
+/** Shared SSRF address policy. Non-global addresses are blocked, except the
+ * documented IPv4 Fake-IP compatibility range above. */
 export const isPrivateNetworkHostname = (hostname: string): boolean => {
-  const normalizedHostname = hostname.replace(/^\[|\]$/g, '');
-  const ipVersion = net.isIP(normalizedHostname);
-
-  if (ipVersion === 4) {
-    return isPrivateIpv4(normalizedHostname);
-  }
-
-  if (ipVersion === 6) {
-    const lower = normalizedHostname.toLowerCase();
-    // IPv4-mapped IPv6 addresses bypass the IPv6 private checks below — normalize and re-check.
-    const mappedIpv4 = extractMappedIpv4(lower);
-    if (mappedIpv4 && net.isIP(mappedIpv4) === 4) {
-      return isPrivateIpv4(mappedIpv4);
+  const normalized = hostname
+    .replace(/^\[|\]$/g, '')
+    .toLowerCase()
+    .replace(/\.$/, '');
+  const version = net.isIP(normalized);
+  if (version === 4) return isPrivateIpv4(normalized);
+  if (version === 6) {
+    // Zone identifiers select local interfaces and are never public targets.
+    if (normalized.includes('%')) return true;
+    const words = ipv6Words(normalized);
+    if (words.slice(0, 5).every((word) => word === 0) && words[5] === 0xffff) {
+      return isPrivateIpv4(`${words[6] >>> 8}.${words[6] & 255}.${words[7] >>> 8}.${words[7] & 255}`);
     }
-    // IPv6 link-local is fe80::/10 (fe80 through febf). ULA is fc00::/7 (fc, fd).
-    const firstBlock = parseInt(lower.split(':')[0], 16);
-    const isLinkLocal = firstBlock >= 0xfe80 && firstBlock <= 0xfebf;
-    return lower === '::1' || lower.startsWith('fc') || lower.startsWith('fd') || isLinkLocal;
+    // Global unicast is 2000::/3. Exclude special-use assignments and
+    // transition ranges that can embed an otherwise forbidden IPv4 target.
+    return (
+      (words[0] & 0xe000) !== 0x2000 ||
+      (words[0] === 0x2001 && words[1] < 0x0200) ||
+      (words[0] === 0x2001 && words[1] === 0x0db8) ||
+      words[0] === 0x2002 ||
+      (words[0] === 0x3fff && words[1] < 0x1000)
+    );
   }
-
-  return ['localhost', 'localhost.localdomain'].includes(normalizedHostname.toLowerCase());
+  return normalized === 'localhost' || normalized.endsWith('.localhost') || normalized === 'localhost.localdomain';
 };

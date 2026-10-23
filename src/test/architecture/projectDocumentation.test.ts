@@ -61,7 +61,7 @@ describe('project documentation structure', () => {
   it('does not serve the SPA shell for missing hashed assets', () => {
     const webServerSource = readProjectFile('docker/web-server.js');
 
-    expect(webServerSource).toMatch(/path\.extname\(pathname\)\s*===\s*''/);
+    expect(webServerSource).toMatch(/path\.extname\(pathname\)\s*!==\s*''/);
     expect(webServerSource).toMatch(/writeHead\(404\)/);
   });
 

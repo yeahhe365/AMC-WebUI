@@ -1,6 +1,6 @@
 import { type LibraryItem, type PersistedSessionFileRecord, type SavedChatSession } from '@/types';
-import { getKeyValue, setKeyValue, getItem, getAll, putMany, deleteMany } from './indexedDbAccess';
-import { FILES_STORE, SESSIONS_STORE } from './dbSchema';
+import { getKeyValue, getItem, getAll, getDb, transactionToPromise, withWriteLock } from './indexedDbAccess';
+import { FILES_STORE, KEY_VALUE_STORE, SESSIONS_STORE } from './dbSchema';
 import { extractLibraryItemsFromSessions } from '@/utils/library/libraryFiles';
 import { base64ToBlob } from '@/utils/file/fileEncoding';
 import { removeStoredEmbeddings, updateStoredEmbeddingName } from '@/services/embedding/multimodalIndexStore';
@@ -14,10 +14,19 @@ export const getDeletedLibraryFileIds = async (): Promise<string[]> => {
 };
 
 export const addDeletedLibraryFileIds = async (newIds: string[]): Promise<void> => {
-  const current = await getDeletedLibraryFileIds();
-  const idSet = new Set(current);
-  newIds.forEach((id) => idSet.add(id));
-  await setKeyValue(DELETED_LIBRARY_FILES_STORAGE_KEY, Array.from(idSet));
+  await withWriteLock(async () => {
+    const db = await getDb();
+    const tx = db.transaction(KEY_VALUE_STORE, 'readwrite');
+    const done = transactionToPromise(tx);
+    const store = tx.objectStore(KEY_VALUE_STORE);
+    const request = store.get(DELETED_LIBRARY_FILES_STORAGE_KEY);
+    request.onsuccess = () => {
+      const idSet = new Set<string>(Array.isArray(request.result) ? request.result : []);
+      newIds.forEach((id) => idSet.add(id));
+      store.put(Array.from(idSet), DELETED_LIBRARY_FILES_STORAGE_KEY);
+    };
+    await done;
+  });
 };
 
 export const getStandaloneLibraryFiles = async (): Promise<LibraryItem[]> => {
@@ -41,55 +50,78 @@ export const getStandaloneLibraryFile = async (id: string): Promise<LibraryItem 
   return items.find((item) => item?.id === id);
 };
 
-/**
- * Mirrors standalone payloads into FILES_STORE keyed by item id.
- *
- * Standalone metadata all lives in one key-value array, so resolving a payload
- * through it is O(library size) per lookup. FILES_STORE is keyed by id, which
- * gives the indexer (and the UI's lazy preview loader) an O(1) path without
- * changing the legacy array format.
+/** Keep the legacy metadata array and id-keyed payload mirror in one transaction.
+ * The read must share the write transaction even in browsers without Web Locks.
+ * Queue writes in the request callback so the transaction cannot auto-commit.
  */
-const mirrorStandalonePayloads = async (files: LibraryItem[]): Promise<void> => {
-  await putMany(
-    FILES_STORE,
-    files
-      .filter((file) => file?.id && file.rawFile instanceof Blob)
-      .map((file) => ({
-        id: file.id,
-        sessionId: file.sessionId,
-        messageId: file.messageId,
-        name: file.name,
-        type: file.type,
-        rawFile: file.rawFile,
-      })),
-  );
-};
+const updateStandaloneFiles = async (
+  update: (files: LibraryItem[]) => LibraryItem[],
+  deletedIds: string[] = [],
+  rename?: { id: string; name: string },
+): Promise<void> =>
+  withWriteLock(async () => {
+    const db = await getDb();
+    const tx = db.transaction([KEY_VALUE_STORE, FILES_STORE], 'readwrite');
+    const done = transactionToPromise(tx);
+    const metadataStore = tx.objectStore(KEY_VALUE_STORE);
+    const fileStore = tx.objectStore(FILES_STORE);
+    const request = metadataStore.get(STANDALONE_LIBRARY_STORAGE_KEY);
+    request.onsuccess = () => {
+      const files = update(Array.isArray(request.result) ? request.result : []);
+      metadataStore.put(files, STANDALONE_LIBRARY_STORAGE_KEY);
+      files.forEach((file) => {
+        if (file?.id && file.rawFile instanceof Blob) {
+          fileStore.put({
+            id: file.id,
+            sessionId: file.sessionId,
+            messageId: file.messageId,
+            name: file.name,
+            type: file.type,
+            rawFile: file.rawFile,
+          });
+        }
+      });
+      if (rename && files.some((file) => file.id === rename.id)) {
+        const payload = fileStore.get(rename.id);
+        payload.onsuccess = () => {
+          if (payload.result) fileStore.put({ ...payload.result, name: rename.name });
+        };
+      }
+      deletedIds.forEach((id) => fileStore.delete(id));
+    };
+    await done;
+  });
 
 export const saveStandaloneLibraryFiles = async (files: LibraryItem[]): Promise<void> => {
-  await setKeyValue(STANDALONE_LIBRARY_STORAGE_KEY, files);
-  await mirrorStandalonePayloads(files);
+  await updateStandaloneFiles(() => files);
 };
 
 export const addStandaloneLibraryFiles = async (newFiles: LibraryItem[]): Promise<void> => {
-  const current = await getStandaloneLibraryFiles();
-  const existingIds = new Set(current.map((item) => item.id));
-  const merged = [...newFiles.filter((item) => !existingIds.has(item.id)), ...current];
-  await saveStandaloneLibraryFiles(merged);
+  await updateStandaloneFiles((current) => {
+    const existingIds = new Set(current.map((item) => item.id));
+    return [
+      ...newFiles.filter((item) => {
+        if (existingIds.has(item.id)) return false;
+        existingIds.add(item.id);
+        return true;
+      }),
+      ...current,
+    ];
+  });
 };
 
 export const deleteStandaloneLibraryFiles = async (ids: string[]): Promise<void> => {
-  const current = await getStandaloneLibraryFiles();
   const idSet = new Set(ids);
-  const remaining = current.filter((item) => !idSet.has(item.id));
-  await setKeyValue(STANDALONE_LIBRARY_STORAGE_KEY, remaining);
-  await deleteMany(FILES_STORE, ids);
+  await updateStandaloneFiles((current) => current.filter((item) => !idSet.has(item.id)), ids);
   await removeStoredEmbeddings(ids).catch(() => {});
 };
 
 export const renameStandaloneLibraryFile = async (id: string, newName: string): Promise<void> => {
-  const current = await getStandaloneLibraryFiles();
-  const updated = current.map((item) => (item.id === id ? { ...item, name: newName } : item));
-  await saveStandaloneLibraryFiles(updated);
+  await updateStandaloneFiles(
+    (current) => current.map((item) => (item.id === id ? { ...item, name: newName } : item)),
+    [],
+    { id, name: newName },
+  );
   await updateStoredEmbeddingName(id, newName).catch(() => {});
 };
 

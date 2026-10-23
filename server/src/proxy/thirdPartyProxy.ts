@@ -10,6 +10,7 @@ import { forwardUpstream, guardPublicHttpsUrl } from './proxyForward.js';
 import { runDetachedUpstream, maybeStreamWithSharedJob, type StreamJob } from '../stream-jobs/streamJobStore.js';
 import { copyProxyRequestHeaders } from './proxyHeaders.js';
 import { resolveApiKeyPrecedence } from './apiKeyPrecedence.js';
+import { createConnectionSafeFetch } from '../../../shared/connectionSafeFetch.js';
 
 export const OPENAI_PROXY_PREFIX = '/api/openai';
 
@@ -187,11 +188,10 @@ export async function proxyThirdPartyRequest(
 
   // SSRF guard: only allow https + non-private hosts from the route table
   // (unless enablePrivateHttp is enabled, e.g. for local Ollama/vLLM endpoints).
-  // Embedded credentials are NOT rejected here — this path has never checked
-  // them, so the shared guard's credential check stays off to preserve the
-  // behavior exactly (the Gemini override header does enable it).
+  // Credentials belong in headers; URL userinfo is never forwarded.
   const upstreamGuard = guardPublicHttpsUrl(upstreamUrl, {
     allowPrivateHttp: config.enablePrivateHttp,
+    rejectEmbeddedCredentials: true,
   });
   if (!upstreamGuard.ok) {
     const detail =
@@ -206,6 +206,8 @@ export async function proxyThirdPartyRequest(
     return;
   }
 
+  const safeFetch = createConnectionSafeFetch(fetchImpl, { allowPrivate: config.enablePrivateHttp });
+
   // Stream journal: when the browser sends an x-amc-job-id header on a
   // streaming request, the upstream is buffered independently of the browser
   // connection so a page refresh can resume from the last seq — exactly like
@@ -216,7 +218,7 @@ export async function proxyThirdPartyRequest(
   // blocks all split cleanly on \n\n and buffer as whole events.
   if (
     await maybeStreamWithSharedJob(request, response, { allowedOrigins: config.allowedOrigins }, (job) => {
-      void runThirdPartyUpstream(job, request, upstreamUrl, route, resolved.providerId, fetchImpl);
+      void runThirdPartyUpstream(job, request, upstreamUrl, route, resolved.providerId, safeFetch);
     })
   ) {
     return;
@@ -225,7 +227,7 @@ export async function proxyThirdPartyRequest(
   await forwardUpstream(request, response, {
     upstreamUrl,
     allowedOrigins: config.allowedOrigins,
-    fetchImpl,
+    fetchImpl: safeFetch,
     buildHeaders: () => buildProxyHeaders(request, route, resolved.providerId),
     logTag: '[third-party]',
     errorLabel: 'Third-party',

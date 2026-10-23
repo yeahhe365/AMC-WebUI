@@ -10,6 +10,7 @@ import {
 import { dbService } from '@/services/db/dbService';
 import { DEFAULT_CHAT_SETTINGS } from '@/constants/settingsDefaults';
 import { logService } from '@/services/logService';
+import { mapMessageFiles } from '@/utils/chat/messageVariants';
 import { rehydrateSessionFiles } from '@/utils/chat/session';
 import { syncActiveSessionRoute, type SessionHistoryMode } from '@/stores/sync/sessionRouteSync';
 import { broadcastSyncMessage } from '@/stores/sync/chatSyncChannel';
@@ -54,6 +55,8 @@ const _fileDrafts: { current: Record<string, UploadedFile[]> } = { current: {} }
 const _localLoadingSessionIds = new Set<string>();
 const _sessionPersistVersion = new Map<string, number>();
 let _fileOperationGeneration = 0;
+let _sessionLoadVersion = 0;
+let _sessionRefreshVersion = 0;
 
 interface ChatState extends ChatUiSliceState {
   savedSessions: SavedChatSession[];
@@ -101,6 +104,8 @@ interface ChatActions extends ChatUiSliceActions {
   appendMessageToSession: (sessionId: string, message: ChatMessage, options?: SessionUpdateOptions) => void;
   appendMessageToActiveSession: (message: ChatMessage, options?: SessionUpdateOptions) => void;
   updateAndPersistGroups: (updater: (prev: ChatGroup[]) => ChatGroup[]) => void;
+  beginSessionContentLoad: () => number;
+  getSessionLoadVersion: () => number;
   refreshSessions: () => Promise<void>;
   refreshGroups: () => Promise<void>;
   setSessionLoading: (sessionId: string, isLoading: boolean) => void;
@@ -151,6 +156,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
 
   setActiveSessionId: (value, options) => {
     const nextValue = resolveUpdaterOrValue(value, get().activeSessionId);
+    if (nextValue !== get().activeSessionId) _sessionLoadVersion += 1;
     set({
       activeSessionId: nextValue,
       ...(nextValue !== get().activeSessionId ? { pendingLockedApiKey: null, pendingChatSettings: null } : {}),
@@ -158,27 +164,50 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     syncActiveSessionRoute(nextValue, options?.history ?? 'auto');
   },
 
-  setActiveMessages: (value) =>
-    set((state) => ({
-      activeMessages: resolveUpdaterOrValue(value, state.activeMessages),
-    })),
+  setActiveMessages: (value) => {
+    set((state) => {
+      const activeMessages = resolveUpdaterOrValue(value, state.activeMessages);
+      if (activeMessages !== state.activeMessages) _sessionLoadVersion += 1;
+      return { activeMessages };
+    });
+  },
+
+  beginSessionContentLoad: () => ++_sessionLoadVersion,
+  getSessionLoadVersion: () => _sessionLoadVersion,
 
   refreshSessions: async () => {
+    const refreshVersion = ++_sessionRefreshVersion;
+    const { activeSessionId, activeMessages } = get();
+    const sessionLoadVersion = get().beginSessionContentLoad();
     try {
       const metadataList = await dbService.getAllSessionMetadata();
-      const { activeSessionId, loadingSessionIds, setActiveMessages, setSavedSessions } = get();
-
+      if (refreshVersion !== _sessionRefreshVersion) return;
       let rehydratedActiveMessages: SavedChatSession['messages'] | undefined;
-      if (activeSessionId && !loadingSessionIds.has(activeSessionId)) {
+      if (
+        activeSessionId &&
+        _sessionLoadVersion === sessionLoadVersion &&
+        !get().loadingSessionIds.has(activeSessionId)
+      ) {
         const fullActiveSession = await dbService.getSession(activeSessionId);
-        if (fullActiveSession) {
+        if (refreshVersion !== _sessionRefreshVersion) return;
+        const current = get();
+        if (
+          fullActiveSession &&
+          current.activeSessionId === activeSessionId &&
+          !current.loadingSessionIds.has(activeSessionId) &&
+          current.activeMessages === activeMessages &&
+          _sessionLoadVersion === sessionLoadVersion
+        ) {
           const rehydrated = rehydrateSessionFiles(sanitizeSessionModel(fullActiveSession));
           rehydratedActiveMessages = rehydrated.messages;
-          setActiveMessages(rehydratedActiveMessages);
+          current.setActiveMessages(rehydratedActiveMessages);
         }
       }
 
-      setSavedSessions((prev) => {
+      // A switch or generation during the read must also change which runtime
+      // sessions are retained when the metadata list is merged.
+      const current = get();
+      current.setSavedSessions((prev) => {
         const adjustedPrev =
           rehydratedActiveMessages && activeSessionId
             ? prev.map((session) =>
@@ -186,8 +215,8 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
               )
             : prev;
         return mergeSessionMetadata(adjustedPrev, metadataList, {
-          activeSessionId,
-          loadingSessionIds,
+          activeSessionId: current.activeSessionId,
+          loadingSessionIds: current.loadingSessionIds,
         });
       });
     } catch (refreshError) {
@@ -205,6 +234,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
   },
 
   setSessionLoading: (sessionId, isLoading) => {
+    if (isLoading && sessionId === get().activeSessionId) _sessionLoadVersion += 1;
     if (isLoading) {
       _localLoadingSessionIds.add(sessionId);
     } else {
@@ -394,16 +424,13 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
     if (activeSessionId) {
       const newActiveSession = newFullSessions.find((session) => session.id === activeSessionId);
       if (newActiveSession && newActiveSession.messages !== activeMessages) {
+        _sessionLoadVersion += 1;
         set({ activeMessages: newActiveSession.messages });
       }
     }
 
+    const { modifiedSessions, deletedSessionIds } = getSessionPersistenceChanges(virtualFullSessions, newFullSessions);
     if (persist) {
-      const { modifiedSessions, deletedSessionIds } = getSessionPersistenceChanges(
-        virtualFullSessions,
-        newFullSessions,
-      );
-
       if (modifiedSessions.length > 0 || deletedSessionIds.length > 0) {
         void persistSessionChanges({
           modifiedSessions,
@@ -426,11 +453,7 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
 
     // 会话被删除后不应残留完成标记(删除通过 updater 里的 filter 完成)。
     // 常见路径(无删除)保持原对象引用,避免无谓重渲染。
-    const completedSessionIds = new Set(
-      virtualFullSessions
-        .map((session) => session.id)
-        .filter((sessionId) => !newFullSessions.some((session) => session.id === sessionId)),
-    );
+    const completedSessionIds = new Set(deletedSessionIds);
     set((state) => ({
       savedSessions: metadataOnly,
       completedSessions:
@@ -499,16 +522,20 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         return file;
       });
 
+      const updateFiles = (files: UploadedFile[]) => {
+        let changed = false;
+        const next = files.map((file) => {
+          if (file.id !== fileId) return file;
+          changed = true;
+          return { ...file, ...patch };
+        });
+        return changed ? next : files;
+      };
       let hasActiveChange = false;
       const nextActiveMessages = state.activeMessages.map((message) => {
-        if (message.files && message.files.some((file) => file.id === fileId)) {
-          hasActiveChange = true;
-          return {
-            ...message,
-            files: message.files.map((file) => (file.id === fileId ? { ...file, ...patch } : file)),
-          };
-        }
-        return message;
+        const updated = mapMessageFiles(message, updateFiles);
+        if (updated !== message) hasActiveChange = true;
+        return updated;
       });
 
       if (hasActiveChange && state.activeSessionId) {
@@ -521,14 +548,9 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
 
         let hasMsgChange = false;
         const nextMessages = session.messages.map((message) => {
-          if (message.files && message.files.some((file) => file.id === fileId)) {
-            hasMsgChange = true;
-            return {
-              ...message,
-              files: message.files.map((file) => (file.id === fileId ? { ...file, ...patch } : file)),
-            };
-          }
-          return message;
+          const updated = mapMessageFiles(message, updateFiles);
+          if (updated !== message) hasMsgChange = true;
+          return updated;
         });
 
         if (hasMsgChange) {
@@ -580,17 +602,15 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
       const nextSelected = state.selectedFiles.filter((file) => !targetSet.has(file.id));
       const hasSelectedChange = nextSelected.length !== state.selectedFiles.length;
 
+      const removeFiles = (files: UploadedFile[]) => {
+        const remaining = files.filter((file) => !targetSet.has(file.id));
+        return remaining.length === files.length ? files : remaining.length > 0 ? remaining : undefined;
+      };
       let hasActiveChange = false;
       const nextActiveMessages = state.activeMessages.map((message) => {
-        if (message.files && message.files.some((file) => targetSet.has(file.id))) {
-          hasActiveChange = true;
-          const remainingFiles = message.files.filter((file) => !targetSet.has(file.id));
-          return {
-            ...message,
-            files: remainingFiles.length > 0 ? remainingFiles : undefined,
-          };
-        }
-        return message;
+        const updated = mapMessageFiles(message, removeFiles);
+        if (updated !== message) hasActiveChange = true;
+        return updated;
       });
 
       let hasSessionChange = false;
@@ -598,15 +618,9 @@ export const useChatStore = create<ChatState & ChatActions>((set, get) => ({
         if (!session.messages || session.messages.length === 0) return session;
         let hasMsgChange = false;
         const nextMessages = session.messages.map((message) => {
-          if (message.files && message.files.some((file) => targetSet.has(file.id))) {
-            hasMsgChange = true;
-            const remainingFiles = message.files.filter((file) => !targetSet.has(file.id));
-            return {
-              ...message,
-              files: remainingFiles.length > 0 ? remainingFiles : undefined,
-            };
-          }
-          return message;
+          const updated = mapMessageFiles(message, removeFiles);
+          if (updated !== message) hasMsgChange = true;
+          return updated;
         });
 
         if (hasMsgChange) {

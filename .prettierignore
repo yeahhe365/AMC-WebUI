@@ -7,6 +7,7 @@ test-results/
 .playwright-visible-demo-profile/
 tmp-live-artifact-demo/
 .worktrees/
+.superpowers/
 .codex-dev-*
 docs-site/.astro/
 docs-site/dist/

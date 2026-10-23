@@ -4,7 +4,21 @@ import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default tseslint.config(
-  { ignores: ['dist/', 'server/dist/', 'node_modules/', '.worktrees/', 'coverage/', 'sw.js', 'docs-site/**'] },
+  {
+    ignores: [
+      'dist/',
+      'server/dist/',
+      'node_modules/',
+      '.worktrees/',
+      '.superpowers/',
+      'coverage/',
+      'playwright-report/',
+      'test-results/',
+      '.playwright-visible-demo-profile/',
+      'sw.js',
+      'docs-site/**',
+    ],
+  },
   {
     extends: [js.configs.recommended],
     files: ['**/*.{js,mjs}'],

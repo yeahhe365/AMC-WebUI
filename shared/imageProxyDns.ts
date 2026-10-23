@@ -18,8 +18,8 @@ const defaultLookup: ImageProxyDnsLookup = (hostname, options) => dns.lookup(hos
  * addresses (DNS rebinding / SSRF). Mirrors the MCP HTTP allowlist in
  * server/src/mcp/mcpHttpSecurity.ts so image-proxy and MCP share the same bar.
  *
- * Note: this is still a TOCTOU check (lookup then fetch); full IP pinning would
- * need a custom agent. Same trade-off as MCP safe fetch.
+ * This preflight gives callers a useful validation error. The fetch path must
+ * also use connectionSafeFetch, which binds the check to its actual socket.
  */
 export async function assertImageProxyHostResolvesPublic(
   url: URL,

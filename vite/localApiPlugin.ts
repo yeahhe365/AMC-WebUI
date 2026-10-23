@@ -1,15 +1,20 @@
 import { Buffer } from 'node:buffer';
 import type { IncomingHttpHeaders } from 'node:http';
 import type { Plugin } from 'vite';
-import { fetchImageProxyWithSafeRedirects, readBoundedResponseBody } from '../shared/imageProxyFetch';
-import { parseAllowedImageProxyUrl } from '../shared/imageProxyUrl';
-import { readMacOsClipboardPng } from '../shared/macosClipboardPng';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { proxyExternalImage, IMAGE_PROXY_PATH } from '../server/src/proxy/imageProxy';
+import {
+  handleLocalClipboardImageRequest,
+  LOCAL_CLIPBOARD_IMAGE_PATH,
+  readMacOsClipboardPng,
+} from '../server/src/clipboardImage';
+import { handleEphemeralTokenRequest, EPHEMERAL_TOKEN_PATH } from '../server/src/security/ephemeralToken';
+import { loadConfig } from '../server/src/config';
+import { readBoundedResponseBody } from '../shared/imageProxyFetch';
 
-const IMAGE_PROXY_PATH = '/api/image-proxy';
-const LOCAL_CLIPBOARD_IMAGE_PATH = '/api/local-clipboard-image';
 const MCP_API_PREFIX = '/api/mcp';
 const DEFAULT_MCP_API_BASE_URL = 'http://127.0.0.1:3001';
-const MAX_IMAGE_PROXY_BYTES = 25 * 1024 * 1024;
+class DevBodyTooLarge extends Error {}
 
 type DevServerRequest = {
   method?: string;
@@ -64,7 +69,7 @@ const readRequestBody = async (request: DevServerRequest): Promise<Blob | undefi
     const blobPart = typeof chunk === 'string' ? chunk : new Uint8Array(chunk);
     totalBytes += typeof blobPart === 'string' ? Buffer.byteLength(blobPart) : blobPart.byteLength;
     if (totalBytes > MAX_DEV_BODY_BYTES) {
-      return undefined;
+      throw new DevBodyTooLarge('MCP request body exceeds 1 MiB.');
     }
     chunks.push(blobPart);
   }
@@ -93,10 +98,15 @@ const proxyMcpApiRequest = async (
   try {
     upstreamResponse = await fetch(upstreamUrl.toString(), {
       method,
+      signal: AbortSignal.timeout(90_000),
       headers: createForwardHeaders(request.headers),
       body: method === 'GET' || method === 'HEAD' ? undefined : await readRequestBody(request),
     });
   } catch (error) {
+    if (error instanceof DevBodyTooLarge) {
+      writeMcpProxyJson(response, 413, { error: error.message });
+      return;
+    }
     const message = error instanceof Error ? error.message : 'Unknown upstream error';
     writeMcpProxyJson(response, 502, { error: `MCP API proxy request failed: ${message}` });
     return;
@@ -107,114 +117,35 @@ const proxyMcpApiRequest = async (
     responseHeaders[name] = value;
   });
 
-  const body = new Uint8Array(await upstreamResponse.arrayBuffer());
+  const body = await readBoundedResponseBody(upstreamResponse, 8 * 1024 * 1024);
+  if (!body) {
+    writeMcpProxyJson(response, 502, { error: 'MCP response exceeds 8 MiB or could not be read.' });
+    return;
+  }
   response.writeHead(upstreamResponse.status, responseHeaders);
   response.end(method === 'HEAD' ? undefined : body);
-};
-
-const proxyImageRequest = async (request: DevServerRequest, response: DevServerResponse) => {
-  const method = request.method ?? 'GET';
-  if (method !== 'GET' && method !== 'HEAD') {
-    writeImageProxyJson(response, 405, { error: 'Method not allowed' });
-    return;
-  }
-
-  const requestUrl = new URL(request.url || '/', 'http://localhost');
-  const targetUrl = parseAllowedImageProxyUrl(requestUrl.searchParams.get('url'));
-  if (!targetUrl) {
-    writeImageProxyJson(response, 400, { error: 'Image proxy URL is not allowed.' });
-    return;
-  }
-
-  // Same redirect / SSRF / DNS-rebinding policy as production server/src/imageProxy.ts.
-  const fetchResult = await fetchImageProxyWithSafeRedirects(targetUrl);
-  if (!fetchResult.ok) {
-    if (fetchResult.kind === 'unsafe_redirect') {
-      writeImageProxyJson(response, 400, { error: 'Image proxy target attempted an unsafe redirect.' });
-      return;
-    }
-    if (fetchResult.kind === 'blocked') {
-      writeImageProxyJson(response, 400, { error: fetchResult.message });
-      return;
-    }
-    const message =
-      fetchResult.kind === 'fetch_error' && fetchResult.error instanceof Error
-        ? fetchResult.error.message
-        : 'Unknown upstream error';
-    writeImageProxyJson(response, 502, { error: `Image proxy request failed: ${message}` });
-    return;
-  }
-
-  const upstreamResponse = fetchResult.response;
-
-  if (!upstreamResponse.ok) {
-    writeImageProxyJson(response, 502, { error: `Image proxy target returned ${upstreamResponse.status}.` });
-    return;
-  }
-
-  const contentType = upstreamResponse.headers.get('content-type')?.split(';')[0].trim().toLowerCase() ?? '';
-  if (!contentType.startsWith('image/')) {
-    writeImageProxyJson(response, 415, { error: 'Image proxy target did not return an image.' });
-    return;
-  }
-
-  const contentLength = Number(upstreamResponse.headers.get('content-length') ?? '0');
-  if (contentLength > MAX_IMAGE_PROXY_BYTES) {
-    writeImageProxyJson(response, 413, { error: 'Image proxy target is too large.' });
-    return;
-  }
-
-  const body = await readBoundedResponseBody(upstreamResponse, MAX_IMAGE_PROXY_BYTES);
-  if (!body) {
-    writeImageProxyJson(response, 413, { error: 'Image proxy target is too large.' });
-    return;
-  }
-
-  response.writeHead(upstreamResponse.status, {
-    'content-type': contentType,
-    'cache-control': 'public, max-age=86400',
-    'x-content-type-options': 'nosniff',
-    'content-security-policy': "default-src 'none'; script-src 'none'",
-  });
-  response.end(method === 'HEAD' ? undefined : body);
-};
-
-const localClipboardImageRequest = async (request: { method?: string }, response: DevServerResponse) => {
-  const method = request.method ?? 'GET';
-  if (method !== 'GET' && method !== 'HEAD') {
-    writeImageProxyJson(response, 405, { error: 'Method not allowed' });
-    return;
-  }
-
-  const image = await readMacOsClipboardPng();
-  if (!image) {
-    writeImageProxyJson(response, 404, { error: 'No local clipboard image is available.' });
-    return;
-  }
-
-  response.writeHead(200, {
-    'content-type': image.mimeType,
-    'content-length': String(image.data.byteLength),
-    'cache-control': 'no-store',
-    'x-content-type-options': 'nosniff',
-    'x-clipboard-file-name': encodeURIComponent(image.fileName),
-  });
-  response.end(method === 'HEAD' ? undefined : image.data);
 };
 
 const handleLocalApiRequest = (request: DevServerRequest, response: DevServerResponse, next: () => void) => {
   const requestUrl = new URL(request.url || '/', 'http://localhost');
 
   if (requestUrl.pathname === IMAGE_PROXY_PATH) {
-    void proxyImageRequest(request, response).catch((error) => {
-      const message = error instanceof Error ? error.message : 'Unknown image proxy error';
-      writeImageProxyJson(response, 500, { error: message });
-    });
+    void proxyExternalImage(request as IncomingMessage, response as ServerResponse, requestUrl, [], fetch).catch(
+      (error) => {
+        const message = error instanceof Error ? error.message : 'Unknown image proxy error';
+        writeImageProxyJson(response, 500, { error: message });
+      },
+    );
     return;
   }
 
   if (requestUrl.pathname === LOCAL_CLIPBOARD_IMAGE_PATH) {
-    void localClipboardImageRequest(request, response).catch((error) => {
+    void handleLocalClipboardImageRequest(
+      request as IncomingMessage,
+      response as ServerResponse,
+      [],
+      readMacOsClipboardPng,
+    ).catch((error) => {
       const message = error instanceof Error ? error.message : 'Unknown local clipboard image error';
       writeImageProxyJson(response, 500, { error: message });
     });
@@ -229,54 +160,13 @@ const handleLocalApiRequest = (request: DevServerRequest, response: DevServerRes
     return;
   }
 
-  if (requestUrl.pathname === '/api/live/ephemeral-token') {
-    void (async () => {
-      if (request.method !== 'POST') {
-        response.writeHead(405, { 'content-type': 'application/json' });
-        response.end(JSON.stringify({ error: 'Method not allowed' }));
-        return;
-      }
-      const apiKey =
-        (typeof request.headers?.['x-goog-api-key'] === 'string' ? request.headers['x-goog-api-key'] : undefined) ||
-        process.env.GEMINI_API_KEY ||
-        '';
-      if (!apiKey) {
-        response.writeHead(401, { 'content-type': 'application/json' });
-        response.end(JSON.stringify({ error: 'Live API key is not configured' }));
-        return;
-      }
-      try {
-        const body = (await readRequestBody(request)) ?? undefined;
-        const upstreamRes = await fetch('https://generativelanguage.googleapis.com/v1beta/auth_tokens', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
-          },
-          body: body ? await body.text() : JSON.stringify({ uses: 1 }),
-        });
-        const upstreamData = await upstreamRes.json().catch(() => ({}));
-        if (!upstreamRes.ok) {
-          response.writeHead(upstreamRes.status, { 'content-type': 'application/json' });
-          response.end(JSON.stringify(upstreamData));
-          return;
-        }
-        const tokenName = (upstreamData as { name?: string }).name || '';
-        const token = tokenName.startsWith('authTokens/') ? tokenName.slice('authTokens/'.length) : tokenName;
-        response.writeHead(200, { 'content-type': 'application/json' });
-        response.end(
-          JSON.stringify({
-            token,
-            name: tokenName,
-            expireTime: (upstreamData as { expireTime?: string }).expireTime,
-            newSessionExpireTime: (upstreamData as { newSessionExpireTime?: string }).newSessionExpireTime,
-          }),
-        );
-      } catch (err) {
-        response.writeHead(502, { 'content-type': 'application/json' });
-        response.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Upstream error' }));
-      }
-    })();
+  if (requestUrl.pathname === EPHEMERAL_TOKEN_PATH) {
+    void handleEphemeralTokenRequest(request as IncomingMessage, response as ServerResponse, loadConfig(), fetch).catch(
+      (error) =>
+        writeImageProxyJson(response, 500, {
+          error: error instanceof Error ? error.message : 'Token request failed',
+        }),
+    );
     return;
   }
 

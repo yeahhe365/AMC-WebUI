@@ -7,9 +7,13 @@ import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { getManualChunk, HEAVY_PRELOAD_PATTERNS } from './vite/chunks';
 import { createDisabledMermaidDiagramPlugin } from './vite/disabledMermaidDiagramsPlugin';
 import { createLocalApiPlugin } from './vite/localApiPlugin';
+import { prepareDefaultPyodidePackages } from './vite/pyodideAssets';
 import { ECHARTS_COPY_SOURCE, LAMEJS_WORKER_COPY_SOURCE, PDF_WORKER_COPY_SOURCE } from './vite/staticAssets';
 
-export default defineConfig(async ({ mode }) => {
+export default defineConfig(async ({ mode, command }) => {
+  const externalPythonAssets = process.env.PYODIDE_ASSETS_EXTERNAL === 'true';
+  const pythonPackageDirectory =
+    command === 'build' && !externalPythonAssets ? await prepareDefaultPyodidePackages() : undefined;
   const analyzerPlugin =
     mode === 'analyze'
       ? [
@@ -53,19 +57,17 @@ export default defineConfig(async ({ mode }) => {
             '**/assets/highlight-vendor-*.js',
             '**/assets/pdf-viewer-vendor-*',
             '**/assets/graphviz-vendor-*.js',
-            '**/assets/HistorySidebar-*.js',
             '**/assets/MermaidBlock-*.js',
             '**/assets/*Diagram*.js',
             '**/assets/KaTeX_*',
             '**/assets/html2canvas.esm-*.js',
-            '**/assets/data-vendor-*.js',
-            // ECharts is lazily imported only when a document contains charts, and the
-            // model-icon registry is a large eager glob: neither belongs in the precache.
+            // ECharts and individual icon images load on demand. Startup registry
+            // and data chunks must stay precached so image LRU churn cannot evict them.
             '**/assets/echarts-vendor-*.js',
-            '**/assets/model-icons-*.js',
+            '**/assets/model-icons/**',
             // E2E-only seed page: must not be shipped to (or cached for) real users.
             '**/e2e-seed.html',
-            '**/fonts/NotoSansCJKsc-VF.ttf.part-*',
+            '**/fonts/NotoSansCJKsc-Regular.ttf',
           ],
         },
         devOptions: {
@@ -74,10 +76,12 @@ export default defineConfig(async ({ mode }) => {
       }),
       viteStaticCopy({
         targets: [
-          {
-            src: 'node_modules/pyodide/*',
-            dest: 'pyodide',
-          },
+          ...(externalPythonAssets
+            ? []
+            : [
+                { src: 'node_modules/pyodide/*', dest: 'pyodide' },
+                ...(pythonPackageDirectory ? [{ src: `${pythonPackageDirectory}/*`, dest: 'pyodide' }] : []),
+              ]),
           {
             src: PDF_WORKER_COPY_SOURCE,
             dest: '.',
@@ -110,6 +114,10 @@ export default defineConfig(async ({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: getManualChunk,
+          assetFileNames: (asset: { originalFileNames: string[] }) =>
+            asset.originalFileNames.some((name) => name.replace(/\\/g, '/').includes('/model-icons/'))
+              ? 'assets/model-icons/[name]-[hash][extname]'
+              : 'assets/[name]-[hash][extname]',
         },
       },
     },

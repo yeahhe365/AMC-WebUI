@@ -8,21 +8,25 @@ import customLogoUrl from '@/assets/model-icons/providers/custom.png';
  */
 const MODEL_SVG_MODULES = import.meta.glob<string>('@/assets/model-icons/cherry-models/*.svg', {
   eager: true,
+  query: '?url&no-inline',
   import: 'default',
 });
 
 const PROVIDER_SVG_MODULES = import.meta.glob<string>('@/assets/model-icons/providers/cherry/*.svg', {
   eager: true,
+  query: '?url&no-inline',
   import: 'default',
 });
 
 const MODEL_DARK_SVG_MODULES = import.meta.glob<string>('@/assets/model-icons/cherry-models-dark/*.svg', {
   eager: true,
+  query: '?url&no-inline',
   import: 'default',
 });
 
 const PROVIDER_DARK_SVG_MODULES = import.meta.glob<string>('@/assets/model-icons/providers/cherry-dark/*.svg', {
   eager: true,
+  query: '?url&no-inline',
   import: 'default',
 });
 

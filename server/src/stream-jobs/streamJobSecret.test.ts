@@ -123,6 +123,9 @@ describe('stream job secret binding', () => {
               controller.enqueue(new TextEncoder().encode('data: {"delta":"partial"}\n\n'));
               upstreamGate.release = () => controller.close();
             },
+            cancel() {
+              upstreamGate.release = null;
+            },
           }),
           { status: 200, headers: { 'content-type': 'text/event-stream' } },
         ),

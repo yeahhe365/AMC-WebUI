@@ -7,11 +7,6 @@ import {
   touchRecentSessionId,
 } from './sessionLoaderDrafts';
 
-const mockCleanupFilePreviewUrls = vi.fn();
-vi.mock('@/utils/file/filePreviewUrls', () => ({
-  cleanupFilePreviewUrls: (...args: unknown[]) => mockCleanupFilePreviewUrls(...args),
-}));
-
 const createDummyMessage = (id: string, text: string): ChatMessage => ({
   id,
   role: 'user',
@@ -57,7 +52,11 @@ describe('sessionLoaderDrafts LRU eviction', () => {
   });
 
   it('evicts the least recently used session messages when exceeding maxRetained capacity', () => {
+    const revokePreview = vi.spyOn(URL, 'revokeObjectURL');
     const s1 = createDummySession('s1', 2);
+    s1.messages[0].files = [
+      { id: 'evicted-file', name: 'evicted.txt', type: 'text/plain', size: 1, dataUrl: 'blob:evicted-upload' },
+    ];
     const s2 = createDummySession('s2', 2);
     const s3 = createDummySession('s3', 2);
     const s4 = createDummySession('s4', 0);
@@ -83,7 +82,8 @@ describe('sessionLoaderDrafts LRU eviction', () => {
     expect(resultS2?.messages).toHaveLength(2);
     // s1 is the LRU -> evicted to []
     expect(resultS1?.messages).toEqual([]);
-    expect(mockCleanupFilePreviewUrls).toHaveBeenCalled();
+    expect(revokePreview).toHaveBeenCalledWith('blob:evicted-upload');
+    revokePreview.mockRestore();
   });
 
   it('protects sessions in protectedSessionIds (such as loadingSessionIds) from eviction', () => {

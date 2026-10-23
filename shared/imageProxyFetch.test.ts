@@ -1,5 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
+import dns from 'node:dns';
+import { createServer } from 'node:http';
+import { startHttpServer } from '../server/test/httpServer';
 import type { ImageProxyDnsLookup } from './imageProxyDns.js';
 import {
   fetchImageProxyWithSafeRedirects,
@@ -26,6 +29,34 @@ describe('isUnsafeImageProxyRedirect', () => {
 });
 
 describe('fetchImageProxyWithSafeRedirects', () => {
+  it('does not reach a local listener after DNS changes between validation and connection', async () => {
+    let received = 0;
+    const listener = createServer((_request, response) => {
+      received += 1;
+      response.end('private');
+    });
+    const started = await startHttpServer(listener);
+    const nativeLookup = vi.spyOn(dns, 'lookup').mockImplementation((...args: unknown[]) => {
+      const callback = args.at(-1) as (error: null, address: unknown, family?: number) => void;
+      const options = args[1] as { all?: boolean };
+      callback(null, options?.all ? [{ address: '127.0.0.1', family: 4 }] : '127.0.0.1', 4);
+    });
+    const lookup = vi
+      .fn<ImageProxyDnsLookup>()
+      .mockResolvedValueOnce([{ address: '8.8.8.8', family: 4 }])
+      .mockResolvedValue([{ address: '127.0.0.1', family: 4 }]);
+    try {
+      const target = new URL(started.baseUrl.replace('127.0.0.1', 'rebinder.example'));
+      const result = await fetchImageProxyWithSafeRedirects(target, { lookup });
+      if (result.ok) await result.response.text();
+      expect(received).toBe(0);
+      expect(result.ok).toBe(false);
+    } finally {
+      nativeLookup.mockRestore();
+      listener.closeAllConnections();
+      await started.close();
+    }
+  });
   it('follows a safe public redirect and returns the final response', async () => {
     const fetchImpl = vi
       .fn()

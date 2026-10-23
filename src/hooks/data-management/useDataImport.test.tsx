@@ -113,6 +113,19 @@ describe('useDataImport', () => {
               id: 'message-1',
               role: 'model',
               content: 'Imported reply',
+              variants: [
+                {
+                  id: 'old-reply',
+                  role: 'model',
+                  content: 'Old reply',
+                  timestamp: '2026-04-18T08:29:00.000Z',
+                  generationStartTime: '2026-04-18T08:28:30.000Z',
+                  generationEndTime: '2026-04-18T08:29:30.000Z',
+                  files: [
+                    { id: 'old-file', name: 'old.txt', type: 'text/plain', dataUrl: 'data:text/plain;base64,b2xk' },
+                  ],
+                },
+              ],
               timestamp: '2026-04-18T08:31:00.000Z',
               generationStartTime: '2026-04-18T08:30:30.000Z',
               generationEndTime: '2026-04-18T08:31:30.000Z',
@@ -141,6 +154,11 @@ describe('useDataImport', () => {
     expect(sessions[0].messages[0].timestamp).toBeInstanceOf(Date);
     expect(sessions[0].messages[0].generationStartTime).toBeInstanceOf(Date);
     expect(sessions[0].messages[0].generationEndTime).toBeInstanceOf(Date);
+    const variant = sessions[0].messages[0].variants?.[0];
+    expect(variant?.timestamp).toEqual(new Date('2026-04-18T08:29:00.000Z'));
+    expect(variant?.generationStartTime).toBeInstanceOf(Date);
+    expect(variant?.generationEndTime).toBeInstanceOf(Date);
+    expect(variant?.files?.[0].dataUrl).toBe('data:text/plain;base64,b2xk');
 
     unmount();
   });

@@ -10,11 +10,15 @@
 // Uses only Node built-ins (http, fs, path) so no npm install is needed in the image.
 const http = require('http');
 const net = require('net');
+const tls = require('tls');
+const https = require('https');
+const zlib = require('zlib');
+const { pipeline } = require('stream');
 const fs = require('fs');
 const path = require('path');
 
 const PORT = Number(process.env.PORT || 80);
-const ROOT = process.env.WEB_ROOT || '/app/public';
+const ROOT = path.resolve(process.env.WEB_ROOT || '/app/public');
 const API_UPSTREAM = process.env.API_UPSTREAM || 'http://api:3001';
 const LIVE_WS_PATH = '/api/live';
 
@@ -66,11 +70,18 @@ const MIME = {
 };
 
 // --- proxy /api/* to upstream, preserving method/path/query/body, streaming response ---
-function proxyApi(req, res) {
-  const url = new URL(req.url, API_UPSTREAM);
-  const upstream = new URL(url.pathname + url.search, API_UPSTREAM);
+function resolveUpstream() {
+  const upstream = new URL(API_UPSTREAM);
+  if (!['http:', 'https:'].includes(upstream.protocol)) throw new Error('Unsupported API upstream protocol');
+  return upstream;
+}
 
-  const proxyReq = http.request(
+function proxyApi(req, res, url) {
+  const upstream = resolveUpstream();
+  upstream.pathname = url.pathname;
+  upstream.search = url.search;
+
+  const proxyReq = (upstream.protocol === 'https:' ? https : http).request(
     upstream,
     {
       method: req.method,
@@ -81,7 +92,7 @@ function proxyApi(req, res) {
     },
     (proxyRes) => {
       res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
-      proxyRes.pipe(res);
+      pipeline(proxyRes, res, () => {});
     },
   );
 
@@ -90,6 +101,8 @@ function proxyApi(req, res) {
     if (!res.headersSent) {
       res.writeHead(502, { 'content-type': 'application/json' });
       res.end(JSON.stringify({ error: 'Bad Gateway', message: err.message }));
+    } else {
+      res.destroy();
     }
   });
 
@@ -102,8 +115,37 @@ function proxyApi(req, res) {
   req.pipe(proxyReq);
 }
 
-function serveStatic(req, res) {
-  const url = new URL(req.url, 'http://localhost');
+const withinRoot = (file) => file === ROOT || file.startsWith(ROOT + path.sep);
+const compressible = (ext) =>
+  ['.html', '.js', '.mjs', '.css', '.json', '.svg', '.map', '.txt', '.wasm', '.ttf'].includes(ext);
+
+function chooseEncoding(header, canCompress) {
+  const accepted = new Map();
+  for (const item of String(header || '')
+    .toLowerCase()
+    .split(',')) {
+    const [name, ...params] = item.trim().split(';');
+    if (!name) continue;
+    const qParam = params.map((part) => part.trim()).find((part) => part.startsWith('q='));
+    const quality = qParam === undefined ? 1 : Number(qParam.slice(2));
+    accepted.set(name, Number.isFinite(quality) && quality >= 0 && quality <= 1 ? quality : 0);
+  }
+  const quality = (name) => accepted.get(name) ?? accepted.get('*') ?? 0;
+  const choices = canCompress
+    ? [
+        ['br', quality('br')],
+        ['gzip', quality('gzip')],
+      ]
+    : [];
+  // Identity is always available unless explicitly excluded. With no explicit
+  // identity preference, prefer an acceptable compressed representation.
+  const identity = accepted.get('identity') ?? (accepted.get('*') === 0 ? 0 : 0.001);
+  choices.push(['identity', identity]);
+  choices.sort((a, b) => b[1] - a[1]);
+  return choices[0][1] > 0 ? choices[0][0] : null;
+}
+
+async function serveStatic(req, res, url) {
   let pathname;
   try {
     pathname = decodeURIComponent(url.pathname);
@@ -112,102 +154,174 @@ function serveStatic(req, res) {
     res.end('Bad Request');
     return;
   }
-
-  // Guard against path traversal.
-  const resolved = path.normalize(path.join(ROOT, pathname));
-  if (resolved !== ROOT && !resolved.startsWith(ROOT + path.sep)) {
+  if (pathname.includes('\0')) {
+    res.writeHead(400);
+    res.end('Bad Request');
+    return;
+  }
+  if (!['GET', 'HEAD'].includes(req.method)) {
+    res.writeHead(405, { allow: 'GET, HEAD' });
+    res.end('Method Not Allowed');
+    return;
+  }
+  const resolved = path.resolve(ROOT, `.${pathname}`);
+  if (!withinRoot(resolved)) {
     res.writeHead(403);
     res.end('Forbidden');
     return;
   }
-
   let filePath = resolved;
   let stat;
   try {
-    stat = fs.statSync(filePath);
+    stat = await fs.promises.stat(filePath);
     if (stat.isDirectory()) {
       filePath = path.join(filePath, 'index.html');
-      stat = fs.statSync(filePath);
+      stat = await fs.promises.stat(filePath);
     }
   } catch {
-    // SPA fallback: serve index.html for unknown routes (non-asset requests)
-    if (path.extname(pathname) === '') {
-      try {
-        filePath = path.join(ROOT, 'index.html');
-        stat = fs.statSync(filePath);
-      } catch {
-        res.writeHead(404);
-        res.end('Not Found');
-        return;
-      }
-    } else {
+    if (path.extname(pathname) !== '') {
+      res.writeHead(404);
+      res.end('Not Found');
+      return;
+    }
+    filePath = path.join(ROOT, 'index.html');
+    try {
+      stat = await fs.promises.stat(filePath);
+    } catch {
       res.writeHead(404);
       res.end('Not Found');
       return;
     }
   }
-
-  const ext = path.extname(filePath).toLowerCase();
-  const headers = { 'content-type': MIME[ext] || 'application/octet-stream' };
-
-  // Cache policy
-  if (pathname === '/runtime-config.js') {
-    headers['cache-control'] = 'no-store';
-  } else if (pathname.startsWith('/assets/')) {
-    headers['cache-control'] = 'public, max-age=31536000, immutable';
-  } else if (ext === '.mjs') {
-    headers['cache-control'] = 'no-cache';
-  } else if (ext === '.html') {
-    // index.html must always revalidate so new builds' chunk hashes replace stale ones.
-    headers['cache-control'] = 'no-cache';
+  // Async metadata avoids blocking every request. Resolve symlinks too: a
+  // lexical path check alone permits an in-root link to expose outside files.
+  const realFile = await fs.promises.realpath(filePath);
+  const realRoot = await fs.promises.realpath(ROOT);
+  if (realFile !== realRoot && !realFile.startsWith(realRoot + path.sep)) {
+    res.writeHead(403);
+    res.end('Forbidden');
+    return;
   }
-
-  const stream = fs.createReadStream(filePath);
-  stream.on('error', (err) => {
-    console.error('[web] file stream error:', err.message);
-    if (!res.headersSent) {
-      res.writeHead(500);
-      res.end('Internal Server Error');
-    } else {
-      res.destroy();
-    }
-  });
-
+  if (!stat.isFile()) {
+    res.writeHead(404);
+    res.end('Not Found');
+    return;
+  }
+  const ext = path.extname(filePath).toLowerCase();
+  const encoding = chooseEncoding(req.headers['accept-encoding'], compressible(ext) && stat.size >= 1024);
+  if (!encoding) {
+    res.writeHead(406, { vary: 'Accept-Encoding' });
+    res.end('Not Acceptable');
+    return;
+  }
+  const etag = `W/"${stat.size.toString(16)}-${stat.mtimeMs.toString(16)}-${encoding}"`;
+  const headers = {
+    'content-type': MIME[ext] || 'application/octet-stream',
+    vary: 'Accept-Encoding',
+    etag,
+    'last-modified': stat.mtime.toUTCString(),
+  };
+  if (pathname === '/runtime-config.js') headers['cache-control'] = 'no-store';
+  else if (pathname.startsWith('/assets/')) headers['cache-control'] = 'public, max-age=31536000, immutable';
+  else if (ext === '.mjs' || ext === '.html') headers['cache-control'] = 'no-cache';
+  if (encoding !== 'identity') headers['content-encoding'] = encoding;
+  const ifNoneMatch = req.headers['if-none-match'];
+  const matches =
+    ifNoneMatch &&
+    String(ifNoneMatch)
+      .split(',')
+      .some((tag) => tag.trim() === '*' || tag.trim().replace(/^W\//, '') === etag.replace(/^W\//, ''));
+  const modifiedSince = req.headers['if-modified-since'];
+  if (
+    matches ||
+    (!ifNoneMatch && modifiedSince && Math.floor(stat.mtimeMs / 1000) <= Math.floor(Date.parse(modifiedSince) / 1000))
+  ) {
+    res.writeHead(304, headers);
+    res.end();
+    return;
+  }
+  if (encoding === 'identity') headers['content-length'] = stat.size;
   res.writeHead(200, headers);
-  stream.pipe(res);
+  if (req.method === 'HEAD') {
+    res.end();
+    return;
+  }
+  const stream = fs.createReadStream(realFile);
+  const completed = (error) => {
+    if (error && !res.destroyed) res.destroy();
+  };
+  if (encoding === 'br')
+    pipeline(
+      stream,
+      zlib.createBrotliCompress({ params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 } }),
+      res,
+      completed,
+    );
+  else if (encoding === 'gzip') pipeline(stream, zlib.createGzip(), res, completed);
+  else pipeline(stream, res, completed);
 }
 
-const server = http.createServer((req, res) => {
-  const pathname = new URL(req.url, 'http://localhost').pathname;
+const server = http.createServer(async (req, res) => {
+  let url;
+  try {
+    url = new URL(req.url, 'http://localhost');
+  } catch {
+    res.writeHead(400);
+    res.end('Bad Request');
+    return;
+  }
+  const pathname = url.pathname;
   if (req.method === 'GET' && (pathname === '/healthz' || pathname === '/health')) {
     res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
     res.end(JSON.stringify({ status: 'ok', service: 'web' }));
     return;
   }
-  if (pathname === '/api' || pathname.startsWith('/api/')) {
-    return proxyApi(req, res);
+  const api = pathname === '/api' || pathname.startsWith('/api/');
+  try {
+    if (api) proxyApi(req, res, url);
+    else await serveStatic(req, res, url);
+  } catch (error) {
+    console.error('[web] request error:', error.message);
+    if (res.headersSent) res.destroy();
+    else {
+      res.writeHead(api ? 502 : 500);
+      res.end(api ? 'Bad Gateway' : 'Internal Server Error');
+    }
   }
-  return serveStatic(req, res);
 });
 
 // WebSocket upgrade for /api/live: bridge the raw TCP socket to api:3001.
 // http.request-based proxyApi cannot forward the WS upgrade handshake, so we
 // open a plain TCP socket to the upstream and splice the two sockets together,
 // letting the api container terminate the actual WS frames.
-const isLiveWsUpgrade = (req) => {
-  const pathname = new URL(req.url, 'http://localhost').pathname;
-  return pathname === LIVE_WS_PATH || pathname.startsWith(`${LIVE_WS_PATH}/`);
-};
-
 server.on('upgrade', (req, socket, head) => {
-  if (!isLiveWsUpgrade(req)) {
+  // Attach error handling before validation so an early rejected handshake
+  // cannot emit an unhandled socket error.
+  socket.on('error', () => {});
+  let pathname;
+  try {
+    pathname = new URL(req.url, 'http://localhost').pathname;
+  } catch {
+    socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+    return;
+  }
+  if (pathname !== LIVE_WS_PATH && !pathname.startsWith(`${LIVE_WS_PATH}/`)) {
     socket.destroy();
     return;
   }
-
-  const upstream = new URL(API_UPSTREAM);
+  let upstream;
+  try {
+    upstream = resolveUpstream();
+  } catch {
+    socket.end('HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+    return;
+  }
   const upstreamPort = Number(upstream.port) || (upstream.protocol === 'https:' ? 443 : 80);
-  const upstreamSocket = net.connect(upstreamPort, upstream.hostname);
+  const host = upstream.hostname.replace(/^\[|\]$/g, '');
+  const upstreamSocket =
+    upstream.protocol === 'https:'
+      ? tls.connect({ port: upstreamPort, host, servername: net.isIP(host) ? undefined : host })
+      : net.connect(upstreamPort, host);
 
   let cleanup = () => {
     cleanup = () => {};
@@ -233,7 +347,7 @@ server.on('upgrade', (req, socket, head) => {
   });
   socket.on('close', cleanup);
 
-  upstreamSocket.on('connect', () => {
+  upstreamSocket.on(upstream.protocol === 'https:' ? 'secureConnect' : 'connect', () => {
     // Re-emit the exact upgrade request bytes the browser sent so the api
     // container sees the original path, query, and headers (incl. the WS key).
     const reqLines = [

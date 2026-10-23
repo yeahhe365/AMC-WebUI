@@ -1,5 +1,5 @@
-import type { SavedChatSession, UploadedFile } from '@/types';
-import { cleanupFilePreviewUrls } from '@/utils/file/filePreviewUrls';
+import type { ChatMessage, SavedChatSession, UploadedFile } from '@/types';
+import { releaseManagedObjectUrlsByOwner } from '@/services/objectUrlManager';
 
 export const DEFAULT_MAX_RETAINED_RUNTIME_SESSIONS = 3;
 
@@ -88,5 +88,14 @@ export const getSessionDraftFiles = (fileDrafts: Record<string, UploadedFile[]>,
   fileDrafts[sessionId] || [];
 
 export const cleanupSessionFilePreviews = (session?: SavedChatSession) => {
-  session?.messages.forEach((message) => cleanupFilePreviewUrls(message.files));
+  if (!session) return;
+  const uploadUrls = new Set<string>();
+  const collectUrls = (message: ChatMessage) => {
+    message.files?.forEach((file) => {
+      if (file.dataUrl) uploadUrls.add(file.dataUrl);
+    });
+    message.variants?.forEach(collectUrls);
+  };
+  session.messages.forEach(collectUrls);
+  releaseManagedObjectUrlsByOwner(`session:${session.id}`, uploadUrls);
 };

@@ -94,6 +94,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: google-chrome --version
       - run: pnpm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-failure-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
 
   docker-build:
     runs-on: ubuntu-latest

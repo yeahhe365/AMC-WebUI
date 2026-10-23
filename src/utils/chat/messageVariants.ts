@@ -1,4 +1,4 @@
-import type { ChatMessage, SavedChatSession } from '@/types';
+import type { ChatMessage, SavedChatSession, UploadedFile } from '@/types';
 
 /**
  * Creates a clean snapshot of a message suitable for storage in `variants`.
@@ -83,4 +83,18 @@ export const appendModelVariant = (existingMessage: ChatMessage, newLoadingMessa
     variants: updatedVariants,
     currentVariantIndex: newVariantIndex,
   };
+};
+
+/** Transform attachments in both the active reply and every stored snapshot.
+ * Preserve references when the transform leaves all files untouched.
+ */
+export const mapMessageFiles = (
+  message: ChatMessage,
+  map: (files: UploadedFile[], message: ChatMessage) => UploadedFile[] | undefined,
+): ChatMessage => {
+  const files = message.files ? map(message.files, message) : message.files;
+  const variants = message.variants?.map((variant) => mapMessageFiles(variant, map));
+  const variantsChanged = variants?.some((variant, index) => variant !== message.variants![index]);
+  if (files === message.files && !variantsChanged) return message;
+  return { ...message, files, ...(variantsChanged ? { variants } : {}) };
 };

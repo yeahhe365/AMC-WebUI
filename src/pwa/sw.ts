@@ -3,6 +3,7 @@
 import { clientsClaim } from 'workbox-core';
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
+import { ExpirationPlugin } from 'workbox-expiration';
 import { NetworkOnly, StaleWhileRevalidate } from 'workbox-strategies';
 
 declare let self: ServiceWorkerGlobalScope & {
@@ -52,5 +53,6 @@ registerRoute(
     !url.pathname.startsWith('/api/'),
   new StaleWhileRevalidate({
     cacheName: 'static-assets',
+    plugins: [new ExpirationPlugin({ maxEntries: 128, maxAgeSeconds: 30 * 24 * 60 * 60, purgeOnQuotaError: true })],
   }),
 );

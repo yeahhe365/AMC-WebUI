@@ -1,6 +1,7 @@
 import dns from 'node:dns/promises';
 import net from 'node:net';
 import { isPrivateNetworkHostname } from '../../../shared/privateNetwork.js';
+import { createConnectionSafeFetch } from '../../../shared/connectionSafeFetch.js';
 
 export type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>;
 
@@ -21,6 +22,8 @@ export async function assertMcpHttpUrlAllowed(urlString: string, allowPrivate: b
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error('MCP HTTP server URL must use http:// or https://.');
   }
+
+  if (parsed.username || parsed.password) throw new Error('MCP HTTP server URL must not include credentials.');
 
   const hostname = parsed.hostname.replace(/^\[|\]$/g, '');
   if (!hostname) {
@@ -65,6 +68,7 @@ export async function assertMcpHttpUrlAllowed(urlString: string, allowPrivate: b
  * Fetch wrapper that re-validates redirect targets so a public URL cannot bounce to a private IP.
  */
 export function createSafeMcpFetch(allowPrivate: boolean, baseFetch: FetchLike = fetch): FetchLike {
+  const connectionFetch = createConnectionSafeFetch(baseFetch as typeof fetch, { allowPrivate });
   return async (input, init) => {
     const initialUrl = typeof input === 'string' ? input : input instanceof URL ? input.href : String(input);
     await assertMcpHttpUrlAllowed(initialUrl, allowPrivate);
@@ -77,7 +81,7 @@ export function createSafeMcpFetch(allowPrivate: boolean, baseFetch: FetchLike =
     };
 
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-      const response = await baseFetch(currentUrl, currentInit);
+      const response: Response = await connectionFetch(currentUrl, currentInit);
 
       if (response.status < 300 || response.status >= 400) {
         return response;
@@ -88,7 +92,14 @@ export function createSafeMcpFetch(allowPrivate: boolean, baseFetch: FetchLike =
         return response;
       }
 
-      const nextUrl = new URL(location, currentUrl).href;
+      // Release the response even when validation rejects the next hop.
+      await response.body?.cancel().catch(() => undefined);
+      const previous = new URL(currentUrl);
+      const next = new URL(location, previous);
+      if (next.origin !== previous.origin || (previous.protocol === 'https:' && next.protocol !== 'https:')) {
+        throw new Error('MCP HTTP redirect must stay on the same origin without a protocol downgrade.');
+      }
+      const nextUrl = next.href;
       await assertMcpHttpUrlAllowed(nextUrl, allowPrivate);
 
       // Drop body on redirect for non-GET (matches common fetch redirect behavior for 301/302).
@@ -103,13 +114,6 @@ export function createSafeMcpFetch(allowPrivate: boolean, baseFetch: FetchLike =
         redirect: 'manual',
       };
       currentUrl = nextUrl;
-
-      // Consume body to free the connection before following.
-      try {
-        await response.arrayBuffer();
-      } catch {
-        // ignore
-      }
     }
 
     throw new Error(`MCP HTTP request exceeded ${MAX_REDIRECTS} redirects.`);

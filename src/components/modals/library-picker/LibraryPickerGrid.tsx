@@ -37,7 +37,7 @@ export const LibraryPickerGrid: React.FC<LibraryPickerGridProps> = ({
             onClick={(event) => toggleSelectItem(item.id, event)}
             onDoubleClick={() => handleItemDoubleClick(item)}
             onKeyDown={(event) => {
-              if (event.key === ' ' || event.key === 'Enter') {
+              if (event.target === event.currentTarget && (event.key === ' ' || event.key === 'Enter')) {
                 event.preventDefault();
                 toggleSelectItem(item.id, event);
               }
@@ -55,14 +55,14 @@ export const LibraryPickerGrid: React.FC<LibraryPickerGridProps> = ({
                 className={`absolute bottom-2 right-2 w-5 h-5 rounded-full flex items-center justify-center transition-all shadow-sm ${
                   isSelected
                     ? 'bg-[var(--theme-accent)] text-white scale-100 opacity-100'
-                    : 'bg-black/30 border border-white/70 text-transparent group-hover:opacity-100 opacity-0 scale-90 group-hover:scale-100'
+                    : 'bg-black/30 border border-white/70 text-transparent group-hover:opacity-100 group-focus-within:opacity-100 opacity-0 scale-90 group-hover:scale-100'
                 }`}
               >
                 <Check size={12} strokeWidth={3} />
               </div>
 
               <div
-                className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 backdrop-blur-xs p-1 rounded-xl z-10"
+                className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity bg-black/60 backdrop-blur-xs p-1 rounded-xl z-10"
                 onClick={(event) => event.stopPropagation()}
               >
                 <button

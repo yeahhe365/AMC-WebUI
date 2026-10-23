@@ -3,6 +3,23 @@ import { describe, expect, it } from 'vitest';
 import { isPrivateNetworkHostname } from './privateNetwork.js';
 
 describe('isPrivateNetworkHostname', () => {
+  it.each([
+    '::ffff:7f00:1',
+    '[::ffff:a9fe:a9fe]',
+    '0:0:0:0:0:ffff:0a00:0001',
+    '0:0:0:0:0:0:0:1',
+    '::',
+    'fec0::1',
+    'ff02::1',
+    '2001:db8::1',
+    '198.51.100.1',
+    '224.0.0.1',
+    '255.255.255.255',
+    'localhost.',
+    'a.localhost',
+  ])('blocks normalized or special-use target %s', (hostname) => {
+    expect(isPrivateNetworkHostname(hostname)).toBe(true);
+  });
   it('blocks IPv4 private and link-local ranges', () => {
     expect(isPrivateNetworkHostname('127.0.0.1')).toBe(true);
     expect(isPrivateNetworkHostname('10.0.0.1')).toBe(true);
@@ -41,7 +58,7 @@ describe('isPrivateNetworkHostname', () => {
     // fe80::/10 covers fe80 through febf, not just the fe80: prefix.
     expect(isPrivateNetworkHostname('fe90::1')).toBe(true);
     expect(isPrivateNetworkHostname('febf::1')).toBe(true);
-    expect(isPrivateNetworkHostname('fec0::1')).toBe(false);
+    expect(isPrivateNetworkHostname('fec0::1')).toBe(true);
   });
 
   it('blocks IPv4-mapped IPv6 addresses (the rebinding bypass)', () => {

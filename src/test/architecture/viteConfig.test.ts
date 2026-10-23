@@ -147,11 +147,15 @@ describe('vite.config runtime ownership', () => {
     expect(config).toContain("'**/assets/highlight-vendor-*.js'");
     expect(config).toContain("'**/assets/pdf-viewer-vendor-*'");
     expect(config).toContain("'**/assets/graphviz-vendor-*.js'");
-    expect(config).toContain("'**/assets/HistorySidebar-*.js'");
+    // These chunks are required by the shell and must survive runtime image LRU churn.
+    expect(config).not.toContain("'**/assets/HistorySidebar-*.js'");
+    expect(config).not.toContain("'**/assets/model-icons-*.js'");
+    expect(config).not.toContain("'**/assets/data-vendor-*.js'");
+    expect(config).toContain("'**/assets/model-icons/**'");
     expect(config).toContain("'**/assets/MermaidBlock-*.js'");
     expect(config).toContain("'**/assets/*Diagram*.js'");
     expect(config).toContain("'**/assets/KaTeX_*'");
-    expect(config).toContain("'**/fonts/NotoSansCJKsc-VF.ttf.part-*'");
+    expect(config).toContain("'**/fonts/NotoSansCJKsc-Regular.ttf'");
   });
 
   it('provides an opt-in bundle analyzer without changing normal production builds', () => {

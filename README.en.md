@@ -252,6 +252,7 @@ Notes:
 
 - Docker defaults to BYOK for personal deployments. After startup, enter your Gemini API key in **Settings -> Third-Party Providers** to use both regular chat, Live API, and third-party compatible endpoints. You do not need to set `GEMINI_API_KEY` or `THIRD_PARTY_ROUTES` in `.env` or `docker-compose.yml`.
 - The `web` image packages the already built local `dist/` directory.
+- The `api` image uses pinned pnpm with the workspace lockfile and security overrides, then a frozen production deployment containing only API dependencies.
 - After frontend or backend API changes, run `pnpm run build:docker` before rebuilding the Docker services.
 
 > Security note
@@ -286,11 +287,13 @@ The `RUNTIME_*` values are written into `runtime-config.js` at container startup
 
 MCP `stdio` and private/local HTTP access are disabled by default. Enable `ENABLE_MCP_STDIO=true` or `ENABLE_MCP_PRIVATE_HTTP=true` only for trusted self-hosted deployments.
 
-Pyodide assets are copied to `dist/pyodide/` during production builds and load from same-origin `/pyodide/` by default. To use a CDN or a separate static host, set `RUNTIME_PYODIDE_BASE_URL` to a full directory URL such as `https://cdn.jsdelivr.net/pyodide/v0.27.7/full/`. The PWA precache excludes large `pyodide/` assets by default, so local Python loads them on demand the first time it runs.
+Default production builds copy Pyodide and scientific packages to `dist/pyodide/`. Downloads are pinned to the installed runtime's SHA-256 manifest and cached locally; browsers load packages on demand from the same origin. To use an external versioned asset host, run `PYODIDE_ASSETS_EXTERNAL=true pnpm run build` and set `RUNTIME_PYODIDE_BASE_URL` to a matching full directory URL such as `https://cdn.jsdelivr.net/pyodide/v0.27.7/full/`. Static deployments must set `pyodideBaseUrl` in `runtime-config.js`. Large Python assets remain excluded from the PWA precache.
 
 Docker defaults to BYOK: after you enter an API key in Settings, regular Gemini proxy requests use the browser-provided key, and Live API goes through the `/api/live` WebSocket full proxy, which the `api` container bridges to the official `wss://generativelanguage…/BidiGenerateContent` endpoint. A browser key is forwarded when present (BYOK fallback); otherwise the server-managed `LIVE_GEMINI_API_KEY` or `GEMINI_API_KEY` is used.
 
 If you want server-managed credentials for regular Gemini requests, set `GEMINI_API_KEY` and `RUNTIME_SERVER_MANAGED_API=true`. Live API and third-party requests follow the same rule: the browser key wins, falling back to the server key (unless `SERVER_KEY_PRIORITY=true`). A browser-local key is suitable for personal or trusted deployments, but it is not a server secret: scripts running in the same browser context, extensions, XSS, or device compromise may still read it.
+
+Server-selected regular Gemini keys always use the administrator's trusted `GEMINI_API_BASE`, which may point to a local proxy. Browser upstream overrides apply only to browser BYOK keys. Stream limits, replay failures and build measurements are recorded in the [optimization and operations notes](docs/optimization-2026-10-23.md).
 
 OpenAI Compatible and third-party requests route through `/api/openai/*` in Docker mode, using `RUNTIME_THIRD_PARTY_PROXY_URL` to select the proxy. The API container looks up the upstream from the `THIRD_PARTY_ROUTES` routing table using the `x-third-party-provider` header (https, non-private hosts only); a browser key wins, falling back to the route's server-side key. In static deployments (Pages) `RUNTIME_THIRD_PARTY_PROXY_URL` is not injected, so the browser connects to the provider directly. To pass OpenAI Compatible traffic through your own gateway, point the compatible Base URL at that gateway directly.
 

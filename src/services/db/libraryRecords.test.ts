@@ -17,6 +17,25 @@ let mockStore: Record<string, any> = {};
 let mockSessions: any[] = [];
 
 vi.mock('./indexedDbAccess', () => ({
+  withWriteLock: (callback: () => Promise<void>) => callback(),
+  transactionToPromise: async () => {},
+  getDb: async () => ({
+    transaction: () => ({
+      objectStore: (storeName: string) => ({
+        get: (key: string) => {
+          const request: any = { result: mockStore[key], onsuccess: null };
+          queueMicrotask(() => request.onsuccess?.());
+          return request;
+        },
+        put: (value: any, key?: string) => {
+          mockStore[storeName === 'files' ? value.id : key!] = value;
+        },
+        delete: (key: string) => {
+          delete mockStore[key];
+        },
+      }),
+    }),
+  }),
   getKeyValue: vi.fn(async (key: string) => mockStore[key]),
   setKeyValue: vi.fn(async (key: string, value: any) => {
     mockStore[key] = value;

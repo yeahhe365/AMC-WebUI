@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { extractTurnNavigationItems } from './useTurnNavigationItems';
+import { renderHook } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { extractTurnNavigationItems, useTurnNavigationItems } from './useTurnNavigationItems';
 import type { ChatMessage } from '@/types';
 
 function createMessage(
@@ -92,5 +93,36 @@ describe('extractTurnNavigationItems', () => {
     const items = extractTurnNavigationItems(messages);
     expect(items[0].prompt).toBe('简而言之： 用户提问');
     expect(items[0].response).toBe('这是模型的文本回答');
+  });
+});
+
+describe('useTurnNavigationItems cache', () => {
+  it('reuses stable history snippets while refreshing changed content and thoughts', () => {
+    const prompt = createMessage({ id: 'cached-user', role: 'user', content: '**history prompt**' });
+    const response = createMessage({ id: 'cached-model', role: 'model', content: 'history response' });
+    const livePrompt = createMessage({ id: 'live-user', role: 'user', content: 'live' });
+    const liveResponse = createMessage({ id: 'live-model', role: 'model', content: 'first chunk' });
+    const { result, rerender } = renderHook(({ messages }) => useTurnNavigationItems(messages), {
+      initialProps: { messages: [prompt, response, livePrompt, liveResponse] },
+    });
+    const replace = vi.spyOn(String.prototype, 'replace');
+    rerender({ messages: [{ ...prompt }, { ...response }, livePrompt, { ...liveResponse, content: 'second chunk' }] });
+    expect(result.current[1].response).toBe('second chunk');
+    expect(replace.mock.calls.length).toBeLessThanOrEqual(12);
+    replace.mockRestore();
+    rerender({
+      messages: [
+        { ...prompt, content: 'edited prompt' },
+        { ...response, content: '', thoughts: 'thinking' },
+      ],
+    });
+    expect(result.current[0]).toMatchObject({ prompt: 'edited prompt', response: 'thinking' });
+    rerender({
+      messages: [
+        { ...prompt, content: 'edited prompt' },
+        { ...response, content: '', thoughts: 'new thoughts' },
+      ],
+    });
+    expect(result.current[0].response).toBe('new thoughts');
   });
 });

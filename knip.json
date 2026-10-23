@@ -2,12 +2,16 @@
   "workspaces": {
     ".": {
       "entry": [
-        "server/src/index.ts",
         "src/utils/export/dom.ts",
         "src/utils/export/files.ts",
         "src/utils/export/image.ts",
         "src/utils/export/templates.ts"
       ]
+    },
+    "server": {
+      "entry": ["src/index.ts", "../shared/connectionSafeFetch.ts"],
+      "project": ["src/**/*.ts", "../shared/**/*.ts"],
+      "ignoreDependencies": ["undici"]
     }
   },
   "ignore": ["docker/web-server.js", "public/runtime-config.js", "e2e/fixtures/mcp-test-server.mjs"],

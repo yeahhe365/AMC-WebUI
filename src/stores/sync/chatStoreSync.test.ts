@@ -346,4 +346,65 @@ describe('chatStoreSync', () => {
       expect.any(Function),
     );
   });
+  it.each(['switch', 'generation', 'newer-request', 'cleanup'])(
+    'discards a delayed content load after %s',
+    async (change) => {
+      const channel = createChannel();
+      const documentState = createDocumentState(false);
+      const localLoadingSessionIds = new Set<string>();
+      const messages: SavedChatSession['messages'] = [
+        { id: 'a-old', role: 'model' as const, content: 'old', timestamp: new Date() },
+      ];
+      const state = {
+        activeSessionId: 'a',
+        activeMessages: messages,
+        refreshSessions: vi.fn(),
+        refreshGroups: vi.fn(),
+        setActiveMessages: (next: SavedChatSession['messages']) => {
+          state.activeMessages = next;
+        },
+        setSavedSessions: vi.fn(),
+        setLoadingSessionIds: vi.fn(),
+        setCompletedSessions: vi.fn(),
+      };
+      let resolve!: (session: SavedChatSession) => void;
+      const firstRead = new Promise<SavedChatSession>((done) => {
+        resolve = done;
+      });
+      const newer = createSavedChatSessionMetadata({ id: 'a', messages: [{ ...messages[0], id: 'a-newer' }] });
+      const getSession = vi.fn().mockReturnValueOnce(firstRead).mockResolvedValue(newer);
+      const cleanup = setupChatStoreSync({
+        store: { getState: () => state },
+        localLoadingSessionIds,
+        getChannel: () => channel,
+        getSession,
+        rehydrateSession: (session) => session,
+        documentRef: documentState.documentRef,
+      });
+      const emit = () =>
+        (channel as BroadcastChannel & { emitMessage: (message: SyncMessage) => void }).emitMessage({
+          type: 'SESSION_CONTENT_UPDATED',
+          sessionId: 'a',
+        });
+      emit();
+      if (change === 'switch') {
+        state.activeSessionId = 'b';
+        state.activeMessages = [{ ...messages[0], id: 'b' }];
+      } else if (change === 'generation') {
+        localLoadingSessionIds.add('a');
+        state.activeMessages = [{ ...messages[0], id: 'generating', isLoading: true }];
+      } else if (change === 'newer-request') {
+        emit();
+        await Promise.resolve();
+      } else {
+        cleanup();
+      }
+      const expectedMessages = state.activeMessages;
+      resolve(createSavedChatSessionMetadata({ id: 'a', messages: [{ ...messages[0], id: 'a-stale' }] }));
+      await firstRead;
+      await Promise.resolve();
+      expect(state.activeMessages).toBe(expectedMessages);
+      cleanup();
+    },
+  );
 });

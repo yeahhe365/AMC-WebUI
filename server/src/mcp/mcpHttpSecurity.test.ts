@@ -45,6 +45,25 @@ describe('assertMcpHttpUrlAllowed', () => {
 });
 
 describe('createSafeMcpFetch', () => {
+  it.each(['https://other.example.com/mcp', 'http://public.example.com/mcp'])(
+    'rejects credential-bearing redirect to %s before making the next request',
+    async (location) => {
+      dnsLookup.mockResolvedValue([{ address: '1.2.3.4', family: 4 }]);
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(new Response(null, { status: 307, headers: { location } }))
+        .mockResolvedValueOnce(new Response('leaked'));
+      const safeFetch = createSafeMcpFetch(false, fetchMock);
+      await expect(
+        safeFetch('https://public.example.com/mcp', {
+          method: 'POST',
+          headers: { authorization: 'Bearer fake-secret' },
+          body: 'private payload',
+        }),
+      ).rejects.toThrow(/redirect/i);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
   afterEach(() => {
     dnsLookup.mockReset();
   });
@@ -71,7 +90,7 @@ describe('createSafeMcpFetch', () => {
     const safeFetch = createSafeMcpFetch(false, baseFetch);
 
     await expect(safeFetch('https://public.example.com/mcp')).rejects.toThrow(
-      /Private MCP HTTP server URLs are disabled|resolves to private/,
+      /Private MCP HTTP server URLs are disabled|resolves to private|redirect/,
     );
   });
 
@@ -83,7 +102,7 @@ describe('createSafeMcpFetch', () => {
       .mockResolvedValueOnce(
         new Response(null, {
           status: 302,
-          headers: { location: 'https://cdn.example.com/mcp' },
+          headers: { location: '/canonical/mcp' },
         }),
       )
       .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
@@ -94,6 +113,6 @@ describe('createSafeMcpFetch', () => {
 
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(String(fetchMock.mock.calls[1][0])).toBe('https://cdn.example.com/mcp');
+    expect(String(fetchMock.mock.calls[1][0])).toBe('https://public.example.com/canonical/mcp');
   });
 });

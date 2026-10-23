@@ -46,7 +46,13 @@ import { EnvConfigGenerator } from '@/components/EnvConfigGenerator';
 | `RUNTIME_API_PROXY_URL`| 前端 Gemini 默认代理地址 | 公开前端 | `/api/gemini` |
 | `RUNTIME_LIVE_API_BASE_URL`| 前端 Live API 连接地址（留空直连官方） | 公开前端 | `/api/live` |
 | `RUNTIME_THIRD_PARTY_PROXY_URL`| 前端第三方兼容代理地址（留空直连） | 公开前端 | `/api/openai` |
-| `RUNTIME_PYODIDE_BASE_URL` | Pyodide WASM 运行时资源地址（留空使用默认 CDN） | 公开前端 | 空 |
+| `RUNTIME_PYODIDE_BASE_URL` | Pyodide WASM 运行时资源地址（留空使用同源 `/pyodide/`） | 公开前端 | 空 |
+
+服务端选中的普通 Gemini Key 始终使用 `GEMINI_API_BASE`；浏览器自定义地址仅对浏览器 BYOK Key 生效。`GEMINI_API_BASE` 是管理员受信任配置，可以指向本地反代。受限制的代理在实际连接时检查 DNS，MCP 不跟随跨源或 HTTPS 降级重定向。保留 `198.18.0.0/15` 的 Fake-IP 兼容，用于 Clash/Surge/Mihomo TUN。
+
+流式任务默认最多同时运行 32 个任务，保留 256 个任务、全局 64 MiB 历史，单个事件和单任务历史各为 8 MiB。空闲 120 秒、运行 1 小时终止；已完成历史保留 10 分钟。Compose 可用 `AMC_STREAM_JOB_*` 环境变量调整。历史过期或被淘汰时续传返回 `409`，前端应保留已有内容并重新发起请求；内存历史不跨进程重启保存。
+
+默认构建按安装的 Pyodide 清单下载科学计算包、校验 SHA-256 并缓存。使用外部版本化资源时，可执行 `PYODIDE_ASSETS_EXTERNAL=true pnpm run build` 省略同源资源，同时设置匹配版本的 `RUNTIME_PYODIDE_BASE_URL`。
 
 ---
 
