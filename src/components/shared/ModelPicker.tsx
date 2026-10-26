@@ -59,6 +59,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
     width: 320,
     above: false,
     height: dropdownMaxHeight,
+    detailHeight: dropdownMaxHeight,
   });
   // Bottom-edge fade while the list still has content below the fold — gone
   // once the user scrolls to the end, so the last row is never obscured.
@@ -153,9 +154,13 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
       const above = below < Math.min(dropdownMaxHeight, 240) && aboveSpace > below;
       const height = Math.min(dropdownMaxHeight, above ? aboveSpace : below);
       setDropdownPosition((current) =>
-        current.offset === offset && current.width === width && current.above === above && current.height === height
+        current.offset === offset &&
+        current.width === width &&
+        current.above === above &&
+        current.height === height &&
+        current.detailHeight === below
           ? current
-          : { offset, width, above, height },
+          : { offset, width, above, height, detailHeight: below },
       );
       const detailWidth = 320;
       setDetailSide(
@@ -187,6 +192,10 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   useClickOutside(containerRef, () => navigation.close(), isOpen);
 
   const activeEntry = activeIndex >= 0 ? visibleEntries[activeIndex] : undefined;
+  const detailModel = hoveredEntry?.model || activeEntry?.model || selectedModel;
+  // This picker receives only an id, so a shared id across providers cannot identify one selected connection.
+  const isDetailSelected =
+    detailModel?.id === selectedId && effectiveModels.filter((model) => model.id === selectedId).length === 1;
   // Same model id may exist on several providers — scope option ids by provider
   // so DOM ids, aria-activedescendant, and React keys stay unique.
   const activeOptionKey = activeEntry ? `${activeEntry.model.providerId ?? 'gemini'}:${activeEntry.id}` : undefined;
@@ -195,6 +204,9 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.defaultPrevented) return;
 
+    if (['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
+      setHoveredEntry(null);
+    }
     navigation.handleKeyDown(event);
   };
 
@@ -249,7 +261,10 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                     isEntrySelected={(entry) => entry.id === selectedId}
                     activeEntryId={activeEntry?.id}
                     onSelectEntry={handleSelectModel}
-                    onHoverEntry={setHoveredEntry}
+                    onHoverEntry={(entry) => {
+                      // Keep the preview while the pointer crosses to its card for reading or scrolling.
+                      if (entry) setHoveredEntry(entry);
+                    }}
                   />
                 )}
               </div>
@@ -262,20 +277,23 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         detailSide &&
         !dropdownPosition.above &&
         dropdownPosition.height >= dropdownMaxHeight &&
-        (hoveredEntry?.model || activeEntry?.model || selectedModel) && (
+        detailModel && (
           <div
             data-testid="model-picker-detail-hovercard"
-            style={
-              detailSide === 'right'
+            style={{
+              ...(detailSide === 'right'
                 ? { left: dropdownPosition.offset + dropdownPosition.width + 8 }
-                : { right: `calc(100% - ${dropdownPosition.offset}px + 8px)` }
-            }
+                : { right: `calc(100% - ${dropdownPosition.offset}px + 8px)` }),
+              maxHeight: dropdownPosition.detailHeight,
+            }}
             className={`hidden sm:block absolute top-full mt-1 z-50 transition-all duration-150 animate-in fade-in zoom-in-95 pointer-events-none ${
               detailSide === 'left' ? 'right-[calc(100%+8px)]' : 'left-[328px]'
             }`}
           >
             <ModelDetailCard
-              model={(hoveredEntry?.model || activeEntry?.model || selectedModel)!}
+              model={detailModel}
+              selectionStatus={isDetailSelected ? 'selected' : 'preview'}
+              className="max-h-[inherit] overflow-y-auto custom-scrollbar"
               renderModelIcon={getModelIcon}
             />
           </div>

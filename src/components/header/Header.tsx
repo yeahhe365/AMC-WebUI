@@ -78,7 +78,8 @@ export const Header: React.FC<HeaderProps> = ({
   const showTextTools = permissions.canGenerateSuggestions;
 
   return (
-    <header className="bg-[var(--theme-bg-primary)] px-2 py-[0.4rem] sm:px-3 sm:py-[0.52rem] flex items-center justify-between gap-2 sm:gap-3 flex-shrink-0 relative z-20">
+    // Above message actions (z-20) and composer (z-30), below the mobile sidebar backdrop (z-40).
+    <header className="bg-[var(--theme-bg-primary)] px-2 py-[0.4rem] sm:px-3 sm:py-[0.52rem] flex items-center justify-between gap-2 sm:gap-3 flex-shrink-0 relative z-[35]">
       <div className="flex flex-1 items-center gap-1 sm:gap-2 min-w-0">
         <button
           onClick={onToggleHistorySidebar}

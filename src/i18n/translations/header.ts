@@ -1,4 +1,31 @@
 export const headerTranslations = {
+  modelPickerDetailSelected: {
+    en: 'Current selection',
+    zh: '当前选择',
+    ja: '選択中のモデル',
+    ko: '현재 선택',
+    es: 'Selección actual',
+    fr: 'Sélection actuelle',
+    de: 'Aktuelle Auswahl',
+  },
+  modelPickerDetailPreview: {
+    en: 'Previewing model details',
+    zh: '正在查看模型详情',
+    ja: 'モデルの詳細をプレビュー中',
+    ko: '모델 세부 정보 미리보기',
+    es: 'Vista previa del modelo',
+    fr: 'Aperçu des détails du modèle',
+    de: 'Vorschau der Modelldetails',
+  },
+  modelPickerDetailPreviewHint: {
+    en: 'Viewing details does not switch models. Select a model in the list to switch.',
+    zh: '查看详情不会切换模型，点击列表中的模型后才会切换。',
+    ja: '詳細を見てもモデルは切り替わりません。一覧でモデルを選択すると切り替わります。',
+    ko: '세부 정보를 보는 것만으로는 모델이 바뀌지 않습니다. 목록에서 모델을 선택하면 전환됩니다.',
+    es: 'Ver los detalles no cambia el modelo. Selecciona uno en la lista para cambiarlo.',
+    fr: 'Consulter les détails ne change pas de modèle. Sélectionnez un modèle dans la liste pour changer.',
+    de: 'Die Vorschau wechselt das Modell nicht. Wähle zum Wechseln ein Modell in der Liste aus.',
+  },
   historySidebarClose: {
     en: 'Close history sidebar',
     zh: '关闭历史记录侧边栏',

@@ -26,6 +26,7 @@ interface ModelDetailCardProps {
   model: ModelOption;
   renderModelIcon?: (model: ModelOption) => React.ReactNode;
   className?: string;
+  selectionStatus?: 'selected' | 'preview';
 }
 
 const MODALITY_ICONS: Record<ModelModalityId, React.ElementType> = {
@@ -49,7 +50,12 @@ const BADGE_STYLE =
   'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-medium bg-[var(--theme-bg-tertiary)]/60 text-[var(--theme-text-secondary)] border border-[var(--theme-border-secondary)]/50 hover:bg-[var(--theme-bg-tertiary)] hover:text-[var(--theme-text-primary)] transition-colors';
 const ICON_STYLE = 'text-[var(--theme-text-tertiary)] flex-shrink-0';
 
-export const ModelDetailCard: React.FC<ModelDetailCardProps> = ({ model, renderModelIcon, className = '' }) => {
+export const ModelDetailCard: React.FC<ModelDetailCardProps> = ({
+  model,
+  renderModelIcon,
+  className = '',
+  selectionStatus,
+}) => {
   const { t } = useI18n();
   const spec = getModelSpecification(model);
 
@@ -62,6 +68,7 @@ export const ModelDetailCard: React.FC<ModelDetailCardProps> = ({ model, renderM
   return (
     <div
       data-testid="model-detail-card"
+      data-model-selection-status={selectionStatus}
       className={`w-72 sm:w-80 rounded-2xl bg-[var(--theme-bg-secondary)] border border-[var(--theme-border-primary)] p-3.5 shadow-premium space-y-3 pointer-events-auto select-none ${className}`}
     >
       <div className="flex items-start gap-2.5">
@@ -88,6 +95,19 @@ export const ModelDetailCard: React.FC<ModelDetailCardProps> = ({ model, renderM
           </p>
         </div>
       </div>
+
+      {selectionStatus && (
+        <div className="space-y-1 text-xs text-[var(--theme-text-secondary)]">
+          <p className="font-medium">
+            {t(selectionStatus === 'selected' ? 'modelPickerDetailSelected' : 'modelPickerDetailPreview')}
+          </p>
+          {selectionStatus === 'preview' && (
+            <p className="text-[11px] leading-relaxed text-[var(--theme-text-tertiary)]">
+              {t('modelPickerDetailPreviewHint')}
+            </p>
+          )}
+        </div>
+      )}
 
       {description && (
         <p className="text-xs leading-relaxed text-[var(--theme-text-secondary)] line-clamp-2">{description}</p>
