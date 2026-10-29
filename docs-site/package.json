@@ -15,7 +15,7 @@
     "@astrojs/starlight": "^0.42.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "astro": "^7.3.2",
+    "astro": "^7.3.3",
     "cookie": "^2.0.1",
     "lucide-react": "^0.417.0",
     "react": "^18.3.1",
