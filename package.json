@@ -108,7 +108,7 @@
     "turndown-plugin-gfm": "^1.0.2",
     "ws": "^8.20.2",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.4.3",
+    "zod": "^4.6.6",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
