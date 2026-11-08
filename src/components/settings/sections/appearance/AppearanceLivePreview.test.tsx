@@ -1,9 +1,16 @@
 import { act } from 'react';
 import { fireEvent, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { renderWithProviders } from '@/test/render/providerRenderer';
 import { AppearanceLivePreview } from './AppearanceLivePreview';
 import type { AppSettings } from '@/types';
+
+// The preview suspends on a lazily imported markdown renderer. Warming the module
+// keeps the first assertion from racing the import, which is far slower than the
+// default waitFor budget on a cold, parallel test run.
+beforeAll(async () => {
+  await import('@/components/message/StandardMarkdownRenderer');
+});
 
 const baseSettings: AppSettings = {
   themeId: 'onyx',

@@ -14,19 +14,21 @@ describe('GeminiProviderDetail', () => {
   });
 
   it('renders ApiConfigSection at top and model list at bottom', () => {
-    render(
+    const { container } = render(
       <GeminiProviderDetail
         settings={{ apiKey: 'test-key', useCustomApiConfig: true } as any}
         onUpdateSettings={vi.fn()}
       />,
     );
 
-    // Header title
-    expect(screen.getByText(/Google Gemini/i)).toBeInTheDocument();
+    // API config comes before the model list.
+    const apiConfig = container.querySelector('[data-settings-item="api-config"]');
+    expect(apiConfig).not.toBeNull();
+    const firstModelRow = screen.getByText('Gemini 2.5 Flash');
+    expect(apiConfig!.compareDocumentPosition(firstModelRow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // Models header
     expect(screen.getAllByText(/Models|模型/i).length).toBeGreaterThanOrEqual(1);
     // Model items
-    expect(screen.getByText('Gemini 2.5 Flash')).toBeInTheDocument();
     expect(screen.getByText('Gemini 2.5 Pro')).toBeInTheDocument();
   });
 

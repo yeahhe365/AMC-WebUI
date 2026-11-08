@@ -281,9 +281,14 @@ describe('SettingsModal', () => {
     const aside = document.querySelector('aside');
     expect(aside).not.toBeNull();
     const rows = [aside?.children[0], aside?.children[1], aside?.querySelector('nav'), aside?.lastElementChild];
-    for (const row of rows) {
-      expect((row as HTMLElement)?.className.split(' ')).toContain('px-4');
-    }
+    // The footer row pads all four sides, so `p-3` is the same gutter as `px-3`.
+    const gutterOf = (row: Element | null | undefined) => {
+      const classes = (row as HTMLElement | null)?.className.split(' ') ?? [];
+      return classes.find((cls) => /^p[xy]?-\d+$/.test(cls))?.replace(/^p-/, 'px-');
+    };
+    const gutters = rows.map(gutterOf);
+    expect(gutters[0]).toBe('px-3');
+    expect(new Set(gutters).size).toBe(1);
   });
 
   it('moves the mobile match count inline and hides the sidebar status while searching', async () => {

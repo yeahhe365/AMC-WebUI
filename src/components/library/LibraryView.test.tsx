@@ -87,7 +87,7 @@ describe('LibraryView', () => {
       await Promise.resolve();
     });
 
-    expect(screen.getByText(/No files found/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Add your first file/i })).toBeInTheDocument();
   });
 
   it('renders list of items from both session and standalone files', async () => {
