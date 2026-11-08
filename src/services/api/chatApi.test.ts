@@ -636,10 +636,10 @@ describe('chatApi stream idle watchdog', () => {
       onComplete,
     );
 
-    // Advance past the default 60s idle budget (plus one watchdog tick).
+    // Advance past the default 180s idle budget (plus one watchdog tick).
     // advanceTimersByTimeAsync lets the abort→resolve microtasks flush so the
     // stalled generator settles and the loop reaches its timeout branch.
-    await vi.advanceTimersByTimeAsync(70_000);
+    await vi.advanceTimersByTimeAsync(190_000);
     await sendPromise;
 
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({ name: 'StreamIdleTimeoutError' }));
@@ -677,7 +677,7 @@ describe('chatApi stream idle watchdog', () => {
     );
 
     // A 30s gap (typical deep-search server-side search window) is within the
-    // default 60s budget: the watchdog must NOT fire.
+    // default 180s budget: the watchdog must NOT fire.
     await vi.advanceTimersByTimeAsync(30_000);
     releaseSecondChunk();
     await sendPromise;

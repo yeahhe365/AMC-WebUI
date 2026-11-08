@@ -8,9 +8,10 @@
  * stream error instead of an infinite spinner.
  *
  * Deep search runs Google Search on the Gemini server, so the SSE can
- * legitimately sit silent for 10-60s between chunks; hence the generous 60s
- * default. Override via VITE_STREAM_IDLE_TIMEOUT_MS when a deployment needs a
- * longer budget.
+ * legitimately sit silent for 10-60s between chunks. Local fork: the default is
+ * raised to 180s because inline video attachments through the AI Studio proxy
+ * can take 50-80s before the first event. Override via
+ * VITE_STREAM_IDLE_TIMEOUT_MS when a deployment needs a different budget.
  */
 const STREAM_IDLE_TIMEOUT_MS = readStreamIdleTimeoutMs();
 
@@ -22,7 +23,7 @@ function readStreamIdleTimeoutMs(): number {
       return parsed;
     }
   }
-  return 60_000;
+  return 180_000;
 }
 
 export const createStreamIdleTimeoutError = (): Error => {
