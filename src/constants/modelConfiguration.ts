@@ -62,10 +62,6 @@ export const THINKING_BUDGET_RANGES: { [key: string]: { min: number; max: number
     modelIds: [ROBOTICS_MODEL, `models/${ROBOTICS_MODEL}`],
     range: thinkingBudgetRange(128, 24576),
   },
-  {
-    modelIds: ['gemini-2.5-flash-lite', 'models/gemini-2.5-flash-lite'],
-    range: thinkingBudgetRange(512, 24576),
-  },
 ]);
 
 export const DEFAULT_TEMPERATURE = 1.0;
