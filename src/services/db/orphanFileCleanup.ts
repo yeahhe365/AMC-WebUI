@@ -22,39 +22,45 @@ export const cleanupOrphanFiles = async (): Promise<OrphanCleanupResult> => {
     const hasEmbeddings = db.objectStoreNames.contains(EMBEDDINGS_STORE);
     const hasMetadata = db.objectStoreNames.contains(SESSION_METADATA_STORE);
     const hasKeyValue = db.objectStoreNames.contains(KEY_VALUE_STORE);
-    const sessionStoreName = hasMetadata ? SESSION_METADATA_STORE : SESSIONS_STORE;
+    // 权威表是 SESSIONS_STORE，session_metadata 只是 v7 的轻量镜像，两者可能漂移
+    // （旧标签页以无版本号方式打开 v7 库时只写 sessions）。只用镜像判断"会话还存不存在"
+    // 会在镜像缺一条时把该会话的**全部**附件与向量一起删掉，而且同一事务提交、不可恢复。
+    // 因此这里取两张表的并集：只要任一表里还有这个会话，就认为它活着。
+    const sessionStoreNames = hasMetadata ? [SESSIONS_STORE, SESSION_METADATA_STORE] : [SESSIONS_STORE];
 
     const storeNames = [
       FILES_STORE,
-      sessionStoreName,
+      ...sessionStoreNames,
       ...(hasKeyValue ? [KEY_VALUE_STORE] : []),
       ...(hasEmbeddings ? [EMBEDDINGS_STORE] : []),
     ];
 
     const tx = db.transaction(storeNames, 'readwrite');
     const fileStore = tx.objectStore(FILES_STORE);
-    const sessionStore = tx.objectStore(sessionStoreName);
     const kvStore = hasKeyValue ? tx.objectStore(KEY_VALUE_STORE) : null;
     const embeddingsStore = hasEmbeddings ? tx.objectStore(EMBEDDINGS_STORE) : null;
 
-    // 1. Gather all active session IDs
+    // 1. Gather all active session IDs (union of the authoritative store and the mirror)
     const validSessionIds = new Set<string>();
-    await new Promise<void>((resolve, reject) => {
-      const req = sessionStore.openCursor();
-      req.onsuccess = (event) => {
-        const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
-        if (cursor) {
-          const val = cursor.value;
-          if (val && typeof val.id === 'string') {
-            validSessionIds.add(val.id);
+    for (const storeName of sessionStoreNames) {
+      const sessionStore = tx.objectStore(storeName);
+      await new Promise<void>((resolve, reject) => {
+        const req = sessionStore.openCursor();
+        req.onsuccess = (event) => {
+          const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+          if (cursor) {
+            const val = cursor.value;
+            if (val && typeof val.id === 'string') {
+              validSessionIds.add(val.id);
+            }
+            cursor.continue();
+          } else {
+            resolve();
           }
-          cursor.continue();
-        } else {
-          resolve();
-        }
-      };
-      req.onerror = () => reject(req.error);
-    });
+        };
+        req.onerror = () => reject(req.error);
+      });
+    }
 
     // 2. Gather standalone library file IDs from KEY_VALUE_STORE if present
     const validLibraryFileIds = new Set<string>();

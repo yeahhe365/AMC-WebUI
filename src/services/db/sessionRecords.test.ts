@@ -125,7 +125,18 @@ vi.mock('./indexedDbAccess', () => ({
   withWriteLock: vi.fn(async (fn: () => Promise<any>) => fn()),
   transactionToPromise: vi.fn(async () => undefined),
   getAll: vi.fn(async () => []),
-  getItem: vi.fn(async () => undefined),
+  getItem: vi.fn(async (storeName: string, key: string) =>
+    storeName === 'sessions' ? mockSessions[key] : storeName === 'session_metadata' ? mockMetadata[key] : undefined,
+  ),
+  getAllKeys: vi.fn(async (storeName: string) =>
+    storeName === 'session_metadata' ? Object.keys(mockMetadata) : Object.keys(mockSessions),
+  ),
+  putMany: vi.fn(async (storeName: string, values: any[]) => {
+    if (storeName !== 'session_metadata') return;
+    values.forEach((value) => {
+      mockMetadata[value.id] = value;
+    });
+  }),
 }));
 
 describe('sessionRecords.deleteFilesFromSessions', () => {
@@ -301,6 +312,52 @@ describe('sessionRecords dual-write and metadata storage', () => {
     expect(results[0].messages).toEqual([]);
   });
 
+  // DB-2：旧实现只在镜像"完全为空"时回填，于是只要镜像里有任意一条，
+  // 缺失的会话就永远补不回来，用户看到的是"聊了几天的历史突然少了几条"。
+  it('recovers sessions missing from the mirror instead of hiding them', async () => {
+    const { getAllSessionMetadata } = await import('./sessionRecords');
+
+    mockSessions['s-mirrored'] = {
+      id: 's-mirrored',
+      title: 'Mirrored',
+      timestamp: 100,
+      settings: {} as any,
+      messages: [{ id: 'm1', role: 'user', content: 'body', timestamp: new Date() }],
+    };
+    mockMetadata['s-mirrored'] = { ...mockSessions['s-mirrored'], messages: [] };
+    mockSessions['s-lost'] = {
+      id: 's-lost',
+      title: 'Lost From Sidebar',
+      timestamp: 200,
+      settings: {} as any,
+      messages: [{ id: 'm2', role: 'user', content: 'body', timestamp: new Date() }],
+    };
+
+    const results = await getAllSessionMetadata();
+
+    expect(results.map((session) => session.id).sort()).toEqual(['s-lost', 's-mirrored']);
+    const recovered = results.find((session) => session.id === 's-lost');
+    expect(recovered?.title).toBe('Lost From Sidebar');
+    // 返回的是轻量行，不要把这几十 MB 的消息体一起塞回侧栏。
+    expect(recovered?.messages).toEqual([]);
+    // 同时补进了镜像，下次走快路径就能直接读到。
+    expect(mockMetadata['s-lost']).toBeDefined();
+  });
+
+  it('leaves the mirror untouched when it already covers every session', async () => {
+    const { getAllSessionMetadata } = await import('./sessionRecords');
+    const { putMany } = await import('./indexedDbAccess');
+
+    mockSessions['s1'] = { id: 's1', title: 'S1', timestamp: 1, settings: {} as any, messages: [] };
+    mockMetadata['s1'] = { ...mockSessions['s1'], messages: [] };
+    const callsBefore = (putMany as unknown as { mock: { calls: unknown[] } }).mock.calls.length;
+
+    const results = await getAllSessionMetadata();
+
+    expect(results).toHaveLength(1);
+    expect((putMany as unknown as { mock: { calls: unknown[] } }).mock.calls.length).toBe(callsBefore);
+  });
+
   it('updates session_metadata and preserves full sessions messages on saveSessionMetadata', async () => {
     const { saveSessionMetadata } = await import('./sessionRecords');
 
@@ -338,6 +395,30 @@ describe('sessionRecords dual-write and metadata storage', () => {
     expect(mockSessions['s-meta'].sortOrder).toBe(42);
     expect(mockSessions['s-meta'].messages).toHaveLength(1);
     expect(mockSessions['s-meta'].messages[0].content).toBe('Preserve me');
+  });
+
+  // DB-4：多标签页里 A 删了某条会话、B 的列表里还留着它。B 下次保存元数据时，
+  // 旧实现会对查不到的记录 put 一个 `messages: []` 的零消息壳 —— 删掉的会话因此
+  // "复活"成一条空聊天。删除就该是删除。
+  it('does not resurrect a session that was deleted from another tab', async () => {
+    const { saveManySessionMetadata } = await import('./sessionRecords');
+
+    // 镜像里还残留这一行，权威表里已经被删掉。
+    mockMetadata['s-gone'] = {
+      id: 's-gone',
+      title: 'Deleted Elsewhere',
+      timestamp: 1,
+      settings: {} as any,
+      messages: [],
+    };
+
+    await saveManySessionMetadata([
+      { id: 's-gone', title: 'Deleted Elsewhere', timestamp: 1, settings: {} as any, messages: [] },
+    ]);
+
+    expect(mockSessions['s-gone']).toBeUndefined();
+    // 顺手把残留的镜像行也清掉，别让它继续在侧栏里晃。
+    expect(mockMetadata['s-gone']).toBeUndefined();
   });
 
   it('batch updates multiple sessions via saveManySessionMetadata', async () => {

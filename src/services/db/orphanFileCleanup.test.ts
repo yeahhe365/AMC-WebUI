@@ -171,6 +171,30 @@ describe('cleanupOrphanFiles', () => {
     expect(mockEmbeddings['file-deleted-sess']).toBeUndefined();
   });
 
+  // DB-1：session_metadata 只是 v7 的轻量镜像。旧实现"有镜像就只看镜像"，
+  // 一旦两表漂移（旧标签页以无版本号方式打开 v7 库，只写 sessions），
+  // 该会话的全部附件与向量会在同一事务里被删掉，不可恢复。
+  it('keeps attachments of a session that exists only in the authoritative sessions store', async () => {
+    mockMetadata['session-other'] = { id: 'session-other', title: 'Other' };
+    mockSessions['session-drifted'] = { id: 'session-drifted', title: 'Drifted' };
+
+    mockFiles['file-drifted'] = {
+      id: 'file-drifted',
+      sessionId: 'session-drifted',
+      name: 'drifted.png',
+      type: 'image/png',
+      rawFile: new Blob(['x'.repeat(50)]),
+    } as any;
+    mockEmbeddings['file-drifted'] = { id: 'file-drifted', vector: [0.1] };
+
+    const result = await cleanupOrphanFiles();
+
+    expect(result.deletedFileCount).toBe(0);
+    expect(result.freedBytes).toBe(0);
+    expect(mockFiles['file-drifted']).toBeDefined();
+    expect(mockEmbeddings['file-drifted']).toBeDefined();
+  });
+
   it('returns 0 when there are no orphan files', async () => {
     mockMetadata['s1'] = { id: 's1', title: 'S1' };
     mockFiles['f1'] = {

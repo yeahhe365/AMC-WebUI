@@ -5,7 +5,7 @@ import {
   stripSessionFilePayloads,
 } from '@/utils/chat/session';
 import { EMBEDDINGS_STORE, FILES_STORE, KEY_VALUE_STORE, SESSIONS_STORE, SESSION_METADATA_STORE } from './dbSchema';
-import { getAll, getDb, getItem, transactionToPromise, withWriteLock } from './indexedDbAccess';
+import { getAll, getAllKeys, getDb, getItem, putMany, transactionToPromise, withWriteLock } from './indexedDbAccess';
 import { getDraftFilesKey } from './draftFileRecords';
 import { mapMessageFiles } from '@/utils/chat/messageVariants';
 import { releaseManagedObjectUrlsByOwner } from '@/services/objectUrlManager';
@@ -84,23 +84,27 @@ export const saveManySessionMetadata = async (sessions: SavedChatSession[]): Pro
       sessions.map(
         (session) =>
           new Promise<void>((resolve, reject) => {
-            if (metaStore) {
-              metaStore.put({ ...session, messages: [] });
-            }
-
             const getReq = sessionStore.get(session.id);
             getReq.onsuccess = () => {
               const existing = getReq.result as SavedChatSession | undefined;
-              if (existing) {
-                sessionStore.put({
-                  ...existing,
-                  ...session,
-                  settings: { ...existing.settings, ...session.settings },
-                  messages: existing.messages,
-                });
-              } else {
-                sessionStore.put({ ...session, messages: [] });
+              if (!existing) {
+                // 权威表里已经没有这条会话了（通常是被另一个标签页删掉）。
+                // 这里绝不能像旧实现那样 put 一个 `messages: []` 的零消息壳：
+                // 那会让"A 标签删除、B 标签保存一次"把删掉的会话复活成空聊天。
+                // 顺手把镜像里可能残留的那一行也清掉。
+                metaStore?.delete(session.id);
+                resolve();
+                return;
               }
+
+              const merged: SavedChatSession = {
+                ...existing,
+                ...session,
+                settings: { ...existing.settings, ...session.settings },
+                messages: existing.messages,
+              };
+              sessionStore.put(merged);
+              metaStore?.put({ ...merged, messages: [] });
               resolve();
             };
             getReq.onerror = () => reject(getReq.error);
@@ -278,6 +282,30 @@ const readMetadataFromStore = async (db: IDBDatabase, storeName: string): Promis
   });
 };
 
+/**
+ * 把会话清单补进 `session_metadata` 镜像。`putMany` 自带 web 写锁，
+ * 不再是唯一一处绕过 `withWriteLock` 的写事务。
+ */
+const backfillSessionMetadata = (rows: SavedChatSession[]): void => {
+  if (rows.length === 0) return;
+  void putMany(
+    SESSION_METADATA_STORE,
+    rows.map((row) => ({ ...row, messages: [] })),
+  ).catch(() => {
+    // 回填是尽力而为：读路径已经把缺的行直接返回给调用方，这里失败不影响本次展示。
+  });
+};
+
+/**
+ * 读会话清单（侧栏用）。
+ *
+ * 权威来源始终是 `SESSIONS_STORE`，`session_metadata` 只是为了让这里不必反序列化
+ * 全部消息体而存在的镜像。所以：
+ * - 镜像**完全为空**（首次升级 v7）→ 整表回填后直接返回权威表内容；
+ * - 镜像**部分缺失**（漂移、跨标签页写失败）→ 只补缺的那几条，并把它们一起返回。
+ *   旧实现只在"完全为空"时回填，于是只要镜像里有任意一条，缺的会话就永远补不上，
+ *   表现为"聊天历史少了几条、怎么重启都不回来"。
+ */
 export const getAllSessionMetadata = async (): Promise<SavedChatSession[]> => {
   const db = await getDb();
   if (!db.objectStoreNames.contains(SESSION_METADATA_STORE)) {
@@ -285,24 +313,38 @@ export const getAllSessionMetadata = async (): Promise<SavedChatSession[]> => {
   }
 
   const metadata = await readMetadataFromStore(db, SESSION_METADATA_STORE);
+
   if (metadata.length === 0) {
     const sessions = await readMetadataFromStore(db, SESSIONS_STORE);
     if (sessions.length > 0) {
-      void (async () => {
-        try {
-          const freshDb = await getDb();
-          if (!freshDb.objectStoreNames.contains(SESSION_METADATA_STORE)) return;
-          const tx = freshDb.transaction(SESSION_METADATA_STORE, 'readwrite');
-          const metaStore = tx.objectStore(SESSION_METADATA_STORE);
-          sessions.forEach((s) => metaStore.put({ ...s, messages: [] }));
-        } catch {
-          // ignore background backfill failure
-        }
-      })();
+      backfillSessionMetadata(sessions);
       return sessions;
     }
+    return metadata;
   }
-  return metadata;
+
+  // 只读主键（不含 messages），既能拿到完整会话清单，又不会把整库消息体读进内存。
+  const sessionIds = (await getAllKeys(SESSIONS_STORE)).filter((key): key is string => typeof key === 'string');
+  const mirroredIds = new Set(metadata.map((entry) => entry.id));
+  const missingIds = sessionIds.filter((id) => !mirroredIds.has(id));
+  if (missingIds.length === 0) {
+    return metadata;
+  }
+
+  const recoveredSessions: SavedChatSession[] = [];
+  for (const id of missingIds) {
+    const session = await getItem<SavedChatSession>(SESSIONS_STORE, id);
+    if (session) {
+      recoveredSessions.push({ ...session, messages: [] });
+    }
+  }
+  if (recoveredSessions.length === 0) {
+    return metadata;
+  }
+
+  backfillSessionMetadata(recoveredSessions);
+  // 本次就把它们返回给调用方，用户不必等回填完成就能在侧栏看到这些会话。
+  return [...metadata, ...recoveredSessions];
 };
 
 export const searchSessions = async (query: string): Promise<string[]> => {
