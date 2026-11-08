@@ -18,6 +18,15 @@ interface ModelBadgeListProps {
 
 const MODELS: ModelInfo[] = [
   {
+    id: 'gemini-4-argon',
+    name: 'Gemini 4 Argon',
+    category: 'core',
+    contextWindow: '1M Tokens',
+    features: ['旗舰推理', '最长 1M 输出', '深度思考', 'Live Artifacts'],
+    description: '当前旗舰推理模型，100 万 Token 上下文与最长 100 万 Token 解码，面向最困难的长程任务。',
+    descriptionEn: 'Flagship reasoning model with a shared 1M-token context window and long decodes up to 1M tokens.',
+  },
+  {
     id: 'gemini-3.8-flash',
     name: 'Gemini 3.8 Flash',
     category: 'core',
@@ -47,7 +56,7 @@ const MODELS: ModelInfo[] = [
   },
   {
     id: 'gemini-3.1-pro-preview',
-    name: 'Gemini 3.1 Pro Preview',
+    name: 'Gemini 3.1 Pro',
     category: 'core',
     contextWindow: '1M Tokens',
     features: ['高阶数理', '超大上下文', '32K Token 思考预算'],
@@ -83,11 +92,21 @@ const MODELS: ModelInfo[] = [
       'Extended-thinking variant of the Live endpoint, enabling longer reasoning chains during real-time conversation.',
   },
   {
+    id: 'gemini-nano-banana-2.1',
+    name: 'Nano Banana 2.1',
+    category: 'media',
+    contextWindow: '128K Tokens',
+    features: ['原生生图', '1K / 2K / 4K', '14 种画面比例', '搜索增强 (Web + Image)'],
+    description: '最新原生图像模型，输入支持文本、图片、视频与 PDF，思考等级 Minimal / Medium / High。',
+    descriptionEn:
+      'Newest native image model, accepting text, image, video and PDF input with Minimal, Medium or High thinking.',
+  },
+  {
     id: 'gemini-3-pro-image',
-    name: 'Gemini 3 Pro Image (Nano Banana)',
+    name: 'Nano Banana Pro',
     category: 'media',
     contextWindow: '64K Tokens',
-    features: ['原生生图', '比例定制 (1:1 / 16:9)', '四图并发'],
+    features: ['原生生图', '比例定制 (1:1 / 16:9)', '四图并发', '仅图片输入'],
     description: 'Gemini 原生高质量绘图模型，支持自然语言指令精准控制构图、材质与光影。',
     descriptionEn:
       'Native high-quality text-to-image model supporting custom aspect ratios and multi-image generation.',
@@ -102,8 +121,17 @@ const MODELS: ModelInfo[] = [
     descriptionEn: 'Expressive speech synthesis with 30 lifelike voices and real-time speed adjustment.',
   },
   {
+    id: 'gemini-3.8-flash-lite-tts',
+    name: 'Gemini 3.8 Flash-Lite TTS',
+    category: 'media',
+    contextWindow: '8K Tokens',
+    features: ['轻量语音合成', '30 种音色', '更低成本'],
+    description: '语音合成的轻量档，音色库与标准档一致，面向高频朗读与批量合成。',
+    descriptionEn: 'Lighter speech synthesis tier with the same 30-voice palette, built for high-volume readout.',
+  },
+  {
     id: 'gemini-3.5-live-translate-preview',
-    name: 'Gemini 3.5 Live Translate Preview',
+    name: 'Gemini 3.5 Live Translate',
     category: 'live',
     contextWindow: '128K Tokens',
     features: ['实时语音翻译', '双向低延迟', '多语种同传'],
@@ -130,7 +158,7 @@ const MODELS: ModelInfo[] = [
   },
   {
     id: 'gemini-3.1-flash-image',
-    name: 'Gemini 3.1 Flash Image (Nano Banana 2)',
+    name: 'Nano Banana 2',
     category: 'media',
     contextWindow: '128K Tokens',
     features: ['原生生图', '比例定制 (1:1 / 16:9)', '多图并发'],
@@ -139,7 +167,7 @@ const MODELS: ModelInfo[] = [
   },
   {
     id: 'gemini-3.1-flash-lite-image',
-    name: 'Gemini 3.1 Flash-Lite Image',
+    name: 'Nano Banana 2 Lite',
     category: 'media',
     contextWindow: '64K Tokens',
     features: ['轻量生图', '低成本', '快速出图'],
