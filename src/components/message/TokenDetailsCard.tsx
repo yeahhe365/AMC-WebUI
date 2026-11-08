@@ -134,7 +134,8 @@ export const TokenDetailsCard: React.FC<TokenDetailsCardProps> = React.memo(
       };
       const route = resolveChatApiRoute(appSettings, effectiveChatSettings);
 
-      const mId = propModelId || route.modelId || appSettings.modelId || 'gemini-2.5-flash';
+      // Last-resort display fallback only; every earlier source normally resolves.
+      const mId = propModelId || route.modelId || appSettings.modelId || 'gemini-3.5-flash-lite';
       const pId = sessionSettings?.providerId || route.providerId;
 
       let pName = propProviderName;

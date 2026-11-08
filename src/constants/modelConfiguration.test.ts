@@ -11,4 +11,11 @@ describe('THINKING_BUDGET_RANGES', () => {
     expect(THINKING_BUDGET_RANGES['gemini-robotics-er-1.6-preview']).toBeUndefined();
     expect(THINKING_BUDGET_RANGES['models/gemini-robotics-er-1.6-preview']).toBeUndefined();
   });
+
+  it('drops budget ranges for the shut-down Gemini 2.5 Pro and 2.5 Flash', () => {
+    expect(THINKING_BUDGET_RANGES['gemini-2.5-pro']).toBeUndefined();
+    expect(THINKING_BUDGET_RANGES['models/gemini-2.5-pro']).toBeUndefined();
+    expect(THINKING_BUDGET_RANGES['gemini-2.5-flash']).toBeUndefined();
+    expect(THINKING_BUDGET_RANGES['models/gemini-2.5-flash']).toBeUndefined();
+  });
 });

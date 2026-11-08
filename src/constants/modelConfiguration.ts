@@ -63,14 +63,6 @@ export const THINKING_BUDGET_RANGES: { [key: string]: { min: number; max: number
     range: thinkingBudgetRange(128, 24576),
   },
   {
-    modelIds: ['gemini-2.5-pro', 'models/gemini-2.5-pro'],
-    range: thinkingBudgetRange(128, 32768),
-  },
-  {
-    modelIds: ['gemini-2.5-flash', 'models/gemini-2.5-flash'],
-    range: thinkingBudgetRange(0, 24576),
-  },
-  {
     modelIds: ['gemini-2.5-flash-lite', 'models/gemini-2.5-flash-lite'],
     range: thinkingBudgetRange(512, 24576),
   },

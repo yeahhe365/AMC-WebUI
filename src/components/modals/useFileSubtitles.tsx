@@ -290,7 +290,7 @@ export const useFileSubtitles = ({
     let apiKey: string | null = null;
     const keyResult = getGeminiKeyForRequest(
       appSettings,
-      { ...DEFAULT_CHAT_SETTINGS, modelId: 'gemini-2.5-flash' },
+      { ...DEFAULT_CHAT_SETTINGS, modelId: DEFAULT_THOUGHT_TRANSLATION_MODEL_ID },
       { skipIncrement: true },
     );
     if (!('error' in keyResult)) {

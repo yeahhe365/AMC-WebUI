@@ -106,7 +106,7 @@ export const SETTINGS_TOOLS: McpToolDefinition[] = [
         },
         modelId: {
           type: 'string',
-          description: 'Model ID to use for chat (e.g. gemini-3.8-flash, gemini-2.5-pro)',
+          description: 'Model ID to use for chat (e.g. gemini-3.8-flash, gemini-3.5-flash-lite)',
         },
         temperature: {
           type: 'number',
