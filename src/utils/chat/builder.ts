@@ -3,6 +3,7 @@ import type { PartMediaResolutionLevel } from '@google/genai';
 import { logService } from '@/services/logService';
 import { isGemini3ImageModel, isGemini3Model } from '@/utils/model/modelCapabilities';
 import { blobToBase64, fileToString } from '@/utils/file/fileEncoding';
+import { buildAttachmentTextCacheKey, withAttachmentTextCache } from '@/utils/file/attachmentTextCache';
 import { getFileKindFlags, isImageMimeType, isTextFile } from '@/utils/file/fileTypeClassification';
 import { normalizeYoutubeUrl } from '@/utils/file/youtubeUrl';
 
@@ -115,13 +116,27 @@ const buildFilePart = async (
       }
 
       if (!part) {
-        let textContent = '';
-        if (fileSource && (fileSource instanceof File || fileSource instanceof Blob)) {
-          textContent = await fileToString(fileSource as File);
-        } else if (urlSource) {
-          // Fetch from URL when rawFile is missing.
-          const response = await fetch(urlSource);
-          textContent = await response.text();
+        // 文本附件此前每条消息都重读一遍 rawFile / dataUrl（CTX-2）；这里按文件身份
+        // 走一层进程内缓存，并优先复用已抽好的 `textContent`。
+        let textContent = file.textContent ?? '';
+        if (!textContent) {
+          textContent = await withAttachmentTextCache(
+            buildAttachmentTextCacheKey('text', file.id, file.size, file.name),
+            async () => {
+              if (fileSource && (fileSource instanceof File || fileSource instanceof Blob)) {
+                return fileToString(fileSource as File);
+              }
+              if (urlSource) {
+                // Fetch from URL when rawFile is missing.
+                const response = await fetch(urlSource);
+                return response.text();
+              }
+              return '';
+            },
+          );
+          if (textContent) {
+            enrichedFile.textContent = textContent;
+          }
         }
         if (textContent) {
           part = { text: textContent };
@@ -162,7 +177,10 @@ const buildFilePart = async (
         try {
           const { extractDocxText } = await import('@/utils/document/docxPreview');
           if (fileSource && fileSource instanceof Blob) {
-            const { text } = await extractDocxText(fileSource as File);
+            const text = await withAttachmentTextCache(
+              buildAttachmentTextCacheKey('docx', file.id, file.size, file.name),
+              async () => (await extractDocxText(fileSource as File)).text,
+            );
             enrichedFile.textContent = text;
             part = { text: `[Document: ${file.name}]\n${text}` };
           }
@@ -174,12 +192,17 @@ const buildFilePart = async (
         try {
           const { generateZipContext } = await import('@/utils/import-context/loaders');
           if (fileSource) {
-            const fileObj =
-              fileSource instanceof File
-                ? fileSource
-                : new File([fileSource], file.name, { type: file.type || 'application/zip' });
-            const contextFile = await generateZipContext(fileObj);
-            const text = await fileToString(contextFile);
+            const text = await withAttachmentTextCache(
+              buildAttachmentTextCacheKey('zip', file.id, file.size, file.name),
+              async () => {
+                const fileObj =
+                  fileSource instanceof File
+                    ? fileSource
+                    : new File([fileSource], file.name, { type: file.type || 'application/zip' });
+                const contextFile = await generateZipContext(fileObj);
+                return fileToString(contextFile);
+              },
+            );
             enrichedFile.textContent = text;
             part = { text: `[Archive Context: ${file.name}]\n${text}` };
           }

@@ -4,6 +4,10 @@ import { logService } from '@/services/logService';
 export interface PdfInspectionResult {
   numPages: number;
   text: string;
+  /** 实际读取过文本的页数(受 maxPages 限制)。 */
+  pagesRead?: number;
+  /** 是否因页数或字符数上限而只取了文档的一部分。 */
+  truncated?: boolean;
 }
 
 export interface PdfInspectionOptions {
@@ -38,8 +42,11 @@ const inspectPdfData = async (
         const pageLimit = Math.min(pdfDoc.numPages, options.maxPages ?? DEFAULT_MAX_PAGES);
         const charLimit = options.maxChars ?? DEFAULT_MAX_CHARS;
         let accumulatedChars = 0;
+        let pagesRead = 0;
+        let truncatedByChars = false;
 
         for (let pageNum = 1; pageNum <= pageLimit; pageNum++) {
+          pagesRead = pageNum;
           const page = await pdfDoc.getPage(pageNum);
           const content = await page.getTextContent();
           const pageText = content.items
@@ -52,6 +59,7 @@ const inspectPdfData = async (
             pageTexts.push(pdfDoc.numPages > 1 ? `[Page ${pageNum}]\n${pageText}` : pageText);
             accumulatedChars += pageText.length;
             if (accumulatedChars >= charLimit) {
+              truncatedByChars = true;
               break;
             }
           }
@@ -60,6 +68,8 @@ const inspectPdfData = async (
         return {
           numPages: pdfDoc.numPages,
           text: pageTexts.join('\n\n'),
+          pagesRead,
+          truncated: truncatedByChars || pdfDoc.numPages > pageLimit,
         };
       } finally {
         try {
@@ -92,6 +102,23 @@ export const extractPdfTextFromBase64 = async (base64: string, options: PdfInspe
   } catch (base64DecodeError) {
     logService.warn('Failed to decode base64 for PDF text extraction', { error: base64DecodeError });
     return '';
+  }
+};
+
+/**
+ * 同 `extractPdfTextFromBase64`，但额外返回页数与截断信息，便于在 prompt 里
+ * 明确告知模型"只收到了前 N 页"，避免它对着残缺文本自信地总结整份文档。
+ */
+export const extractPdfTextFromBase64WithMeta = async (
+  base64: string,
+  options: PdfInspectionOptions = {},
+): Promise<PdfInspectionResult> => {
+  try {
+    const uint8Array = decodeBase64ToArrayBuffer(base64);
+    return await inspectPdfData(uint8Array, options);
+  } catch (base64DecodeError) {
+    logService.warn('Failed to decode base64 for PDF text extraction', { error: base64DecodeError });
+    return { numPages: 1, text: '' };
   }
 };
 

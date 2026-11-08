@@ -12,6 +12,11 @@ vi.mock('@/utils/file/pdfTextExtraction', () => ({
     if (base64 === 'empty-doc') return '';
     return 'Extracted sample PDF text';
   }),
+  extractPdfTextFromBase64WithMeta: vi.fn(async (base64: string) => {
+    if (base64 === 'empty-doc') return { numPages: 2, text: '' };
+    if (base64 === 'long-doc') return { numPages: 200, text: 'Page text', pagesRead: 50, truncated: true };
+    return { numPages: 3, text: 'Extracted sample PDF text', pagesRead: 3, truncated: false };
+  }),
 }));
 
 vi.mock('@/services/api/protocols/openai-responses/openaiResponsesApi', () => ({
@@ -95,6 +100,42 @@ describe('standardChatThirdParty utilities', () => {
         text: '[Document (PDF)]\nExtracted sample PDF text',
       });
       expect(result[1].parts[0]).toEqual({ text: 'Here is the summary' });
+    });
+
+    // CTX-1：历史里同一个 PDF 每轮都会被重新物化，没有缓存时线性变慢。
+    it('reuses the extracted text for a PDF that repeats across turns', async () => {
+      const { extractPdfTextFromBase64WithMeta } = await import('@/utils/file/pdfTextExtraction');
+      const { clearAttachmentTextCache } = await import('@/utils/file/attachmentTextCache');
+      clearAttachmentTextCache();
+      vi.mocked(extractPdfTextFromBase64WithMeta).mockClear();
+      const pdfPart = {
+        inlineData: { mimeType: 'application/pdf', data: 'cached-base64-payload' },
+      } as unknown as ContentPart;
+
+      const history = [
+        { role: 'user' as const, parts: [pdfPart] },
+        { role: 'model' as const, parts: [{ text: 'summary' }] },
+        { role: 'user' as const, parts: [pdfPart] },
+      ];
+
+      await normalizeHistoryForNonAnthropicProvider(history);
+      await normalizeHistoryForNonAnthropicProvider(history);
+
+      // 两次完整历史各出现两次同一个 PDF，但真正的 pdf.js 解析只该发生一次。
+      expect(extractPdfTextFromBase64WithMeta).toHaveBeenCalledTimes(1);
+    });
+
+    it('tells the model when only part of a PDF was extracted', async () => {
+      const { clearAttachmentTextCache } = await import('@/utils/file/attachmentTextCache');
+      clearAttachmentTextCache();
+
+      const result = await normalizePartsForNonAnthropicProvider([
+        { inlineData: { mimeType: 'application/pdf', data: 'long-doc' } } as unknown as ContentPart,
+      ]);
+
+      expect(result[0]).toEqual({
+        text: '[Document (PDF)] [Pages 1-50 of 200 extracted; the rest is not included]\nPage text',
+      });
     });
   });
 

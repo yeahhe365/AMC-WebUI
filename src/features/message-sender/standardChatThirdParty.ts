@@ -23,7 +23,9 @@ import { toOpenAITools, toAnthropicTools, toOpenAIResponsesTools } from '@/featu
 import { runStandardToolLoop, TOOL_LOOP_CAP_NOTICE } from '@/features/standard-chat/standardToolLoop';
 import { getProxyProviderHeader } from '@/utils/third-party/thirdPartyApiProviders';
 import { isPdfMimeType } from '@/utils/file/fileTypeClassification';
-import { extractPdfTextFromBase64 } from '@/utils/file/pdfTextExtraction';
+import { extractPdfTextFromBase64WithMeta } from '@/utils/file/pdfTextExtraction';
+import { buildAttachmentTextCacheKey, withAttachmentTextCache } from '@/utils/file/attachmentTextCache';
+import { hashString } from '@/utils/format/stringHash';
 import type {
   ChatMessage,
   ChatSettings as IndividualChatSettings,
@@ -34,22 +36,53 @@ import type {
 import type { ContentPart } from '@/types/chat';
 import type { StreamHandlerFunctions } from './messageSenderTypes';
 
+/**
+ * PDF 的注入文本：带上"只取了前 N 页"的说明。
+ * 抽取上限是 50 页 / 64000 字符（`pdfTextExtraction` 的默认值），此前是静默截断，
+ * 模型拿到残缺文本仍会当成整份文档来总结。
+ */
+const formatExtractedPdfText = (extracted: {
+  text: string;
+  numPages?: number;
+  pagesRead?: number;
+  truncated?: boolean;
+}) => {
+  const trimmed = extracted.text.trim();
+  if (!trimmed) {
+    return '[Document (PDF)]\n(Text content could not be extracted from this PDF)';
+  }
+  const range =
+    extracted.truncated && extracted.pagesRead && extracted.numPages
+      ? ` [Pages 1-${extracted.pagesRead} of ${extracted.numPages} extracted; the rest is not included]`
+      : '';
+  return `[Document (PDF)]${range}\n${trimmed}`;
+};
+
 export const normalizePartsForNonAnthropicProvider = async (parts: ContentPart[]): Promise<ContentPart[]> => {
   const result: ContentPart[] = [];
   for (const part of parts) {
     const inlineData = (part as { inlineData?: { mimeType?: string; data?: string } })?.inlineData;
     if (inlineData?.data && isPdfMimeType(inlineData.mimeType)) {
-      const extractedText = await extractPdfTextFromBase64(inlineData.data);
       result.push({
-        text: extractedText.trim()
-          ? `[Document (PDF)]\n${extractedText}`
-          : '[Document (PDF)]\n(Text content could not be extracted from this PDF)',
+        text: await readPdfPartText(inlineData.mimeType ?? 'application/pdf', inlineData.data),
       });
     } else {
       result.push(part);
     }
   }
   return result;
+};
+
+/**
+ * PDF part 的文本化结果按**内容**缓存：第三方历史里每轮都会把所有 PDF part 重新走一遍，
+ * 没有缓存时"一段对话里 3 个 PDF"就变成每发一条消息重新解析 3 次 pdf.js（CTX-1）。
+ * 键里带长度和 32 位哈希，避免整段 base64 被当作 Map 的键长期驻留内存。
+ */
+const readPdfPartText = async (mimeType: string, base64: string): Promise<string> => {
+  const cacheKey = buildAttachmentTextCacheKey('pdf', mimeType, base64.length, hashString(base64));
+  return withAttachmentTextCache(cacheKey, async () =>
+    formatExtractedPdfText(await extractPdfTextFromBase64WithMeta(base64)),
+  );
 };
 
 export const normalizeHistoryForNonAnthropicProvider = async (
