@@ -243,6 +243,20 @@ describe('estimateMessageCostUsd and formatCostUsd', () => {
     expect(cost).toBeCloseTo(0.00525, 5);
   });
 
+  it('still prices an unlisted Flash variant, so the fallback anchor must stay live', () => {
+    // Guards the generic "flash" fallback: it once read gemini-3.6-flash directly,
+    // which would have turned every unlisted Flash id into an unpriced request the
+    // day that model was shut down.
+    const cost = estimateMessageCostUsd('gemini-9.9-flash-experimental', {
+      promptTokens: 1000,
+      completionTokens: 500,
+    });
+
+    expect(cost).not.toBeNull();
+    // 1000/1M * 1.5 + 500/1M * 7.5 = 0.00525
+    expect(cost).toBeCloseTo(0.00525, 5);
+  });
+
   it('formats small costs below floor as <$0.0001', () => {
     expect(formatCostUsd(0.00005)).toBe('<$0.0001');
     expect(formatCostUsd(0.0012)).toBe('$0.0012');

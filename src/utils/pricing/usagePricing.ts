@@ -255,7 +255,11 @@ export const estimateMessageCostUsd = (modelId: string, tokens: TokenCostStats):
     } else if (normalized.includes('pro')) {
       modalityPricing = MODALITY_TEXT_PRICING['gemini-3.1-pro-preview'];
     } else if (normalized.includes('flash')) {
-      modalityPricing = MODALITY_TEXT_PRICING['gemini-3.6-flash'];
+      // Anchor the generic fallback on the current Flash generation. It used to
+      // point at gemini-3.6-flash, so that model's shutdown would have silently
+      // dropped pricing for every unlisted Flash variant. 3.6 / 3.7 / 3.8 Flash
+      // share identical rates, so moving the anchor changes no computed cost.
+      modalityPricing = MODALITY_TEXT_PRICING['gemini-3.8-flash'];
     }
   }
 
