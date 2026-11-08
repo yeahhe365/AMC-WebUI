@@ -112,6 +112,20 @@ describe('modelSpecifications', () => {
     expect(proImage.thinkingBudgetRange).toBeUndefined();
   });
 
+  it('resolves specifications for Nano Banana 2.1, whose id no longer says "image"', () => {
+    const spec = getModelSpecification({ id: 'gemini-nano-banana-2.1', name: 'Nano Banana 2.1' });
+
+    expect(spec.contextWindow).toContain('128K');
+    expect(spec.maxOutput).toContain('32K');
+    // minimal / medium (default) / high, unlike the two-level 3.1 image models.
+    expect(spec.thinkingLevelRange).toContain('Minimal');
+    expect(spec.thinkingLevelRange).toContain('Medium');
+    expect(spec.thinkingLevelRange).toContain('High');
+    expect(spec.thinkingBudgetRange).toBeUndefined();
+    // Nano Banana 2.1 takes PDF input.
+    expect(spec.capabilities.some((c) => c.id === 'pdf')).toBe(true);
+  });
+
   it('resolves input modalities (vision, audio, video) and pdf capability for multimodal models', () => {
     const flashModel = getModelSpecification({ id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' });
     expect(flashModel.modalities.map((m) => m.id)).toEqual(['vision', 'audio', 'video']);

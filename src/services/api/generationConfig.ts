@@ -124,7 +124,11 @@ type InternalBuildGenerationConfigOptions = {
 
 const buildGoogleSearchToolForModel = (modelId: string): Tool => {
   const norm = normalizeModelId(modelId);
-  return norm === 'gemini-3.1-flash-image' || norm === 'gemini-3.1-flash-image-preview'
+  // Image-generation models that also ground on image search advertise both
+  // search types; Nano Banana 2.1 grounds with Google Web and Image Search.
+  return norm === 'gemini-3.1-flash-image' ||
+    norm === 'gemini-3.1-flash-image-preview' ||
+    norm.startsWith('gemini-nano-banana')
     ? {
         googleSearch: {
           searchTypes: {
@@ -227,6 +231,22 @@ async function buildGenerationConfigFromOptions({
         includeThoughts: true,
         // Gemini 3.1 Flash Image / Lite expose only minimal/high thinking levels.
         thinkingLevel: toSdkThinkingLevel(thinkingLevel === 'HIGH' ? 'HIGH' : 'MINIMAL', 'MINIMAL'),
+      };
+    }
+
+    if (normalizedModelId.startsWith('gemini-nano-banana')) {
+      // Nano Banana 2.1 exposes minimal / medium (default) / high, so unlike the
+      // 3.1 image models it is not clamped to the two-level MINIMAL/HIGH pair.
+      generationConfig.thinkingConfig = {
+        includeThoughts: true,
+        thinkingLevel: toSdkThinkingLevel(
+          thinkingLevel === 'MINIMAL' || thinkingLevel === 'LOW'
+            ? 'MINIMAL'
+            : thinkingLevel === 'HIGH' || thinkingLevel === 'XHIGH' || thinkingLevel === 'MAX'
+              ? 'HIGH'
+              : 'MEDIUM',
+          'MEDIUM',
+        ),
       };
     }
 

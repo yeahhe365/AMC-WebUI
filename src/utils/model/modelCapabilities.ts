@@ -79,6 +79,12 @@ const isGemini31FlashImageModel = (modelId: string): boolean => {
 const isGemini31FlashLiteImageModel = (modelId: string): boolean =>
   modelId.toLowerCase().includes('gemini-3.1-flash-lite-image');
 
+/**
+ * Google renamed the image family in October 2026: gemini-nano-banana-2.1 no
+ * longer contains "image" in its id, so every `includes('image')` test missed it.
+ */
+const isNanoBananaImageModel = (modelId: string): boolean => modelId.toLowerCase().includes('nano-banana');
+
 const isTtsModel = (modelId: string): boolean => modelId.toLowerCase().includes('tts');
 
 export const isOpenAIGpt5FamilyModel = (modelId: string): boolean => {
@@ -227,7 +233,7 @@ const supportsThinkingLevel = (modelId: string): boolean => {
   ) {
     return true;
   }
-  if (isGemini31FlashImageModel(modelId)) {
+  if (isGemini31FlashImageModel(modelId) || isNanoBananaImageModel(modelId)) {
     return true;
   }
   if (isGemmaModel(modelId)) {
@@ -251,11 +257,15 @@ export const isGemini3ImageModel = (modelId: string): boolean => {
     norm === 'gemini-3-pro-image-preview' ||
     norm === 'gemini-3.1-flash-image' ||
     norm === 'gemini-3.1-flash-image-preview' ||
-    norm === 'gemini-3.1-flash-lite-image'
+    norm === 'gemini-3.1-flash-lite-image' ||
+    norm.startsWith('gemini-nano-banana')
   );
 };
 
-export const isImageGenerationModel = (modelId: string): boolean => modelId.toLowerCase().includes('image');
+export const isImageGenerationModel = (modelId: string): boolean => {
+  const lowerId = modelId.toLowerCase();
+  return lowerId.includes('image') || lowerId.includes('nano-banana');
+};
 
 export interface ModelInteractionPermissions {
   canAcceptAttachments: boolean;
@@ -347,7 +357,26 @@ export const getModelCapabilities = (modelId: string): ModelCapabilities => {
   };
 
   let supportedAspectRatios: string[] | undefined;
-  if (isGemini31FlashImageModel(modelId)) {
+  if (isNanoBananaImageModel(modelId)) {
+    // gemini-nano-banana-2.1: 14 documented ratios, including the wide/tall
+    // 1:4, 1:8, 4:1 and 8:1 that the 2K/4K tiling fix targets. No "Auto".
+    supportedAspectRatios = [
+      '1:1',
+      '1:4',
+      '1:8',
+      '16:9',
+      '9:16',
+      '4:1',
+      '4:3',
+      '3:4',
+      '3:2',
+      '2:3',
+      '4:5',
+      '5:4',
+      '8:1',
+      '21:9',
+    ];
+  } else if (isGemini31FlashImageModel(modelId)) {
     if (isGemini31FlashLiteImageModel(modelId)) {
       // gemini-3.1-flash-lite-image: only 1K resolution, 10 aspect ratios (no Auto, no 1:4/1:8/4:1/8:1)
       supportedAspectRatios = ['1:1', '3:2', '2:3', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];
@@ -454,6 +483,11 @@ export const getDefaultThinkingLevelForModel = (modelId: string, fallback?: Thin
     return 'MINIMAL';
   }
 
+  // Nano Banana 2.1 documents medium as its default thinking level.
+  if (isNanoBananaImageModel(modelId)) {
+    return 'MEDIUM';
+  }
+
   if (isGemini4Model(modelId)) {
     return 'MEDIUM';
   }
@@ -491,6 +525,12 @@ export const normalizeThinkingLevelForModel = (
     (isGemini3ProTextModel(modelId) || isGemini37Or38FlashModel(modelId) || isGemini4Model(modelId))
   ) {
     return 'LOW';
+  }
+
+  // Nano Banana 2.1 accepts minimal / medium / high; NONE is not a valid level.
+  if (isNanoBananaImageModel(modelId)) {
+    if (resolvedLevel === 'NONE') return 'MINIMAL';
+    return resolvedLevel === 'XHIGH' || resolvedLevel === 'MAX' ? 'HIGH' : resolvedLevel;
   }
 
   // Gemma and Flash Image only accept MINIMAL and HIGH in the Gemini API.

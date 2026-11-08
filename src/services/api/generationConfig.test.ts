@@ -295,6 +295,84 @@ describe('buildGenerationConfig', () => {
     ]);
   });
 
+  it('builds a Nano Banana 2.1 config with medium thinking and no sampling params', async () => {
+    const config = await buildGenerationConfig(
+      'gemini-nano-banana-2.1',
+      'sys',
+      baseConfig,
+      false,
+      0,
+      false,
+      false,
+      false,
+      undefined,
+      '1:1',
+      false,
+      '2K',
+    );
+
+    expect(config.imageConfig).toEqual({ imageSize: '2K', aspectRatio: '1:1' });
+    expect(config.thinkingConfig).toEqual({ includeThoughts: true, thinkingLevel: 'MEDIUM' });
+    // Nano Banana 2.1 rejects temperature/topP/topK/seed with an API error.
+    expect(config.temperature).toBeUndefined();
+    expect(config.topP).toBeUndefined();
+    expect(config.topK).toBeUndefined();
+    expect(config.seed).toBeUndefined();
+  });
+
+  it('maps Nano Banana 2.1 thinking levels onto minimal / medium / high', async () => {
+    const thinkingLevelFor = async (level: ThinkingLevel) => {
+      const config = await buildGenerationConfig(
+        'gemini-nano-banana-2.1',
+        'sys',
+        baseConfig,
+        false,
+        0,
+        false,
+        false,
+        false,
+        level,
+        '1:1',
+        false,
+        '1K',
+      );
+      return config.thinkingConfig?.thinkingLevel;
+    };
+
+    await expect(thinkingLevelFor('LOW')).resolves.toBe('MINIMAL');
+    await expect(thinkingLevelFor('MINIMAL')).resolves.toBe('MINIMAL');
+    await expect(thinkingLevelFor('MEDIUM')).resolves.toBe('MEDIUM');
+    await expect(thinkingLevelFor('HIGH')).resolves.toBe('HIGH');
+  });
+
+  it('uses image search grounding for Nano Banana 2.1 when search is enabled', async () => {
+    const config = await buildGenerationConfig(
+      'gemini-nano-banana-2.1',
+      'sys',
+      baseConfig,
+      false,
+      0,
+      true,
+      false,
+      false,
+      undefined,
+      '1:1',
+      false,
+      '2K',
+    );
+
+    expect(config.tools).toEqual([
+      {
+        googleSearch: {
+          searchTypes: {
+            webSearch: {},
+            imageSearch: {},
+          },
+        },
+      },
+    ]);
+  });
+
   it('does not enable search for Gemini image models when only deep search is enabled', async () => {
     const config = await buildGenerationConfig(
       'gemini-3.1-flash-image-preview',

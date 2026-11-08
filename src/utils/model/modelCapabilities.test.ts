@@ -5,7 +5,9 @@ import {
   getModelCapabilities,
   isDeepSeekReasoningModel,
   isGemini3Model,
+  isGemini3ImageModel,
   isGemini4Model,
+  isImageGenerationModel,
   isLiveTranslateModel,
   isLiveTranscribeModel,
   isQwenReasoningModel,
@@ -252,6 +254,33 @@ describe('getModelCapabilities', () => {
     expect(capabilities.supportedAspectRatios).toEqual(expect.arrayContaining(['1:4', '4:1', '1:8', '8:1']));
     expect(capabilities.supportedImageSizes).toEqual(expect.arrayContaining(['512', '1K', '2K', '4K']));
   });
+
+  it('recognizes gemini-nano-banana-2.1 as an image model despite the renamed id', () => {
+    // Google dropped "image" from the id in October 2026, which every
+    // includes('image') check used to rely on.
+    expect(isImageGenerationModel('gemini-nano-banana-2.1')).toBe(true);
+    expect(isGemini3ImageModel('gemini-nano-banana-2.1')).toBe(true);
+
+    const capabilities = getModelCapabilities('gemini-nano-banana-2.1');
+    expect(capabilities.isImageGenerationModel).toBe(true);
+    expect(capabilities.isGemini3ImageModel).toBe(true);
+    expect(capabilities.supportsThinkingLevel).toBe(true);
+    expect(capabilities.permissions).toMatchObject({
+      canAcceptAttachments: true,
+      canUseGoogleSearch: true,
+      canUseCodeExecution: false,
+      canGenerateSuggestions: false,
+      requiresTextPrompt: true,
+    });
+  });
+
+  it('gives gemini-nano-banana-2.1 its 14 documented ratios and 1K/2K/4K sizes', () => {
+    const capabilities = getModelCapabilities('gemini-nano-banana-2.1');
+
+    expect(capabilities.supportedAspectRatios).toEqual(expect.arrayContaining(['1:4', '4:1', '1:8', '8:1', '21:9']));
+    expect(capabilities.supportedAspectRatios).not.toContain('Auto');
+    expect(capabilities.supportedImageSizes).toEqual(['1K', '2K', '4K']);
+  });
 });
 
 describe('getDefaultThinkingLevelForModel', () => {
@@ -261,6 +290,14 @@ describe('getDefaultThinkingLevelForModel', () => {
 
   it('defaults Gemini 3.1 Flash Image to MINIMAL', () => {
     expect(getDefaultThinkingLevelForModel('gemini-3.1-flash-image-preview')).toBe('MINIMAL');
+  });
+
+  it('defaults gemini-nano-banana-2.1 to MEDIUM and keeps all three levels', () => {
+    expect(getDefaultThinkingLevelForModel('gemini-nano-banana-2.1')).toBe('MEDIUM');
+    // Unlike the 3.1 image models it is not clamped to the MINIMAL/HIGH pair.
+    expect(normalizeThinkingLevelForModel('gemini-nano-banana-2.1', 'MEDIUM')).toBe('MEDIUM');
+    expect(normalizeThinkingLevelForModel('gemini-nano-banana-2.1', 'HIGH')).toBe('HIGH');
+    expect(normalizeThinkingLevelForModel('gemini-nano-banana-2.1', 'NONE')).toBe('MINIMAL');
   });
 
   it('defaults Gemini 3.8 Flash, 3.7 Flash and Robotics to MEDIUM per official API', () => {

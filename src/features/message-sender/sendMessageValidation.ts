@@ -87,7 +87,12 @@ export const validateMessageBeforeSend = ({
   }
 
   if (isGemini3Image) {
-    const allowsPdfReferences = normalizeModelId(activeModelId) === 'gemini-3.1-flash-image-preview';
+    const normalizedImageModelId = normalizeModelId(activeModelId);
+    // Nano Banana 2.1 documents PDF input; the 3.1 image models except the
+    // preview one only take images.
+    const allowsPdfReferences =
+      normalizedImageModelId === 'gemini-3.1-flash-image-preview' ||
+      normalizedImageModelId.startsWith('gemini-nano-banana');
     const hasUnsupportedAttachments = files.some((file) => {
       if (isImageMimeType(file.type)) return false;
       if (allowsPdfReferences && isPdfMimeType(file.type)) return false;

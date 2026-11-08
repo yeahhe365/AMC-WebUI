@@ -86,7 +86,8 @@ const isAudioSupportedModel = (modelId: string): boolean => {
     lower.includes('tts') ||
     lower.includes('flash-lite-image') ||
     lower.includes('flash-image') ||
-    lower.includes('pro-image')
+    lower.includes('pro-image') ||
+    lower.includes('nano-banana')
   ) {
     return false;
   }
@@ -137,6 +138,10 @@ const isPdfSupportedModel = (modelId: string): boolean => {
     return false;
   }
   if (lower.includes('gemini-1.5') || lower.includes('gemini-2') || lower.includes('gemini-3')) {
+    return true;
+  }
+  // Nano Banana 2.1 accepts PDF input, unlike the other image models above.
+  if (lower.includes('nano-banana')) {
     return true;
   }
   if (
@@ -231,6 +236,10 @@ const resolveContextWindow = (modelId: string): { contextWindow: string; maxOutp
   }
 
   // Gemini image generation models
+  if (lower.includes('nano-banana')) {
+    // gemini-nano-banana-2.1: 131,072 in / 32,768 out at 1K, 2K and 4K.
+    return { contextWindow: '131,072 (128K)', maxOutput: '32,768 (32K)' };
+  }
   if (lower.includes('flash-lite-image')) {
     return { contextWindow: '65,536 (64K)', maxOutput: '4,096 (4K)' };
   }
@@ -348,6 +357,10 @@ const resolveThinkingLevelSpec = (modelId: string): ThinkingLevelSpec | undefine
   }
 
   // Image models
+  if (lower.includes('nano-banana')) {
+    // gemini-nano-banana-2.1: minimal / medium (default) / high.
+    return { type: 'range', min: 'MINIMAL', max: 'HIGH', defaultLevel: 'MEDIUM' };
+  }
   if (lower.includes('pro-image')) {
     return { type: 'fixed' };
   }

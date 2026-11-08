@@ -137,6 +137,14 @@ export const GOOGLE_MODELS: Record<string, CatalogModelSpec> = {
     capabilities: { vision: false, audio: true, thinking: false, tools: false },
     ownedBy: 'google',
   },
+  'gemini-nano-banana-2.1': {
+    id: 'gemini-nano-banana-2.1',
+    name: 'Nano Banana 2.1',
+    contextWindow: 131_072,
+    maxOutputTokens: 32_768,
+    capabilities: { vision: true, image: true, thinking: true, tools: false },
+    ownedBy: 'google',
+  },
   'gemini-3.1-flash-image': {
     id: 'gemini-3.1-flash-image',
     name: 'Nano Banana 2',

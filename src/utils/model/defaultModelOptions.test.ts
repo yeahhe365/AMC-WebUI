@@ -26,6 +26,14 @@ describe('getDefaultModelOptions', () => {
     expect(ttsIds).toEqual(['gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts']);
   });
 
+  it('offers Nano Banana 2.1 in the image group', () => {
+    const models = getDefaultModelOptions();
+    const nano = models.find((model) => model.id === 'gemini-nano-banana-2.1');
+
+    expect(nano).toBeDefined();
+    expect(nano?.name).toBe('Nano Banana 2.1');
+  });
+
   it('does not include shut-down Gemini 2.x text models', () => {
     const models = getDefaultModelOptions();
 
