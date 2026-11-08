@@ -32,10 +32,16 @@ function walk(file, seen = visited) {
   if (!fs.existsSync(file) || !file.startsWith(`${dist}${path.sep}`)) throw new Error(`Missing startup asset: ${file}`);
   seen.add(file);
   const [imports] = lexer.parse(fs.readFileSync(file, 'utf8'));
-  for (const item of imports)
-    if (item.d === -1 && item.n?.startsWith('.')) {
-      walk(path.resolve(path.dirname(file), item.n), seen);
+  for (const item of imports) {
+    // es-module-lexer 2.x reports { n: specifier, d: depth } (d === -1 means static),
+    // 3.x renames them to { specifier, type } with type 'static' | 'dynamic'. Vite 7.3.7
+    // pulled in 3.x, so accept either shape instead of silently matching no imports.
+    const specifier = item.specifier ?? item.n;
+    const isStatic = item.type === undefined ? item.d === -1 : item.type === 'static';
+    if (isStatic && specifier?.startsWith('.')) {
+      walk(path.resolve(path.dirname(file), specifier), seen);
     }
+  }
 }
 walk(resolveEntryFile(entry));
 const chunks = [...visited]
