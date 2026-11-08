@@ -111,6 +111,14 @@ const isAudioSupportedModel = (modelId: string): boolean => {
 
 const isVideoSupportedModel = (modelId: string): boolean => {
   const lower = modelId.toLowerCase();
+  // Gemini 3 Pro Image takes only image and text; the 3.1 image models and
+  // Nano Banana 2.1 all document video input.
+  if (lower.includes('pro-image')) {
+    return false;
+  }
+  if (lower.includes('flash-image') || lower.includes('flash-lite-image') || lower.includes('nano-banana')) {
+    return true;
+  }
   if (
     lower.includes('tts') ||
     lower.includes('transcribe') ||

@@ -120,11 +120,17 @@ describe('validateMessageBeforeSend', () => {
     }
   });
 
-  it('allows PDF references for the 3.1 image models and Nano Banana 2.1', () => {
+  it('allows PDF and video references for the 3.1 image models and Nano Banana 2.1', () => {
     const pdf = createUploadedFile({
       id: 'pdf-active',
       name: 'document.pdf',
       type: 'application/pdf',
+      uploadState: 'active',
+    });
+    const video = createUploadedFile({
+      id: 'video-active',
+      name: 'clip.mp4',
+      type: 'video/mp4',
       uploadState: 'active',
     });
     const imagePermissions = { canAcceptAttachments: true, requiresTextPrompt: true };
@@ -132,7 +138,7 @@ describe('validateMessageBeforeSend', () => {
     for (const modelId of ['gemini-3.1-flash-image', 'gemini-3.1-flash-lite-image', 'gemini-nano-banana-2.1']) {
       const result = validateMessageBeforeSend({
         text: 'Turn this document into an infographic',
-        files: [pdf],
+        files: [pdf, video],
         permissions: imagePermissions,
         isContinueMode: false,
         isServerCodeExecutionEnabled: false,
@@ -145,28 +151,61 @@ describe('validateMessageBeforeSend', () => {
     }
   });
 
-  it('still blocks PDF references for Gemini 3 Pro Image, which takes images only', () => {
+  it('names image, PDF and video when an image model gets an unsupported attachment', () => {
+    const text = createUploadedFile({
+      id: 'text-active',
+      name: 'notes.txt',
+      type: 'text/plain',
+      uploadState: 'active',
+    });
+
+    const result = validateMessageBeforeSend({
+      text: 'Turn this into an infographic',
+      files: [text],
+      permissions: { canAcceptAttachments: true, requiresTextPrompt: true },
+      isContinueMode: false,
+      isServerCodeExecutionEnabled: false,
+      isGemini3Image: true,
+      activeModelId: 'gemini-nano-banana-2.1',
+      t,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.fileError).toBe(t('messageSenderImageModelSupportsImagePdfVideoOnly'));
+    }
+  });
+
+  it('still blocks PDF and video references for Gemini 3 Pro Image, which takes images only', () => {
     const pdf = createUploadedFile({
       id: 'pdf-only-pro',
       name: 'document.pdf',
       type: 'application/pdf',
       uploadState: 'active',
     });
-
-    const result = validateMessageBeforeSend({
-      text: 'Turn this document into an infographic',
-      files: [pdf],
-      permissions: { canAcceptAttachments: true, requiresTextPrompt: true },
-      isContinueMode: false,
-      isServerCodeExecutionEnabled: false,
-      isGemini3Image: true,
-      activeModelId: 'gemini-3-pro-image',
-      t,
+    const video = createUploadedFile({
+      id: 'video-only-pro',
+      name: 'clip.mp4',
+      type: 'video/mp4',
+      uploadState: 'active',
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.fileError).toBe(t('messageSenderImageModelSupportsImageOnly'));
+    for (const file of [pdf, video]) {
+      const result = validateMessageBeforeSend({
+        text: 'Turn this document into an infographic',
+        files: [file],
+        permissions: { canAcceptAttachments: true, requiresTextPrompt: true },
+        isContinueMode: false,
+        isServerCodeExecutionEnabled: false,
+        isGemini3Image: true,
+        activeModelId: 'gemini-3-pro-image',
+        t,
+      });
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.fileError).toBe(t('messageSenderImageModelSupportsImageOnly'));
+      }
     }
   });
 });

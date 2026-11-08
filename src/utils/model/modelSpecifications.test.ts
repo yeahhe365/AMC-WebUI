@@ -78,10 +78,10 @@ describe('modelSpecifications', () => {
     expect(spec.thinkingBudgetRange).toBeUndefined();
   });
 
-  it('resolves specifications for Gemini 3.1 Flash TTS (no thinking)', () => {
+  it('resolves specifications for Gemini 3.8 Flash TTS (no thinking)', () => {
     const model: ModelOption = {
-      id: 'gemini-3.1-flash-tts-preview',
-      name: 'Gemini 3.1 Flash TTS',
+      id: 'gemini-3.8-flash-tts',
+      name: 'Gemini 3.8 Flash TTS',
     };
 
     const spec = getModelSpecification(model);
@@ -110,6 +110,18 @@ describe('modelSpecifications', () => {
     expect(proImage.maxOutput).toContain('32K');
     expect(proImage.thinkingLevelRange).toBe('内置思考（不可调节）');
     expect(proImage.thinkingBudgetRange).toBeUndefined();
+  });
+
+  it('advertises video input for the image models whose cards document it', () => {
+    const modalityIds = (modelId: string) =>
+      getModelSpecification({ id: modelId, name: modelId }).modalities.map((modality) => modality.id);
+
+    // Text, image, video and PDF in; Gemini 3 Pro Image takes image and text only.
+    for (const modelId of ['gemini-3.1-flash-image', 'gemini-3.1-flash-lite-image', 'gemini-nano-banana-2.1']) {
+      expect(modalityIds(modelId), modelId).toEqual(['vision', 'video']);
+    }
+
+    expect(modalityIds('gemini-3-pro-image')).toEqual(['vision']);
   });
 
   it('resolves specifications for Nano Banana 2.1, whose id no longer says "image"', () => {

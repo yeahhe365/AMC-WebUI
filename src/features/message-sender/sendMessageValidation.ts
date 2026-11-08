@@ -7,6 +7,7 @@ import {
   isPdfMimeType,
   isTextFile,
   isVideoFile,
+  isVideoMimeType,
 } from '@/utils/file/fileTypeClassification';
 import { normalizeModelId } from '@/utils/model/modelId';
 import type { MessageSenderTranslator } from './messageSenderTypes';
@@ -88,15 +89,15 @@ export const validateMessageBeforeSend = ({
 
   if (isGemini3Image) {
     const normalizedImageModelId = normalizeModelId(activeModelId);
-    // The 3.1 image models and Nano Banana 2.1 document PDF input; Gemini 3 Pro
-    // Image takes only images.
-    const allowsPdfReferences =
+    // The 3.1 image models and Nano Banana 2.1 document image, PDF and video
+    // input; Gemini 3 Pro Image takes only images.
+    const acceptsRichReferences =
       normalizedImageModelId === 'gemini-3.1-flash-image' ||
       normalizedImageModelId === 'gemini-3.1-flash-lite-image' ||
       normalizedImageModelId.startsWith('gemini-nano-banana');
     const hasUnsupportedAttachments = files.some((file) => {
       if (isImageMimeType(file.type)) return false;
-      if (allowsPdfReferences && isPdfMimeType(file.type)) return false;
+      if (acceptsRichReferences && (isPdfMimeType(file.type) || isVideoMimeType(file.type))) return false;
       return true;
     });
 
@@ -107,8 +108,8 @@ export const validateMessageBeforeSend = ({
       });
       return {
         ok: false,
-        fileError: allowsPdfReferences
-          ? t('messageSenderImageModelSupportsImageAndPdfOnly')
+        fileError: acceptsRichReferences
+          ? t('messageSenderImageModelSupportsImagePdfVideoOnly')
           : t('messageSenderImageModelSupportsImageOnly'),
       };
     }

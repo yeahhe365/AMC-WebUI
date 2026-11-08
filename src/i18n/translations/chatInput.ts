@@ -3487,14 +3487,14 @@ export const chatInputTranslations = {
     es: 'El modo compatible con OpenAI no puede enviar referencias remotas de Gemini Files API. Vuelve a adjuntar {filename} como archivo local de imagen, audio o texto, o vuelve a la API de Gemini.',
     ko: 'OpenAI 호환 모드에서는 Gemini Files API 원격 참조를 전송할 수 없습니다. {filename}을(를) 로컬 이미지, 오디오 또는 텍스트 파일로 다시 첨부하거나 Gemini API로 다시 전환하세요.',
   },
-  messageSenderImageModelSupportsImageAndPdfOnly: {
-    en: 'Nano Banana 2 supports image and PDF attachments only.',
-    zh: 'Nano Banana 2 仅支持图片和 PDF 附件。',
-    ja: 'Nano Banana 2は画像とPDFの添付のみをサポートしています。',
-    de: 'Nano Banana 2 unterstützt nur Bild- und PDF-Anhänge.',
-    fr: "Nano Banana 2 ne prend en charge que les pièces jointes d'image et PDF.",
-    es: 'Nano Banana 2 solo admite adjuntos de imagen y PDF.',
-    ko: 'Nano Banana 2는 이미지와 PDF 첨부만 지원합니다.',
+  messageSenderImageModelSupportsImagePdfVideoOnly: {
+    en: 'This image model supports image, PDF and video attachments only.',
+    zh: '这个图片模型仅支持图片、PDF 和视频附件。',
+    ja: 'この画像モデルは画像、PDF、動画の添付のみをサポートしています。',
+    de: 'Dieses Bildmodell unterstützt nur Bild-, PDF- und Videoanhänge.',
+    fr: "Ce modèle d'image ne prend en charge que les pièces jointes d'image, PDF et vidéo.",
+    es: 'Este modelo de imagen solo admite adjuntos de imagen, PDF y vídeo.',
+    ko: '이 이미지 모델은 이미지, PDF, 동영상 첨부만 지원합니다.',
   },
   messageSenderImageModelSupportsImageOnly: {
     en: 'This image model supports image attachments only.',
