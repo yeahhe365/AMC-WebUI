@@ -17,7 +17,7 @@ describe('ToolsMenu', () => {
     act(() => {
       renderer.root.render(
         <ToolsMenu
-          currentModelId="gemini-3.1-flash-image-preview"
+          currentModelId="gemini-3.1-flash-image"
           toolStates={createChatToolToggleStatesFromFlags()}
           toolUtilityActions={toolUtilityActions}
           disabled={false}

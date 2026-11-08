@@ -558,7 +558,7 @@ describe('createChatHistoryForApi', () => {
       }),
     ];
 
-    const history = await createChatHistoryForApi(msgs, false, 'gemini-3.1-flash-image-preview');
+    const history = await createChatHistoryForApi(msgs, false, 'gemini-3.1-flash-image');
 
     expect(history[0].parts[0]).toEqual({
       text: 'Here is an updated result.',
@@ -583,7 +583,7 @@ describe('createChatHistoryForApi', () => {
       }),
     ];
 
-    await expect(createChatHistoryForApi(msgs, false, 'gemini-3.1-flash-image-preview')).rejects.toThrow(
+    await expect(createChatHistoryForApi(msgs, false, 'gemini-3.1-flash-image')).rejects.toThrow(
       'Please reattach the image',
     );
   });

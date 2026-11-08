@@ -21,7 +21,7 @@ describe('buildModelCatalog', () => {
     const models: ModelOption[] = [
       { id: 'gemini-3.8-live', name: 'Gemini 3.8 Live', isPinned: true },
       { id: 'gemini-3.1-flash-tts-preview', name: 'Gemini 3.1 Flash TTS Preview' },
-      { id: 'gemini-3-pro-image-preview', name: 'Gemini 3 Pro Image Preview' },
+      { id: 'gemini-3-pro-image', name: 'Gemini 3 Pro Image Preview' },
       { id: 'gemma-4-31b-it', name: 'Gemma 4 31B IT' },
       { id: 'gemini-robotics-er-2-preview', name: 'Gemini Robotics-ER 2 Preview' },
     ];
@@ -38,7 +38,7 @@ describe('buildModelCatalog', () => {
       group: 'standard',
       badgeKeys: expect.arrayContaining(['tts', 'flash']),
     });
-    expect(getEntry(entries, 'gemini-3-pro-image-preview')).toMatchObject({
+    expect(getEntry(entries, 'gemini-3-pro-image')).toMatchObject({
       category: 'image',
       group: 'standard',
       badgeKeys: expect.arrayContaining(['image', 'pro']),
@@ -60,13 +60,13 @@ describe('filterModelCatalog', () => {
   const entries = buildModelCatalog([
     { id: 'gemini-3.8-live', name: 'Gemini 3.8 Live' },
     { id: 'gemini-3.1-flash-tts-preview', name: 'Gemini 3.1 Flash TTS Preview' },
-    { id: 'gemini-3.1-flash-image-preview', name: 'Nano Banana 2' },
+    { id: 'gemini-3.1-flash-image', name: 'Nano Banana 2' },
   ]);
 
   it('matches name, id, and capability tags', () => {
     expect(filterModelCatalog(entries, 'tts').map((entry) => entry.id)).toEqual(['gemini-3.1-flash-tts-preview']);
     expect(filterModelCatalog(entries, 'live').map((entry) => entry.id)).toEqual(['gemini-3.8-live']);
-    expect(filterModelCatalog(entries, 'nano').map((entry) => entry.id)).toEqual(['gemini-3.1-flash-image-preview']);
+    expect(filterModelCatalog(entries, 'nano').map((entry) => entry.id)).toEqual(['gemini-3.1-flash-image']);
   });
 });
 
@@ -95,7 +95,7 @@ describe('buildModelCatalogSections', () => {
     const entries = buildModelCatalog([
       { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash', isPinned: true },
       { id: 'gemini-3.1-flash-tts-preview', name: 'Gemini 3.1 Flash TTS' },
-      { id: 'gemini-3.1-flash-image-preview', name: 'Nano Banana 2' },
+      { id: 'gemini-3.1-flash-image', name: 'Nano Banana 2' },
     ]);
 
     expect(buildModelCatalogSections(entries).map((section) => section.key)).toEqual(['pinned', 'tts', 'image']);

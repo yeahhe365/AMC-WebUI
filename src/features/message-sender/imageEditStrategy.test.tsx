@@ -112,7 +112,7 @@ describe('imageEditStrategy', () => {
           isCompletionSoundEnabled: false,
         }),
         currentChatSettings: createChatSettings({
-          modelId: 'gemini-3.1-flash-image-preview',
+          modelId: 'gemini-3.1-flash-image',
           systemInstruction: '',
         }),
         text: 'edit this image',
@@ -203,7 +203,7 @@ describe('imageEditStrategy', () => {
           isCompletionSoundEnabled: false,
         }),
         currentChatSettings: createChatSettings({
-          modelId: 'gemini-3.1-flash-image-preview',
+          modelId: 'gemini-3.1-flash-image',
           systemInstruction: '',
         }),
         text: 'edit this image',
@@ -279,7 +279,7 @@ describe('imageEditStrategy', () => {
           isCompletionSoundEnabled: false,
         }),
         currentChatSettings: createChatSettings({
-          modelId: 'gemini-3.1-flash-image-preview',
+          modelId: 'gemini-3.1-flash-image',
           systemInstruction: '',
         }),
         text: 'edit this image',

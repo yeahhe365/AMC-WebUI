@@ -83,7 +83,7 @@ describe('useChatEffects', () => {
     const setAspectRatio = vi.fn();
     const props = createProps({
       currentChatSettings: createChatSettings({
-        modelId: 'gemini-3-pro-image-preview',
+        modelId: 'gemini-3-pro-image',
       }),
       setAspectRatio,
     });
@@ -91,7 +91,7 @@ describe('useChatEffects', () => {
     const hook = renderHook(() => useChatEffects(props));
 
     props.currentChatSettings = createChatSettings({
-      modelId: 'gemini-3.1-flash-image-preview',
+      modelId: 'gemini-3.1-flash-image',
     });
 
     hook.rerender();
@@ -105,7 +105,7 @@ describe('useChatEffects', () => {
     const setImageSize = vi.fn();
     const props = createProps({
       currentChatSettings: createChatSettings({
-        modelId: 'gemini-3.1-flash-image-preview',
+        modelId: 'gemini-3.1-flash-image',
       }),
       aspectRatio: '1:4',
       imageSize: '4K',
@@ -130,7 +130,7 @@ describe('useChatEffects', () => {
     const setAspectRatio = vi.fn();
     const props = createProps({
       currentChatSettings: createChatSettings({
-        modelId: 'gemini-3.1-flash-image-preview',
+        modelId: 'gemini-3.1-flash-image',
       }),
       aspectRatio: 'Auto',
       setAspectRatio,

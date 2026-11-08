@@ -46,7 +46,7 @@ describe('useAppEvents PWA lifecycle', () => {
     { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', isPinned: true },
     { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', isPinned: true },
     { id: 'gemma-4-31b-it', name: 'Gemma 4 31B IT' },
-    { id: 'gemini-3.1-flash-image-preview', name: 'Nano Banana 2' },
+    { id: 'gemini-3.1-flash-image', name: 'Nano Banana 2' },
   ];
 
   beforeEach(() => {
@@ -173,7 +173,7 @@ describe('useAppEvents PWA lifecycle', () => {
       useAppEvents({
         appSettings: createAppSettings({
           ...appSettings,
-          tabModelCycleIds: ['gemini-3.1-flash-image-preview', 'gemini-3-flash-preview'],
+          tabModelCycleIds: ['gemini-3.1-flash-image', 'gemini-3-flash-preview'],
         }),
         setAppSettings: vi.fn(),
         startNewChat: vi.fn(),
@@ -193,7 +193,7 @@ describe('useAppEvents PWA lifecycle', () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
     });
 
-    expect(handleSelectModelInHeader).toHaveBeenCalledWith('gemini-3.1-flash-image-preview');
+    expect(handleSelectModelInHeader).toHaveBeenCalledWith('gemini-3.1-flash-image');
 
     textarea.remove();
     unmount();

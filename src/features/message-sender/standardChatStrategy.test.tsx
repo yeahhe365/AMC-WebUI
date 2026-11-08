@@ -790,7 +790,7 @@ describe('standardChatStrategy', () => {
 
     const { result, unmount } = renderStandardChat({
       currentChatSettings: {
-        modelId: 'gemini-3-pro-image-preview',
+        modelId: 'gemini-3-pro-image',
         isLocalPythonEnabled: true,
       },
       getStreamHandlers,
@@ -801,7 +801,7 @@ describe('standardChatStrategy', () => {
         text: 'make it cinematic',
         files: [],
         editingMessageId: null,
-        activeModelId: 'gemini-3-pro-image-preview',
+        activeModelId: 'gemini-3-pro-image',
         request: createPreparedRequest(),
       });
     });
@@ -811,11 +811,7 @@ describe('standardChatStrategy', () => {
         isLocalPythonEnabled: false,
       }),
     );
-    expect(mockAppendFunctionDeclarationsToTools).toHaveBeenCalledWith(
-      'gemini-3-pro-image-preview',
-      expect.any(Object),
-      [],
-    );
+    expect(mockAppendFunctionDeclarationsToTools).toHaveBeenCalledWith('gemini-3-pro-image', expect.any(Object), []);
 
     unmount();
   });

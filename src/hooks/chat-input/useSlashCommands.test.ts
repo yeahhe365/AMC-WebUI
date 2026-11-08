@@ -167,8 +167,8 @@ describe('useSlashCommands', () => {
     unmount();
   });
 
-  it('hides fast command on gemini-3-pro-image-preview', () => {
-    const props = createProps({ currentModelId: 'gemini-3-pro-image-preview' });
+  it('hides fast command on gemini-3-pro-image', () => {
+    const props = createProps({ currentModelId: 'gemini-3-pro-image' });
     const { result, unmount } = renderHook(() => useSlashCommands(props));
 
     act(() => {

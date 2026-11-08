@@ -3,8 +3,8 @@ import { getCachedModelCapabilities } from './modelCapabilitiesStore';
 
 describe('modelCapabilitiesStore', () => {
   it('computes and caches capabilities by model id', () => {
-    const first = getCachedModelCapabilities('gemini-3-pro-image-preview');
-    const second = getCachedModelCapabilities('gemini-3-pro-image-preview');
+    const first = getCachedModelCapabilities('gemini-3-pro-image');
+    const second = getCachedModelCapabilities('gemini-3-pro-image');
 
     expect(first).toBe(second);
     expect(first.isGemini3ImageModel).toBe(true);

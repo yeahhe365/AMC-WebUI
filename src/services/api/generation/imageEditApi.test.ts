@@ -44,7 +44,7 @@ describe('editImageApi', () => {
 
     await editImageApi(
       'key',
-      'gemini-3.1-flash-image-preview',
+      'gemini-3.1-flash-image',
       [],
       [{ text: 'edit this image' }],
       new AbortController().signal,
@@ -62,7 +62,7 @@ describe('editImageApi', () => {
     expect(buildGenerationConfigMock).toHaveBeenCalled();
     expect(sendStatelessMessageNonStreamApiMock).toHaveBeenCalledWith(
       'key',
-      'gemini-3.1-flash-image-preview',
+      'gemini-3.1-flash-image',
       [],
       [{ text: 'edit this image' }],
       expect.objectContaining({

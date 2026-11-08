@@ -93,7 +93,7 @@ describe('modelSpecifications', () => {
   });
 
   it('resolves specifications for Image models (Nano Banana series)', () => {
-    const flashImage = getModelSpecification({ id: 'gemini-3.1-flash-image-preview', name: 'Nano Banana 2' });
+    const flashImage = getModelSpecification({ id: 'gemini-3.1-flash-image', name: 'Nano Banana 2' });
     expect(flashImage.contextWindow).toContain('128K');
     expect(flashImage.maxOutput).toContain('32K');
     expect(flashImage.thinkingLevelRange).toBe('Minimal / High (默认 Minimal)');
@@ -105,7 +105,7 @@ describe('modelSpecifications', () => {
     expect(liteImage.thinkingLevelRange).toBe('Minimal / High (默认 Minimal)');
     expect(liteImage.thinkingBudgetRange).toBeUndefined();
 
-    const proImage = getModelSpecification({ id: 'gemini-3-pro-image-preview', name: 'Nano Banana Pro' });
+    const proImage = getModelSpecification({ id: 'gemini-3-pro-image', name: 'Nano Banana Pro' });
     expect(proImage.contextWindow).toContain('64K');
     expect(proImage.maxOutput).toContain('32K');
     expect(proImage.thinkingLevelRange).toBe('内置思考（不可调节）');
@@ -240,7 +240,7 @@ describe('modelSpecifications', () => {
     expect(formatThinkingLevelSpec(roboticsSpec.thinkingLevelSpec, tZh)).toBe('低 ~ 高 (推荐 中)');
     expect(formatThinkingLevelSpec(roboticsSpec.thinkingLevelSpec, tEn)).toBe('Low ~ High (Recommended Medium)');
 
-    const fixedImageSpec = getModelSpecification({ id: 'gemini-3-pro-image-preview', name: 'Nano Banana Pro' });
+    const fixedImageSpec = getModelSpecification({ id: 'gemini-3-pro-image', name: 'Nano Banana Pro' });
     expect(fixedImageSpec.descriptionKey).toBe('modelDescGeminiImage');
     expect(formatThinkingLevelSpec(fixedImageSpec.thinkingLevelSpec, tZh)).toBe('内置思考（不可调节）');
     expect(formatThinkingLevelSpec(fixedImageSpec.thinkingLevelSpec, tEn)).toBe('Built-in (Fixed)');

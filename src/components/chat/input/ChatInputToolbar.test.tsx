@@ -44,7 +44,7 @@ describe('ChatInputToolbar', () => {
           value={createChatInputToolbarContextValue({
             ...(currentChatSettings ? { currentChatSettings: currentChatSettings as any } : {}),
             capabilities: {
-              ...getModelCapabilities('gemini-3.1-flash-image-preview'),
+              ...getModelCapabilities('gemini-3.1-flash-image'),
               ...mockCapabilities.value,
             },
           })}

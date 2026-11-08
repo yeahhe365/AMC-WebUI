@@ -58,7 +58,7 @@ describe('isGemini3Model', () => {
   });
 
   it('returns true for gemini-3-pro', () => {
-    expect(isGemini3Model('gemini-3-pro-image-preview')).toBe(true);
+    expect(isGemini3Model('gemini-3-pro-image')).toBe(true);
   });
 
   it('returns true for gemini-3.1-flash family ids', () => {
@@ -213,7 +213,7 @@ describe('getModelCapabilities', () => {
     const textCapabilities = getModelCapabilities('gemini-3.1-pro-preview');
     const ttsCapabilities = getModelCapabilities('gemini-3.1-flash-tts-preview');
     const liveCapabilities = getModelCapabilities('gemini-3.8-live');
-    const geminiImageCapabilities = getModelCapabilities('gemini-3.1-flash-image-preview');
+    const geminiImageCapabilities = getModelCapabilities('gemini-3.1-flash-image');
 
     expect(textCapabilities.permissions).toMatchObject({
       canAcceptAttachments: true,
@@ -246,7 +246,7 @@ describe('getModelCapabilities', () => {
   });
 
   it('exposes the latest Gemini 3.1 Flash Image ratios and sizes', () => {
-    const capabilities = getModelCapabilities('gemini-3.1-flash-image-preview');
+    const capabilities = getModelCapabilities('gemini-3.1-flash-image');
 
     expect(capabilities.isImageGenerationModel).toBe(true);
     expect(capabilities).not.toHaveProperty('isRealImagenModel');
@@ -289,7 +289,7 @@ describe('getDefaultThinkingLevelForModel', () => {
   });
 
   it('defaults Gemini 3.1 Flash Image to MINIMAL', () => {
-    expect(getDefaultThinkingLevelForModel('gemini-3.1-flash-image-preview')).toBe('MINIMAL');
+    expect(getDefaultThinkingLevelForModel('gemini-3.1-flash-image')).toBe('MINIMAL');
   });
 
   it('defaults gemini-nano-banana-2.1 to MEDIUM and keeps all three levels', () => {
@@ -450,9 +450,9 @@ describe('Gemini 3.5 Transcribe model capabilities', () => {
 });
 
 describe('specialized audio and image model capability constraints', () => {
-  it('does not support thinking levels for gemini-3-pro-image-preview but supports them for flash image', () => {
-    expect(getModelCapabilities('gemini-3-pro-image-preview').supportsThinkingLevel).toBe(false);
-    expect(getModelCapabilities('gemini-3.1-flash-image-preview').supportsThinkingLevel).toBe(true);
+  it('does not support thinking levels for gemini-3-pro-image but supports them for flash image', () => {
+    expect(getModelCapabilities('gemini-3-pro-image').supportsThinkingLevel).toBe(false);
+    expect(getModelCapabilities('gemini-3.1-flash-image').supportsThinkingLevel).toBe(true);
     expect(getModelCapabilities('gemini-3.1-flash-lite-image').supportsThinkingLevel).toBe(true);
   });
 

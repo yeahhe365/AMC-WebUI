@@ -126,9 +126,7 @@ const buildGoogleSearchToolForModel = (modelId: string): Tool => {
   const norm = normalizeModelId(modelId);
   // Image-generation models that also ground on image search advertise both
   // search types; Nano Banana 2.1 grounds with Google Web and Image Search.
-  return norm === 'gemini-3.1-flash-image' ||
-    norm === 'gemini-3.1-flash-image-preview' ||
-    norm.startsWith('gemini-nano-banana')
+  return norm === 'gemini-3.1-flash-image' || norm.startsWith('gemini-nano-banana')
     ? {
         googleSearch: {
           searchTypes: {
@@ -222,11 +220,7 @@ async function buildGenerationConfigFromOptions({
       imageConfig,
     };
 
-    if (
-      normalizedModelId === 'gemini-3.1-flash-image' ||
-      normalizedModelId === 'gemini-3.1-flash-image-preview' ||
-      normalizedModelId === 'gemini-3.1-flash-lite-image'
-    ) {
+    if (normalizedModelId === 'gemini-3.1-flash-image' || normalizedModelId === 'gemini-3.1-flash-lite-image') {
       generationConfig.thinkingConfig = {
         includeThoughts: true,
         // Gemini 3.1 Flash Image / Lite expose only minimal/high thinking levels.

@@ -187,7 +187,7 @@ describe('useMessageSender', () => {
 
     const { result, unmount } = renderMessageSender({
       currentChatSettings: {
-        modelId: 'gemini-3.1-flash-image-preview',
+        modelId: 'gemini-3.1-flash-image',
       },
       selectedFiles,
       setAppFileError,
@@ -350,7 +350,7 @@ describe('useMessageSender', () => {
 
     const { result, unmount } = renderMessageSender({
       currentChatSettings: {
-        modelId: 'gemini-3.1-flash-image-preview',
+        modelId: 'gemini-3.1-flash-image',
       },
       selectedFiles: [
         createUploadedFile({
@@ -412,7 +412,7 @@ describe('useMessageSender', () => {
   it('converts local Files API references to inline files before sending in OpenAI-compatible mode', async () => {
     mockGetModelCapabilities.mockImplementation((modelId: string) => ({
       isTtsModel: false,
-      isGemini3ImageModel: modelId === 'gemini-3-pro-image-preview',
+      isGemini3ImageModel: modelId === 'gemini-3-pro-image',
     }));
 
     const setAppFileError = vi.fn();
@@ -481,7 +481,7 @@ describe('useMessageSender', () => {
   it('blocks remote-only Files API references in OpenAI-compatible mode', async () => {
     mockGetModelCapabilities.mockImplementation((modelId: string) => ({
       isTtsModel: false,
-      isGemini3ImageModel: modelId === 'gemini-3-pro-image-preview',
+      isGemini3ImageModel: modelId === 'gemini-3-pro-image',
     }));
 
     const setAppFileError = vi.fn();
@@ -526,7 +526,7 @@ describe('useMessageSender', () => {
   it('omits historical Gemini Files API ids before sending in OpenAI-compatible mode', async () => {
     mockGetModelCapabilities.mockImplementation((modelId: string) => ({
       isTtsModel: false,
-      isGemini3ImageModel: modelId === 'gemini-3-pro-image-preview',
+      isGemini3ImageModel: modelId === 'gemini-3-pro-image',
     }));
 
     const { result, unmount } = renderMessageSender({

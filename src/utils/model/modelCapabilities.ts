@@ -72,7 +72,7 @@ const isGemini38LiveExtendedThinkingModel = (modelId: string): boolean =>
 
 const isGemini31FlashImageModel = (modelId: string): boolean => {
   const lowerId = modelId.toLowerCase();
-  // Includes both gemini-3.1-flash-image-preview and gemini-3.1-flash-lite-image.
+  // Covers both gemini-3.1-flash-image and gemini-3.1-flash-lite-image.
   return lowerId.includes('gemini-3.1-flash-image') || lowerId.includes('gemini-3.1-flash-lite-image');
 };
 
@@ -249,14 +249,16 @@ const supportsThinkingLevel = (modelId: string): boolean => {
 
 /**
  * Checks whether the given model is a Gemini 3 native image-generation model.
+ *
+ * Only stable ids are listed. The two "-preview" image ids were shut down on
+ * 2026-06-25, so a session that still points at one now fails with the
+ * provider's own error instead of being handled as a live image model.
  */
 export const isGemini3ImageModel = (modelId: string): boolean => {
   const norm = normalizeModelId(modelId);
   return (
     norm === 'gemini-3-pro-image' ||
-    norm === 'gemini-3-pro-image-preview' ||
     norm === 'gemini-3.1-flash-image' ||
-    norm === 'gemini-3.1-flash-image-preview' ||
     norm === 'gemini-3.1-flash-lite-image' ||
     norm.startsWith('gemini-nano-banana')
   );
@@ -381,7 +383,7 @@ export const getModelCapabilities = (modelId: string): ModelCapabilities => {
       // gemini-3.1-flash-lite-image: only 1K resolution, 10 aspect ratios (no Auto, no 1:4/1:8/4:1/8:1)
       supportedAspectRatios = ['1:1', '3:2', '2:3', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'];
     } else {
-      // gemini-3.1-flash-image-preview: 14 aspect ratios including 1:4, 1:8, 4:1, 8:1
+      // gemini-3.1-flash-image: 14 aspect ratios including 1:4, 1:8, 4:1, 8:1
       supportedAspectRatios = [
         'Auto',
         '1:1',

@@ -182,9 +182,9 @@ describe('buildGenerationConfig', () => {
     );
   });
 
-  it('returns image config with imageSize for gemini-3-pro-image-preview', async () => {
+  it('returns image config with imageSize for gemini-3-pro-image', async () => {
     const config = await buildGenerationConfig(
-      'gemini-3-pro-image-preview',
+      'gemini-3-pro-image',
       'sys',
       baseConfig,
       false,
@@ -201,9 +201,9 @@ describe('buildGenerationConfig', () => {
     expect(config.imageConfig!.imageSize).toBe('2K');
   });
 
-  it('normalizes stale imageSize values for gemini-3-pro-image-preview', async () => {
+  it('normalizes stale imageSize values for gemini-3-pro-image', async () => {
     const config = await buildGenerationConfig(
-      'gemini-3-pro-image-preview',
+      'gemini-3-pro-image',
       'sys',
       baseConfig,
       false,
@@ -220,14 +220,14 @@ describe('buildGenerationConfig', () => {
     expect(config.imageConfig!.imageSize).toBe('1K');
   });
 
-  it('defaults imageSize to 1K for gemini-3-pro-image-preview', async () => {
-    const config = await buildGenerationConfig('gemini-3-pro-image-preview', 'sys', baseConfig, false, 0);
+  it('defaults imageSize to 1K for gemini-3-pro-image', async () => {
+    const config = await buildGenerationConfig('gemini-3-pro-image', 'sys', baseConfig, false, 0);
     expect(config.imageConfig!.imageSize).toBe('1K');
   });
 
-  it('includes thinkingConfig for gemini-3.1-flash-image-preview', async () => {
+  it('includes thinkingConfig for gemini-3.1-flash-image', async () => {
     const config = await buildGenerationConfig(
-      'gemini-3.1-flash-image-preview',
+      'gemini-3.1-flash-image',
       'sys',
       baseConfig,
       false,
@@ -246,9 +246,9 @@ describe('buildGenerationConfig', () => {
     });
   });
 
-  it('defaults gemini-3.1-flash-image-preview to MINIMAL thinking', async () => {
+  it('defaults gemini-3.1-flash-image to MINIMAL thinking', async () => {
     const config = await buildGenerationConfig(
-      'gemini-3.1-flash-image-preview',
+      'gemini-3.1-flash-image',
       'sys',
       baseConfig,
       false,
@@ -267,9 +267,9 @@ describe('buildGenerationConfig', () => {
     });
   });
 
-  it('uses image search grounding for gemini-3.1-flash-image-preview when search is enabled', async () => {
+  it('uses image search grounding for gemini-3.1-flash-image when search is enabled', async () => {
     const config = await buildGenerationConfig(
-      'gemini-3.1-flash-image-preview',
+      'gemini-3.1-flash-image',
       'sys',
       baseConfig,
       false,
@@ -375,7 +375,7 @@ describe('buildGenerationConfig', () => {
 
   it('does not enable search for Gemini image models when only deep search is enabled', async () => {
     const config = await buildGenerationConfig(
-      'gemini-3.1-flash-image-preview',
+      'gemini-3.1-flash-image',
       'sys',
       baseConfig,
       false,
@@ -413,7 +413,7 @@ describe('buildGenerationConfig', () => {
         imageOutputMode?: string,
       ) => Promise<any>
     )(
-      'gemini-3.1-flash-image-preview',
+      'gemini-3.1-flash-image',
       'sys',
       baseConfig,
       false,
@@ -438,9 +438,9 @@ describe('buildGenerationConfig', () => {
     });
   });
 
-  it('drops unsupported panoramic ratios for gemini-3-pro-image-preview', async () => {
+  it('drops unsupported panoramic ratios for gemini-3-pro-image', async () => {
     const config = await buildGenerationConfig(
-      'gemini-3-pro-image-preview',
+      'gemini-3-pro-image',
       'sys',
       baseConfig,
       false,
@@ -605,7 +605,7 @@ describe('buildGenerationConfig', () => {
 
   it('does not add codeExecution tool for Gemini image-generation models when enabled', async () => {
     const config = await buildGenerationConfig(
-      'gemini-3.1-flash-image-preview',
+      'gemini-3.1-flash-image',
       'sys',
       baseConfig,
       true,

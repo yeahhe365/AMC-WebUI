@@ -106,7 +106,7 @@ describe('messagePipeline', () => {
         isCompletionNotificationEnabled: false,
       }),
       currentChatSettings: createChatSettings({
-        modelId: 'gemini-3.1-flash-image-preview',
+        modelId: 'gemini-3.1-flash-image',
       }),
       updateAndPersistSessions,
       setActiveSessionId,

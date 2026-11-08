@@ -38,9 +38,7 @@ describe('getModelIcon', () => {
   });
 
   it('uses the Nano Banana SVG brand icon for Gemini image models', () => {
-    const geminiImageMarkup = renderToStaticMarkup(
-      getModelIcon({ id: 'gemini-3-pro-image-preview', name: 'Nano Banana Pro' }),
-    );
+    const geminiImageMarkup = renderToStaticMarkup(getModelIcon({ id: 'gemini-3-pro-image', name: 'Nano Banana Pro' }));
 
     expect(geminiImageMarkup).toContain('data-model-brand-icon="nanobanana"');
     expect(geminiImageMarkup).toContain('alt="Nano Banana"');

@@ -144,11 +144,11 @@ describe('resolveModelSwitchSettings', () => {
         thinkingBudget: 0,
         thinkingLevel: 'HIGH',
       },
-      targetModelId: 'gemini-3.1-flash-image-preview',
+      targetModelId: 'gemini-3.1-flash-image',
     });
 
     expect(result).toEqual({
-      modelId: 'gemini-3.1-flash-image-preview',
+      modelId: 'gemini-3.1-flash-image',
       mediaResolution: MediaResolution.MEDIA_RESOLUTION_UNSPECIFIED,
       thinkingBudget: 0,
       thinkingLevel: 'MINIMAL',

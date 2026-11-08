@@ -446,7 +446,7 @@ describe('chatApi media resolution routing', () => {
 
     await sendStatelessMessageNonStreamApi(
       'key',
-      'gemini-3.1-flash-image-preview',
+      'gemini-3.1-flash-image',
       [],
       [{ text: 'Generate an icon.' }],
       { responseModalities: ['IMAGE', 'TEXT'] },

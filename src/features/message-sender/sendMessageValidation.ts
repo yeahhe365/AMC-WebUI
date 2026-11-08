@@ -89,10 +89,9 @@ export const validateMessageBeforeSend = ({
   if (isGemini3Image) {
     const normalizedImageModelId = normalizeModelId(activeModelId);
     // The 3.1 image models and Nano Banana 2.1 document PDF input; Gemini 3 Pro
-    // Image takes only images. The preview id is dead but kept for saved sessions.
+    // Image takes only images.
     const allowsPdfReferences =
       normalizedImageModelId === 'gemini-3.1-flash-image' ||
-      normalizedImageModelId === 'gemini-3.1-flash-image-preview' ||
       normalizedImageModelId === 'gemini-3.1-flash-lite-image' ||
       normalizedImageModelId.startsWith('gemini-nano-banana');
     const hasUnsupportedAttachments = files.some((file) => {

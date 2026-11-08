@@ -20,7 +20,7 @@ describe('ModelListView', () => {
           availableModels={[
             { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', isPinned: true },
             { id: 'gemma-4-31b-it', name: 'Gemma 4 31B IT' },
-            { id: 'gemini-3-pro-image-preview', name: 'Gemini 3 Pro Image Preview' },
+            { id: 'gemini-3-pro-image', name: 'Gemini 3 Pro Image Preview' },
           ]}
           selectedModelId="gemini-3-flash-preview"
           onSelectModel={vi.fn()}
