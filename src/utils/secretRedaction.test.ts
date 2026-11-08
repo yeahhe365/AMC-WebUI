@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AppSettings } from '@/types';
 import {
+  APP_SETTINGS_CREDENTIAL_FIELDS,
   REDACTED_SECRET_SENTINEL,
   redactExportedAppSettings,
   redactExportedSessionSettings,
@@ -52,6 +53,40 @@ describe('redactExportedAppSettings', () => {
     expect(JSON.stringify(redacted)).not.toContain('or-key-456');
   });
 
+  // P0-7：这 5 个字段此前完全没脱敏，导出文件里是明文（含 Docker 下发的部署口令）。
+  it('redacts every credential field in the settings export', () => {
+    const secrets = {
+      serverAccessPassword: 'deploy-password-xyz',
+      liveApiKey: 'live-key-xyz',
+      tokenCalculatorApiKey: 'token-key-xyz',
+      embeddingApiKey: 'embedding-key-xyz',
+      lockedApiKey: 'locked-key-xyz',
+    };
+    const redacted = redactExportedAppSettings(createAppSettings(secrets));
+    const serialized = JSON.stringify(redacted);
+
+    for (const [field, raw] of Object.entries(secrets)) {
+      expect(redacted[field as keyof typeof secrets]).toBe(REDACTED_SECRET_SENTINEL);
+      expect(serialized).not.toContain(raw);
+    }
+    expect(serialized).not.toContain('gemini-key-123');
+    expect(serialized).not.toContain('or-key-456');
+  });
+
+  it('lists every credential-looking settings field', () => {
+    // 与 secretRedaction.ts 里的编译期护栏同一份语义：名字像凭据 + 值是字符串。
+    expect([...APP_SETTINGS_CREDENTIAL_FIELDS].sort()).toEqual(
+      [
+        'apiKey',
+        'embeddingApiKey',
+        'liveApiKey',
+        'lockedApiKey',
+        'serverAccessPassword',
+        'tokenCalculatorApiKey',
+      ].sort(),
+    );
+  });
+
   it('keeps non-secret connection fields intact', () => {
     const redacted = redactExportedAppSettings(createAppSettings());
 
@@ -79,6 +114,41 @@ describe('restoreRedactedSecrets', () => {
     const restored = restoreRedactedSecrets(imported, current);
 
     expect(restored.thirdPartyApi.connections[0].apiKey).toBeNull();
+  });
+
+  it('restores every credential field from the locally stored settings', () => {
+    const imported = redactExportedAppSettings(
+      createAppSettings({
+        serverAccessPassword: 'deploy-password-xyz',
+        liveApiKey: 'live-key-xyz',
+        tokenCalculatorApiKey: 'token-key-xyz',
+        embeddingApiKey: 'embedding-key-xyz',
+        lockedApiKey: 'locked-key-xyz',
+      }),
+    );
+    const restored = restoreRedactedSecrets(
+      imported,
+      createAppSettings({
+        serverAccessPassword: 'local-password',
+        liveApiKey: 'local-live',
+        tokenCalculatorApiKey: 'local-token',
+        embeddingApiKey: 'local-embedding',
+        lockedApiKey: 'local-locked',
+      }),
+    );
+
+    expect(restored.serverAccessPassword).toBe('local-password');
+    expect(restored.liveApiKey).toBe('local-live');
+    expect(restored.tokenCalculatorApiKey).toBe('local-token');
+    expect(restored.embeddingApiKey).toBe('local-embedding');
+    expect(restored.lockedApiKey).toBe('local-locked');
+  });
+
+  it('nulls a redacted credential when the local settings have none', () => {
+    const imported = redactExportedAppSettings(createAppSettings({ liveApiKey: 'live-key-xyz' }));
+    const restored = restoreRedactedSecrets(imported, createAppSettings({ liveApiKey: null }));
+
+    expect(restored.liveApiKey).toBeNull();
   });
 
   it('keeps explicit keys from the imported file untouched', () => {
