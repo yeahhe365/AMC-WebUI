@@ -1,5 +1,4 @@
 import { normalizeModelApiModeTag, type ModelOption } from '@/types';
-import { migrateRemovedModelId } from '@/constants/modelConfiguration';
 
 import { getModelCapabilities, isImageGenerationModel } from './modelCapabilities';
 
@@ -7,10 +6,10 @@ export const sanitizeModelOptions = (models: ModelOption[]): ModelOption[] => {
   const seenIds = new Set<string>();
 
   return models.reduce<ModelOption[]>((sanitized, model) => {
-    // Removed-model migrations (migrateRemovedModelId) apply ONLY to the
-    // selected-model pointer (resolveSupportedModelId / tab cycle ids), never to
-    // user-defined custom list entries. Rewriting an entry here silently changed
-    // or dropped ids the user typed in the list editor (issue #114).
+    // Ids are kept exactly as stored — both for custom list entries and for the
+    // selected-model pointer. Deprecated ids are no longer remapped (see
+    // modelConfiguration.ts), so a stale id surfaces as a provider error rather
+    // than being silently swapped for a model the user never picked.
     const normalizedId = model.id.trim();
 
     if (!normalizedId || seenIds.has(normalizedId)) {
@@ -39,7 +38,7 @@ export const sanitizeModelOptions = (models: ModelOption[]): ModelOption[] => {
 };
 
 export const resolveSupportedModelId = (modelId: string | null | undefined, fallback: string): string =>
-  migrateRemovedModelId(modelId) || fallback;
+  modelId || fallback;
 
 /**
  * De-duplicate a model list by id, preserving the first occurrence of each id.

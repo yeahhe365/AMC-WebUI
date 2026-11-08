@@ -46,7 +46,7 @@ export interface ApiUsageRetentionLimits {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export const DEFAULT_API_USAGE_RETENTION: ApiUsageRetentionLimits = {
+const DEFAULT_API_USAGE_RETENTION: ApiUsageRetentionLimits = {
   retentionMs: 365 * DAY_MS,
   maxRecords: 50_000,
 };

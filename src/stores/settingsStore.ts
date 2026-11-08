@@ -6,7 +6,6 @@ import { DEFAULT_FILES_API_CONFIG, getDefaultAppSettings } from '@/constants/set
 import { AVAILABLE_THEMES, DEFAULT_THEME_ID } from '@/constants/themeRegistry';
 import { logService } from '@/services/logService';
 import { resolveAppLanguage, type SupportedLanguage } from '@/i18n/languageRegistry';
-import { migrateRemovedModelId } from '@/constants/modelConfiguration';
 import { resolveSupportedModelId } from '@/utils/model/modelSorting';
 import { dbService } from '@/services/db/dbService';
 import { normalizeLiveArtifactsSystemPrompts } from '@/utils/live-ui/liveUiPromptSettings';
@@ -70,7 +69,7 @@ function sanitizeAppSettings(settings: AppSettings): AppSettings {
     selectionAskModelId: (() => {
       const raw = settings.selectionAskModelId;
       if (typeof raw !== 'string' || !raw.trim()) return defaultSettings.selectionAskModelId;
-      return migrateRemovedModelId(raw) ?? raw;
+      return raw;
     })(),
     selectionAskProviderId: (() => {
       const rawModel = settings.selectionAskModelId;
@@ -84,15 +83,13 @@ function sanitizeAppSettings(settings: AppSettings): AppSettings {
         return cycleIds;
       }
       const seen = new Set<string>();
-      return cycleIds
-        .map((id) => migrateRemovedModelId(id) ?? id)
-        .filter((id) => {
-          if (seen.has(id)) {
-            return false;
-          }
-          seen.add(id);
-          return true;
-        });
+      return cycleIds.filter((id) => {
+        if (seen.has(id)) {
+          return false;
+        }
+        seen.add(id);
+        return true;
+      });
     })(),
     liveArtifactsSystemPrompts: normalizeLiveArtifactsSystemPrompts(settings),
     liveTranslateTargetLanguageCode:

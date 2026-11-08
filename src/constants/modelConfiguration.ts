@@ -34,36 +34,16 @@ export const MODELS_SUPPORTING_RAW_MODE = [
   ROBOTICS_MODEL,
 ];
 
-/** Built-in model IDs removed from the app; remap saved settings to a supported replacement. */
-const REMOVED_MODEL_ID_MIGRATIONS: Readonly<Record<string, string>> = {
-  'gemini-3.1-flash-lite': 'gemini-3.5-flash-lite',
-  'models/gemini-3.1-flash-lite': 'gemini-3.5-flash-lite',
-  // Exact IDs only — must not match gemini-3.5-flash-lite.
-  'gemini-3.5-flash': 'gemini-3.7-flash',
-  'models/gemini-3.5-flash': 'gemini-3.7-flash',
-  // Robotics ER generation 1 shut down 2026-08-31; migrate to ER 2.
-  'gemini-robotics-er-1.6-preview': ROBOTICS_MODEL,
-  'models/gemini-robotics-er-1.6-preview': ROBOTICS_MODEL,
-  // Live: Gemini 3.1 Flash Live deprecated; migrate to Gemini 3.8 Live.
-  'gemini-3.1-flash-live-preview': 'gemini-3.8-live',
-  'models/gemini-3.1-flash-live-preview': 'gemini-3.8-live',
-  'gemini-3.1-flash-live': 'gemini-3.8-live',
-  'models/gemini-3.1-flash-live': 'gemini-3.8-live',
-  // Gemini 2.0 Flash shut down 2026-06-01; Google names 3.6 Flash the replacement.
-  'gemini-2.0-flash': 'gemini-3.6-flash',
-  'models/gemini-2.0-flash': 'gemini-3.6-flash',
-  // Docs label 3.1 Flash TTS preview "Legacy" and point at the stable 3.8 TTS models.
-  'gemini-3.1-flash-tts-preview': 'gemini-3.8-flash-tts',
-  'models/gemini-3.1-flash-tts-preview': 'gemini-3.8-flash-tts',
-};
-
-export const migrateRemovedModelId = (modelId: string | null | undefined): string | undefined => {
-  if (!modelId) {
-    return modelId ?? undefined;
-  }
-  return REMOVED_MODEL_ID_MIGRATIONS[modelId] ?? modelId;
-};
-
+/**
+ * There is deliberately NO automatic remapping of saved model ids.
+ *
+ * A previous map rewrote deprecated ids (gemini-2.0-flash → gemini-3.6-flash
+ * and friends) during settings hydration. That silently switched the user to a
+ * model they never chose — and each target had its own shutdown date, so the
+ * rewrite had to be maintained forever just to keep pointing somewhere live.
+ * Saved ids are now preserved verbatim: if the model is gone, the request fails
+ * with the provider's own error and the user picks a replacement.
+ */
 export const DEFAULT_THINKING_LEVEL = 'HIGH';
 
 const thinkingBudgetRange = (min: number, max: number) => ({ min, max });

@@ -61,11 +61,16 @@ describe('sortModels', () => {
     ]);
   });
 
-  it('migrates removed model ids only for the selected-model pointer, never for custom list entries', () => {
-    expect(resolveSupportedModelId('gemini-3.1-flash-lite', 'gemini-3.6-flash')).toBe('gemini-3.5-flash-lite');
-    expect(resolveSupportedModelId('gemini-3.5-flash', 'gemini-3.6-flash')).toBe('gemini-3.7-flash');
-    // Must not remap gemini-3.5-flash-lite via prefix.
+  it('keeps stored ids verbatim for both the pointer and custom list entries', () => {
+    // Deprecated ids are no longer remapped: the user sees the provider error and
+    // picks a replacement, instead of being silently switched to another model.
+    expect(resolveSupportedModelId('gemini-3.1-flash-lite', 'gemini-3.6-flash')).toBe('gemini-3.1-flash-lite');
+    expect(resolveSupportedModelId('gemini-3.5-flash', 'gemini-3.6-flash')).toBe('gemini-3.5-flash');
+    expect(resolveSupportedModelId('gemini-2.0-flash', 'gemini-3.6-flash')).toBe('gemini-2.0-flash');
     expect(resolveSupportedModelId('gemini-3.5-flash-lite', 'gemini-3.6-flash')).toBe('gemini-3.5-flash-lite');
+    // Only a missing id falls back.
+    expect(resolveSupportedModelId(undefined, 'gemini-3.6-flash')).toBe('gemini-3.6-flash');
+    expect(resolveSupportedModelId('', 'gemini-3.6-flash')).toBe('gemini-3.6-flash');
 
     // A user-entered custom model list must keep the exact ids the user typed.
     // Previously sanitizeModelOptions rewrote gemini-3.5-flash → gemini-3.7-flash,
