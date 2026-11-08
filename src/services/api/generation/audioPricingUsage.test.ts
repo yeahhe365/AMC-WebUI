@@ -45,16 +45,10 @@ describe('audio pricing usage logging', () => {
       },
     });
 
-    await generateSpeechApi(
-      'api-key',
-      'gemini-3.1-flash-tts-preview',
-      'hello world',
-      'Aoede',
-      new AbortController().signal,
-    );
+    await generateSpeechApi('api-key', 'gemini-3.8-flash-tts', 'hello world', 'Aoede', new AbortController().signal);
 
     expect(recordTokenUsageMock).toHaveBeenCalledWith(
-      'gemini-3.1-flash-tts-preview',
+      'gemini-3.8-flash-tts',
       expect.objectContaining({
         promptTokens: 120,
         completionTokens: 240,

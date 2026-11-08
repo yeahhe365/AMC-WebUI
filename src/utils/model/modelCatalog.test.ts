@@ -20,7 +20,7 @@ describe('buildModelCatalog', () => {
   it('adds category and badge metadata for shared picker rendering', () => {
     const models: ModelOption[] = [
       { id: 'gemini-3.8-live', name: 'Gemini 3.8 Live', isPinned: true },
-      { id: 'gemini-3.1-flash-tts-preview', name: 'Gemini 3.1 Flash TTS Preview' },
+      { id: 'gemini-3.8-flash-tts', name: 'Gemini 3.8 Flash TTS' },
       { id: 'gemini-3-pro-image', name: 'Gemini 3 Pro Image Preview' },
       { id: 'gemma-4-31b-it', name: 'Gemma 4 31B IT' },
       { id: 'gemini-robotics-er-2-preview', name: 'Gemini Robotics-ER 2 Preview' },
@@ -33,7 +33,7 @@ describe('buildModelCatalog', () => {
       group: 'pinned',
       badgeKeys: expect.arrayContaining(['pinned', 'live']),
     });
-    expect(getEntry(entries, 'gemini-3.1-flash-tts-preview')).toMatchObject({
+    expect(getEntry(entries, 'gemini-3.8-flash-tts')).toMatchObject({
       category: 'tts',
       group: 'standard',
       badgeKeys: expect.arrayContaining(['tts', 'flash']),
@@ -59,12 +59,12 @@ describe('buildModelCatalog', () => {
 describe('filterModelCatalog', () => {
   const entries = buildModelCatalog([
     { id: 'gemini-3.8-live', name: 'Gemini 3.8 Live' },
-    { id: 'gemini-3.1-flash-tts-preview', name: 'Gemini 3.1 Flash TTS Preview' },
+    { id: 'gemini-3.8-flash-tts', name: 'Gemini 3.8 Flash TTS' },
     { id: 'gemini-3.1-flash-image', name: 'Nano Banana 2' },
   ]);
 
   it('matches name, id, and capability tags', () => {
-    expect(filterModelCatalog(entries, 'tts').map((entry) => entry.id)).toEqual(['gemini-3.1-flash-tts-preview']);
+    expect(filterModelCatalog(entries, 'tts').map((entry) => entry.id)).toEqual(['gemini-3.8-flash-tts']);
     expect(filterModelCatalog(entries, 'live').map((entry) => entry.id)).toEqual(['gemini-3.8-live']);
     expect(filterModelCatalog(entries, 'nano').map((entry) => entry.id)).toEqual(['gemini-3.1-flash-image']);
   });
@@ -94,7 +94,7 @@ describe('buildModelCatalogSections', () => {
   it('groups providerless catalogs into pinned and category sections', () => {
     const entries = buildModelCatalog([
       { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash', isPinned: true },
-      { id: 'gemini-3.1-flash-tts-preview', name: 'Gemini 3.1 Flash TTS' },
+      { id: 'gemini-3.8-flash-tts', name: 'Gemini 3.8 Flash TTS' },
       { id: 'gemini-3.1-flash-image', name: 'Nano Banana 2' },
     ]);
 
@@ -182,7 +182,7 @@ describe('getTabCycleModelIds', () => {
     { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', isPinned: true },
     { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', isPinned: true },
     { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash-Lite', isPinned: true },
-    { id: 'gemini-3.1-flash-tts-preview', name: 'Gemini 3.1 Flash TTS Preview', isPinned: true },
+    { id: 'gemini-3.8-flash-tts', name: 'Gemini 3.8 Flash TTS', isPinned: true },
   ];
 
   it('falls back to the default quick-switch order when no manual selection is set', () => {

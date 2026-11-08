@@ -154,7 +154,7 @@ describe('useSlashCommands', () => {
   });
 
   it('hides artifacts command on models that cannot generate suggestions', () => {
-    const props = createProps({ currentModelId: 'gemini-3.1-flash-tts-preview' });
+    const props = createProps({ currentModelId: 'gemini-3.8-flash-tts' });
     const { result, unmount } = renderHook(() => useSlashCommands(props));
 
     act(() => {

@@ -99,7 +99,7 @@ describe('modelSpecifications', () => {
     expect(flashImage.thinkingLevelRange).toBe('Minimal / High (默认 Minimal)');
     expect(flashImage.thinkingBudgetRange).toBeUndefined();
 
-    const liteImage = getModelSpecification({ id: 'gemini-3.1-flash-lite-image', name: 'Nano Banana Lite' });
+    const liteImage = getModelSpecification({ id: 'gemini-3.1-flash-lite-image', name: 'Nano Banana 2 Lite' });
     expect(liteImage.contextWindow).toContain('64K');
     expect(liteImage.maxOutput).toContain('4K');
     expect(liteImage.thinkingLevelRange).toBe('Minimal / High (默认 Minimal)');

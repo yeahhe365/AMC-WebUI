@@ -132,13 +132,13 @@ describe('HeaderModelSelector', () => {
     expect(renderer.container.querySelector('button[aria-label="Toggle reasoning mode"]')).toBeNull();
   });
 
-  it('does not show the thinking fast toggle for Gemini 3.1 Flash TTS Preview', async () => {
+  it('does not show the thinking fast toggle for Gemini 3.8 Flash TTS', async () => {
     await act(async () => {
       renderer.root.render(
         <HeaderModelSelector
-          currentModelName="Gemini 3.1 Flash TTS Preview"
-          availableModels={[{ id: 'gemini-3.1-flash-tts-preview', name: 'Gemini 3.1 Flash TTS Preview' }]}
-          selectedModelId="gemini-3.1-flash-tts-preview"
+          currentModelName="Gemini 3.8 Flash TTS"
+          availableModels={[{ id: 'gemini-3.8-flash-tts', name: 'Gemini 3.8 Flash TTS' }]}
+          selectedModelId="gemini-3.8-flash-tts"
           onSelectModel={vi.fn()}
           isSwitchingModel={false}
           isLoading={false}

@@ -146,7 +146,7 @@ describe('useMessageSender', () => {
 
     const { result, unmount } = renderMessageSender({
       currentChatSettings: {
-        modelId: 'gemini-3.1-flash-tts-preview',
+        modelId: 'gemini-3.8-flash-tts',
       },
       selectedFiles: [
         createUploadedFile({

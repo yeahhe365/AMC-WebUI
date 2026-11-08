@@ -115,8 +115,8 @@ describe('getModelCapabilities', () => {
     expect(getModelCapabilities('gemini-3.8-live-extended-thinking').supportsMinimalThinkingLevel).toBe(false);
   });
 
-  it('does not mark Gemini 3.1 Flash TTS Preview as supporting thinking', () => {
-    const capabilities = getModelCapabilities('gemini-3.1-flash-tts-preview');
+  it('does not mark Gemini 3.8 Flash TTS as supporting thinking', () => {
+    const capabilities = getModelCapabilities('gemini-3.8-flash-tts');
 
     expect(capabilities.isTtsModel).toBe(true);
     expect(capabilities.supportsThinkingLevel).toBe(false);
@@ -211,7 +211,7 @@ describe('getModelCapabilities', () => {
 
   it('exposes interaction permissions so UI code does not branch on model families', () => {
     const textCapabilities = getModelCapabilities('gemini-3.1-pro-preview');
-    const ttsCapabilities = getModelCapabilities('gemini-3.1-flash-tts-preview');
+    const ttsCapabilities = getModelCapabilities('gemini-3.8-flash-tts');
     const liveCapabilities = getModelCapabilities('gemini-3.8-live');
     const geminiImageCapabilities = getModelCapabilities('gemini-3.1-flash-image');
 

@@ -89,6 +89,14 @@ describe('knownModelsCatalog', () => {
       expect(KNOWN_MODELS_CATALOG['gemini-2.5-pro']?.contextWindow).toBe(1_048_576);
       expect(KNOWN_MODELS_CATALOG['gemini-2.5-flash']?.contextWindow).toBe(1_048_576);
     });
+
+    it('drops the preview TTS model that Google retires on 2026-11-17', () => {
+      // Never selectable in this app: the registry only ever offered the 3.8 TTS
+      // models, which Google names as the replacement.
+      expect(KNOWN_MODELS_CATALOG['gemini-3.1-flash-tts-preview']).toBeUndefined();
+      expect(KNOWN_MODELS_CATALOG['gemini-3.8-flash-tts']?.contextWindow).toBe(8_192);
+      expect(KNOWN_MODELS_CATALOG['gemini-3.8-flash-lite-tts']?.contextWindow).toBe(8_192);
+    });
   });
 
   describe('inferModelCapabilities', () => {
@@ -149,7 +157,7 @@ describe('knownModelsCatalog', () => {
       expect(liveTranslateCaps.vision).toBe(false);
       expect(liveTranslateCaps.audio).toBe(true);
 
-      const ttsCaps = getOrInferModelCapabilities({ id: 'gemini-3.1-flash-tts-preview' });
+      const ttsCaps = getOrInferModelCapabilities({ id: 'gemini-3.8-flash-tts' });
       expect(ttsCaps.vision).toBe(false);
       expect(ttsCaps.audio).toBe(true);
     });

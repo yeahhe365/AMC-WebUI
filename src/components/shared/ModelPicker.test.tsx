@@ -30,9 +30,7 @@ describe('getModelIcon', () => {
   });
 
   it('uses the Gemini SVG brand icon for TTS models', () => {
-    const ttsMarkup = renderToStaticMarkup(
-      getModelIcon({ id: 'gemini-3.1-flash-tts-preview', name: 'Gemini 3.1 Flash TTS Preview' }),
-    );
+    const ttsMarkup = renderToStaticMarkup(getModelIcon({ id: 'gemini-3.8-flash-tts', name: 'Gemini 3.8 Flash TTS' }));
 
     expect(ttsMarkup).toContain('data-model-brand-icon="gemini"');
   });
@@ -52,9 +50,9 @@ describe('getModelIcon', () => {
     expect(roboticsMarkup).toContain('data-model-brand-icon="gemini"');
   });
 
-  it('uses the Nano Banana SVG for Nano Banana Lite image models', () => {
+  it('uses the Nano Banana SVG for Nano Banana 2 Lite image models', () => {
     const liteMarkup = renderToStaticMarkup(
-      getModelIcon({ id: 'gemini-3.1-flash-lite-image', name: 'Nano Banana Lite' }),
+      getModelIcon({ id: 'gemini-3.1-flash-lite-image', name: 'Nano Banana 2 Lite' }),
     );
 
     expect(liteMarkup).toContain('data-model-brand-icon="nanobanana"');

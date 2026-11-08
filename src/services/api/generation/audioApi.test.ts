@@ -32,7 +32,7 @@ describe('generateSpeechApi request config', () => {
   it('uses the selected single-speaker voice for standard TTS prompts', async () => {
     await generateSpeechApi(
       'api-key',
-      'gemini-3.1-flash-tts-preview',
+      'gemini-3.8-flash-tts',
       'Say cheerfully: Have a wonderful day!',
       'Aoede',
       new AbortController().signal,
@@ -55,7 +55,7 @@ describe('generateSpeechApi request config', () => {
   it('switches to multi-speaker voice config when the prompt declares speaker voices', async () => {
     await generateSpeechApi(
       'api-key',
-      'gemini-3.1-flash-tts-preview',
+      'gemini-3.8-flash-tts',
       `# AUDIO PROFILE: Two hosts
 ### SPEAKER VOICES
 Joe: Kore
@@ -112,13 +112,7 @@ describe('generateSpeechApi timeout', () => {
       ],
     });
 
-    await generateSpeechApi(
-      'api-key',
-      'gemini-3.1-flash-tts-preview',
-      'Say hello',
-      'Aoede',
-      new AbortController().signal,
-    );
+    await generateSpeechApi('api-key', 'gemini-3.8-flash-tts', 'Say hello', 'Aoede', new AbortController().signal);
 
     const request = generateContentMock.mock.calls[0][0];
     expect(request.config.abortSignal).toBeInstanceOf(AbortSignal);
@@ -136,7 +130,7 @@ describe('generateSpeechApi timeout', () => {
 
     const promise = generateSpeechApi(
       'api-key',
-      'gemini-3.1-flash-tts-preview',
+      'gemini-3.8-flash-tts',
       'Say hello',
       'Aoede',
       new AbortController().signal,
@@ -156,13 +150,7 @@ describe('generateSpeechApi timeout', () => {
       candidates: [{ content: { parts: [{ inlineData: { data: 'pcm-audio' } }] } }],
     });
 
-    await generateSpeechApi(
-      'api-key',
-      'gemini-3.1-flash-tts-preview',
-      'Say hello',
-      'Aoede',
-      new AbortController().signal,
-    );
+    await generateSpeechApi('api-key', 'gemini-3.8-flash-tts', 'Say hello', 'Aoede', new AbortController().signal);
 
     // Advancing far past the budget must not reject a settled request.
     await expect(

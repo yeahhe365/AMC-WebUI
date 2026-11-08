@@ -73,10 +73,10 @@ describe('ModelDetailCard', () => {
     expect(screen.getByText('Low ~ High (Default Medium)')).toBeInTheDocument();
   });
 
-  it('does not render thinking section for Gemini 3.1 Flash TTS', () => {
+  it('does not render thinking section for Gemini 3.8 Flash TTS', () => {
     const model: ModelOption = {
-      id: 'gemini-3.1-flash-tts-preview',
-      name: 'Gemini 3.1 Flash TTS',
+      id: 'gemini-3.8-flash-tts',
+      name: 'Gemini 3.8 Flash TTS',
     };
 
     render(

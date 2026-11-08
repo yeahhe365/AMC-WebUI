@@ -100,7 +100,7 @@ describe('useChatEffects', () => {
     hook.unmount();
   });
 
-  it('clamps stale image settings when switching from Nano Banana 2 to Nano Banana Lite', () => {
+  it('clamps stale image settings when switching from Nano Banana 2 to Nano Banana 2 Lite', () => {
     const setAspectRatio = vi.fn();
     const setImageSize = vi.fn();
     const props = createProps({

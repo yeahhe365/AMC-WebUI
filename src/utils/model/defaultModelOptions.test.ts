@@ -34,6 +34,13 @@ describe('getDefaultModelOptions', () => {
     expect(nano?.name).toBe('Nano Banana 2.1');
   });
 
+  it('uses Google’s “Nano Banana 2 Lite” name for the lite image model', () => {
+    const models = getDefaultModelOptions();
+    const lite = models.find((model) => model.id === 'gemini-3.1-flash-lite-image');
+
+    expect(lite?.name).toBe('Nano Banana 2 Lite');
+  });
+
   it('does not offer the shut-down Gemini 2.0 models', () => {
     const models = getDefaultModelOptions();
 

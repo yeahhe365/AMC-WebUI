@@ -182,11 +182,7 @@ describe('GenerationSection', () => {
 
     await act(async () => {
       renderer.root.render(
-        <GenerationSection
-          modelId="gemini-3.1-flash-tts-preview"
-          currentSettings={baseSettings}
-          onUpdateSetting={vi.fn()}
-        />,
+        <GenerationSection modelId="gemini-3.8-flash-tts" currentSettings={baseSettings} onUpdateSetting={vi.fn()} />,
       );
     });
 

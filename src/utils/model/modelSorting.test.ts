@@ -136,10 +136,10 @@ describe('model option sanitization', () => {
     expect(resolveSupportedModelId('gemini-2.5-flash-preview-09-2025', 'gemini-3.6-flash')).toBe(
       'gemini-2.5-flash-preview-09-2025',
     );
-    expect(resolveSupportedModelId('gemini-2.5-flash-preview-tts', 'gemini-3.1-flash-tts-preview')).toBe(
+    expect(resolveSupportedModelId('gemini-2.5-flash-preview-tts', 'gemini-3.8-flash-tts')).toBe(
       'gemini-2.5-flash-preview-tts',
     );
-    expect(resolveSupportedModelId('gemini-2.5-pro-preview-tts', 'gemini-3.1-flash-tts-preview')).toBe(
+    expect(resolveSupportedModelId('gemini-2.5-pro-preview-tts', 'gemini-3.8-flash-tts')).toBe(
       'gemini-2.5-pro-preview-tts',
     );
   });

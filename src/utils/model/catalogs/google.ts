@@ -113,14 +113,6 @@ export const GOOGLE_MODELS: Record<string, CatalogModelSpec> = {
     capabilities: { vision: false, audio: true, thinking: false, tools: false },
     ownedBy: 'google',
   },
-  'gemini-3.1-flash-tts-preview': {
-    id: 'gemini-3.1-flash-tts-preview',
-    name: 'Gemini 3.1 Flash TTS',
-    contextWindow: 8_192,
-    maxOutputTokens: 16_384,
-    capabilities: { vision: false, audio: true, thinking: false, tools: false },
-    ownedBy: 'google',
-  },
   'gemini-3.8-flash-tts': {
     id: 'gemini-3.8-flash-tts',
     name: 'Gemini 3.8 Flash TTS',
@@ -155,7 +147,7 @@ export const GOOGLE_MODELS: Record<string, CatalogModelSpec> = {
   },
   'gemini-3.1-flash-lite-image': {
     id: 'gemini-3.1-flash-lite-image',
-    name: 'Nano Banana Lite',
+    name: 'Nano Banana 2 Lite',
     contextWindow: 65_536,
     maxOutputTokens: 4_096,
     capabilities: { vision: true, image: true, thinking: true, tools: false },

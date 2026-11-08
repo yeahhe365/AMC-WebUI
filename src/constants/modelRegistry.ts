@@ -130,7 +130,7 @@ const MODEL_REGISTRY: RegisteredModel[] = [
   },
   {
     id: 'gemini-3.1-flash-lite-image',
-    name: 'Nano Banana Lite',
+    name: 'Nano Banana 2 Lite',
     groups: ['image'],
   },
 ];

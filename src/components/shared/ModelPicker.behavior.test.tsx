@@ -37,7 +37,7 @@ describe('ModelPicker behavior', () => {
   const models: ModelOption[] = [
     { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', isPinned: true },
     { id: 'gemma-4-31b-it', name: 'Gemma 4 31B IT' },
-    { id: 'gemini-3.1-flash-tts-preview', name: 'Gemini 3.1 Flash TTS Preview' },
+    { id: 'gemini-3.8-flash-tts', name: 'Gemini 3.8 Flash TTS' },
     { id: 'gemini-3-pro-image', name: 'Gemini 3 Pro Image Preview' },
   ];
 
@@ -62,7 +62,7 @@ describe('ModelPicker behavior', () => {
     expect(renderer.container.querySelector('[data-provider-section="openai-compatible"]')).toBeNull();
     expect(renderer.container.textContent).not.toContain('Pinned');
     expect(renderer.container.textContent).not.toContain('Speech');
-    expect(renderer.container.textContent).toContain('Gemini 3.1 Flash TTS Preview');
+    expect(renderer.container.textContent).toContain('Gemini 3.8 Flash TTS');
   });
 
   it('groups models by provider when provider metadata is available', () => {
