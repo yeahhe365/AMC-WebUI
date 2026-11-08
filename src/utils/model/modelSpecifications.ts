@@ -130,19 +130,18 @@ const isVideoSupportedModel = (modelId: string): boolean => {
 
 const isPdfSupportedModel = (modelId: string): boolean => {
   const lower = modelId.toLowerCase();
-  if (
-    lower.includes('tts') ||
-    lower.includes('flash-lite-image') ||
-    lower.includes('flash-image') ||
-    lower.includes('pro-image')
-  ) {
+  // Gemini 3 Pro Image takes only image and text; the 3.1 image models and
+  // Nano Banana 2.1 all document PDF input.
+  if (lower.includes('pro-image')) {
+    return false;
+  }
+  if (lower.includes('flash-image') || lower.includes('flash-lite-image') || lower.includes('nano-banana')) {
+    return true;
+  }
+  if (lower.includes('tts')) {
     return false;
   }
   if (lower.includes('gemini-1.5') || lower.includes('gemini-2') || lower.includes('gemini-3')) {
-    return true;
-  }
-  // Nano Banana 2.1 accepts PDF input, unlike the other image models above.
-  if (lower.includes('nano-banana')) {
     return true;
   }
   if (

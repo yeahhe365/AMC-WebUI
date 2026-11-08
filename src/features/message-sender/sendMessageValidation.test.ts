@@ -119,4 +119,54 @@ describe('validateMessageBeforeSend', () => {
       expect(result.fileError).toBe(t('messageSenderCodeExecutionTextFileTooLarge'));
     }
   });
+
+  it('allows PDF references for the 3.1 image models and Nano Banana 2.1', () => {
+    const pdf = createUploadedFile({
+      id: 'pdf-active',
+      name: 'document.pdf',
+      type: 'application/pdf',
+      uploadState: 'active',
+    });
+    const imagePermissions = { canAcceptAttachments: true, requiresTextPrompt: true };
+
+    for (const modelId of ['gemini-3.1-flash-image', 'gemini-3.1-flash-lite-image', 'gemini-nano-banana-2.1']) {
+      const result = validateMessageBeforeSend({
+        text: 'Turn this document into an infographic',
+        files: [pdf],
+        permissions: imagePermissions,
+        isContinueMode: false,
+        isServerCodeExecutionEnabled: false,
+        isGemini3Image: true,
+        activeModelId: modelId,
+        t,
+      });
+
+      expect(result, modelId).toEqual({ ok: true });
+    }
+  });
+
+  it('still blocks PDF references for Gemini 3 Pro Image, which takes images only', () => {
+    const pdf = createUploadedFile({
+      id: 'pdf-only-pro',
+      name: 'document.pdf',
+      type: 'application/pdf',
+      uploadState: 'active',
+    });
+
+    const result = validateMessageBeforeSend({
+      text: 'Turn this document into an infographic',
+      files: [pdf],
+      permissions: { canAcceptAttachments: true, requiresTextPrompt: true },
+      isContinueMode: false,
+      isServerCodeExecutionEnabled: false,
+      isGemini3Image: true,
+      activeModelId: 'gemini-3-pro-image',
+      t,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.fileError).toBe(t('messageSenderImageModelSupportsImageOnly'));
+    }
+  });
 });
