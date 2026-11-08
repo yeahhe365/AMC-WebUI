@@ -327,19 +327,23 @@ Additional notes:
 - `server/` currently serves the Gemini-native proxy path. OpenAI Compatible mode does not use that Node API by default.
 - If you want OpenAI Compatible traffic to use a self-hosted gateway, set that gateway's compatible Base URL in the frontend settings directly.
 
-#### Optional: Use AIStudioToAPI as a Gemini-Compatible Backend
+#### Optional: Use AIStudio2API as a Gemini-Compatible Backend
 
-If you want to use a Google AI Studio web account as the API source, you can also try deploying [AIStudioToAPI](https://github.com/iBUHub/AIStudioToAPI) as a third-party Gemini-compatible backend. It exposes Gemini Native API style `/v1beta/*` endpoints and can be used as the custom API proxy for AMC WebUI.
+If you want to use Google AI Studio web accounts as the API source, we recommend deploying [AIStudio2API](https://github.com/Mag1cFall/AIStudio2API) as a third-party Gemini-compatible backend. It is a single Go service that fronts multiple Google accounts with Gemini Native API style `/v1beta/*` endpoints (it also speaks OpenAI Chat Completions, Responses and Anthropic Messages), streams natively, and supports image/video generation, TTS, Live and file uploads.
 
 Example:
 
 ```text
-RUNTIME_API_PROXY_URL=https://your-aistudio-to-api.example.com/v1beta
+RUNTIME_API_PROXY_URL=https://your-aistudio2api.example.com/v1beta
 ```
 
-You can also open **Settings -> Third-Party Providers** (or API Configuration), enable custom API configuration and API proxy, then enter the AIStudioToAPI Gemini-compatible Base URL, such as `http://localhost:7860/v1beta`. The API key entered in AMC WebUI should match one of the `API_KEYS` configured for the AIStudioToAPI deployment.
+You can also open **Settings -> Third-Party Providers** (or API Configuration), enable custom API configuration and API proxy, then enter the AIStudio2API Gemini-compatible Base URL, such as `http://localhost:2048/v1beta`. The API key entered in AMC WebUI should match the `PROXY_API_KEY` configured for the AIStudio2API deployment.
 
-Note: AIStudioToAPI is a third-party project, so review its account login, authentication, rate limiting, and public exposure risks before use. It can replace the regular Gemini API proxy source. AMC WebUI's Live API in static deployments connects directly from the browser to the official Live service.
+Enable the Files API described above for attachments: AIStudio2API uploads them to the generating account's Google Drive and references the file, which avoids inlining large payloads. The account must have granted Drive access in AI Studio; without it the service falls back to inline Base64 automatically.
+
+Note: AIStudio2API is a third-party project, so review its account login, authentication, rate limiting, and public exposure risks before use. It can replace the regular Gemini API proxy source. AMC WebUI's Live API in static deployments connects directly from the browser to the official Live service.
+
+Alternative: [AIStudioToAPI](https://github.com/iBUHub/AIStudioToAPI) (Node) also exposes `/v1beta/*`, but it depends on the AI Studio "Build" channel that the upstream has disabled and needs a local patch to generate at all — prefer AIStudio2API.
 
 ### Build and Preview
 

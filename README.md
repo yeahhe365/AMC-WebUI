@@ -337,19 +337,23 @@ RUNTIME_API_PROXY_URL=https://your-api.example.com/api/gemini
 - `server/` 当前承载的是 Gemini 原生代理链路；OpenAI 兼容模式默认不会经过这个 Node API 服务
 - 如果你希望 OpenAI 兼容模式也走自建网关，请把该网关的兼容 Base URL 直接填到前端设置中
 
-#### 可选：使用 AIStudioToAPI 作为 Gemini 兼容后端
+#### 可选：使用 AIStudio2API 作为 Gemini 兼容后端
 
-如果你希望通过 Google AI Studio 网页端账号提供 API 来源，也可以尝试将 [AIStudioToAPI](https://github.com/iBUHub/AIStudioToAPI) 部署为第三方 Gemini 兼容后端。它提供 Gemini Native API 格式的 `/v1beta/*` 接口，可作为 AMC WebUI 的自定义 API 代理地址。
+如果你希望通过 Google AI Studio 网页端账号提供 API 来源，推荐将 [AIStudio2API](https://github.com/Mag1cFall/AIStudio2API) 部署为第三方 Gemini 兼容后端。它是 Go 编写的单文件服务，用多个 Google 账号提供 Gemini Native API 格式的 `/v1beta/*` 接口（同时兼容 OpenAI Chat Completions、Responses 与 Anthropic Messages），原生流式输出，并支持图片 / 视频生成、TTS、Live 与文件上传。
 
 示例：
 
 ```text
-RUNTIME_API_PROXY_URL=https://your-aistudio-to-api.example.com/v1beta
+RUNTIME_API_PROXY_URL=https://your-aistudio2api.example.com/v1beta
 ```
 
-在界面中也可以进入 **设置 -> 第三方服务商 (Third-Party Providers)**（或 API 配置），启用“自定义 API 配置 / API 代理”，并填入 AIStudioToAPI 的 Gemini 兼容 Base URL（例如 `http://localhost:7860/v1beta`）。AMC WebUI 中填写的 API Key 应与 AIStudioToAPI 部署时配置的 `API_KEYS` 对应。
+在界面中也可以进入 **设置 -> 第三方服务商 (Third-Party Providers)**（或 API 配置），启用“自定义 API 配置 / API 代理”，并填入 AIStudio2API 的 Gemini 兼容 Base URL（例如 `http://localhost:2048/v1beta`）。AMC WebUI 中填写的 API Key 应与 AIStudio2API 部署时配置的 `PROXY_API_KEY` 对应。
 
-注意：AIStudioToAPI 属于第三方项目，请自行评估账号登录、鉴权、限流与公网暴露风险；它可替代普通 Gemini API 代理来源。静态部署下 AMC WebUI 的 Live API 采用浏览器直连官方 Live 服务。
+文件附件建议开启上文的 Files API：AIStudio2API 会把附件上传到生成账号的 Google Drive 再按文件引用，省去把大文件内联进请求体的开销；该账号需在 AI Studio 里授权过 Drive，未授权时服务会自动回退为内联 Base64 发送。
+
+注意：AIStudio2API 属于第三方项目，请自行评估账号登录、鉴权、限流与公网暴露风险；它可替代普通 Gemini API 代理来源。静态部署下 AMC WebUI 的 Live API 采用浏览器直连官方 Live 服务。
+
+备选：[AIStudioToAPI](https://github.com/iBUHub/AIStudioToAPI)（Node 实现）同样提供 `/v1beta/*` 接口，但它依赖的 AI Studio「Build」通道已被上游停用，需要自行打补丁才能正常生成，建议优先使用 AIStudio2API。
 
 ### 构建与预览
 
