@@ -64,7 +64,18 @@ export const createSettingsVirtualMcpServer = (): VirtualMcpServer => {
     id: SETTINGS_VIRTUAL_MCP_ID,
     name: 'AMC Settings Manager',
     description: 'Manage AMC WebUI global application settings, MCP servers, and active chat session parameters.',
-    disabledAutoApproveTools: ['reset_settings', 'delete_mcp_server'],
+    // 凡是"改了就会持久化一个能被下轮工具发现消费的外部端点/开关"的工具，都必须
+    // 有人确认：新增/改 URL 会引入攻击者控制的工具清单（描述可注入），toggle 能把
+    // 本地 Python 这类虚拟服务器打开，import 是一批新增，reset/delete 是不可逆删除。
+    // 判据见 `src/features/mcp/toolApproval.ts`（工具名是否在此数组里）。
+    disabledAutoApproveTools: [
+      'reset_settings',
+      'delete_mcp_server',
+      'add_mcp_server',
+      'update_mcp_server',
+      'toggle_mcp_server',
+      'import_mcp_config',
+    ],
 
     listTools: async () => SETTINGS_TOOLS,
 

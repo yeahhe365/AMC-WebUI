@@ -91,7 +91,9 @@ export const validateAndBuildNewServer = (
     id: serverId,
     name,
     transport,
-    enabled: payload.enabled !== false,
+    // 默认**不启用**：模型新增的服务器先出现在列表里等用户确认，
+    // 避免"模型装一个、下一轮就开始用它"这条链自动成立。
+    enabled: payload.enabled === true,
   };
 
   if (transport === 'http' || transport === 'sse') {

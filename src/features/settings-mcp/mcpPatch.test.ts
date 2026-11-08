@@ -41,8 +41,17 @@ describe('mcpPatch', () => {
       expect(server?.auth).toEqual({ type: 'bearer', token: 'token-12345' });
       expect(server?.headers).toEqual({ 'X-Custom': 'val' });
       expect(server?.timeout).toBe(30);
-      expect(server?.enabled).toBe(true);
+      // 新增服务器默认不启用：等用户在设置里确认后再打开（P0-8 / MCP-ADD-1）。
+      expect(server?.enabled).toBe(false);
       expect(server?.isTrusted).toBe(true);
+    });
+
+    it('only enables a new server when enabled is explicitly true', () => {
+      const { server } = validateAndBuildNewServer(
+        { name: 'Explicit', transport: 'http', url: 'https://api.example.com/mcp', enabled: true },
+        [],
+      );
+      expect(server?.enabled).toBe(true);
     });
 
     it('validates and builds a valid stdio server', () => {

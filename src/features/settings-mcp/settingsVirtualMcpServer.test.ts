@@ -71,6 +71,11 @@ describe('settingsVirtualMcpServer', () => {
       expect(server.name).toBe('AMC Settings Manager');
       expect(server.disabledAutoApproveTools).toContain('reset_settings');
       expect(server.disabledAutoApproveTools).toContain('delete_mcp_server');
+      // 这些工具会引入/改动"下轮可被工具发现的外部端点"，或打开本地代码执行，
+      // 必须有人确认（MCP-ADD-1 / P0-8）。
+      for (const toolName of ['add_mcp_server', 'update_mcp_server', 'toggle_mcp_server', 'import_mcp_config']) {
+        expect(server.disabledAutoApproveTools).toContain(toolName);
+      }
 
       const tools = await server.listTools();
       const toolNames = tools.map((t) => t.name);
