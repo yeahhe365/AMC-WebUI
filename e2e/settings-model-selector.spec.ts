@@ -96,7 +96,9 @@ test('workspace settings content does not expose a horizontal scrollbar', async 
 
   await page.getByRole('tab', { name: 'Appearance' }).click();
 
-  const settingsScroller = page.locator('main > div').first();
+  // <main> 的第一个子元素是标题栏，不是滚动容器；滚动容器是它的兄弟节点。
+  // 按角色定位（main 内唯一的 overflow-y-auto 区域），不要依赖子元素顺序。
+  const settingsScroller = page.locator('main > div.overflow-y-auto').first();
 
   await expect.poll(() => settingsScroller.evaluate((element) => getComputedStyle(element).overflowX)).toBe('hidden');
 });

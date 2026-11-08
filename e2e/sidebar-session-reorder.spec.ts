@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 import { seedAppState } from './helpers/appHarness';
 
@@ -296,6 +296,54 @@ test('time view disables session dragging', async ({ page }) => {
   await expect(page.locator('[data-history-sidebar-root]')).toContainText('Today');
 });
 
+/**
+ * Virtuoso 先用 initialItemCount 铺占位行、再按真实测量结果校正行高，期间每一行的位置都在变。
+ * 读一次 boundingBox 就按下鼠标，指针可能落在邻居行甚至行间空隙上，dragstart 不会触发。
+ * 这里等到连续两次读数一致（布局稳定）再返回。
+ */
+async function settleBoundingBox(locator: Locator) {
+  let previous = await locator.boundingBox();
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (previous === null) throw new Error('Missing bounding box while settling the row');
+    await locator.page().waitForTimeout(50);
+    const current = await locator.boundingBox();
+    if (current === null) throw new Error('Row disappeared while settling the row');
+    if (current.x === previous.x && current.y === previous.y && current.height === previous.height) return current;
+    previous = current;
+  }
+  throw new Error('Row never settled to a stable position');
+}
+
+/**
+ * 用真实鼠标事件起拖，并确认拖拽真的生效（源行进入被拖动态）。
+ * 起拖失败时重试：CI 上指针落到旧坐标属于时序抖动，重试不会削弱断言 ——
+ * 后续要验证的「行被虚拟列表卸载后不留变暗」仍然只可能发生在一次真实拖拽里。
+ */
+async function startNativeDrag(page: Page, title: string) {
+  const surface = rowSurface(page, title);
+  const source = page.getByRole('link', { name: title, exact: true });
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const box = await settleBoundingBox(source);
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+
+    await page.mouse.move(centerX, centerY);
+    await page.mouse.down();
+    await page.mouse.move(centerX, centerY - 12, { steps: 4 });
+
+    try {
+      await expect(surface).toHaveClass(/opacity-35/, { timeout: 3_000 });
+      return;
+    } catch {
+      await page.mouse.up();
+      await page.waitForTimeout(200);
+    }
+  }
+
+  throw new Error(`Could not start a native drag on "${title}" after 3 attempts`);
+}
+
 test('a drag cancelled by the virtual list leaves no dimmed row behind', async ({ page }) => {
   // 超过 50 条会话会走 Virtuoso。拖动中贴近列表边缘会触发自动滚动，被拖的行滚出渲染窗口后
   // 会被卸载；浏览器随之取消这次拖拽，既不再派发 dragend 也没有 drop。这里锁定：
@@ -305,23 +353,14 @@ test('a drag cancelled by the virtual list leaves no dimmed row behind', async (
 
   const source = page.getByRole('link', { name: 'Newest chat', exact: true });
   await expect(source).toBeVisible();
-  // Wait for the virtual list's entrance animation before reading coordinates;
-  // visibility alone can leave the pointer aimed at the adjacent moving row.
-  await source.hover();
 
   const container = page.locator('[data-history-sidebar-root] .overflow-y-auto').first();
   const containerBox = await container.boundingBox();
-  const sourceBox = await source.boundingBox();
-  if (!containerBox || !sourceBox) {
-    throw new Error('Missing bounding box for the drag');
+  if (!containerBox) {
+    throw new Error('Missing bounding box for the session list');
   }
 
-  await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2 - 12, { steps: 4 });
-
-  // 前提确认：拖动确实生效了（源行进入被拖动态），否则后面的断言毫无意义。
-  await expect(rowSurface(page, 'Newest chat')).toHaveClass(/opacity-35/);
+  await startNativeDrag(page, 'Newest chat');
 
   // 贴近底部边缘 48px 内 → 自动滚动 → 源行被虚拟列表卸载
   await page.mouse.move(containerBox.x + 60, containerBox.y + containerBox.height - 10, { steps: 10 });
@@ -334,5 +373,7 @@ test('a drag cancelled by the virtual list leaves no dimmed row behind', async (
     element.scrollTop = 0;
   });
 
+  // 先确认那行被重新渲染出来了，否则「没有变暗样式」对着一片空白也成立，断言就失去了意义。
+  await expect(source).toBeVisible();
   await expect(rowSurface(page, 'Newest chat')).not.toHaveClass(/opacity-35/);
 });
