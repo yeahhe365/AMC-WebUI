@@ -21,6 +21,19 @@ const fallbackThinkingTimeMs = (message: {
   return new Date().getTime() - message.generationStartTime.getTime();
 };
 
+/**
+ * 把本轮增量**追加**到已有内容之后，而不是替换它（P0-4）。
+ *
+ * Continue（续写）模式下这条消息本身就有正文——它被当作 prefill 发给模型
+ * （见 `standardChatTurn.ts` 的 `finalParts: [{ text: prefillContent }]`），
+ * `streamState.content` 只是"这一轮续写新增的那一段"。旧实现直接赋值覆盖，
+ * 于是"点停止"或"上游报错"会把原回复整段吃掉并立刻落库；而续写模式又被
+ * 显式排除在 stream journal 之外（`standardChatGemini.ts` 的 `!isContinueMode`），
+ * 没有任何服务端兜底可以恢复。这里与 `streamOnComplete` 的无条件追加保持一致。
+ */
+const appendStreamedText = (base: string | null | undefined, addition: string | undefined): string =>
+  `${base || ''}${addition ?? ''}`;
+
 export const useApiErrorHandler = (updateAndPersistSessions: SessionsUpdater) => {
   const { t } = useI18n();
 
@@ -52,8 +65,8 @@ export const useApiErrorHandler = (updateAndPersistSessions: SessionsUpdater) =>
               }
               return {
                 ...message,
-                content: partialContent !== undefined ? partialContent : message.content,
-                thoughts: partialThoughts !== undefined ? partialThoughts : message.thoughts,
+                content: appendStreamedText(message.content, partialContent),
+                thoughts: appendStreamedText(message.thoughts, partialThoughts),
                 isLoading: false,
                 generationEndTime: new Date(),
                 stoppedByUser: true,
@@ -93,7 +106,7 @@ export const useApiErrorHandler = (updateAndPersistSessions: SessionsUpdater) =>
             if (message.id !== modelMessageId) {
               return message;
             }
-            const partial = (partialContent !== undefined ? partialContent : message.content || '').trim();
+            const partial = appendStreamedText(message.content, partialContent).trim();
             const errorBody = quoteAsApiError ? `[${errorMessage}]` : errorMessage;
             const content = quoteAsApiError || partial ? `${partial}\n\n${errorBody}` : errorBody;
 
@@ -101,7 +114,7 @@ export const useApiErrorHandler = (updateAndPersistSessions: SessionsUpdater) =>
               ...message,
               role: 'error' as const,
               content,
-              thoughts: partialThoughts !== undefined ? partialThoughts : message.thoughts,
+              thoughts: appendStreamedText(message.thoughts, partialThoughts),
               isLoading: false,
               generationEndTime: new Date(),
               thinkingTimeMs: fallbackThinkingTimeMs(message),

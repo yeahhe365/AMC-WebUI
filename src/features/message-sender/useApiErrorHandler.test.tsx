@@ -156,6 +156,74 @@ describe('useApiErrorHandler', () => {
     expect(finalState[0].messages[0].generationEndTime).toBeInstanceOf(Date);
   });
 
+  // P0-4:续写模式下这条消息已有正文（被当作 prefill 发给模型），本轮增量必须追加，
+  // 否则"点停止/上游报错"会把原回复整段吃掉，且续写不进 stream journal，无法恢复。
+  it('appends the aborted increment to the existing reply instead of replacing it', () => {
+    const updateAndPersistSessions = vi.fn();
+    const { result } = renderHookWithProviders(() => useApiErrorHandler(updateAndPersistSessions), { language: 'zh' });
+    const session = createSession();
+    session.messages = [{ ...session.messages[0], content: 'Original answer.', thoughts: 'Original thoughts.' }];
+
+    act(() => {
+      const abortError = new Error('aborted');
+      abortError.name = 'AbortError';
+      result.current.handleApiError(abortError, 'session-1', 'generation-1', 'Error', ' continued', ' and more');
+    });
+
+    const finalState = updateAndPersistSessions.mock.calls[0]?.[0]([session]);
+    expect(finalState[0].messages[0].content).toBe('Original answer. continued');
+    expect(finalState[0].messages[0].thoughts).toBe('Original thoughts. and more');
+  });
+
+  it('keeps the original reply when an aborted continue produced no increment', () => {
+    const updateAndPersistSessions = vi.fn();
+    const { result } = renderHookWithProviders(() => useApiErrorHandler(updateAndPersistSessions), { language: 'zh' });
+    const session = createSession();
+    session.messages = [{ ...session.messages[0], content: 'Original answer.' }];
+
+    act(() => {
+      const abortError = new Error('aborted');
+      abortError.name = 'AbortError';
+      result.current.handleApiError(abortError, 'session-1', 'generation-1', 'Error', '');
+    });
+
+    const finalState = updateAndPersistSessions.mock.calls[0]?.[0]([session]);
+    expect(finalState[0].messages[0].content).toBe('Original answer.');
+  });
+
+  it('appends the API error notice after the existing reply instead of replacing it', () => {
+    const updateAndPersistSessions = vi.fn();
+    const { result } = renderHookWithProviders(() => useApiErrorHandler(updateAndPersistSessions), { language: 'zh' });
+    const session = createSession();
+    session.messages = [{ ...session.messages[0], content: 'Original answer.' }];
+
+    act(() => {
+      result.current.handleApiError(new Error('boom'), 'session-1', 'generation-1', 'Error', ' tail');
+    });
+
+    const finalState = updateAndPersistSessions.mock.calls[0]?.[0]([session]);
+    expect(finalState[0].messages[0].content).toBe('Original answer. tail\n\n[错误：boom]');
+  });
+
+  it('keeps the original reply when an empty-reply fallback fires after a continue', () => {
+    const updateAndPersistSessions = vi.fn();
+    const { result } = renderHookWithProviders(() => useApiErrorHandler(updateAndPersistSessions), { language: 'zh' });
+    const session = createSession();
+    session.messages = [{ ...session.messages[0], content: 'Original answer.' }];
+    const error = Object.assign(new Error('模型结束了这一轮，但没有给出可见回复。请重试。'), {
+      name: 'EmptyReplyError',
+    });
+
+    act(() => {
+      result.current.handleApiError(error, 'session-1', 'generation-1', 'Error', '');
+    });
+
+    const finalState = updateAndPersistSessions.mock.calls[0]?.[0]([session]);
+    expect(finalState[0].messages[0].content).toBe(
+      'Original answer.\n\n模型结束了这一轮，但没有给出可见回复。请重试。',
+    );
+  });
+
   it('invalidates matching file references and clears lockedApiKey on Files API permission denied errors', () => {
     const updateAndPersistSessions = vi.fn();
     const { result } = renderHookWithProviders(() => useApiErrorHandler(updateAndPersistSessions), { language: 'zh' });
