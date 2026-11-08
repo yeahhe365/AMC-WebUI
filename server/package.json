@@ -7,8 +7,8 @@
     "node": ">=24 <27"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.31.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "undici": "^7.30.2",
-    "ws": "^8.20.2"
+    "ws": "^8.22.1"
   }
 }
