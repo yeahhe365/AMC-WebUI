@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { translateSubtitlesWithGemini } from './geminiSubtitleTranslateService';
 import type { SubtitleCue } from './subtitleFormatter';
 import { getConfiguredApiClient, getConfiguredApiClientContext } from '@/services/api/apiClient';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 vi.mock('@/services/api/apiClient', () => ({
   getConfiguredApiClient: vi.fn(),
@@ -141,5 +142,43 @@ describe('geminiSubtitleTranslateService', () => {
     expect(translatedCues[0].translation).toBe('REST 翻译 1');
     expect(translatedCues[1].translation).toBe('REST 翻译 2');
     expect(fetchMock).toHaveBeenCalled();
+  });
+
+  // P0-9:这条兜底是手写 fetch,SDK 的 httpOptions 里那份口令它拿不到。
+  describe('deployment access password on the REST fallback', () => {
+    const setPassword = (password: string | null) =>
+      useSettingsStore.setState((state) => ({ appSettings: { ...state.appSettings, serverAccessPassword: password } }));
+
+    const mockFallback = async (context: Record<string, unknown>) => {
+      vi.mocked(getConfiguredApiClient).mockRejectedValueOnce(new Error('SDK network error'));
+      vi.mocked(getConfiguredApiClientContext).mockResolvedValue(context as any);
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: JSON.stringify([{ id: 1, translation: 'ok' }]) }] } }],
+        }),
+      });
+      globalThis.fetch = fetchMock as any;
+      await translateSubtitlesWithGemini(mockApiKey, [mockCues[0]!]);
+      return (fetchMock.mock.calls[0]?.[1]?.headers ?? {}) as Record<string, string>;
+    };
+
+    afterEach(() => setPassword(null));
+
+    it('sends x-access-token when the request goes through the deployment proxy', async () => {
+      setPassword('deploy-pwd');
+      const headers = await mockFallback({
+        apiBaseUrl: 'https://generativelanguage.googleapis.com',
+        proxyBaseUrl: 'https://amc.example.com/api/gemini',
+      });
+      expect(headers['x-access-token']).toBe('deploy-pwd');
+    });
+
+    it('never sends the password to Google when there is no proxy', async () => {
+      setPassword('deploy-pwd');
+      const headers = await mockFallback({ apiBaseUrl: 'https://generativelanguage.googleapis.com' });
+      expect(headers['x-access-token']).toBeUndefined();
+      expect(headers.authorization).toBeUndefined();
+    });
   });
 });

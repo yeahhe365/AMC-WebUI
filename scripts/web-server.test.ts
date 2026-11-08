@@ -17,7 +17,7 @@ afterEach(async () => {
 
 const asset = 'export const greeting = "你好 compressed world";\n'.repeat(1200);
 
-async function startWeb(upstream = 'http://127.0.0.1:9') {
+async function startWeb(upstream = 'http://127.0.0.1:9', extraEnv: Record<string, string> = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'amc-web-test-'));
   cleanups.push(() => fs.rm(root, { recursive: true, force: true }));
   await fs.mkdir(path.join(root, 'assets'));
@@ -32,7 +32,7 @@ async function startWeb(upstream = 'http://127.0.0.1:9') {
       `${source}\nserver.on('listening', () => process.send({ port: server.address().port }));`,
     ],
     {
-      env: { PATH: process.env.PATH, PORT: '0', WEB_ROOT: root, API_UPSTREAM: upstream },
+      env: { PATH: process.env.PATH, PORT: '0', WEB_ROOT: root, API_UPSTREAM: upstream, ...extraEnv },
       stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
     },
   );
@@ -69,12 +69,17 @@ function request(port: number, target: string, headers: http.OutgoingHttpHeaders
   });
 }
 
-function rawUpgrade(port: number, target: string) {
+function rawUpgrade(port: number, target: string, headers: Record<string, string> = {}) {
   return new Promise<string>((resolve, reject) => {
     const socket = net.connect(port, '127.0.0.1');
     let result = '';
+    const extra = Object.entries(headers)
+      .map(([name, value]) => `${name}: ${value}\r\n`)
+      .join('');
     socket.on('connect', () =>
-      socket.write(`GET ${target} HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n`),
+      socket.write(
+        `GET ${target} HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n${extra}\r\n`,
+      ),
     );
     socket.on('data', (chunk) => {
       result += chunk.toString();
@@ -156,6 +161,49 @@ describe('Docker Web server process', () => {
     expect(identity.headers['content-encoding']).toBeUndefined();
     expect(identity.body.toString()).toBe(asset);
     expect((await request(port, '/assets/app.js', { 'accept-encoding': 'identity;q=0, *;q=0' })).status).toBe(406);
+  });
+
+  async function captureUpgradeHeaders(extraEnv: Record<string, string>, sentHeaders: Record<string, string>) {
+    const seen: http.IncomingHttpHeaders[] = [];
+    const upstream = http.createServer();
+    upstream.on('upgrade', (req, socket) => {
+      seen.push(req.headers);
+      socket.end('HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n');
+    });
+    const started = await startHttpServer(upstream);
+    cleanups.push(started.close);
+    const { port } = await startWeb(started.baseUrl, extraEnv);
+    const response = await rawUpgrade(port, '/api/live?model=test', sentHeaders);
+    return { response, headers: seen[0] };
+  }
+
+  // 浏览器无法为 WebSocket 握手加自定义头,所以口令只能由这层桥接补上;
+  // 少了这一步,只要部署设了 ACCESS_PASSWORD,所有 Live 连接都会 401（P0-2）。
+  it('injects the deployment access password into bridged live upgrades', async () => {
+    const { response, headers } = await captureUpgradeHeaders({ RUNTIME_SERVER_ACCESS_PASSWORD: 'p@ss word' }, {});
+    expect(response).toMatch(/^HTTP\/1\.1 101 /);
+    expect(headers['x-access-token']).toBe('p@ss word');
+  });
+
+  it('does not duplicate a caller-supplied access token and skips injection when unset', async () => {
+    const spoofed = await captureUpgradeHeaders(
+      { RUNTIME_SERVER_ACCESS_PASSWORD: 'from-env' },
+      { 'x-access-token': 'from-browser' },
+    );
+    expect(spoofed.headers['x-access-token']).toBe('from-env');
+
+    const unset = await captureUpgradeHeaders({}, {});
+    expect(unset.headers['x-access-token']).toBeUndefined();
+  });
+
+  it('refuses to inject an access password containing CR/LF', async () => {
+    const { response, headers } = await captureUpgradeHeaders(
+      { RUNTIME_SERVER_ACCESS_PASSWORD: 'evil\r\nX-Injected: 1' },
+      {},
+    );
+    expect(response).toMatch(/^HTTP\/1\.1 101 /);
+    expect(headers['x-access-token']).toBeUndefined();
+    expect(headers['x-injected']).toBeUndefined();
   });
 
   it('streams API SSE before the upstream completes and bridges live upgrades', async () => {

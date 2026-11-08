@@ -24,17 +24,12 @@ describe('apiAuthHeaders', () => {
     }));
 
     expect(getServerAccessPassword()).toBe('secret-token-123');
-    expect(getServerAuthHeaders()).toEqual({
-      'x-access-token': 'secret-token-123',
-      authorization: 'Bearer secret-token-123',
-    });
+    // 只发专用头:authorization 是 provider 的 Key 通道,不能被部署口令占用(P0-1)。
+    expect(getServerAuthHeaders()).toEqual({ 'x-access-token': 'secret-token-123' });
   });
 
   it('allows overriding password in getServerAuthHeaders', () => {
-    expect(getServerAuthHeaders('custom-override')).toEqual({
-      'x-access-token': 'custom-override',
-      authorization: 'Bearer custom-override',
-    });
+    expect(getServerAuthHeaders('custom-override')).toEqual({ 'x-access-token': 'custom-override' });
   });
 
   it('verifies server access password against /api/auth/verify', async () => {
@@ -59,10 +54,7 @@ describe('apiAuthHeaders', () => {
     expect(fetchSpy).toHaveBeenCalledWith(
       '/api/auth/verify',
       expect.objectContaining({
-        headers: {
-          'x-access-token': 'correct-pass',
-          authorization: 'Bearer correct-pass',
-        },
+        headers: { 'x-access-token': 'correct-pass' },
       }),
     );
   });

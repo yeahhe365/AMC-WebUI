@@ -14,6 +14,7 @@ vi.mock('@/services/api/apiClient', () => ({
 
 import { uploadFileApi, deleteFileApi } from '@/services/api/fileApi';
 import { getConfiguredApiClient, getConfiguredApiClientContext } from '@/services/api/apiClient';
+import { useSettingsStore } from '@/stores/settingsStore';
 
 describe('geminiTranscribeService', () => {
   const mockApiKey = 'test-gemini-api-key';
@@ -372,6 +373,58 @@ describe('geminiTranscribeService', () => {
         );
       } finally {
         global.fetch = originalFetch;
+      }
+    });
+
+    // P0-9:这条兜底是手写 fetch,SDK 的 httpOptions 里那份口令它拿不到。
+    it('should carry the deployment access password on the REST fallback only when proxied', async () => {
+      const controller = new AbortController();
+      const mockUploadedFile = {
+        name: 'files/audio-rest-pwd',
+        uri: 'https://generativelanguage.googleapis.com/v1beta/files/audio-rest-pwd',
+        mimeType: 'audio/wav',
+      };
+      const restResponse = {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ audioTranscription: { text: 'pwd transcript' } }] } }],
+        }),
+      };
+
+      const runFallback = async (context: Record<string, unknown>) => {
+        vi.mocked(uploadFileApi).mockResolvedValue(mockUploadedFile as any);
+        vi.mocked(getConfiguredApiClient).mockResolvedValue({} as any);
+        vi.mocked(getConfiguredApiClientContext).mockResolvedValue(context as any);
+        const originalFetch = global.fetch;
+        const fetchMock = vi.fn().mockResolvedValue(restResponse as any);
+        global.fetch = fetchMock as any;
+        try {
+          await transcribeAudioWithGemini(mockApiKey, mockBlob, mockFileName, controller.signal, undefined, 4.0);
+          return (fetchMock.mock.calls[0]?.[1]?.headers ?? {}) as Record<string, string>;
+        } finally {
+          global.fetch = originalFetch;
+        }
+      };
+
+      useSettingsStore.setState((state) => ({
+        appSettings: { ...state.appSettings, serverAccessPassword: 'deploy-pwd' },
+      }));
+      try {
+        const proxied = await runFallback({
+          apiBaseUrl: 'https://generativelanguage.googleapis.com',
+          proxyBaseUrl: 'https://amc.example.com/api/gemini',
+        });
+        expect(proxied['x-access-token']).toBe('deploy-pwd');
+
+        const direct = await runFallback({
+          apiBaseUrl: 'https://generativelanguage.googleapis.com',
+          proxyBaseUrl: null,
+        });
+        expect(direct['x-access-token']).toBeUndefined();
+      } finally {
+        useSettingsStore.setState((state) => ({
+          appSettings: { ...state.appSettings, serverAccessPassword: null },
+        }));
       }
     });
   });

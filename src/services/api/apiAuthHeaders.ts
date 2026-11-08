@@ -8,6 +8,16 @@ export const getServerAccessPassword = (): string | null => {
   }
 };
 
+/**
+ * 部署访问口令对应的请求头。
+ *
+ * 只使用 `x-access-token` 这一个专用通道,刻意**不再**附带 `authorization: Bearer <口令>`:
+ * 第三方服务商线路(OpenAI 兼容)把 `authorization` 当作自己的 API Key 通道,而
+ * `requestFactory` 里这几个头是展开在 provider 认证头之后的,一旦这里也写
+ * `authorization`,部署口令就会覆盖掉用户真实的 provider key,被当成 API Key 发往
+ * 上游厂商(既是"开了口令就全挂",也是口令泄露)。服务端 `isAuthorized` 同时接受
+ * `authorization: Bearer` 与 `x-access-token`,所以去掉前者不影响鉴权。
+ */
 export const getServerAuthHeaders = (passwordOverride?: string | null): Record<string, string> => {
   const token = passwordOverride !== undefined ? passwordOverride?.trim() || null : getServerAccessPassword();
   if (!token) {
@@ -15,7 +25,6 @@ export const getServerAuthHeaders = (passwordOverride?: string | null): Record<s
   }
   return {
     'x-access-token': token,
-    authorization: `Bearer ${token}`,
   };
 };
 
@@ -32,10 +41,7 @@ export const verifyServerAccessPassword = async (
   try {
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        'x-access-token': trimmed,
-        authorization: `Bearer ${trimmed}`,
-      },
+      headers: getServerAuthHeaders(trimmed),
     });
     if (response.status === 200) {
       return { ok: true };

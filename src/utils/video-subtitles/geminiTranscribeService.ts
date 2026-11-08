@@ -1,6 +1,7 @@
 import type { File as GeminiFile } from '@google/genai';
 import { uploadFileApi, deleteFileApi } from '@/services/api/fileApi';
 import { getConfiguredApiClient, getConfiguredApiClientContext } from '@/services/api/apiClient';
+import { getServerAuthHeaders } from '@/services/api/apiAuthHeaders';
 import { logService } from '@/services/logService';
 import { normalizeTranscriptionLanguage } from '@/services/api/generation/audioApi';
 import type { WordAnnotation } from './subtitleFormatter';
@@ -360,6 +361,8 @@ export async function transcribeAudioWithGemini(
         headers: {
           'Content-Type': 'application/json',
           'x-goog-api-key': apiKey,
+          // 只有请求真的打到自建 API 容器时才带部署口令;直连 Google 时绝不能把口令发出去。
+          ...(proxyBaseUrl ? getServerAuthHeaders() : {}),
         },
         body: JSON.stringify({
           contents: [

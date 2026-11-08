@@ -1,4 +1,5 @@
 import { getConfiguredApiClient, getConfiguredApiClientContext } from '@/services/api/apiClient';
+import { getServerAuthHeaders } from '@/services/api/apiAuthHeaders';
 import { logService } from '@/services/logService';
 import { DEFAULT_THOUGHT_TRANSLATION_MODEL_ID } from '@/constants/modelConfiguration';
 import type { SubtitleCue } from './subtitleFormatter';
@@ -133,6 +134,8 @@ ${JSON.stringify(inputItems, null, 2)}`;
         headers: {
           'Content-Type': 'application/json',
           'x-goog-api-key': apiKey,
+          // 只有请求真的打到自建 API 容器时才带部署口令;直连 Google 时绝不能把口令发出去。
+          ...(proxyBaseUrl ? getServerAuthHeaders() : {}),
         },
         body: JSON.stringify({
           contents: [

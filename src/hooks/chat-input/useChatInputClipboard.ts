@@ -5,6 +5,7 @@ import { processChatInputClipboardData, shouldHandleChatInputClipboardData } fro
 import { useI18n } from '@/contexts/I18nContext';
 import { MIME_TO_EXTENSION_MAP, SUPPORTED_IMAGE_MIME_TYPES } from '@/constants/fileTypeSupport';
 import { isYoutubeUrl, normalizeYoutubeUrl } from '@/utils/file/youtubeUrl';
+import { getServerAuthHeaders } from '@/services/api/apiAuthHeaders';
 const DEFAULT_CLIPBOARD_IMAGE_EXTENSION = '.image';
 /** Matches pasted file paths or file:/// URIs pointing to supported image extensions. */
 const IMAGE_FILE_NAME_TEXT_REGEX = /^(?:file:\/\/\/)?[^\r\n]+\.(?:png|jpe?g|webp|gif|heic|heif|avif|bmp|tiff?)$/i;
@@ -62,7 +63,12 @@ const readLocalClipboardImageFile = async (): Promise<File | null> => {
   }
 
   try {
-    const response = await fetch(LOCAL_CLIPBOARD_IMAGE_ENDPOINT, { cache: 'no-store' });
+    // 该端点受部署访问口令保护,不带口令会被 401 静默当成"没有剪贴板图片"。
+    const authHeaders = getServerAuthHeaders();
+    const response = await fetch(LOCAL_CLIPBOARD_IMAGE_ENDPOINT, {
+      cache: 'no-store',
+      ...(Object.keys(authHeaders).length > 0 ? { headers: authHeaders } : {}),
+    });
     if (!response.ok) {
       return null;
     }

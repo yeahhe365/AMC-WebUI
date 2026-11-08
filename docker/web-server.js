@@ -47,6 +47,24 @@ function writeRuntimeConfig() {
   console.log('[web] runtime-config.js written');
 }
 
+// --- deployment access password for the WS upgrade ---
+// Browsers cannot set custom headers on a WebSocket handshake, so a Live
+// connection to the api container carries no credential at all and would be
+// rejected with 401 as soon as ACCESS_PASSWORD is set. This bridge re-emits the
+// handshake itself, so it is the only place that can add the header.
+const ACCESS_PASSWORD_HEADER = 'x-access-token';
+
+const readWsAccessPassword = () => {
+  const raw = trim(process.env.RUNTIME_SERVER_ACCESS_PASSWORD);
+  if (!raw) return null;
+  // Refuse anything that could smuggle extra header lines into the handshake.
+  if (/[\r\n]/.test(raw)) {
+    console.error('[web] RUNTIME_SERVER_ACCESS_PASSWORD contains CR/LF; not injecting it into the WS handshake');
+    return null;
+  }
+  return raw;
+};
+
 // --- MIME types ---
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -350,15 +368,20 @@ server.on('upgrade', (req, socket, head) => {
   upstreamSocket.on(upstream.protocol === 'https:' ? 'secureConnect' : 'connect', () => {
     // Re-emit the exact upgrade request bytes the browser sent so the api
     // container sees the original path, query, and headers (incl. the WS key).
-    const reqLines = [
-      `${req.method} ${req.url} HTTP/1.1`,
-      ...Object.entries(req.headers).map(([name, value]) => {
+    // The deployment password is appended here because the browser cannot send
+    // it on a WS handshake; any browser-supplied copy is dropped first so the
+    // header never appears twice.
+    const wsAccessPassword = readWsAccessPassword();
+    const headerLines = Object.entries(req.headers)
+      .filter(([name]) => !(wsAccessPassword && name.toLowerCase() === ACCESS_PASSWORD_HEADER))
+      .map(([name, value]) => {
         const headerValue = Array.isArray(value) ? value.join(', ') : value;
         return `${name}: ${headerValue}`;
-      }),
-      '',
-      '',
-    ];
+      });
+    if (wsAccessPassword) {
+      headerLines.push(`${ACCESS_PASSWORD_HEADER}: ${wsAccessPassword}`);
+    }
+    const reqLines = [`${req.method} ${req.url} HTTP/1.1`, ...headerLines, '', ''];
     upstreamSocket.write(reqLines.join('\r\n'));
     if (head && head.length > 0) {
       upstreamSocket.write(head);

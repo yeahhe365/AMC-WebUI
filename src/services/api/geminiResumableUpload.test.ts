@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFakeResumableUploadXhr } from '@/test/api/fakeResumableUpload';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { uploadGeminiFileResumable, type InternalGeminiApiClient } from './geminiResumableUpload';
 
 type StartUploadRequestRecord = {
@@ -70,5 +71,41 @@ describe('uploadGeminiFileResumable', () => {
     });
     expect(onProgress).toHaveBeenCalledWith(5, 5);
     expect(uploadedFile.name).toBe('files/test-file');
+  });
+
+  // P0-9:XHR 分片上传是手写请求,SDK 的 httpOptions 带不到这里;
+  // 少了口令头,只要部署设了 ACCESS_PASSWORD,所有大附件上传都会 401。
+  it('carries the deployment access password on the XHR chunk upload', async () => {
+    useSettingsStore.setState((state) => ({
+      appSettings: { ...state.appSettings, serverAccessPassword: 'deploy-pwd' },
+    }));
+    const apiClient: InternalGeminiApiClient = {
+      request: async () => ({
+        headers: { 'x-goog-upload-url': 'https://upload.example.com/resumable/session-2' },
+        json: async () => ({}),
+      }),
+    };
+
+    try {
+      await uploadGeminiFileResumable({
+        apiClient,
+        apiBaseUrl: 'https://proxy.example.com/gemini',
+        proxyBaseUrl: 'https://proxy.example.com/gemini',
+        apiKey: 'api-key',
+        file: new File(['hello'], 'sample.txt', { type: 'text/plain' }),
+        mimeType: 'text/plain',
+        displayName: 'sample.txt',
+        signal: new AbortController().signal,
+      });
+    } finally {
+      useSettingsStore.setState((state) => ({
+        appSettings: { ...state.appSettings, serverAccessPassword: null },
+      }));
+    }
+
+    expect(uploadXhr.requests[0]?.headers['x-access-token']).toBe('deploy-pwd');
+    // 口令不能顶掉 Gemini 自己的 key 通道。
+    expect(uploadXhr.requests[0]?.headers['x-goog-api-key']).toBe('api-key');
+    expect(uploadXhr.requests[0]?.headers.authorization).toBeUndefined();
   });
 });

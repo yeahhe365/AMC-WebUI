@@ -1,6 +1,7 @@
 import type { File as GeminiFile } from '@google/genai';
 import { logService } from '@/services/logService';
 import { safeJsonParse } from '@/utils/safeJsonParse';
+import { getServerAuthHeaders } from './apiAuthHeaders';
 
 const ABORT_ERROR_MESSAGE = 'Upload cancelled by user.';
 const MAX_UPLOAD_CHUNK_SIZE = 8 * 1024 * 1024;
@@ -222,6 +223,10 @@ const uploadFileBytes = async (
       xhr.setRequestHeader('X-Goog-Upload-Offset', String(chunkOffset));
       xhr.setRequestHeader('X-Goog-Upload-Command', uploadCommand);
       xhr.setRequestHeader('x-goog-api-key', apiKey);
+      // XHR 不走 SDK,部署访问口令必须在这里显式补上,否则口令部署下分片上传必 401。
+      for (const [name, value] of Object.entries(getServerAuthHeaders())) {
+        xhr.setRequestHeader(name, value);
+      }
 
       xhr.upload.addEventListener('progress', (event) => {
         if (!event.lengthComputable || !onProgress) return;
@@ -270,6 +275,7 @@ const uploadFileBytes = async (
           'X-Goog-Upload-Command': uploadCommand,
           'Content-Length': String(chunk.size),
           ...(apiKey ? { 'x-goog-api-key': apiKey } : {}),
+          ...getServerAuthHeaders(),
         },
       },
       abortSignal: signal,

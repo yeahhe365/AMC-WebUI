@@ -1,5 +1,6 @@
 import { blobToDataUrl } from '@/utils/file/fileEncoding';
 import { isImageMimeType } from '@/utils/file/fileTypeClassification';
+import { getServerAuthHeaders } from '@/services/api/apiAuthHeaders';
 
 const FALLBACK_IMAGE_WIDTH = 1200;
 const FALLBACK_IMAGE_HEIGHT = 675;
@@ -12,8 +13,14 @@ const fetchImageSourceAsDataUrl = async (src: string): Promise<string | null> =>
     const controller = new AbortController();
     const timeoutId = window.setTimeout(() => controller.abort(), IMAGE_FETCH_TIMEOUT_MS);
     let response: Response;
+    // 只有请求自身端点(/api/image-proxy)时才带部署口令;回落分支是上游原始图片地址,
+    // 把口令发过去等于泄露,所以按"是否同源相对路径"区分。
+    const authHeaders = src.startsWith('/') ? getServerAuthHeaders() : {};
     try {
-      response = await fetch(src, { signal: controller.signal });
+      response = await fetch(src, {
+        signal: controller.signal,
+        ...(Object.keys(authHeaders).length > 0 ? { headers: authHeaders } : {}),
+      });
     } finally {
       window.clearTimeout(timeoutId);
     }

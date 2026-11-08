@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Part, UsageMetadata } from '@google/genai';
 import { logService } from '@/services/logService';
+import { useSettingsStore } from '@/stores/settingsStore';
 import {
   appendSamplingParameters,
   createApiRequestInitFactory,
@@ -60,6 +61,54 @@ describe('createApiRequestInitFactory', () => {
     expect(init.body).toBeUndefined();
     expect(Object.keys(init.headers as Record<string, string>)).toEqual(['authorization']);
     expect((init.headers as Record<string, string>).authorization).toBe('Bearer key');
+  });
+});
+
+describe('createApiRequestInitFactory 在部署访问口令下的头部组合', () => {
+  // 回归护栏（P0-1）:部署口令必须只走 x-access-token。一旦再次写入
+  // authorization,OpenAI 兼容线路的 provider key 会被覆盖成部署口令,
+  // 既导致"开了口令就全挂",也会把口令泄露给上游厂商。
+  const setPassword = (password: string | null) =>
+    useSettingsStore.setState((state) => ({ appSettings: { ...state.appSettings, serverAccessPassword: password } }));
+
+  afterEach(() => setPassword(null));
+
+  it('keeps the provider authorization and adds only x-access-token', () => {
+    setPassword('deploy-pwd');
+    const factory = createApiRequestInitFactory((apiKey) => ({ authorization: `Bearer ${apiKey}` }));
+    const signal = new AbortController().signal;
+    const headers = factory.createRequestInit('sk-provider', {}, signal).headers as Record<string, string>;
+
+    expect(headers.authorization).toBe('Bearer sk-provider');
+    expect(headers['x-access-token']).toBe('deploy-pwd');
+    expect(Object.keys(headers)).toEqual(['authorization', 'x-access-token', 'content-type']);
+  });
+
+  it('does the same for GET inits and for Anthropic-style auth headers', () => {
+    setPassword('deploy-pwd');
+    const factory = createApiRequestInitFactory((apiKey) => ({
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    }));
+    const signal = new AbortController().signal;
+    const getHeaders = factory.createGetRequestInit('sk-ant', signal).headers as Record<string, string>;
+    expect(getHeaders['x-api-key']).toBe('sk-ant');
+    expect(getHeaders['x-access-token']).toBe('deploy-pwd');
+    expect(getHeaders.authorization).toBeUndefined();
+
+    const postHeaders = factory.createRequestInit('sk-ant', {}, signal).headers as Record<string, string>;
+    expect(postHeaders.authorization).toBeUndefined();
+    expect(postHeaders['x-access-token']).toBe('deploy-pwd');
+  });
+
+  it('adds nothing when no access password is configured', () => {
+    setPassword(null);
+    const factory = createApiRequestInitFactory((apiKey) => ({ authorization: `Bearer ${apiKey}` }));
+    const headers = factory.createRequestInit('sk-provider', {}, new AbortController().signal).headers as Record<
+      string,
+      string
+    >;
+    expect(headers).toEqual({ authorization: 'Bearer sk-provider', 'content-type': 'application/json' });
   });
 });
 
