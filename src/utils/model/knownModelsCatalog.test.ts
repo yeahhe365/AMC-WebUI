@@ -81,12 +81,13 @@ describe('knownModelsCatalog', () => {
       expect(KNOWN_MODELS_CATALOG['grok-420-reasoning'].capabilities.thinking).toBe(true);
     });
 
-    it('no longer lists the shut-down Gemini 2.x text models', () => {
-      // 2.0 Flash was shut down 2026-06-01; 2.5 Pro / 2.5 Flash were retired on 2026-10-20.
-      // Listing them let users pick an id the provider answers with a hard error.
+    it('no longer lists shut-down Gemini 2.0 models but keeps the still-served 2.5 ones', () => {
+      // 2.0 Flash was shut down on 2026-06-01. 2.5 Pro / 2.5 Flash shut down on
+      // 2026-12-01 and 2.5 Flash-Lite has no shutdown date, so their metadata
+      // must stay for ids that are already saved.
       expect(KNOWN_MODELS_CATALOG['gemini-2.0-flash']).toBeUndefined();
-      expect(KNOWN_MODELS_CATALOG['gemini-2.5-pro']).toBeUndefined();
-      expect(KNOWN_MODELS_CATALOG['gemini-2.5-flash']).toBeUndefined();
+      expect(KNOWN_MODELS_CATALOG['gemini-2.5-pro']?.contextWindow).toBe(1_048_576);
+      expect(KNOWN_MODELS_CATALOG['gemini-2.5-flash']?.contextWindow).toBe(1_048_576);
     });
   });
 

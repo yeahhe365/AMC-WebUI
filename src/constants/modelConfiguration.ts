@@ -62,6 +62,20 @@ export const THINKING_BUDGET_RANGES: { [key: string]: { min: number; max: number
     modelIds: [ROBOTICS_MODEL, `models/${ROBOTICS_MODEL}`],
     range: thinkingBudgetRange(128, 24576),
   },
+  // Gemini 2.5 token budgets. All three are still served: 2.5 Pro and 2.5 Flash
+  // shut down on December 1, 2026, and 2.5 Flash-Lite has no shutdown date.
+  {
+    modelIds: ['gemini-2.5-pro', 'models/gemini-2.5-pro'],
+    range: thinkingBudgetRange(128, 32768),
+  },
+  {
+    modelIds: ['gemini-2.5-flash', 'models/gemini-2.5-flash'],
+    range: thinkingBudgetRange(0, 24576),
+  },
+  {
+    modelIds: ['gemini-2.5-flash-lite', 'models/gemini-2.5-flash-lite'],
+    range: thinkingBudgetRange(512, 24576),
+  },
 ]);
 
 export const DEFAULT_TEMPERATURE = 1.0;

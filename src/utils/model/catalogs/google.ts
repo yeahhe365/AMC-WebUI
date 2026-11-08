@@ -169,6 +169,26 @@ export const GOOGLE_MODELS: Record<string, CatalogModelSpec> = {
     capabilities: { vision: true, image: true, thinking: true, tools: false },
     ownedBy: 'google',
   },
+  // Gemini 2.5 Pro / Flash are deprecated but still served: requests keep
+  // working until the December 1, 2026 shutdown, after which Google auto-routes
+  // them to gemini-3.8-flash and gemini-3.5-flash-lite respectively. Keep their
+  // metadata so ids that are already saved still resolve.
+  'gemini-2.5-pro': {
+    id: 'gemini-2.5-pro',
+    name: 'Gemini 2.5 Pro',
+    contextWindow: 1_048_576,
+    maxOutputTokens: 65_536,
+    capabilities: { vision: true, thinking: true, tools: true },
+    ownedBy: 'google',
+  },
+  'gemini-2.5-flash': {
+    id: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    contextWindow: 1_048_576,
+    maxOutputTokens: 65_536,
+    capabilities: { vision: true, thinking: true, tools: true },
+    ownedBy: 'google',
+  },
   'gemini-robotics-er-2-preview': {
     id: 'gemini-robotics-er-2-preview',
     name: 'Gemini Robotics-ER 2',

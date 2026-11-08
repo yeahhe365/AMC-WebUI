@@ -6,6 +6,7 @@ import {
   isGrokReasoningModel,
   getModelCapabilities,
 } from './modelCapabilities';
+import { THINKING_BUDGET_RANGES } from '@/constants/modelConfiguration';
 import { KNOWN_MODELS_CATALOG, formatContextWindow } from './knownModelsCatalog';
 
 export type ModelModalityId = 'vision' | 'audio' | 'video';
@@ -493,10 +494,17 @@ const resolveThinkingBudget = (modelId: string): string | undefined => {
     return '1,024 ~ 64,000';
   }
 
-  // Everything else either uses the thinking_level enum (Gemini 3.x, 4 and
-  // Robotics ER 2) or publishes no token budget, so no range is shown. The
-  // Gemini 2.5 lookup that used to sit here was unreachable once every 2.5 id
-  // left THINKING_BUDGET_RANGES.
+  // Gemini 3.x and Gemini Robotics ER 2 use the thinking_level enum instead of
+  // a token budget; the Gemini 2.5 series still takes one.
+  if (isGemini3Model(modelId) || lower.includes('gemini-robotics-er-2')) {
+    return undefined;
+  }
+
+  const range = THINKING_BUDGET_RANGES[modelId] || THINKING_BUDGET_RANGES[modelId.replace(/^models\//, '')];
+  if (range) {
+    return `${range.min.toLocaleString()} ~ ${range.max.toLocaleString()}`;
+  }
+
   return undefined;
 };
 

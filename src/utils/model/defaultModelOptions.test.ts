@@ -34,12 +34,10 @@ describe('getDefaultModelOptions', () => {
     expect(nano?.name).toBe('Nano Banana 2.1');
   });
 
-  it('does not include shut-down Gemini 2.x text models', () => {
+  it('does not offer the shut-down Gemini 2.0 models', () => {
     const models = getDefaultModelOptions();
 
     expect(models.some((model) => model.id === 'gemini-2.0-flash')).toBe(false);
-    expect(models.some((model) => model.id === 'gemini-2.5-pro')).toBe(false);
-    expect(models.some((model) => model.id === 'gemini-2.5-flash')).toBe(false);
   });
 
   it('does not include removed Imagen models', () => {
