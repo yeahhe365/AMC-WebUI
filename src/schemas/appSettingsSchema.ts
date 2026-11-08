@@ -11,8 +11,10 @@ import {
   HarmCategory,
   LIVE_ARTIFACTS_PROMPT_MODES,
   MediaResolution,
+  TASK_SUGGESTION_MODES,
   THINKING_LEVELS,
   TRANSLATION_TARGET_LANGUAGES,
+  type VisionPromptMode,
 } from '@/types';
 import { createEmptyLiveArtifactsSystemPrompts } from '@/utils/live-ui/liveUiPromptSettings';
 import { sanitizeThirdPartyApiSettings } from '@/utils/third-party/thirdPartyApiProviders';
@@ -56,6 +58,12 @@ const optionalBooleanWithDefault = (fallback: boolean | undefined) => optionalWi
 const numberWithDefault = (fallback: number) => withDefault(z.number().finite(), fallback);
 const stringWithDefault = (fallback: string) => withDefault(z.string(), fallback);
 const optionalStringWithDefault = (fallback: string | undefined) => optionalWithDefault(z.string(), fallback);
+
+/**
+ * `VisionPromptMode` 没有配套的 `as const` 数组（类型本身是字面量联合），
+ * 这里显式列出来供 zod 校验；`satisfies` 保证每个值都是合法模式。
+ */
+const VISION_PROMPT_MODES = ['bbox', 'hdGuide'] as const satisfies readonly NonNullable<VisionPromptMode>[];
 
 const filesApiConfigSchema: z.ZodType<FilesApiConfig> = z
   .object({
@@ -266,7 +274,7 @@ const geoLocationCoordinatesSchema = z
   })
   .optional();
 
-const appSettingsSchema: z.ZodType<AppSettings> = z.object({
+const appSettingsShape = {
   modelId: stringWithDefault(DEFAULT_APP_SETTINGS.modelId),
   providerId: optionalWithDefault(z.string().min(1), DEFAULT_APP_SETTINGS.providerId),
   temperature: numberWithDefault(DEFAULT_APP_SETTINGS.temperature),
@@ -285,6 +293,10 @@ const appSettingsSchema: z.ZodType<AppSettings> = z.object({
   isLocalPythonEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isLocalPythonEnabled),
   isUrlContextEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isUrlContextEnabled),
   isDeepSearchEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isDeepSearchEnabled),
+  isPdfNavEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isPdfNavEnabled),
+  isVideoNavEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isVideoNavEnabled),
+  isAudioNavEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isAudioNavEnabled),
+  isImageNavEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isImageNavEnabled),
   maxOutputTokens: optionalWithDefault(z.number().finite().positive(), DEFAULT_APP_SETTINGS.maxOutputTokens),
   stopSequences: z
     .unknown()
@@ -324,6 +336,15 @@ const appSettingsSchema: z.ZodType<AppSettings> = z.object({
   showInputTranslationButton: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.showInputTranslationButton),
   isStreamingEnabled: booleanWithDefault(DEFAULT_APP_SETTINGS.isStreamingEnabled),
   transcriptionModelId: stringWithDefault(DEFAULT_APP_SETTINGS.transcriptionModelId),
+  transcriptionLanguage: optionalStringWithDefault(DEFAULT_APP_SETTINGS.transcriptionLanguage),
+  transcriptionWordTimestamps: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.transcriptionWordTimestamps),
+  transcriptionSpeakerLabels: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.transcriptionSpeakerLabels),
+  transcriptionSmartMode: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.transcriptionSmartMode),
+  transcriptionOutputSubtitles: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.transcriptionOutputSubtitles),
+  transcriptionCustomVocabulary: optionalStringWithDefault(DEFAULT_APP_SETTINGS.transcriptionCustomVocabulary),
+  // 无默认值：导入文件没带这个字段时保持 undefined，用户已填的提示词才不会在
+  // 默认值里被换成一个空串。
+  transcriptionSystemInstruction: optionalStringWithDefault(undefined),
   filesApiConfig: filesApiConfigSchema,
   expandCodeBlocksByDefault: booleanWithDefault(DEFAULT_APP_SETTINGS.expandCodeBlocksByDefault),
   isAutoTitleEnabled: booleanWithDefault(DEFAULT_APP_SETTINGS.isAutoTitleEnabled),
@@ -358,6 +379,13 @@ const appSettingsSchema: z.ZodType<AppSettings> = z.object({
     z.number().finite().min(10).max(32),
     DEFAULT_APP_SETTINGS.liveArtifactsCustomFontSize,
   ),
+  isLiveArtifactsEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isLiveArtifactsEnabled),
+  isVisualFormattingActive: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isVisualFormattingActive),
+  visionPromptMode: optionalWithDefault(z.enum(VISION_PROMPT_MODES).nullable(), DEFAULT_APP_SETTINGS.visionPromptMode),
+  taskSuggestionMode: optionalWithDefault(
+    z.enum(TASK_SUGGESTION_MODES).nullable(),
+    DEFAULT_APP_SETTINGS.taskSuggestionMode,
+  ),
   isPasteRichTextAsMarkdownEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isPasteRichTextAsMarkdownEnabled),
   isPasteAsTextFileEnabled: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.isPasteAsTextFileEnabled),
   showInputPasteButton: optionalBooleanWithDefault(DEFAULT_APP_SETTINGS.showInputPasteButton),
@@ -387,7 +415,21 @@ const appSettingsSchema: z.ZodType<AppSettings> = z.object({
   liveApiKey: nullableStringWithDefault(DEFAULT_APP_SETTINGS.liveApiKey),
   embeddingApiKey: nullableStringWithDefault(DEFAULT_APP_SETTINGS.embeddingApiKey),
   thirdPartyApi: thirdPartyApiSchema,
-});
+} as const;
+
+/**
+ * 编译期护栏：`AppSettings` 的每一个顶层字段都必须在 schema 里出现。
+ *
+ * zod 默认剥掉未知键，而导入后是**整体替换** settings，所以 schema 少一个字段
+ * 就等于"导出→导入后该设置被静默重置"。此前漏了 15 个（PDF/视频/音频/图片导航预设、
+ * 转写选项等）。少登记一个字段，`MissingSchemaKeys` 就不再是 never，
+ * 下面这行 `Record<..., never>` 会直接编译失败。
+ */
+type MissingSchemaKeys = Exclude<keyof AppSettings, keyof typeof appSettingsShape>;
+const SCHEMA_COVERS_APP_SETTINGS: Record<MissingSchemaKeys, never> = {};
+void SCHEMA_COVERS_APP_SETTINGS;
+
+const appSettingsSchema: z.ZodType<AppSettings> = z.object(appSettingsShape);
 
 export const sanitizeImportedAppSettings = (value: unknown): AppSettings =>
   appSettingsSchema.parse(migrateLegacyOpenAICompatibleInput(migrateLegacyAutoOpenHtmlPreview(value)));

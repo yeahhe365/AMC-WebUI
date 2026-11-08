@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { sanitizeImportedAppSettings } from './appSettingsSchema';
+import { createAppSettings } from '@/test/data/factories';
+import { redactExportedAppSettings, restoreRedactedSecrets } from '@/utils/secretRedaction';
 
 describe('appSettingsSchema', () => {
   it('preserves custom Live Artifacts prompts from imported settings', () => {
@@ -314,5 +316,59 @@ describe('appSettingsSchema', () => {
 
     expect(defaultSettings.readingFontFamily).toBe('sans');
     expect(invalidSettings.readingFontFamily).toBe('sans');
+  });
+  // P0-6:这 15 个字段此前不在 schema 里，zod 会把它们当未知键剥掉，
+  // 而导入后是整体替换 settings —— 用户导出再导入，功能就被静默重置了。
+  describe('fields that export→import used to drop (P0-6)', () => {
+    const preserved = {
+      isPdfNavEnabled: true,
+      isVideoNavEnabled: true,
+      isAudioNavEnabled: true,
+      isImageNavEnabled: true,
+      isLiveArtifactsEnabled: true,
+      isVisualFormattingActive: true,
+      visionPromptMode: 'hdGuide' as const,
+      taskSuggestionMode: 'ocr' as const,
+      transcriptionLanguage: 'ja',
+      transcriptionWordTimestamps: true,
+      transcriptionSmartMode: true,
+      transcriptionOutputSubtitles: true,
+      transcriptionSpeakerLabels: true,
+      transcriptionCustomVocabulary: 'AMC, WebUI',
+      transcriptionSystemInstruction: 'Keep speaker labels in Japanese.',
+    };
+
+    it('keeps every one of them on import', () => {
+      const settings = sanitizeImportedAppSettings({ ...preserved });
+
+      expect(settings).toMatchObject(preserved);
+    });
+
+    it('survives a full export → import round trip together with redacted credentials', () => {
+      const exported = redactExportedAppSettings(createAppSettings({ ...preserved, apiKey: 'gemini-key' }));
+      const imported = sanitizeImportedAppSettings(JSON.parse(JSON.stringify(exported)));
+      const restored = restoreRedactedSecrets(imported, createAppSettings({ apiKey: 'local-key' }));
+
+      expect(restored).toMatchObject(preserved);
+      expect(restored.apiKey).toBe('local-key');
+    });
+
+    it('falls back to defaults when an older export does not carry them', () => {
+      const settings = sanitizeImportedAppSettings({});
+
+      // 有默认值的按默认值补齐（此前是 undefined，等价于"功能被关掉"）。
+      expect(settings.isPdfNavEnabled).toBe(false);
+      expect(settings.visionPromptMode).toBeNull();
+      expect(settings.taskSuggestionMode).toBeNull();
+      expect(settings.transcriptionLanguage).toBe('');
+      // 唯一没有默认值的那个：保持 undefined，不要用空串盖掉用户已填的提示词。
+      expect(settings.transcriptionSystemInstruction).toBeUndefined();
+    });
+
+    it('rejects an unknown task suggestion mode instead of importing it', () => {
+      const settings = sanitizeImportedAppSettings({ taskSuggestionMode: 'not-a-mode' });
+
+      expect(settings.taskSuggestionMode).toBeNull();
+    });
   });
 });
