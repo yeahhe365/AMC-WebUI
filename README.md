@@ -125,7 +125,7 @@
 
 - 支持标准 Model Context Protocol (MCP)，通过 Node API（`/api/mcp/*`）提供服务端桥接
 - 支持 **stdio**、**SSE** 及 **Streamable HTTP** 三种传输协议（HTTP/SSE 连接受 `ENABLE_MCP_PRIVATE_HTTP` 私网安全策略保护）
-- 人在回路（Human-in-the-loop）工具调用授权机制：执行外部 MCP 工具调用前弹窗征得用户授权
+- 人在回路（Human-in-the-loop）工具调用授权机制：**默认所有 MCP 工具在调用前都会弹窗征得授权**，只有在设置里显式标记为「自动批准」的工具才跳过弹窗；内置虚拟工具（Python/JS 沙箱、图书馆检索、聊天记忆）在代码里声明了各自的只读白名单
 - 完整的 MCP 工具、提示词（Prompts）、资源（Resources）管理与连接状态展示
 - 支持开发者日志监控与实时错误排查
 

@@ -70,10 +70,11 @@ describe('VirtualMcpServerCard', () => {
     expect(await findByText('templateId')).toBeInTheDocument();
   });
 
-  it('renders requires approval badge when a tool is in disabledAutoApproveTools', async () => {
+  it('marks allowlisted tools auto-approved and everything else as requiring approval', async () => {
+    // Approval is the default, so only the allowlisted tool shows "auto-approved".
     const serverWithApproval: VirtualMcpServer = {
       ...dummyServer,
-      disabledAutoApproveTools: ['create_connection'],
+      autoApproveTools: ['list_templates'],
     };
 
     const { findByText } = render(
@@ -87,7 +88,30 @@ describe('VirtualMcpServerCard', () => {
       />,
     );
 
-    expect(await findByText('settingsMcpAutoApproveDisabled')).toBeInTheDocument();
     expect(await findByText('settingsMcpAutoApproveEnabled')).toBeInTheDocument();
+    expect(await findByText('settingsMcpAutoApproveDisabled')).toBeInTheDocument();
+  });
+
+  it('keeps a legacy deny-list entry gated even when the tool is allowlisted', async () => {
+    const serverWithBoth: VirtualMcpServer = {
+      ...dummyServer,
+      autoApproveTools: ['list_templates', 'create_connection'],
+      disabledAutoApproveTools: ['create_connection'],
+    };
+
+    const { findAllByText } = render(
+      <VirtualMcpServerCard
+        server={serverWithBoth}
+        isExpanded={true}
+        isEnabled={true}
+        onToggleExpanded={vi.fn()}
+        onToggleEnabled={vi.fn()}
+        t={t}
+      />,
+    );
+
+    // One allowlisted tool stays auto-approved; the deny-listed one still asks.
+    expect(await findAllByText('settingsMcpAutoApproveEnabled')).toHaveLength(1);
+    expect(await findAllByText('settingsMcpAutoApproveDisabled')).toHaveLength(1);
   });
 });

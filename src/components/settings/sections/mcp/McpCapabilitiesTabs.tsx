@@ -133,9 +133,12 @@ export const McpCapabilitiesTabs: React.FC<McpCapabilitiesTabsProps> = ({
               }
               return filteredTools.map((tool) => {
                 const disabled = new Set(server.disabledTools ?? []);
-                const autoDisabled = new Set(server.disabledAutoApproveTools ?? []);
+                const autoApproved = new Set(server.autoApproveTools ?? []);
+                const legacyGated = new Set(server.disabledAutoApproveTools ?? []);
                 const isEnabled = !disabled.has(tool.name);
-                const isAutoApproved = !autoDisabled.has(tool.name);
+                // Approval is the default; only an allowlisted tool skips the dialog,
+                // and a legacy deny-list entry still wins over the allowlist.
+                const isAutoApproved = autoApproved.has(tool.name) && !legacyGated.has(tool.name);
                 const toggleTool = (toolName: string, enabled: boolean) => {
                   const next = enabled
                     ? (server.disabledTools ?? []).filter((name) => name !== toolName)
@@ -143,11 +146,17 @@ export const McpCapabilitiesTabs: React.FC<McpCapabilitiesTabsProps> = ({
                   onUpdateServer(index, { disabledTools: next.length ? next : undefined });
                 };
                 const toggleAutoApprove = (toolName: string, autoApprove: boolean) => {
-                  const next = autoApprove
+                  const nextAllowlist = autoApprove
+                    ? Array.from(new Set([...(server.autoApproveTools ?? []), toolName]))
+                    : (server.autoApproveTools ?? []).filter((name) => name !== toolName);
+                  // Turning it on must also lift a legacy deny-list entry, or the
+                  // toggle would appear on while the tool still prompts.
+                  const nextDenylist = autoApprove
                     ? (server.disabledAutoApproveTools ?? []).filter((name) => name !== toolName)
-                    : [...(server.disabledAutoApproveTools ?? []), toolName];
+                    : (server.disabledAutoApproveTools ?? []);
                   onUpdateServer(index, {
-                    disabledAutoApproveTools: next.length ? next : undefined,
+                    autoApproveTools: nextAllowlist.length ? nextAllowlist : undefined,
+                    disabledAutoApproveTools: nextDenylist.length ? nextDenylist : undefined,
                   });
                 };
                 return (

@@ -69,6 +69,8 @@ export const createChatMemoryVirtualMcpServer = (deps: ChatMemoryVirtualMcpDeps 
     id: CHAT_MEMORY_VIRTUAL_MCP_ID,
     name: 'Chat History & Long-Term Memory',
     description: 'Search past conversations and long-term memory records stored locally in browser IndexedDB.',
+    // Read-only over the user's own local history.
+    autoApproveTools: ['search_chat_history', 'get_chat_detail'],
     listTools: async () => CHAT_MEMORY_MCP_TOOLS,
     callTool: async (toolName, args) => {
       if (toolName === 'search_chat_history') {

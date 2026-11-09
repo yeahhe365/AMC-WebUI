@@ -13,9 +13,8 @@ import { toMcpFunctionName } from './mcpToolNames';
 import { isRecord } from '../../../shared/predicates';
 import { extractMcpCallError, summarizeMcpResultForModel } from './mcpResultSummary';
 import {
-  isSessionApproved,
+  needsApprovalNow,
   rememberSessionApproval,
-  requiresApproval,
   sessionApprovalKey,
   type McpApprovalDecision,
   type McpApprovalRequest,
@@ -47,6 +46,36 @@ interface CreateMcpClientFunctionsOptions {
 }
 
 type McpToolsLister = NonNullable<CreateMcpClientFunctionsOptions['listTools']>;
+
+/**
+ * Resolves the approval gate for one tool call.
+ *
+ * Fails closed: when a tool requires approval but no dialog is available, the
+ * call is refused. Approval is now the default, so "no handler" can no longer
+ * mean "run it" — that would silently turn every gated tool back on for any
+ * caller that forgot to wire the dialog.
+ */
+const assertToolApproved = async (
+  server: McpServerConfig,
+  serverName: string,
+  toolName: string,
+  args: Record<string, unknown>,
+  requestApproval: CreateMcpClientFunctionsOptions['requestApproval'],
+): Promise<void> => {
+  const approvalKey = sessionApprovalKey(server.id, toolName);
+
+  if (!requestApproval) {
+    throw new Error(`Tool ${toolName} on ${serverName} needs user approval, but no approval prompt is available.`);
+  }
+
+  const decision = await requestApproval({ serverId: server.id, serverName, toolName, args });
+  if (decision === 'deny') {
+    throw new Error(`User denied tool execution: ${toolName}`);
+  }
+  if (decision === 'allow-session') {
+    rememberSessionApproval(approvalKey);
+  }
+};
 
 const MCP_DISCOVERY_CACHE_TTL_MS = 30_000;
 
@@ -346,24 +375,17 @@ export const createMcpClientFunctions = async ({
               name: virtualServer.name,
               enabled: true,
               transport: 'stdio',
+              autoApproveTools: virtualServer.autoApproveTools,
               disabledAutoApproveTools: virtualServer.disabledAutoApproveTools,
             };
-            if (requestApproval && requiresApproval(dummyServerConfig, tool.name)) {
-              const approvalKey = sessionApprovalKey(virtualServer.id, tool.name);
-              if (!isSessionApproved(approvalKey)) {
-                const decision = await requestApproval({
-                  serverId: virtualServer.id,
-                  serverName: virtualServer.name,
-                  toolName: tool.name,
-                  args: isRecord(args) ? args : {},
-                });
-                if (decision === 'deny') {
-                  throw new Error(`User denied tool execution: ${tool.name}`);
-                }
-                if (decision === 'allow-session') {
-                  rememberSessionApproval(approvalKey);
-                }
-              }
+            if (needsApprovalNow(dummyServerConfig, tool.name)) {
+              await assertToolApproved(
+                dummyServerConfig,
+                virtualServer.name,
+                tool.name,
+                isRecord(args) ? args : {},
+                requestApproval,
+              );
             }
 
             const callArgs = isRecord(args) ? args : {};
@@ -413,6 +435,7 @@ export const createMcpClientFunctions = async ({
           headers: server.headers,
           auth: server.auth,
           disabledTools: server.disabledTools,
+          autoApproveTools: server.autoApproveTools,
           disabledAutoApproveTools: server.disabledAutoApproveTools,
           isTrusted: server.isTrusted,
           timeout: server.timeout,
@@ -469,22 +492,14 @@ export const createMcpClientFunctions = async ({
               if (latestServer && (!latestServer.enabled || (latestServer.disabledTools ?? []).includes(tool.name))) {
                 throw new Error(`Tool ${tool.name} on ${serverTools.serverName} was disabled by the user.`);
               }
-              if (requestApproval && requiresApproval(server, tool.name)) {
-                const approvalKey = sessionApprovalKey(server.id, tool.name);
-                if (!isSessionApproved(approvalKey)) {
-                  const decision = await requestApproval({
-                    serverId: server.id,
-                    serverName: serverTools.serverName,
-                    toolName: tool.name,
-                    args: isRecord(args) ? args : {},
-                  });
-                  if (decision === 'deny') {
-                    throw new Error(`User denied tool execution: ${tool.name}`);
-                  }
-                  if (decision === 'allow-session') {
-                    rememberSessionApproval(approvalKey);
-                  }
-                }
+              if (needsApprovalNow(server, tool.name)) {
+                await assertToolApproved(
+                  server,
+                  serverTools.serverName,
+                  tool.name,
+                  isRecord(args) ? args : {},
+                  requestApproval,
+                );
               }
               // Surface the call live: the card rendered from the FunctionCall
               // part holds this exact args object, so the run attaches to it.

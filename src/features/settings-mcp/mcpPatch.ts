@@ -22,6 +22,7 @@ interface AddMcpServerPayload {
   enabled?: boolean;
   isTrusted?: boolean;
   disabledTools?: string[];
+  autoApproveTools?: string[];
   disabledAutoApproveTools?: string[];
 }
 
@@ -38,6 +39,7 @@ interface UpdateMcpServerPayload {
   enabled?: boolean;
   isTrusted?: boolean;
   disabledTools?: string[];
+  autoApproveTools?: string[];
   disabledAutoApproveTools?: string[];
 }
 
@@ -147,6 +149,9 @@ export const validateAndBuildNewServer = (
   const disabledTools = sanitizeStringArray(payload.disabledTools);
   if (disabledTools) server.disabledTools = disabledTools;
 
+  const autoApproveTools = sanitizeStringArray(payload.autoApproveTools);
+  if (autoApproveTools) server.autoApproveTools = autoApproveTools;
+
   const disabledAutoApproveTools = sanitizeStringArray(payload.disabledAutoApproveTools);
   if (disabledAutoApproveTools) server.disabledAutoApproveTools = disabledAutoApproveTools;
 
@@ -219,6 +224,10 @@ export const applyMcpServerUpdate = (
 
   if (patch.disabledTools !== undefined) {
     updated.disabledTools = sanitizeStringArray(patch.disabledTools);
+  }
+
+  if (patch.autoApproveTools !== undefined) {
+    updated.autoApproveTools = sanitizeStringArray(patch.autoApproveTools);
   }
 
   if (patch.disabledAutoApproveTools !== undefined) {

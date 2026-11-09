@@ -319,6 +319,34 @@ describe('appSettingsSchema', () => {
   });
   // P0-6:这 15 个字段此前不在 schema 里，zod 会把它们当未知键剥掉，
   // 而导入后是整体替换 settings —— 用户导出再导入，功能就被静默重置了。
+  describe('MCP approval fields', () => {
+    const serveWith = (extra: Record<string, unknown>) =>
+      sanitizeImportedAppSettings({
+        mcpServers: [
+          { id: 's1', name: 'S1', enabled: true, transport: 'http', url: 'https://x.example.com', ...extra },
+        ],
+      }).mcpServers[0];
+
+    it('keeps an allowlist on import', () => {
+      // Approval is the default now, so losing this field on import would
+      // silently re-gate every tool the user had explicitly allowed.
+      expect(serveWith({ autoApproveTools: ['safe_tool'] }).autoApproveTools).toEqual(['safe_tool']);
+    });
+
+    it('keeps the legacy deny-list alongside it', () => {
+      const server = serveWith({
+        autoApproveTools: ['safe_tool'],
+        disabledAutoApproveTools: ['dangerous_tool'],
+      });
+      expect(server.autoApproveTools).toEqual(['safe_tool']);
+      expect(server.disabledAutoApproveTools).toEqual(['dangerous_tool']);
+    });
+
+    it('drops non-string entries instead of trusting them', () => {
+      expect(serveWith({ autoApproveTools: ['safe_tool', 42] }).autoApproveTools).toEqual(['safe_tool']);
+    });
+  });
+
   describe('fields that export→import used to drop (P0-6)', () => {
     const preserved = {
       isPdfNavEnabled: true,

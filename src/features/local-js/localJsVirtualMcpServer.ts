@@ -39,6 +39,9 @@ export const createLocalJsVirtualMcpServer = (deps: LocalJsVirtualMcpDeps = {}):
     id: LOCAL_JS_VIRTUAL_MCP_ID,
     name: 'JavaScript Sandbox (Web Worker)',
     description: 'Execute JavaScript/TypeScript code locally in a high-speed isolated browser Web Worker sandbox.',
+    // Sandboxed in a Web Worker with network/storage APIs blocked, so a prompt
+    // on every call would only train the user to click through dialogs.
+    autoApproveTools: ['run_javascript'],
     listTools: async () => LOCAL_JS_MCP_TOOLS,
     callTool: async (toolName, args, signal) => {
       if (toolName !== 'run_javascript') {

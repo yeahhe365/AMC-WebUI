@@ -51,6 +51,8 @@ export const createLocalPythonVirtualMcpServer = (deps: LocalPythonVirtualMcpDep
     name: 'Python Sandbox (Pyodide)',
     description:
       'Execute Python code locally in the browser sandbox using Pyodide (micropip; numpy, pandas, matplotlib, scipy load on demand).',
+    // Runs in the Pyodide worker, confined to the browser sandbox.
+    autoApproveTools: ['run_python'],
     listTools: async () => LOCAL_PYTHON_MCP_TOOLS,
     callTool: async (toolName, args, signal) => {
       if (toolName !== 'run_python') {

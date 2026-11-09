@@ -18,6 +18,7 @@ export interface SanitizedMcpServerSummary {
   timeout?: number;
   longRunning?: boolean;
   disabledTools?: string[];
+  autoApproveTools?: string[];
 }
 
 export interface SanitizedVirtualMcpServerSummary {
@@ -26,6 +27,7 @@ export interface SanitizedVirtualMcpServerSummary {
   description: string;
   enabled: boolean;
   isVirtual: true;
+  autoApproveTools?: string[];
   disabledAutoApproveTools?: string[];
 }
 
@@ -81,5 +83,6 @@ export const toVirtualMcpServerSummary = (
   description: vServer.description,
   enabled: isEnabled,
   isVirtual: true,
+  autoApproveTools: vServer.autoApproveTools,
   disabledAutoApproveTools: vServer.disabledAutoApproveTools,
 });

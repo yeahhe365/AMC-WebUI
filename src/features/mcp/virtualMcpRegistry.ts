@@ -4,6 +4,9 @@ export interface VirtualMcpServer {
   id: string;
   name: string;
   description: string;
+  /** Tools this built-in server may run without asking (read-only / sandboxed). */
+  autoApproveTools?: string[];
+  /** Legacy deny-list; still honoured and wins over `autoApproveTools`. */
   disabledAutoApproveTools?: string[];
   listTools: () => Promise<McpToolDefinition[]>;
   callTool: (

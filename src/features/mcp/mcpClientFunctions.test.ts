@@ -1,7 +1,8 @@
 import { Type } from '@google/genai';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import type { McpServerConfig } from '@/types';
+import { resetSessionApprovals } from './toolApproval';
 import { logService } from '@/services/logService';
 import type { McpToolDefinition } from '@/services/api/mcpApi';
 import { useMcpToolRun } from '@/stores/mcp/mcpToolRuntimeStore';
@@ -9,7 +10,11 @@ import { createMcpClientFunctions } from './mcpClientFunctions';
 import { toMcpFunctionName } from './mcpToolNames';
 import type { VirtualMcpServer } from './virtualMcpRegistry';
 
+const allowEverything = async () => 'allow-once' as const;
+
 describe('createMcpClientFunctions', () => {
+  beforeEach(() => resetSessionApprovals());
+
   const filesystemServer: McpServerConfig = {
     id: 'filesystem',
     name: 'Filesystem',
@@ -71,6 +76,7 @@ describe('createMcpClientFunctions', () => {
       servers: [filesystemServer],
       listTools,
       callTool,
+      requestApproval: allowEverything,
       abortSignal: abortController.signal,
     });
     const functionName = toMcpFunctionName('filesystem', 'read_file');
@@ -138,6 +144,7 @@ describe('createMcpClientFunctions', () => {
       servers: [filesystemServer, secondServer],
       listTools,
       callTool,
+      requestApproval: allowEverything,
     });
 
     const requestedServers = listTools.mock.calls[0][0] as McpServerConfig[];
@@ -260,6 +267,7 @@ describe('createMcpClientFunctions', () => {
       servers,
       listTools,
       callTool,
+      requestApproval: allowEverything,
       resolveLatestServers: () => [{ ...servers[0], enabled: true, disabledTools: ['ok_tool'] }] as any,
     } as any);
     const handlerKey = Object.keys(fns).find((key) => key.includes('ok_tool'))!;
@@ -270,6 +278,7 @@ describe('createMcpClientFunctions', () => {
       servers,
       listTools,
       callTool,
+      requestApproval: allowEverything,
       resolveLatestServers: () => [{ ...servers[0], enabled: false }] as any,
     } as any);
     const handlerKey2 = Object.keys(fns2).find((key) => key.includes('ok_tool'))!;
@@ -281,6 +290,7 @@ describe('createMcpClientFunctions', () => {
       servers,
       listTools,
       callTool,
+      requestApproval: allowEverything,
       resolveLatestServers: () => servers,
     } as any);
     const handlerKey3 = Object.keys(fns3).find((key) => key.includes('ok_tool'))!;
@@ -429,6 +439,8 @@ describe('createMcpClientFunctions', () => {
 });
 
 describe('createMcpClientFunctions discovery cache', () => {
+  beforeEach(() => resetSessionApprovals());
+
   const httpServer: McpServerConfig = {
     id: 'cache-remote',
     name: 'Cache Remote',
@@ -509,13 +521,16 @@ describe('createMcpClientFunctions discovery cache', () => {
 });
 
 describe('createMcpClientFunctions approval gate', () => {
+  beforeEach(() => resetSessionApprovals());
+
+  // Approval is the default: only listed tools skip the dialog.
   const server: McpServerConfig = {
     id: 'fs',
     name: 'FS',
     enabled: true,
     transport: 'stdio',
     command: 'npx',
-    disabledAutoApproveTools: ['write_file'],
+    autoApproveTools: ['read_file'],
   };
   const listTools = vi.fn(async () => ({
     servers: [
@@ -531,7 +546,7 @@ describe('createMcpClientFunctions approval gate', () => {
     errors: [],
   }));
 
-  it('auto-executes tools not requiring approval without consulting the callback', async () => {
+  it('auto-executes an allowlisted tool without consulting the callback', async () => {
     const callTool = vi.fn(async () => ({ content: [] }));
     const requestApproval = vi.fn();
     const fns = await createMcpClientFunctions({ servers: [server], listTools, callTool, requestApproval });
@@ -540,7 +555,7 @@ describe('createMcpClientFunctions approval gate', () => {
     expect(requestApproval).not.toHaveBeenCalled();
   });
 
-  it('denies a gated tool when the user rejects and never calls the tool', async () => {
+  it('asks before a tool that is not allowlisted', async () => {
     const callTool = vi.fn(async () => ({ content: [] }));
     const requestApproval = vi.fn(async () => 'deny' as const);
     const fns = await createMcpClientFunctions({ servers: [server], listTools, callTool, requestApproval });
@@ -564,21 +579,29 @@ describe('createMcpClientFunctions approval gate', () => {
     expect(callTool).toHaveBeenCalledTimes(2);
   });
 
-  it('auto-executes gated tools when no approval callback is supplied (headless)', async () => {
+  it('refuses a tool that needs approval when no callback is supplied instead of running it', async () => {
     const callTool = vi.fn(async () => ({ content: [] }));
     const fns = await createMcpClientFunctions({ servers: [server], listTools, callTool });
-    await fns[toMcpFunctionName('fs', 'write_file')].handler({}, undefined);
-    expect(callTool).toHaveBeenCalledOnce();
+    await expect(fns[toMcpFunctionName('fs', 'write_file')].handler({}, undefined)).rejects.toThrow(
+      /needs user approval/i,
+    );
+    // The regression this guards: "no dialog available" used to mean "run it".
+    expect(callTool).not.toHaveBeenCalled();
   });
 });
 
 describe('createMcpClientFunctions live run lifecycle', () => {
+  beforeEach(() => resetSessionApprovals());
+
+  // Allowlisted on purpose: this block covers the ungated path, where the run
+  // must be registered in the same tick as the call (the live card reads it).
   const server: McpServerConfig = {
     id: 'fs',
     name: 'FS',
     enabled: true,
     transport: 'stdio',
     command: 'npx',
+    autoApproveTools: ['read_file'],
   };
   const listTools = vi.fn(async () => ({
     servers: [
@@ -592,7 +615,12 @@ describe('createMcpClientFunctions live run lifecycle', () => {
   }));
 
   const getHandler = async (callTool: Parameters<typeof createMcpClientFunctions>[0]['callTool']) => {
-    const fns = await createMcpClientFunctions({ servers: [server], listTools, callTool });
+    const fns = await createMcpClientFunctions({
+      servers: [server],
+      listTools,
+      callTool,
+      requestApproval: allowEverything,
+    });
     return fns[toMcpFunctionName('fs', 'read_file')].handler;
   };
 
@@ -665,6 +693,8 @@ describe('createMcpClientFunctions live run lifecycle', () => {
 });
 
 describe('createMcpClientFunctions virtual servers', () => {
+  beforeEach(() => resetSessionApprovals());
+
   it('discovers tools from virtual servers even when servers array is empty', async () => {
     const virtualServer = {
       id: 'internal_test',
@@ -679,6 +709,7 @@ describe('createMcpClientFunctions virtual servers', () => {
     const fns = await createMcpClientFunctions({
       servers: [],
       virtualServers: [virtualServer],
+      requestApproval: allowEverything,
     });
 
     const expectedName = toMcpFunctionName('internal_test', 'ping');
@@ -712,6 +743,7 @@ describe('createMcpClientFunctions virtual servers', () => {
     const fns = await createMcpClientFunctions({
       servers: [],
       virtualServers: [virtualServer],
+      requestApproval: allowEverything,
     });
 
     const toolName = toMcpFunctionName('internal_files', 'generate');
@@ -723,6 +755,8 @@ describe('createMcpClientFunctions virtual servers', () => {
 });
 
 describe('createMcpClientFunctions virtual server approval gate', () => {
+  beforeEach(() => resetSessionApprovals());
+
   const gatedServer: VirtualMcpServer = {
     id: 'amc_provider_manager',
     name: 'AMC Provider Manager',

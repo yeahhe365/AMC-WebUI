@@ -67,7 +67,21 @@ export const createSettingsVirtualMcpServer = (): VirtualMcpServer => {
     // 凡是"改了就会持久化一个能被下轮工具发现消费的外部端点/开关"的工具，都必须
     // 有人确认：新增/改 URL 会引入攻击者控制的工具清单（描述可注入），toggle 能把
     // 本地 Python 这类虚拟服务器打开，import 是一批新增，reset/delete 是不可逆删除。
-    // 判据见 `src/features/mcp/toolApproval.ts`（工具名是否在此数组里）。
+    // 判据见 `src/features/mcp/toolApproval.ts`（默认要审批，`autoApproveTools` 才免审批，
+    // 此数组里的工具即使被列进白名单也仍然要审批）。
+    // Approval is the default (see toolApproval.ts), so the tools that may run
+    // without asking have to be named. These only read state or adjust
+    // reversible local preferences; anything that installs, edits, enables or
+    // deletes an endpoint stays gated by the deny-list below.
+    autoApproveTools: [
+      'get_settings',
+      'list_options',
+      'list_mcp_servers',
+      'test_mcp_server',
+      'update_appearance_settings',
+      'update_generation_settings',
+      'update_language_voice_settings',
+    ],
     disabledAutoApproveTools: [
       'reset_settings',
       'delete_mcp_server',

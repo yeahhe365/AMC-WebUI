@@ -205,7 +205,11 @@ export const VirtualMcpServerCard: React.FC<VirtualMcpServerCardProps> = ({
               <div className="space-y-2">
                 {filteredTools.map((tool) => {
                   const showSchema = schemaToolNames.has(tool.name);
-                  const isAutoApproved = !server.disabledAutoApproveTools?.includes(tool.name);
+                  // Approval is the default: a tool skips the dialog only when
+                  // allowlisted, and a legacy deny-list entry still wins.
+                  const isAutoApproved =
+                    Boolean(server.autoApproveTools?.includes(tool.name)) &&
+                    !server.disabledAutoApproveTools?.includes(tool.name);
                   return (
                     <div
                       key={tool.name}

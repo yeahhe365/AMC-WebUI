@@ -110,6 +110,8 @@ export const createLibraryVirtualMcpServer = (deps: LibraryVirtualMcpDeps = {}):
     id: LIBRARY_SEARCH_VIRTUAL_MCP_ID,
     name: 'Knowledge Base & Library Search',
     description: 'Search and read documents, code, and notes stored in the local Library / Knowledge Base.',
+    // Read-only over the user's own local library.
+    autoApproveTools: ['search_library', 'read_library_file'],
     listTools: async () => LIBRARY_MCP_TOOLS,
     callTool: async (toolName, args) => {
       if (toolName === 'search_library') {

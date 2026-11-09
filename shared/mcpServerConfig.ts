@@ -20,6 +20,13 @@ export interface McpServerConfig {
   headers?: Record<string, string>;
   auth?: McpServerAuthConfig;
   disabledTools?: string[];
+  /**
+   * Tools that run without asking the user first. Approval is the default, so
+   * this is the only way a tool skips the confirmation dialog (see
+   * `src/features/mcp/toolApproval.ts`).
+   */
+  autoApproveTools?: string[];
+  /** Legacy deny-list; still honoured and wins over `autoApproveTools`. */
   disabledAutoApproveTools?: string[];
   isTrusted?: boolean;
   /** Per-server tool-call timeout in seconds (1..3600). */

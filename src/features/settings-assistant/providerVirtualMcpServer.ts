@@ -290,6 +290,15 @@ export const createProviderVirtualMcpServer = (deps: ProviderToolsDeps): Virtual
     // `update_connection` stays out on purpose: benign edits (name, key, models) should
     // still apply directly, and its destructive edits (baseUrl / protocol / model list)
     // already fail closed with `approval-unavailable` instead of being applied.
+    // Approval is the default, so the read-only and reversible tools are named
+    // here. `delete_connection` is unrecoverable and stays gated below.
+    autoApproveTools: [
+      'list_templates',
+      'list_connections',
+      'create_connection',
+      'update_connection',
+      'test_connection',
+    ],
     disabledAutoApproveTools: ['delete_connection'],
     listTools: async () => PROVIDER_VIRTUAL_MCP_TOOLS,
     callTool: async (toolName, args, signal) => {

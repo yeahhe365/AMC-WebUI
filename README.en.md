@@ -125,7 +125,7 @@ The project currently focuses on one main application shape: a **Vite + React SP
 
 - Full standard Model Context Protocol (MCP) support bridged through Node API endpoints (`/api/mcp/*`).
 - Supports **stdio**, **SSE**, and **Streamable HTTP** transports (HTTP/SSE connections adhere to the `ENABLE_MCP_PRIVATE_HTTP` private-network security policy).
-- Human-in-the-loop tool execution approval dialogs before invoking external MCP tools.
+- Human-in-the-loop tool execution approval dialogs before invoking external MCP tools. **Approval is the default for every MCP tool**; a tool skips the dialog only when it is explicitly marked auto-approved in settings, and the built-in virtual tools (Python/JS sandboxes, library search, chat memory) ship with a read-only allowlist declared in code.
 - Complete browsing and management of MCP tools, Prompts, and Resources.
 - Real-time connection status monitoring and developer logging.
 
