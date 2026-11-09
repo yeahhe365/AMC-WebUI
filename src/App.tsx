@@ -4,25 +4,13 @@ import { useApp } from './hooks/app/useApp';
 import { WindowProvider } from './contexts/WindowContext';
 import { I18nProvider } from './contexts/I18nContext';
 import { MainContent } from './components/layout/MainContent';
+import { AppOverlays } from './components/layout/AppOverlays';
 import { PiPPlaceholder } from './components/layout/PiPPlaceholder';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 import { PwaUpdateBanner } from './components/pwa/PwaUpdateBanner';
-import { ToastViewport } from './components/shared/toast/ToastViewport';
 import { lazyNamedComponent } from './utils/lazyNamedComponent';
 import { isFileDrag } from '@/utils/file-upload/fileUploadPolicy';
 
-const LazyMcpToolApprovalDialog = lazyNamedComponent(
-  () => import('./components/mcp/McpToolApprovalDialog'),
-  'McpToolApprovalDialog',
-);
-const LazyMcpShareInstallGate = lazyNamedComponent(
-  () => import('./components/mcp/McpShareInstallGate'),
-  'McpShareInstallGate',
-);
-const LazyAssistantApiKeyDialog = lazyNamedComponent(
-  () => import('./components/settings/sections/providers/assistant/AssistantApiKeyDialog'),
-  'AssistantApiKeyDialog',
-);
 const LazyGlobalCommandPalette = lazyNamedComponent(
   () => import('./components/command/GlobalCommandPalette'),
   'GlobalCommandPalette',
@@ -86,6 +74,7 @@ const AppContent: React.FC = () => {
                 {...dragHandlers}
               >
                 <MainContent app={app} />
+                <AppOverlays />
               </div>
             </WindowProvider>,
             pipState.pipContainer,
@@ -95,6 +84,7 @@ const AppContent: React.FC = () => {
       ) : (
         <WindowProvider>
           <MainContent app={app} />
+          <AppOverlays />
         </WindowProvider>
       )}
       {eventsState.needRefresh && !eventsState.updateDismissed ? (
@@ -105,16 +95,6 @@ const AppContent: React.FC = () => {
           onDismiss={eventsState.dismissUpdateBanner}
         />
       ) : null}
-      <ToastViewport />
-      <Suspense fallback={null}>
-        <LazyMcpToolApprovalDialog />
-      </Suspense>
-      <Suspense fallback={null}>
-        <LazyMcpShareInstallGate />
-      </Suspense>
-      <Suspense fallback={null}>
-        <LazyAssistantApiKeyDialog />
-      </Suspense>
       <Suspense fallback={null}>
         <LazyGlobalCommandPalette
           onNewChat={chatState.startNewChat}

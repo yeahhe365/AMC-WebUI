@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { renderWithProviders } from '@/test/render/providerRenderer';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -79,5 +80,25 @@ describe('AlertDialog primitive', () => {
       fireEvent.click(confirmBtn);
     });
     expect(onAction).toHaveBeenCalledTimes(1);
+  });
+
+  it('mounts in the document the window context points at, not the main one', () => {
+    // Document Picture-in-Picture hands the app a second document; a dialog
+    // opened from there must land in it, or its Esc/focus handling is
+    // attached to a window the user is not looking at.
+    const pipDocument = document.implementation.createHTMLDocument('pip');
+
+    renderWithProviders(
+      <AlertDialog open>
+        <AlertDialogContent>
+          <AlertDialogTitle>Clear history?</AlertDialogTitle>
+          <AlertDialogDescription>This cannot be undone.</AlertDialogDescription>
+        </AlertDialogContent>
+      </AlertDialog>,
+      { document: pipDocument },
+    );
+
+    expect(pipDocument.body.querySelector('[role="alertdialog"]')).not.toBeNull();
+    expect(document.body.querySelector('[role="alertdialog"]')).toBeNull();
   });
 });

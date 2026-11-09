@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { renderWithProviders } from '@/test/render/providerRenderer';
 import {
   Dialog,
   DialogTrigger,
@@ -68,5 +69,25 @@ describe('Dialog primitive', () => {
     expect(screen.getByText('Escape Test')).not.toBeNull();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('mounts in the document the window context points at, not the main one', () => {
+    // Document Picture-in-Picture hands the app a second document; a dialog
+    // opened from there must land in it, or its Esc/focus handling is
+    // attached to a window the user is not looking at.
+    const pipDocument = document.implementation.createHTMLDocument('pip');
+
+    renderWithProviders(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Rename chat</DialogTitle>
+          <DialogDescription>Pick a new name.</DialogDescription>
+        </DialogContent>
+      </Dialog>,
+      { document: pipDocument },
+    );
+
+    expect(pipDocument.body.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
   });
 });

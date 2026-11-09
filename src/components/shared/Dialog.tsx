@@ -2,10 +2,10 @@ import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { Z_INDEX_MODAL_BACKDROP } from '@/constants/layout';
+import { useWindowContext } from '@/contexts/WindowContext';
 
 export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
-const DialogPortal = DialogPrimitive.Portal;
 export const DialogClose = DialogPrimitive.Close;
 
 export type DialogOverlayProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>;
@@ -27,31 +27,38 @@ export interface DialogContentProps extends React.ComponentPropsWithoutRef<typeo
 }
 
 export const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.Content>, DialogContentProps>(
-  ({ className = '', children, showCloseButton = true, closeLabel = 'Close', ...props }, ref) => (
-    <DialogPortal>
-      <DialogOverlay />
-      <div
-        className={`fixed inset-0 ${Z_INDEX_MODAL_BACKDROP} flex items-center justify-center p-4 pointer-events-none`}
-      >
-        <DialogPrimitive.Content
-          ref={ref}
-          className={`radix-dialog-content pointer-events-auto relative w-full max-w-lg bg-[var(--theme-bg-primary)] border border-[var(--theme-border-primary)] rounded-2xl shadow-2xl p-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] overflow-hidden ${className}`}
-          {...props}
+  ({ className = '', children, showCloseButton = true, closeLabel = 'Close', ...props }, ref) => {
+    // Radix portals to the main document unless told otherwise. Inside a
+    // Picture-in-Picture window that puts the dialog (and its Esc/focus
+    // handling) in a window the user is not looking at.
+    const { document: targetDocument } = useWindowContext();
+
+    return (
+      <DialogPrimitive.Portal container={targetDocument.body}>
+        <DialogOverlay />
+        <div
+          className={`fixed inset-0 ${Z_INDEX_MODAL_BACKDROP} flex items-center justify-center p-4 pointer-events-none`}
         >
-          {children}
-          {showCloseButton && (
-            <DialogPrimitive.Close
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)]"
-              aria-label={closeLabel}
-            >
-              <X size={18} />
-              <span className="sr-only">{closeLabel}</span>
-            </DialogPrimitive.Close>
-          )}
-        </DialogPrimitive.Content>
-      </div>
-    </DialogPortal>
-  ),
+          <DialogPrimitive.Content
+            ref={ref}
+            className={`radix-dialog-content pointer-events-auto relative w-full max-w-lg bg-[var(--theme-bg-primary)] border border-[var(--theme-border-primary)] rounded-2xl shadow-2xl p-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] overflow-hidden ${className}`}
+            {...props}
+          >
+            {children}
+            {showCloseButton && (
+              <DialogPrimitive.Close
+                className="absolute top-4 right-4 p-1.5 rounded-lg text-[var(--theme-text-tertiary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-tertiary)] active:scale-95 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)]"
+                aria-label={closeLabel}
+              >
+                <X size={18} />
+                <span className="sr-only">{closeLabel}</span>
+              </DialogPrimitive.Close>
+            )}
+          </DialogPrimitive.Content>
+        </div>
+      </DialogPrimitive.Portal>
+    );
+  },
 );
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 

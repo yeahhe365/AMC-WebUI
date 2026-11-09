@@ -1,9 +1,9 @@
 import * as React from 'react';
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import { Z_INDEX_MODAL_BACKDROP } from '@/constants/layout';
+import { useWindowContext } from '@/contexts/WindowContext';
 
 export const AlertDialog = AlertDialogPrimitive.Root;
-const AlertDialogPortal = AlertDialogPrimitive.Portal;
 
 export type AlertDialogOverlayProps = React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Overlay>;
 
@@ -24,20 +24,29 @@ export type AlertDialogContentProps = React.ComponentPropsWithoutRef<typeof Aler
 export const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
   AlertDialogContentProps
->(({ className = '', children, ...props }, ref) => (
-  <AlertDialogPortal>
-    <AlertDialogOverlay />
-    <div className={`fixed inset-0 ${Z_INDEX_MODAL_BACKDROP} flex items-center justify-center p-4 pointer-events-none`}>
-      <AlertDialogPrimitive.Content
-        ref={ref}
-        className={`radix-alert-dialog-content pointer-events-auto relative w-full max-w-md bg-[var(--theme-bg-primary)] border border-[var(--theme-border-primary)] rounded-2xl shadow-2xl p-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] overflow-hidden ${className}`}
-        {...props}
+>(({ className = '', children, ...props }, ref) => {
+  // Radix portals to the main document unless told otherwise. Inside a
+  // Picture-in-Picture window that puts the dialog (and its Esc/focus
+  // handling) in a window the user is not looking at.
+  const { document: targetDocument } = useWindowContext();
+
+  return (
+    <AlertDialogPrimitive.Portal container={targetDocument.body}>
+      <AlertDialogOverlay />
+      <div
+        className={`fixed inset-0 ${Z_INDEX_MODAL_BACKDROP} flex items-center justify-center p-4 pointer-events-none`}
       >
-        {children}
-      </AlertDialogPrimitive.Content>
-    </div>
-  </AlertDialogPortal>
-));
+        <AlertDialogPrimitive.Content
+          ref={ref}
+          className={`radix-alert-dialog-content pointer-events-auto relative w-full max-w-md bg-[var(--theme-bg-primary)] border border-[var(--theme-border-primary)] rounded-2xl shadow-2xl p-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-border-focus)] overflow-hidden ${className}`}
+          {...props}
+        >
+          {children}
+        </AlertDialogPrimitive.Content>
+      </div>
+    </AlertDialogPrimitive.Portal>
+  );
+});
 AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName;
 
 export const AlertDialogHeader = ({ className = '', ...props }: React.HTMLAttributes<HTMLDivElement>) => (
