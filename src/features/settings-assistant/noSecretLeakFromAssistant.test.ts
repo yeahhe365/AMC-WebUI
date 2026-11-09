@@ -20,7 +20,7 @@ describe('assistant secret and apiKey handling', () => {
     expect(propertiesOf('delete_connection')).not.toContain('apiKey');
   });
 
-  it('allows reading stored apiKey and writing direct keys while keeping header values protected', async () => {
+  it('never hands a stored apiKey to the model while still accepting keys the user pastes', async () => {
     let connections: ThirdPartyConnection[] = [
       createThirdPartyConnection({
         id: 'c1',
@@ -38,7 +38,9 @@ describe('assistant secret and apiKey handling', () => {
       requestApiKey: async () => TYPED_KEY_CANARY,
     });
 
-    const listResult = await server.callTool('list_connections', {});
+    const listResult = (await server.callTool('list_connections', {})) as {
+      structuredContent?: { connections: Array<{ maskedApiKey: string | null }> };
+    };
     const createResult = await server.callTool('create_connection', {
       templateId: 'deepseek',
       apiKey: 'sk-direct-key-test',
@@ -46,10 +48,16 @@ describe('assistant secret and apiKey handling', () => {
     const deleteResult = await server.callTool('delete_connection', { connectionId: 'c1' });
 
     const everything = JSON.stringify({ listResult, createResult, deleteResult });
-    // Stored key and direct key are readable/writable
-    expect(everything).toContain(STORED_KEY_CANARY);
+    // The stored key never reaches the model: only its mask does. Anything else
+    // ships the user's credential to the model vendor on every turn.
+    expect(everything).not.toContain(STORED_KEY_CANARY);
+    expect(listResult.structuredContent?.connections[0].maskedApiKey).toMatch(/^sk-/);
     // Header values remain protected to prevent token leak
     expect(everything).not.toContain(HEADER_CANARY);
+
+    // A key the user pasted is still writable — that path types the secret in,
+    // it does not read a stored one back out.
+    expect(connections.find((c) => c.name === 'DeepSeek')?.apiKey).toBe('sk-direct-key-test');
 
     expect(connections.find((c) => c.name === 'DeepSeek')?.apiKey).toBe('sk-direct-key-test');
     expect(connections.find((c) => c.id === 'c1')).toBeUndefined();

@@ -1,4 +1,5 @@
 import { THIRD_PARTY_TEMPLATE_LABELS, getThirdPartyTemplateDefaults } from '@/utils/third-party/thirdPartyApiProviders';
+import { maskSecret } from '@/features/settings-mcp/mcpRedaction';
 import { THIRD_PARTY_TEMPLATE_IDS, type ThirdPartyConnection, type ThirdPartyTemplateId } from '@/types';
 
 /**
@@ -15,7 +16,7 @@ export interface ConnectionSummary {
   protocol: string;
   baseUrl: string | null;
   hasApiKey: boolean;
-  apiKey: string | null;
+  maskedApiKey: string | null;
   headerNames: string[];
   modelCount: number;
   modelIds: string[];
@@ -32,9 +33,13 @@ export interface TemplateSummary {
 }
 
 /**
- * Connection shape exposed to the model. `apiKey` is included directly for
- * natural language provider management. Extra-header values remain dropped
- * to protect private gateway tokens.
+ * Connection shape exposed to the model.
+ *
+ * The stored key is reduced to a mask (`sk-****xyz`), never the value: the
+ * assistant only needs to know whether a key exists and which one it looks
+ * like, and a plaintext key in the transcript would be handed to the model
+ * vendor on every single turn. Extra-header values stay dropped for the same
+ * reason.
  */
 export const toConnectionSummary = (connection: ThirdPartyConnection): ConnectionSummary => ({
   id: connection.id,
@@ -43,7 +48,7 @@ export const toConnectionSummary = (connection: ThirdPartyConnection): Connectio
   protocol: connection.protocol,
   baseUrl: connection.baseUrl,
   hasApiKey: Boolean(connection.apiKey?.trim()),
-  apiKey: connection.apiKey?.trim() ? connection.apiKey.trim() : null,
+  maskedApiKey: maskSecret(connection.apiKey ?? undefined),
   headerNames: Object.keys(connection.extraHeaders ?? {}),
   modelCount: connection.models.length,
   modelIds: connection.models.slice(0, MODEL_IDS_PER_CONNECTION_LIMIT).map((model) => model.id),

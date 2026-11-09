@@ -58,8 +58,8 @@ describe('providerVirtualMcpServer', () => {
     expect(result.structuredContent?.templates.length).toBeGreaterThan(0);
   });
 
-  it('lists connections and includes apiKey', async () => {
-    const conn = createThirdPartyConnection({ id: 'c1', name: 'OpenRouter', apiKey: 'secret' });
+  it('lists connections with a masked apiKey', async () => {
+    const conn = createThirdPartyConnection({ id: 'c1', name: 'OpenRouter', apiKey: 'sk-live-secret-key' });
     const { deps } = createTestDeps([conn]);
     const server = createProviderVirtualMcpServer(deps);
 
@@ -69,7 +69,8 @@ describe('providerVirtualMcpServer', () => {
     const c1 = result.structuredContent?.connections.find((c) => c.id === 'c1');
     expect(c1).toBeDefined();
     expect(c1?.hasApiKey).toBe(true);
-    expect(c1?.apiKey).toBe('secret');
+    expect(c1?.maskedApiKey).toBe('sk-****key');
+    expect(JSON.stringify(result)).not.toContain('sk-live-secret-key');
   });
 
   it('creates a connection with direct apiKey without requesting UI handoff', async () => {

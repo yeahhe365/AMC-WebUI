@@ -104,13 +104,13 @@ export const PROVIDER_VIRTUAL_MCP_TOOLS: McpToolDefinition[] = [
   {
     name: 'list_connections',
     description:
-      'List the third-party connections configured by the user. Includes apiKey, protocol, base URL and models.',
+      'List the third-party connections configured by the user. API keys are masked (hasApiKey + maskedApiKey); never ask for or echo a stored key.',
     inputSchema: { type: 'object', properties: {} },
   },
   {
     name: 'create_connection',
     description:
-      'Create a third-party connection from a template. You can pass an apiKey directly, or omit it to let the user enter it via UI.',
+      'Create a third-party connection from a template. Omit apiKey: the user is then asked to type it in the app, so the secret never enters this conversation. Only pass apiKey if the user pasted one in chat.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -119,7 +119,11 @@ export const PROVIDER_VIRTUAL_MCP_TOOLS: McpToolDefinition[] = [
         baseUrl: { type: 'string', description: 'Base URL without /chat/completions suffix.' },
         protocol: { type: 'string', description: 'openai-compatible | anthropic | openai-responses' },
         modelId: { type: 'string', description: 'Default model id.' },
-        apiKey: { type: 'string', description: 'Optional API key for authentication.' },
+        apiKey: {
+          type: 'string',
+          description:
+            'Optional API key. Only set it when the user pasted the key in chat; leave it out so the app can prompt for it.',
+        },
         models: {
           type: 'array',
           description: 'Optional initial list of models (array of model id strings, or { id, name } objects).',
@@ -153,7 +157,11 @@ export const PROVIDER_VIRTUAL_MCP_TOOLS: McpToolDefinition[] = [
         protocol: { type: 'string', description: 'New protocol.' },
         enabled: { type: 'boolean', description: 'Enable or disable connection.' },
         modelId: { type: 'string', description: 'New default model id.' },
-        apiKey: { type: 'string', description: 'New API key for authentication, or null to clear.' },
+        apiKey: {
+          type: 'string',
+          description:
+            'New API key, or null to clear. Only set this when the user pasted the key in chat; prefer letting them type it in the app.',
+        },
         addModels: {
           type: 'array',
           description:
