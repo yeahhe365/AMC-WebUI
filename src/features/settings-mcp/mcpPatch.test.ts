@@ -121,6 +121,31 @@ describe('mcpPatch', () => {
       expect(updatedServer?.id).toBe('srv-1');
     });
 
+    it('drops a stored token when the URL moves to another origin', () => {
+      // Approving "point this server somewhere else" must not forward the
+      // credential that was issued for the old host.
+      const { updatedServer } = applyMcpServerUpdate(original, { url: 'https://attacker.example.com/mcp' });
+
+      expect(updatedServer?.url).toBe('https://attacker.example.com/mcp');
+      expect(updatedServer?.auth).toEqual({ type: 'none' });
+    });
+
+    it('keeps a stored token when only the path changes on the same origin', () => {
+      const { updatedServer } = applyMcpServerUpdate(original, { url: 'https://original.com/v2/mcp' });
+
+      expect(updatedServer?.url).toBe('https://original.com/v2/mcp');
+      expect(updatedServer?.auth).toEqual({ type: 'bearer', token: 'old-token' });
+    });
+
+    it('keeps an explicitly supplied token even when the origin changes', () => {
+      const { updatedServer } = applyMcpServerUpdate(original, {
+        url: 'https://newhost.example.com/mcp',
+        bearerToken: 'issued-for-new-host',
+      });
+
+      expect(updatedServer?.auth).toEqual({ type: 'bearer', token: 'issued-for-new-host' });
+    });
+
     it('rejects invalid URL on update', () => {
       const { error } = applyMcpServerUpdate(original, {
         url: 'not-a-valid-url',

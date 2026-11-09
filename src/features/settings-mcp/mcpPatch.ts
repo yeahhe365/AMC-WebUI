@@ -158,6 +158,16 @@ export const validateAndBuildNewServer = (
   return { server };
 };
 
+/** Same-origin check used to decide whether a stored token may follow a URL change. */
+const isDifferentOrigin = (previousUrl: string | undefined, nextUrl: string): boolean => {
+  try {
+    return new URL(previousUrl ?? '').origin !== new URL(nextUrl).origin;
+  } catch {
+    // An unparsable previous URL cannot be shown to be the same host.
+    return true;
+  }
+};
+
 export const applyMcpServerUpdate = (
   server: McpServerConfig,
   patch: Partial<UpdateMcpServerPayload> | unknown,
@@ -181,6 +191,13 @@ export const applyMcpServerUpdate = (
       const trimmedUrl = patch.url.trim();
       if (!isValidMcpHttpUrl(trimmedUrl)) {
         return { error: `Invalid HTTP/HTTPS URL: "${trimmedUrl}".` };
+      }
+      // A stored token was issued for the old host. Carrying it to a new
+      // origin hands that credential to whoever controls the new URL, which is
+      // exactly what an approved "change the address" edit must not do. Drop
+      // it unless this update supplies a fresh one.
+      if (patch.bearerToken === undefined && isDifferentOrigin(server.url, trimmedUrl)) {
+        updated.auth = server.auth ? { type: 'none' } : undefined;
       }
       updated.url = trimmedUrl;
     }
