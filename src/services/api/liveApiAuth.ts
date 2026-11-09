@@ -3,7 +3,7 @@ import type { AppSettings } from '@/types';
 import { getClient } from './apiClient';
 import { SERVER_MANAGED_API_KEY } from '@/utils/api/apiKeySelection';
 import { resolveLiveClientBaseUrl } from './geminiApiBaseUrl';
-import { type GeminiClientHttpOptions, withHttpOptionHeaders } from './geminiApiVersion';
+import type { GeminiClientHttpOptions } from './geminiApiVersion';
 import { getServerAuthHeaders } from './apiAuthHeaders';
 
 export class LiveApiAuthConfigurationError extends Error {
@@ -67,9 +67,12 @@ export const getLiveApiClient = async (
   const proxyBaseUrl = resolveLiveClientBaseUrl(appSettings);
   const apiKey = apiKeyForLiveConnection?.trim();
 
-  const authHeaders = getServerAuthHeaders();
-  const effectiveHttpOptions =
-    Object.keys(authHeaders).length > 0 ? withHttpOptionHeaders(httpOptions, authHeaders) : httpOptions;
+  // The deployment password deliberately does NOT ride in httpOptions.headers:
+  // `ai.live.connect` opens a WebSocket and the SDK calls `new WebSocket(url)`,
+  // discarding headers entirely (see @google/genai BrowserWebSocket.connect).
+  // The credential that actually travels is the access cookie issued by
+  // /api/auth/verify, which the browser attaches to the handshake by itself.
+  const effectiveHttpOptions = httpOptions;
 
   if (!apiKey) {
     // No browser key. If the Docker WS proxy is configured, hand the api

@@ -23,6 +23,12 @@ const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 const LOG_RETENTION_MS = LOG_RETENTION_DAYS * MILLISECONDS_PER_DAY;
 const FLUSH_INTERVAL_MS = 2000;
 const FLUSH_THRESHOLD_COUNT = 50;
+// A failed flush retries with exponential backoff instead of every 2s forever,
+// and the buffer is bounded: if IndexedDB stays unavailable (private mode,
+// quota exhausted, blocked upgrade) an unbounded buffer would grow with every
+// log line for the life of the tab.
+const FLUSH_MAX_RETRY_DELAY_MS = 60_000;
+const MAX_BUFFERED_LOG_ENTRIES = 2000;
 const MAX_SERIALIZED_STRING_LENGTH = 5000;
 const TRUNCATED_STRING_SUFFIX = '...[TRUNCATED]';
 
@@ -35,6 +41,7 @@ class LogServiceImpl {
   // Buffered DB writes keep logging responsive during bursts.
   private logBuffer: LogEntry[] = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private flushRetryDelayMs = 0;
   private activeFlushPromise: Promise<void> | null = null;
   private isClearing = false;
   // Logging gate, default OFF: the module initializes before settings load,
@@ -175,15 +182,30 @@ class LogServiceImpl {
 
   private scheduleFlush() {
     if (this.isClearing || this.flushTimer) return;
+    const delay = this.flushRetryDelayMs > 0 ? this.flushRetryDelayMs : FLUSH_INTERVAL_MS;
     this.flushTimer = setTimeout(() => {
+      this.flushTimer = null;
       void this.flush();
-    }, FLUSH_INTERVAL_MS);
+    }, delay);
+  }
+
+  /** Doubles the retry delay after a failed write, up to the cap. */
+  private backOffRetry() {
+    this.flushRetryDelayMs =
+      this.flushRetryDelayMs === 0
+        ? FLUSH_INTERVAL_MS * 2
+        : Math.min(this.flushRetryDelayMs * 2, FLUSH_MAX_RETRY_DELAY_MS);
   }
 
   private queueLog(entry: LogEntry) {
     if (this.isClearing) return;
 
     this.logBuffer.push(entry);
+    if (this.logBuffer.length > MAX_BUFFERED_LOG_ENTRIES) {
+      // Drop from the oldest end: the newest lines are the ones a bug report
+      // needs, and the count cap keeps memory bounded while writes keep failing.
+      this.logBuffer.splice(0, this.logBuffer.length - MAX_BUFFERED_LOG_ENTRIES);
+    }
 
     // Notify listeners immediately for "live" feeling, even if not persisted yet
     this.notifyListeners([entry]);
@@ -217,10 +239,12 @@ class LogServiceImpl {
       try {
         await dbService.addLogs(logsToSave);
         flushSucceeded = true;
+        this.flushRetryDelayMs = 0;
       } catch (flushError) {
         console.error('Failed to flush logs to DB:', flushError);
         if (!this.isClearing) {
           this.logBuffer = [...logsToSave, ...this.logBuffer];
+          this.backOffRetry();
           this.scheduleFlush();
         }
       }

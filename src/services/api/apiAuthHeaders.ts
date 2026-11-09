@@ -42,6 +42,11 @@ export const verifyServerAccessPassword = async (
     const response = await fetch(url, {
       method: 'GET',
       headers: getServerAuthHeaders(trimmed),
+      // The server answers with the access cookie on success. A browser cannot
+      // put a header on a WebSocket handshake, so this cookie is what lets a
+      // Live API connection authenticate on deployments without the Docker WS
+      // bridge. `include` is required for the cross-origin static-hosting case.
+      credentials: 'include',
     });
     if (response.status === 200) {
       return { ok: true };

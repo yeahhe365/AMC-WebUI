@@ -168,6 +168,61 @@ describe('logService', () => {
     ]);
   });
 
+  // Loads a fresh instance under fake timers and drains the "enabled" log that
+  // setEnabled emits, so only the batch under test is being counted.
+  const loadWithFakeTimers = async () => {
+    vi.resetModules();
+    vi.useFakeTimers();
+    const { logService } = await import('./logService');
+    logService.setEnabled(true);
+    await vi.advanceTimersByTimeAsync(2000);
+    mockAddLogs.mockReset();
+    return logService;
+  };
+
+  it('backs off between retries instead of hammering a failing write every 2s', async () => {
+    try {
+      const logService = await loadWithFakeTimers();
+      mockAddLogs.mockRejectedValue(new Error('db unavailable'));
+
+      logService.info('Back off');
+      // First attempt happens on the normal schedule.
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockAddLogs).toHaveBeenCalledTimes(1);
+
+      // The failure doubles the delay, so nothing fires at the old interval.
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockAddLogs).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockAddLogs).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('resets the backoff once a flush succeeds', async () => {
+    try {
+      const logService = await loadWithFakeTimers();
+      mockAddLogs.mockRejectedValueOnce(new Error('db unavailable')).mockResolvedValue(undefined);
+
+      logService.info('Recover');
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockAddLogs).toHaveBeenCalledTimes(1);
+
+      // Retry after the doubled delay succeeds.
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(mockAddLogs).toHaveBeenCalledTimes(2);
+
+      // Back to the base interval for the next batch.
+      logService.info('After recovery');
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(mockAddLogs).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('waits for in-flight flushes before clearing and does not recreate logs during clear', async () => {
     const { logService } = await import('./logService');
     await logService.getRecentLogs();

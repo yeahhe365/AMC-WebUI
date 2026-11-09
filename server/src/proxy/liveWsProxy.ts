@@ -2,6 +2,7 @@ import type { IncomingMessage, Server } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import type { ApiServerConfig } from '../config.js';
 import { timingSafePasswordEqual } from '../security/passwordSecurity.js';
+import { ACCESS_COOKIE_NAME, readCookieValue, timingSafeCookieEqual } from '../security/accessCookie.js';
 
 import { SERVER_MANAGED_API_KEY as SERVER_MANAGED_API_KEY_SENTINEL } from '../../../shared/serverManagedApiKey.js';
 import { resolveApiKeyPrecedence } from './apiKeyPrecedence.js';
@@ -307,7 +308,18 @@ export function attachLiveWsUpgrade(server: Server, config: ApiServerConfig): vo
         headerAccessToken ||
         bearerToken;
 
-      if (!token || !timingSafePasswordEqual(token.trim(), config.accessPassword)) {
+      // A WS handshake cannot carry a custom header, so a static frontend can
+      // only authenticate with the cookie issued by /api/auth/verify. Docker
+      // deployments get the header injected by the web container's bridge.
+      const rawCookie = request.headers.cookie;
+      const cookieHeader = Array.isArray(rawCookie) ? rawCookie[0] : rawCookie;
+      const cookieAuthorized = timingSafeCookieEqual(
+        readCookieValue(cookieHeader, ACCESS_COOKIE_NAME),
+        config.accessPassword,
+      );
+
+      const headerAuthorized = timingSafePasswordEqual(token?.trim(), config.accessPassword);
+      if (!headerAuthorized && !cookieAuthorized) {
         logLiveEvent('rejected', { reason: 'unauthorized' });
         socket.write('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
         socket.destroy();

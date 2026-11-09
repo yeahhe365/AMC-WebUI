@@ -274,6 +274,83 @@ describe('Live WS upgrade security', () => {
     app.closeAllConnections?.();
   });
 
+  // P0-2: a browser cannot put a header on a WS handshake. Without the Docker
+  // WS bridge the only credential the browser adds by itself is a cookie, so
+  // /api/auth/verify has to issue one and the upgrade has to accept it.
+  it('accepts a WebSocket upgrade authenticated by the access cookie', async () => {
+    const config = buildConfig({ accessPassword: 'cookie-password' });
+    const upstreamHttp = http.createServer((_req, res) => res.end());
+    upstreamHttp.on('upgrade', (_req, socket) => {
+      socket.end('HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n');
+    });
+    const upstream = serverCleanup.track(await startHttpServer(upstreamHttp));
+    const app = createServer({ ...config, liveWsUpstreamBase: upstream.baseUrl.replace('http', 'ws') });
+    attachLiveWsUpgrade(app, { ...config, liveWsUpstreamBase: upstream.baseUrl.replace('http', 'ws') });
+    const appServer = serverCleanup.track(await startHttpServer(app));
+
+    const verify = await fetch(`${appServer.baseUrl}/api/auth/verify`, {
+      headers: { 'x-access-token': 'cookie-password' },
+    });
+    expect(verify.status).toBe(200);
+    const setCookie = verify.headers.get('set-cookie');
+    expect(setCookie).toContain('amc_access=');
+    expect(setCookie).toContain('HttpOnly');
+    // The cookie must not be the password itself.
+    expect(setCookie).not.toContain('cookie-password');
+    const cookie = setCookie!.split(';')[0];
+
+    const { hostname, port } = new URL(appServer.baseUrl);
+    const outcome = await new Promise<string>((resolve) => {
+      const request = http.request({
+        hostname,
+        port: Number(port),
+        path: '/api/live?key=byok-key',
+        // A real handshake carries the key/version pair; without it `ws`
+        // answers 400 before the upgrade reaches our auth code.
+        headers: {
+          connection: 'Upgrade',
+          upgrade: 'websocket',
+          'sec-websocket-key': 'dGhlIHNhbXBsZSBub25jZQ==',
+          'sec-websocket-version': '13',
+          cookie,
+        },
+      });
+      request.on('response', (res) => resolve(`status-${res.statusCode}`));
+      request.on('upgrade', () => resolve('upgraded'));
+      request.on('close', () => resolve('closed'));
+      request.on('error', () => resolve('error'));
+      request.end();
+      setTimeout(() => resolve('timeout'), 3000);
+    });
+    expect(outcome).toBe('upgraded');
+    app.closeAllConnections?.();
+  });
+
+  it('still rejects a WebSocket upgrade carrying a forged access cookie', async () => {
+    const config = buildConfig({ accessPassword: 'cookie-password' });
+    const app = createServer(config);
+    attachLiveWsUpgrade(app, config);
+    const appServer = serverCleanup.track(await startHttpServer(app));
+    const { hostname, port } = new URL(appServer.baseUrl);
+
+    const outcome = await new Promise<string>((resolve) => {
+      const request = http.request({
+        hostname,
+        port: Number(port),
+        path: '/api/live',
+        headers: { connection: 'Upgrade', upgrade: 'websocket', cookie: 'amc_access=forged-value' },
+      });
+      request.on('response', (res) => resolve(`status-${res.statusCode}`));
+      request.on('upgrade', () => resolve('upgraded'));
+      request.on('close', () => resolve('closed'));
+      request.on('error', () => resolve('error'));
+      request.end();
+      setTimeout(() => resolve('timeout'), 2000);
+    });
+    expect(outcome).toMatch(/status-401|closed/);
+    app.closeAllConnections?.();
+  });
+
   it('closes the connection with code 1008 if the client overflows the pending buffer before upstream opens', async () => {
     const upstreamHttp = http.createServer((_req, res) => res.end());
     upstreamHttp.on('upgrade', () => {

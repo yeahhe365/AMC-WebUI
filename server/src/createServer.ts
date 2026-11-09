@@ -18,6 +18,13 @@ import { abortJob, readJobSecret } from './stream-jobs/streamJobStore.js';
 import { STREAM_ABORT_PREFIX, UNIFIED_STREAM_ABORT_PREFIX } from './stream-jobs/streamJobsRoutes.js';
 import { OPENAI_PROXY_PREFIX, proxyThirdPartyRequest, type ThirdPartyProxyConfig } from './proxy/thirdPartyProxy.js';
 import { timingSafePasswordEqual } from './security/passwordSecurity.js';
+import {
+  ACCESS_COOKIE_NAME,
+  buildAccessCookieClearHeader,
+  buildAccessCookieHeader,
+  readCookieValue,
+  timingSafeCookieEqual,
+} from './security/accessCookie.js';
 
 interface CreateServerDependencies {
   fetchImpl?: typeof fetch;
@@ -93,8 +100,40 @@ function isAuthorized(request: http.IncomingMessage, accessPassword?: string): b
     return true;
   }
 
+  // Browsers cannot set headers on a WebSocket handshake, but they do send
+  // cookies, so a session cookie from /api/auth/verify is the only channel that
+  // works for deployments without the Docker WS bridge.
+  const rawCookie = request.headers.cookie;
+  const cookieHeader = Array.isArray(rawCookie) ? rawCookie[0] : rawCookie;
+  if (timingSafeCookieEqual(readCookieValue(cookieHeader, ACCESS_COOKIE_NAME), accessPassword)) {
+    return true;
+  }
+
   return false;
 }
+
+/** Whether the request's Origin names a different host than the one that was called. */
+const isCrossSiteRequest = (request: http.IncomingMessage): boolean => {
+  const rawOrigin = request.headers.origin;
+  const origin = Array.isArray(rawOrigin) ? rawOrigin[0] : rawOrigin;
+  const rawHost = request.headers.host;
+  const host = Array.isArray(rawHost) ? rawHost[0] : rawHost;
+  if (!origin || !host) {
+    return false;
+  }
+  try {
+    return new URL(origin).host !== host;
+  } catch {
+    return false;
+  }
+};
+
+/** Whether the request arrived over TLS, so cookies may be marked Secure. */
+const isSecureRequest = (request: http.IncomingMessage): boolean => {
+  const forwardedProto = request.headers['x-forwarded-proto'];
+  const proto = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto;
+  return typeof proto === 'string' && proto.split(',')[0].trim().toLowerCase() === 'https';
+};
 
 export function createServer(config: CreateServerConfig, dependencies: CreateServerDependencies = {}): http.Server {
   const resolvedConfig: ResolvedServerConfig = {
@@ -163,6 +202,19 @@ export function createServer(config: CreateServerConfig, dependencies: CreateSer
 
       if (path === '/api/auth/verify') {
         const authorized = isAuthorized(request, resolvedConfig.accessPassword);
+        const secure = isSecureRequest(request);
+        // A cross-site frontend needs SameSite=None to have the cookie ride a
+        // WS upgrade; same-site deployments keep the stricter Lax.
+        const crossSite = isCrossSiteRequest(request);
+        // Issue (or clear) the cookie session here: this is the only successful
+        // credential handshake the browser can complete, and the WS upgrade
+        // cannot carry a header.
+        const cookieHeaders = authorized
+          ? [buildAccessCookieHeader(resolvedConfig.accessPassword, { secure, crossSite })].filter(
+              (value): value is string => value !== null,
+            )
+          : [];
+        const clearCookies = !authorized && request.headers.cookie;
         sendJson(
           request,
           response,
@@ -171,6 +223,7 @@ export function createServer(config: CreateServerConfig, dependencies: CreateSer
             ? { ok: true, authRequired: Boolean(resolvedConfig.accessPassword) }
             : { error: 'Unauthorized', message: 'Invalid or missing server access password' },
           resolvedConfig.allowedOrigins,
+          [...cookieHeaders, ...(clearCookies ? [buildAccessCookieClearHeader({ secure, crossSite })] : [])],
         );
         return;
       }

@@ -2,6 +2,16 @@ import { applyMigrations, DB_NAME, DB_VERSION, KEY_VALUE_STORE, LOCK_NAME } from
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
+/**
+ * How long to wait for an open request before giving up.
+ *
+ * `indexedDB.open` never settles while another tab holds the old version open
+ * and the upgrade is blocked. Every writer awaits `getDb` inside the Web Lock,
+ * so an open that hangs forever blocks all writes for the life of the tab; this
+ * bound turns that into a recoverable failure the caller can retry.
+ */
+const DB_OPEN_TIMEOUT_MS = 10_000;
+
 const isVersionConflictError = (error: unknown): boolean => {
   if (error instanceof DOMException) {
     return error.name === 'VersionError';
@@ -20,7 +30,33 @@ export const getDb = (): Promise<IDBDatabase> => {
       const openDatabase = (version?: number, allowVersionFallback: boolean = false) => {
         const request = version === undefined ? indexedDB.open(DB_NAME) : indexedDB.open(DB_NAME, version);
 
+        let settled = false;
+        const timeoutId = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          // A blocked upgrade is the usual cause: another tab still holds the
+          // previous version open. Failing the open lets the write lock be
+          // released so a later retry (after the tab closes) can succeed.
+          console.warn(
+            `IndexedDB open did not settle within ${DB_OPEN_TIMEOUT_MS}ms. Another tab may be holding an older version of ${DB_NAME} open.`,
+          );
+          dbPromise = null;
+          reject(new Error(`IndexedDB open timed out after ${DB_OPEN_TIMEOUT_MS}ms`));
+        }, DB_OPEN_TIMEOUT_MS);
+        const settle = () => {
+          settled = true;
+          clearTimeout(timeoutId);
+        };
+
+        request.onblocked = () => {
+          // Fires when another connection holds the previous version open. The
+          // timeout above covers the case where it never clears; this log is
+          // the actionable hint.
+          console.warn(`IndexedDB upgrade for ${DB_NAME} is blocked by another tab.`);
+        };
+
         request.onerror = () => {
+          settle();
           if (allowVersionFallback && isVersionConflictError(request.error)) {
             console.warn(
               `IndexedDB version ${DB_VERSION} is older than the stored schema. Reopening ${DB_NAME} with the browser's current version.`,
@@ -35,6 +71,7 @@ export const getDb = (): Promise<IDBDatabase> => {
         };
 
         request.onsuccess = () => {
+          settle();
           const db = request.result;
           db.onversionchange = () => {
             try {
