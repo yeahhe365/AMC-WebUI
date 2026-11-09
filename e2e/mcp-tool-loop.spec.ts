@@ -84,9 +84,103 @@ test('executes a real MCP tool inside the Gemini tool loop', async ({ page }) =>
   await page.getByLabel('Send message').click();
   await page.waitForURL(/\/chat\//);
 
+  // Approval is the default: the tool call has to be confirmed before the
+  // fixture runs, and this is the only e2e that drives the real dialog.
+  const approval = page.getByRole('alertdialog');
+  await expect(approval).toBeVisible({ timeout: 30_000 });
+  await expect(approval).toContainText('E2E StdIO');
+  await expect(approval).toContainText('echo');
+  await page.getByTestId('mcp-approval-session').click();
+  await expect(approval).toBeHidden();
+
   const messageList = page.locator('[data-testid="virtuoso-item-list"]');
   await expect(messageList.getByText('FINAL_TOOL_OUTPUT>>')).toBeVisible({ timeout: 30_000 });
   // The final answer must embed the REAL stdio MCP server's output, including
   // the environment variable only the real child process could see.
   await expect(messageList.getByText('echo: loop-test (env=loop-env-ok)')).toBeVisible();
+});
+
+test('skips the approval dialog for a tool the server allowlists', async ({ page }) => {
+  await page.route('**/*', async (route) => {
+    const url = route.request().url().toLowerCase();
+    if (!url.includes('generatecontent')) {
+      await route.continue();
+      return;
+    }
+    const body = route.request().postData() ?? '';
+
+    if (body.includes('functionResponse')) {
+      const match = body.match(/echo: loop-test[^"\\]*/) ?? ['TOOL_RESULT_MISSING'];
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          candidates: [{ content: { parts: [{ text: `AUTOOK>> ${match[0]} <<END` }] } }],
+          usageMetadata: { promptTokenCount: 4, candidatesTokenCount: 2, totalTokenCount: 6 },
+        }),
+      });
+      return;
+    }
+
+    const decl = body.match(/"name":"(mcp_[a-z0-9_]*echo[a-z0-9_]*)"/) ?? body.match(/"name":"(mcp_[a-z0-9_]+)"/);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [{ functionCall: { name: decl ? decl[1] : 'mcp_UNKNOWN', args: { text: 'loop-test' } } }],
+            },
+          },
+        ],
+        usageMetadata: { promptTokenCount: 4, candidatesTokenCount: 2, totalTokenCount: 6 },
+      }),
+    });
+  });
+
+  await seedAppState(page, {
+    appSettings: {
+      useCustomApiConfig: true,
+      apiKey: 'e2e-key',
+      isStreamingEnabled: false,
+      isAutoTitleEnabled: false,
+      language: 'en',
+      mcpServers: [
+        {
+          id: 'e2e-stdio',
+          name: 'E2E StdIO',
+          enabled: true,
+          transport: 'stdio',
+          command: 'node',
+          args: ['e2e/fixtures/mcp-test-server.mjs'],
+          env: { MCP_TEST_MARKER: 'loop-env-ok' },
+          autoApproveTools: ['echo'],
+        },
+      ],
+    },
+  });
+
+  await page.evaluate(() => {
+    localStorage.setItem(
+      'all_model_chat_mcp_runtime_v2',
+      JSON.stringify({ state: { masterEnabled: true, selectedServerIds: null }, version: 0 }),
+    );
+  });
+
+  await page.goto('/');
+
+  const input = page.getByLabel('Chat message input');
+  await expect(input).toBeVisible();
+  await input.fill('Please call the echo tool with text loop-test');
+  await page.getByLabel('Send message').click();
+  await page.waitForURL(/\/chat\//);
+
+  const messageList = page.locator('[data-testid="virtuoso-item-list"]');
+  await expect(messageList.getByText('AUTOOK>>')).toBeVisible({ timeout: 30_000 });
+  await expect(messageList.getByText('echo: loop-test (env=loop-env-ok)')).toBeVisible();
+  // The allowlist is the whole point of this case.
+  expect(await page.getByRole('alertdialog').count()).toBe(0);
 });
