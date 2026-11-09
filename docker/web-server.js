@@ -34,7 +34,10 @@ const jsonStringOrNull = (value) => {
 function writeRuntimeConfig() {
   const config = {
     serverManagedApi: toBool(process.env.RUNTIME_SERVER_MANAGED_API),
-    serverAccessPassword: JSON.parse(jsonStringOrNull(process.env.RUNTIME_SERVER_ACCESS_PASSWORD)),
+    // The password itself must never appear here: this file is served at a
+    // public path and anyone can read it. Only say whether this deployment
+    // needs one, so the client can prompt for it instead of guessing.
+    serverAccessPasswordRequired: Boolean(readWsAccessPassword()),
     useCustomApiConfig: toBool(process.env.RUNTIME_USE_CUSTOM_API_CONFIG ?? 'true'),
     useApiProxy: toBool(process.env.RUNTIME_USE_API_PROXY ?? 'true'),
     apiProxyUrl: JSON.parse(jsonStringOrNull(process.env.RUNTIME_API_PROXY_URL ?? '/api/gemini')),

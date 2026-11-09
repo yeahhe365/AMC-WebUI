@@ -177,6 +177,24 @@ describe('Docker Web server process', () => {
     return { response, headers: seen[0] };
   }
 
+  // runtime-config.js 是公开可取的静态文件,把口令写进去等于把口令公开(P0-3)。
+  // 它只能声明"本部署需要口令",让客户端提示用户输入。
+  it('never publishes the access password value in runtime-config.js', async () => {
+    const secret = 'super-secret-deploy-password';
+    const { port } = await startWeb('http://127.0.0.1:9', { RUNTIME_SERVER_ACCESS_PASSWORD: secret });
+    const published = (await request(port, '/runtime-config.js')).body.toString();
+
+    expect(published).not.toContain(secret);
+    expect(published).toContain('"serverAccessPasswordRequired": true');
+  });
+
+  it('reports no password requirement when the deployment has none', async () => {
+    const { port } = await startWeb();
+    const published = (await request(port, '/runtime-config.js')).body.toString();
+
+    expect(published).toContain('"serverAccessPasswordRequired": false');
+  });
+
   // 浏览器无法为 WebSocket 握手加自定义头,所以口令只能由这层桥接补上;
   // 少了这一步,只要部署设了 ACCESS_PASSWORD,所有 Live 连接都会 401（P0-2）。
   it('injects the deployment access password into bridged live upgrades', async () => {

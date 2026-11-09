@@ -63,6 +63,7 @@ services:
         condition: service_healthy
     environment:
       RUNTIME_SERVER_MANAGED_API: ${RUNTIME_SERVER_MANAGED_API:-true}
+      # Used for the WS handshake only; never published in runtime-config.js.
       RUNTIME_SERVER_ACCESS_PASSWORD: ${RUNTIME_SERVER_ACCESS_PASSWORD:-}
       RUNTIME_USE_CUSTOM_API_CONFIG: ${RUNTIME_USE_CUSTOM_API_CONFIG:-true}
       RUNTIME_USE_API_PROXY: ${RUNTIME_USE_API_PROXY:-true}

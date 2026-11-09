@@ -190,6 +190,53 @@ const shellFeatureTranslations: TranslationMap = {
     fr: 'Clé API non configurée.',
     de: 'API-Schlüssel nicht konfiguriert.',
   },
+  // Deployment password prompt (ServerAccessPasswordPrompt). It mounts on the
+  // shell before the settings pack is requested, so its copy must be eager.
+  serverAccessPasswordPromptTitle: {
+    en: 'This deployment needs an access password',
+    zh: '此部署需要访问口令',
+    ja: 'このデプロイにはアクセスパスワードが必要です',
+    ko: '이 배포에는 접근 비밀번호가 필요합니다',
+    es: 'Esta implementación requiere una contraseña de acceso',
+    fr: "Ce déploiement nécessite un mot de passe d'accès",
+    de: 'Diese Bereitstellung erfordert ein Zugriffspasswort',
+  },
+  serverAccessPasswordPromptBody: {
+    en: 'Enter the ACCESS_PASSWORD you were given. It is stored in this browser only and never leaves it except as a request header.',
+    zh: '请输入管理员给你的 ACCESS_PASSWORD。口令只保存在本浏览器，除了作为请求头发送外不会离开。',
+    ja: '管理者から受け取った ACCESS_PASSWORD を入力してください。パスワードはこのブラウザにのみ保存されます。',
+    ko: '관리자에게 받은 ACCESS_PASSWORD를 입력하세요. 비밀번호는 이 브라우저에만 저장됩니다.',
+    es: 'Introduce el ACCESS_PASSWORD que te facilitaron. Solo se guarda en este navegador.',
+    fr: "Saisissez l'ACCESS_PASSWORD qui vous a été communiqué. Il n'est conservé que dans ce navigateur.",
+    de: 'Geben Sie das ACCESS_PASSWORD ein, das Sie erhalten haben. Es wird nur in diesem Browser gespeichert.',
+  },
+  serverAccessPasswordPromptPlaceholder: {
+    en: 'ACCESS_PASSWORD',
+    zh: 'ACCESS_PASSWORD',
+    ja: 'ACCESS_PASSWORD',
+    ko: 'ACCESS_PASSWORD',
+    es: 'ACCESS_PASSWORD',
+    fr: 'ACCESS_PASSWORD',
+    de: 'ACCESS_PASSWORD',
+  },
+  serverAccessPasswordPromptSubmit: {
+    en: 'Verify and save',
+    zh: '验证并保存',
+    ja: '確認して保存',
+    ko: '확인 후 저장',
+    es: 'Verificar y guardar',
+    fr: 'Vérifier et enregistrer',
+    de: 'Prüfen und speichern',
+  },
+  serverAccessPasswordPromptInvalid: {
+    en: 'That password was rejected by the server.',
+    zh: '服务器拒绝了这个口令。',
+    ja: 'サーバーがこのパスワードを拒否しました。',
+    ko: '서버가 이 비밀번호를 거부했습니다.',
+    es: 'El servidor rechazó esa contraseña.',
+    fr: 'Le serveur a refusé ce mot de passe.',
+    de: 'Der Server hat dieses Passwort abgelehnt.',
+  },
   ...ttsStyleTranslations,
 };
 

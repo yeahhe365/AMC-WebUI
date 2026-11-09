@@ -268,31 +268,33 @@ docker compose up -d --build
 
 部署时请区分两类配置：
 
-| 变量名                          | 用途                                                                   | 公开性             | Docker 默认值                               |
-| :------------------------------ | :--------------------------------------------------------------------- | :----------------- | :------------------------------------------ |
-| `GEMINI_API_KEY`                | 可选的服务端托管 Gemini API Key；浏览器 BYOK 优先，留空则回落此 Key    | **仅服务端**       | 空                                          |
-| `LIVE_GEMINI_API_KEY`           | 可选的 Live API 专属服务端 Gemini API Key；优先级高于 `GEMINI_API_KEY` | 仅服务端           | 空                                          |
-| `PORT`                          | `api` 服务监听端口                                                     | 仅服务端           | `3001`                                      |
-| `WEB_PORT`                      | `web` 服务宿主机映射端口                                               | 仅宿主机           | `8080`                                      |
-| `GEMINI_API_BASE`               | Gemini 上游地址（代理目标）                                            | 仅服务端           | `https://generativelanguage.googleapis.com` |
-| `ALLOWED_ORIGINS`               | 逗号分隔 CORS 白名单（跨域部署时使用）                                 | 仅服务端           | 空                                          |
-| `ENABLE_MCP_STDIO`              | 启用 `stdio` MCP 服务调用能力                                          | 仅服务端           | `false`                                     |
-| `ENABLE_MCP_PRIVATE_HTTP`       | 允许 API 服务访问内网/本机 HTTP MCP 地址                               | 仅服务端           | `false`                                     |
-| `ENABLE_LIVE_WS_PROXY`          | 启用 `/api/live` WebSocket 全代理（Docker 默认开启）                   | 仅服务端           | `true`                                      |
-| `LIVE_WS_IDLE_TIMEOUT_MS`       | Live WS 空闲回收时间（毫秒）                                           | 仅服务端           | `300000`                                    |
-| `SERVER_KEY_PRIORITY`           | Key 优先级：`false`=浏览器 BYOK 优先·服务端兜底；`true`=服务端优先     | 仅服务端           | `false`                                     |
-| `THIRD_PARTY_ROUTES`            | JSON：provider → { baseUrl, apiKey } 第三方路由表（仅 https、非私网）  | 仅服务端           | 空                                          |
-| `RUNTIME_SERVER_MANAGED_API`    | 前端默认启用服务端托管 API                                             | **公开运行时配置** | `true`                                      |
-| `RUNTIME_USE_CUSTOM_API_CONFIG` | 前端默认启用“自定义 API 配置”                                          | 公开运行时配置     | `true`                                      |
-| `RUNTIME_USE_API_PROXY`         | 前端默认启用 API 代理                                                  | 公开运行时配置     | `true`                                      |
-| `RUNTIME_API_PROXY_URL`         | 前端默认 Gemini 代理地址                                               | 公开运行时配置     | `/api/gemini`                               |
-| `RUNTIME_LIVE_API_BASE_URL`     | 前端 Live API 代理地址（留空则浏览器直连官方 WS）                      | 公开运行时配置     | `/api/live`                                 |
-| `RUNTIME_THIRD_PARTY_PROXY_URL` | 前端第三方兼容接口代理地址（留空则浏览器直连 provider）                | 公开运行时配置     | `/api/openai`                               |
-| `RUNTIME_PYODIDE_BASE_URL`      | 可选 Pyodide 运行时资源地址；留空时使用同源 `/pyodide/`                | 公开运行时配置     | 空                                          |
+| 变量名                           | 用途                                                                         | 公开性             | Docker 默认值                               |
+| :------------------------------- | :--------------------------------------------------------------------------- | :----------------- | :------------------------------------------ |
+| `GEMINI_API_KEY`                 | 可选的服务端托管 Gemini API Key；浏览器 BYOK 优先，留空则回落此 Key          | **仅服务端**       | 空                                          |
+| `LIVE_GEMINI_API_KEY`            | 可选的 Live API 专属服务端 Gemini API Key；优先级高于 `GEMINI_API_KEY`       | 仅服务端           | 空                                          |
+| `PORT`                           | `api` 服务监听端口                                                           | 仅服务端           | `3001`                                      |
+| `WEB_PORT`                       | `web` 服务宿主机映射端口                                                     | 仅宿主机           | `8080`                                      |
+| `GEMINI_API_BASE`                | Gemini 上游地址（代理目标）                                                  | 仅服务端           | `https://generativelanguage.googleapis.com` |
+| `ALLOWED_ORIGINS`                | 逗号分隔 CORS 白名单（跨域部署时使用）                                       | 仅服务端           | 空                                          |
+| `ENABLE_MCP_STDIO`               | 启用 `stdio` MCP 服务调用能力                                                | 仅服务端           | `false`                                     |
+| `ENABLE_MCP_PRIVATE_HTTP`        | 允许 API 服务访问内网/本机 HTTP MCP 地址                                     | 仅服务端           | `false`                                     |
+| `ENABLE_LIVE_WS_PROXY`           | 启用 `/api/live` WebSocket 全代理（Docker 默认开启）                         | 仅服务端           | `true`                                      |
+| `LIVE_WS_IDLE_TIMEOUT_MS`        | Live WS 空闲回收时间（毫秒）                                                 | 仅服务端           | `300000`                                    |
+| `SERVER_KEY_PRIORITY`            | Key 优先级：`false`=浏览器 BYOK 优先·服务端兜底；`true`=服务端优先           | 仅服务端           | `false`                                     |
+| `THIRD_PARTY_ROUTES`             | JSON：provider → { baseUrl, apiKey } 第三方路由表（仅 https、非私网）        | 仅服务端           | 空                                          |
+| `RUNTIME_SERVER_MANAGED_API`     | 前端默认启用服务端托管 API                                                   | **公开运行时配置** | `true`                                      |
+| `RUNTIME_USE_CUSTOM_API_CONFIG`  | 前端默认启用“自定义 API 配置”                                                | 公开运行时配置     | `true`                                      |
+| `RUNTIME_USE_API_PROXY`          | 前端默认启用 API 代理                                                        | 公开运行时配置     | `true`                                      |
+| `RUNTIME_API_PROXY_URL`          | 前端默认 Gemini 代理地址                                                     | 公开运行时配置     | `/api/gemini`                               |
+| `RUNTIME_LIVE_API_BASE_URL`      | 前端 Live API 代理地址（留空则浏览器直连官方 WS）                            | 公开运行时配置     | `/api/live`                                 |
+| `RUNTIME_THIRD_PARTY_PROXY_URL`  | 前端第三方兼容接口代理地址（留空则浏览器直连 provider）                      | 公开运行时配置     | `/api/openai`                               |
+| `RUNTIME_PYODIDE_BASE_URL`       | 可选 Pyodide 运行时资源地址；留空时使用同源 `/pyodide/`                      | 公开运行时配置     | 空                                          |
+| `RUNTIME_SERVER_ACCESS_PASSWORD` | **不写入前端**：仅在服务端用于 WS 桥接补头；前端只收到“是否启用口令”的布尔值 | 仅服务端           | 空                                          |
 
 说明：
 
 - 上述 `RUNTIME_*` 会在容器启动时写入 `runtime-config.js`，可被浏览器读取，因此只能放“可公开”信息。
+- `RUNTIME_SERVER_ACCESS_PASSWORD` 是例外：它**不会**写进 `runtime-config.js`。`runtime-config.js` 在站点根目录公开可取，写进去等于把口令公开（任何访问者 `curl /runtime-config.js` 即可拿到）。容器只用它在 WebSocket 握手里补 `x-access-token`，并向前端下发一个 `serverAccessPasswordRequired` 布尔值；浏览器首次打开时会提示用户输入 `ACCESS_PASSWORD`，口令只保存在该浏览器的本地存储中。因此**部署口令不是安全边界**（拿到口令的人仍可调用 Node API），请配合网络层访问控制使用。
 - public/runtime-config.js 模板用于纯静态构建，默认不启用自定义 API 配置或代理；Docker 部署会由 `docker/web-server.js` 在容器启动时按上表默认值覆盖该文件。
 - 默认生产构建将 Pyodide 核心和科学计算包复制到 `dist/pyodide/`，运行时从同源 `/pyodide/` 按需加载。首次构建按运行时清单下载包并校验 SHA-256，后续复用本地缓存。若部署独立版本化资源源，可执行 `PYODIDE_ASSETS_EXTERNAL=true pnpm run build` 省略这些资源，并将 `RUNTIME_PYODIDE_BASE_URL` 设置为与安装版本匹配的完整目录 URL，例如 `https://cdn.jsdelivr.net/pyodide/v0.27.7/full/`；纯静态部署需在 `runtime-config.js` 设置对应值。
 - PWA 预缓存默认排除 `pyodide/` 大体积产物，首次执行本地 Python 时仍会按上述地址按需加载。

@@ -19,32 +19,32 @@ Distinguishing between sensitive server-only variables and public runtime config
 
 ## Environment Variables Matrix
 
-| Variable | Purpose | Scope | Default |
-| :--- | :--- | :--- | :--- |
-| `WEB_PORT` | Host exposed port for web container | Host | `8080` |
-| `PORT` | Node API server listening port | Server | `3001` |
-| `GEMINI_API_KEY` | Optional server-managed Gemini key | **Server only** | empty |
-| `LIVE_GEMINI_API_KEY`| Dedicated server key for Live WS proxy | **Server only** | empty |
-| `GEMINI_API_BASE` | Upstream Gemini API base URL (point at your own proxy) | Server | `https://generativelanguage.googleapis.com` |
-| `SERVER_KEY_PRIORITY`| `true`=server priority; `false`=browser key first | Server | `false` |
-| `ACCESS_PASSWORD` | Shared password protecting the Node API from anonymous calls | **Server only** | empty |
-| `SERVER_ACCESS_TOKEN` | Legacy alias for `ACCESS_PASSWORD` | **Server only** | empty |
-| `ALLOWED_ORIGINS` | Comma-separated CORS whitelist | Server | empty |
-| `ENABLE_LIVE_WS_PROXY`| Enable `/api/live` WebSocket proxying | Server | `true` |
-| `LIVE_WS_IDLE_TIMEOUT_MS` | Idle timeout before the Live WS proxy recycles a connection (ms) | Server | `300000` |
-| `ENABLE_MCP_STDIO` | Allow running local stdio MCP processes | Server | `false` |
-| `ENABLE_MCP_PRIVATE_HTTP` | Allow MCP servers on intranet/localhost HTTP endpoints | Server | `false` |
-| `ENABLE_THIRD_PARTY_PRIVATE_HTTP` | Allow third-party routes to reach intranet endpoints (e.g. local Ollama) | Server | `false` |
-| `THIRD_PARTY_ROUTES`| Third-party provider routing table JSON | **Server only** | empty |
-| `NPM_REGISTRY` | npm registry used when building the images | Build arg | `https://registry.npmjs.org` |
-| `RUNTIME_SERVER_MANAGED_API` | Frontend consumes the server-managed key | Public runtime | `true` (Docker) |
-| `RUNTIME_SERVER_ACCESS_PASSWORD` | Password the frontend sends to a protected Node API | Public runtime | empty |
-| `RUNTIME_USE_API_PROXY` | Route frontend requests through the Node API | Public runtime | `true` (Docker) |
-| `RUNTIME_USE_CUSTOM_API_CONFIG` | Let the browser override API configuration | Public runtime | `true` (Docker) |
-| `RUNTIME_API_PROXY_URL`| Frontend Gemini proxy endpoint | Public runtime | `/api/gemini` |
-| `RUNTIME_LIVE_API_BASE_URL`| Frontend Live WS endpoint | Public runtime | `/api/live` |
-| `RUNTIME_THIRD_PARTY_PROXY_URL`| Third-party proxy endpoint | Public runtime | `/api/openai` |
-| `RUNTIME_PYODIDE_BASE_URL` | Pyodide WASM asset base URL (empty uses same-origin `/pyodide/`) | Public runtime | empty |
+| Variable                          | Purpose                                                                         | Scope                                             | Default                                     |
+| :-------------------------------- | :------------------------------------------------------------------------------ | :------------------------------------------------ | :------------------------------------------ |
+| `WEB_PORT`                        | Host exposed port for web container                                             | Host                                              | `8080`                                      |
+| `PORT`                            | Node API server listening port                                                  | Server                                            | `3001`                                      |
+| `GEMINI_API_KEY`                  | Optional server-managed Gemini key                                              | **Server only**                                   | empty                                       |
+| `LIVE_GEMINI_API_KEY`             | Dedicated server key for Live WS proxy                                          | **Server only**                                   | empty                                       |
+| `GEMINI_API_BASE`                 | Upstream Gemini API base URL (point at your own proxy)                          | Server                                            | `https://generativelanguage.googleapis.com` |
+| `SERVER_KEY_PRIORITY`             | `true`=server priority; `false`=browser key first                               | Server                                            | `false`                                     |
+| `ACCESS_PASSWORD`                 | Shared password protecting the Node API from anonymous calls                    | **Server only**                                   | empty                                       |
+| `SERVER_ACCESS_TOKEN`             | Legacy alias for `ACCESS_PASSWORD`                                              | **Server only**                                   | empty                                       |
+| `ALLOWED_ORIGINS`                 | Comma-separated CORS whitelist                                                  | Server                                            | empty                                       |
+| `ENABLE_LIVE_WS_PROXY`            | Enable `/api/live` WebSocket proxying                                           | Server                                            | `true`                                      |
+| `LIVE_WS_IDLE_TIMEOUT_MS`         | Idle timeout before the Live WS proxy recycles a connection (ms)                | Server                                            | `300000`                                    |
+| `ENABLE_MCP_STDIO`                | Allow running local stdio MCP processes                                         | Server                                            | `false`                                     |
+| `ENABLE_MCP_PRIVATE_HTTP`         | Allow MCP servers on intranet/localhost HTTP endpoints                          | Server                                            | `false`                                     |
+| `ENABLE_THIRD_PARTY_PRIVATE_HTTP` | Allow third-party routes to reach intranet endpoints (e.g. local Ollama)        | Server                                            | `false`                                     |
+| `THIRD_PARTY_ROUTES`              | Third-party provider routing table JSON                                         | **Server only**                                   | empty                                       |
+| `NPM_REGISTRY`                    | npm registry used when building the images                                      | Build arg                                         | `https://registry.npmjs.org`                |
+| `RUNTIME_SERVER_MANAGED_API`      | Frontend consumes the server-managed key                                        | Public runtime                                    | `true` (Docker)                             |
+| `RUNTIME_SERVER_ACCESS_PASSWORD`  | Password for the protected Node API; **never written into `runtime-config.js`** | Server only (the browser receives a boolean flag) | empty                                       |
+| `RUNTIME_USE_API_PROXY`           | Route frontend requests through the Node API                                    | Public runtime                                    | `true` (Docker)                             |
+| `RUNTIME_USE_CUSTOM_API_CONFIG`   | Let the browser override API configuration                                      | Public runtime                                    | `true` (Docker)                             |
+| `RUNTIME_API_PROXY_URL`           | Frontend Gemini proxy endpoint                                                  | Public runtime                                    | `/api/gemini`                               |
+| `RUNTIME_LIVE_API_BASE_URL`       | Frontend Live WS endpoint                                                       | Public runtime                                    | `/api/live`                                 |
+| `RUNTIME_THIRD_PARTY_PROXY_URL`   | Third-party proxy endpoint                                                      | Public runtime                                    | `/api/openai`                               |
+| `RUNTIME_PYODIDE_BASE_URL`        | Pyodide WASM asset base URL (empty uses same-origin `/pyodide/`)                | Public runtime                                    | empty                                       |
 
 Server-selected regular Gemini keys always use `GEMINI_API_BASE`; browser base URL overrides apply only to browser BYOK keys. The administrator's base URL is trusted and may point to a local proxy. Restricted proxies validate DNS at connection time. MCP rejects cross-origin and HTTPS downgrade redirects. The `198.18.0.0/15` Fake-IP allowance remains for Clash/Surge/Mihomo TUN compatibility.
 
@@ -57,5 +57,6 @@ Default builds download scientific packages using the installed Pyodide integrit
 ## ⚠️ Security Boundary Notice
 
 This multi-service setup is tailored for **trusted self-hosted environments**:
+
 - Standard BYOK uses browser keys. This architecture does not provide multi-tenant authentication or billing quotas for open public internet access.
 - Deploy reverse proxy authentication (Nginx, Traefik, or Cloudflare Access) when exposing endpoints publicly.

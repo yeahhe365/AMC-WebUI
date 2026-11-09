@@ -891,6 +891,7 @@ describe('translation coverage for protected UI surfaces', () => {
       'src/components/chat/input/toolbar/QuadImageToggle.tsx',
       'src/hooks/file-upload/useFileIdAdder.ts',
       'src/components/pwa/PwaUpdateBanner.tsx',
+      'src/components/layout/ServerAccessPasswordPrompt.tsx',
     ];
 
     // The eager set is what `coreTranslations.ts` pulls in synchronously at module

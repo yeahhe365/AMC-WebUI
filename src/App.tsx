@@ -8,6 +8,7 @@ import { AppOverlays } from './components/layout/AppOverlays';
 import { PiPPlaceholder } from './components/layout/PiPPlaceholder';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 import { PwaUpdateBanner } from './components/pwa/PwaUpdateBanner';
+import { ServerAccessPasswordPrompt } from './components/layout/ServerAccessPasswordPrompt';
 import { lazyNamedComponent } from './utils/lazyNamedComponent';
 import { isFileDrag } from '@/utils/file-upload/fileUploadPolicy';
 
@@ -95,6 +96,7 @@ const AppContent: React.FC = () => {
           onDismiss={eventsState.dismissUpdateBanner}
         />
       ) : null}
+      <ServerAccessPasswordPrompt />
       <Suspense fallback={null}>
         <LazyGlobalCommandPalette
           onNewChat={chatState.startNewChat}

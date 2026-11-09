@@ -2,7 +2,7 @@ import type { AppSettings } from '@/types';
 
 type RuntimeConfigKey =
   | 'serverManagedApi'
-  | 'serverAccessPassword'
+  | 'serverAccessPasswordRequired'
   | 'useCustomApiConfig'
   | 'useApiProxy'
   | 'apiProxyUrl'
@@ -119,8 +119,20 @@ export function getGeminiApiProxyBaseUrl(): string | null {
   return readNullableString(getRuntimeConfig()?.apiProxyUrl) ?? null;
 }
 
+/**
+ * Whether this deployment expects an access password at all.
+ *
+ * Only a boolean travels through the public runtime config: the value itself
+ * would be readable by anyone who fetches runtime-config.js, which made the
+ * "password" no boundary at all. The user enters it once in Settings and it
+ * stays in local storage.
+ */
+export function isServerAccessPasswordRequired(): boolean {
+  return Boolean(readBooleanValue(getRuntimeConfig()?.serverAccessPasswordRequired));
+}
+
 export function getRuntimeConfigAppSettingsOverrides(): Partial<
-  Pick<AppSettings, 'serverManagedApi' | 'serverAccessPassword' | 'useCustomApiConfig' | 'useApiProxy' | 'apiProxyUrl'>
+  Pick<AppSettings, 'serverManagedApi' | 'useCustomApiConfig' | 'useApiProxy' | 'apiProxyUrl'>
 > {
   const runtimeConfig = getRuntimeConfig();
 
@@ -129,20 +141,12 @@ export function getRuntimeConfigAppSettingsOverrides(): Partial<
   }
 
   const overrides: Partial<
-    Pick<
-      AppSettings,
-      'serverManagedApi' | 'serverAccessPassword' | 'useCustomApiConfig' | 'useApiProxy' | 'apiProxyUrl'
-    >
+    Pick<AppSettings, 'serverManagedApi' | 'useCustomApiConfig' | 'useApiProxy' | 'apiProxyUrl'>
   > = {};
 
   const serverManagedApi = readBooleanValue(runtimeConfig.serverManagedApi);
   if (serverManagedApi !== undefined) {
     overrides.serverManagedApi = serverManagedApi;
-  }
-
-  const serverAccessPassword = readNullableString(runtimeConfig.serverAccessPassword);
-  if (serverAccessPassword !== undefined) {
-    overrides.serverAccessPassword = serverAccessPassword;
   }
 
   const useCustomApiConfig = readBooleanValue(runtimeConfig.useCustomApiConfig);
