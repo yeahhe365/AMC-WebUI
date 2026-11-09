@@ -1,5 +1,6 @@
 import type { File as GeminiFile } from '@google/genai';
 import { getConfiguredApiClient, getConfiguredApiClientContext } from './apiClient';
+import { getServerAuthHeaders } from './apiAuthHeaders';
 import { createUploadAbortError, uploadGeminiFileResumable } from './geminiResumableUpload';
 import { logService } from '@/services/logService';
 
@@ -140,6 +141,10 @@ export const registerGcsFilesApi = async (apiKey: string, uris: string[]): Promi
         headers: {
           'Content-Type': 'application/json',
           'x-goog-api-key': apiKey,
+          // An explicit httpOptions block replaces what the client merged in, so
+          // the deployment password has to be restated here or this fallback
+          // 401s on any password-protected deployment.
+          ...getServerAuthHeaders(),
         },
       },
     });

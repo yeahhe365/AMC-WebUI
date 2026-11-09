@@ -274,6 +274,37 @@ describe('registerGcsFilesApi', () => {
     expect(result).toEqual([]);
   });
 
+  it('carries the deployment password on the REST fallback', async () => {
+    // The fallback builds its own httpOptions, which replaces what the client
+    // merged in — so the password has to be restated or this 401s on any
+    // password-protected deployment (P0-9).
+    const { useSettingsStore } = await import('@/stores/settingsStore');
+    useSettingsStore.setState((state) => ({
+      appSettings: { ...state.appSettings, serverAccessPassword: 'deploy-pw' },
+    }));
+
+    const requestMock = vi.fn().mockResolvedValue({ json: async () => ({ files: [] }) });
+    getConfiguredApiClientMock.mockResolvedValue({ files: {} });
+    getConfiguredApiClientContextMock.mockResolvedValue({
+      uploadApiClient: { request: requestMock },
+      apiBaseUrl: 'https://example.test',
+    });
+
+    await registerGcsFilesApi('api-key', ['gs://b/1']);
+
+    expect(requestMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({
+          headers: expect.objectContaining({ 'x-access-token': 'deploy-pw' }),
+        }),
+      }),
+    );
+
+    useSettingsStore.setState((state) => ({
+      appSettings: { ...state.appSettings, serverAccessPassword: null },
+    }));
+  });
+
   it('registers files via SDK when available', async () => {
     const mockFiles = [{ name: 'files/gcs-1', uri: 'gs://b/1' }];
     const mockRegister = vi.fn().mockResolvedValue({ files: mockFiles });
