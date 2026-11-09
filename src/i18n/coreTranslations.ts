@@ -20,8 +20,15 @@ export type { TranslationMap } from './translationTypes';
  * packs (settings, etc.) are registered via `ensureFeatureTranslations`.
  *
  * Keep this list minimal and only for UI that renders on the main shell path
- * (sidebar, chat toolbar, PWA banner). Full settings copy lives under
- * `src/i18n/translations/settings/*` and is loaded on demand.
+ * (sidebar, chat toolbar, PWA banner, the `?mcp=` share gate that pops on first
+ * paint). Full settings copy lives under `src/i18n/translations/settings/*` and
+ * is loaded on demand.
+ *
+ * A key belongs here when its component can mount before the settings pack has
+ * ever been requested — otherwise `getTranslator` falls through to the raw key
+ * and the UI renders `settingsMcpShareTitle` instead of a sentence. Any such
+ * component must be listed in the shell-surface test in
+ * `src/i18n/translationCoverage.test.ts`.
  */
 const shellFeatureTranslations: TranslationMap = {
   settingsThinkingMode: {
@@ -129,6 +136,60 @@ const shellFeatureTranslations: TranslationMap = {
     de: 'Neu laden, um die installierte Shell und die neuesten Ressourcen zu aktualisieren.',
   },
   pwaUpdateLater: { en: 'Later', zh: '稍后', ja: '後で', ko: '나중에', es: 'Más tarde', fr: 'Plus tard', de: 'Später' },
+  settingsMcpCancel: {
+    en: 'Cancel',
+    zh: '取消',
+    ja: 'キャンセル',
+    es: 'Cancelar',
+    ko: '취소',
+    fr: 'Annuler',
+    de: 'Abbrechen',
+  },
+  settingsMcpShareTitle: {
+    en: 'Add shared MCP servers?',
+    zh: '是否添加分享的 MCP 服务器？',
+    ja: '共有されたMCPサーバーを追加しますか？',
+    es: '¿Añadir los servidores MCP compartidos?',
+    ko: '공유된 MCP 서버를 추가할까요?',
+    fr: 'Ajouter les serveurs MCP partagés ?',
+    de: 'Geteilte MCP-Server hinzufügen?',
+  },
+  settingsMcpShareBody: {
+    en: 'They are added disabled. You will be asked to trust each one before it runs.',
+    zh: '它们会以停用状态添加。运行前需要你逐一确认信任。',
+    ja: '無効な状態で追加されます。実行前にそれぞれ信頼の確認が必要です。',
+    es: 'Se añaden desactivados. Se pedirá confirmar confianza en cada uno antes de ejecutarlos.',
+    ko: '비활성 상태로 추가됩니다. 실행 전에 각각 신뢰 확인이 필요합니다.',
+    fr: 'Ils sont ajoutés désactivés. Chaque serveur demandera une confirmation de confiance avant exécution.',
+    de: 'Sie werden deaktiviert hinzugefügt. Vor der Ausführung ist je Server eine Vertrauensbestätigung nötig.',
+  },
+  settingsMcpShareAction: {
+    en: 'Add servers',
+    zh: '添加服务器',
+    ja: 'サーバーを追加',
+    es: 'Añadir servidores',
+    ko: '서버 추가',
+    fr: 'Ajouter les serveurs',
+    de: 'Server hinzufügen',
+  },
+  settingsGenerateQuadImagesTooltip: {
+    en: 'When enabled, image-generation prompts will produce four independent variations at once. This will consume more API credits.',
+    zh: '启用后，图片生成提示词将一次性生成四张独立变体。这将消耗更多 API 用量。',
+    ja: '有効にすると、画像生成プロンプトで一度に4つの独立したバリエーションが生成されます。APIクレジットを多く消費します。',
+    de: 'Wenn aktiviert, erzeugen Bildgenerierungs-Prompts vier unabhängige Variationen auf einmal. Dies verbraucht mehr API-Credits.',
+    es: 'Cuando esté habilitado, las solicitudes de generación de imágenes producirán cuatro variaciones independientes a la vez. Esto consumirá más créditos de API.',
+    ko: '활성화하면 이미지 생성 프롬프트가 한 번에 네 가지 독립적인 변형을 생성합니다. API 크레딧이 더 많이 소모됩니다.',
+    fr: "Lorsqu'ils sont activés, les prompts de génération d'images produiront quatre variations indépendantes à la fois. Cela consommera plus de crédits API.",
+  },
+  apiRuntimeKeyNotConfigured: {
+    en: 'API Key not configured.',
+    zh: 'API 密钥未配置。',
+    ja: 'APIキーが未設定です。',
+    ko: 'API 키가 구성되지 않았습니다.',
+    es: 'Clave de API no configurada.',
+    fr: 'Clé API non configurée.',
+    de: 'API-Schlüssel nicht konfiguriert.',
+  },
   ...ttsStyleTranslations,
 };
 

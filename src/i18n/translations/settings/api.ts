@@ -396,15 +396,6 @@ const apiSettings = {
     fr: 'Le format de la Clé API semble invalide.',
     de: 'Das Format des API-Schlüssels scheint ungültig zu sein.',
   },
-  apiRuntimeKeyNotConfigured: {
-    en: 'API Key not configured.',
-    zh: 'API 密钥未配置。',
-    ja: 'APIキーが未設定です。',
-    ko: 'API 키가 구성되지 않았습니다.',
-    es: 'Clave de API no configurada.',
-    fr: 'Clé API non configurée.',
-    de: 'API-Schlüssel nicht konfiguriert.',
-  },
   apiRuntimeNoValidKeysFound: {
     en: 'No valid API keys found.',
     zh: '未找到有效的 API 密钥。',

@@ -879,4 +879,48 @@ describe('translation coverage for protected UI surfaces', () => {
 
     expect(duplicateOffenders).toEqual([]);
   });
+
+  it('resolves every key used by a shell surface before the settings pack loads', () => {
+    // Components that can mount before the settings pack has ever been requested: the
+    // `?mcp=` share gate pops on first paint, the quad-image toggle lives in the chat
+    // toolbar, and the file-id adder runs from a drag-drop. `getTranslator` falls
+    // through to the raw key when a key is missing, so a settings-pack key here renders
+    // as `settingsMcpShareTitle` on a fresh session.
+    const shellSurfaces = [
+      'src/components/mcp/McpShareInstallGate.tsx',
+      'src/components/chat/input/toolbar/QuadImageToggle.tsx',
+      'src/hooks/file-upload/useFileIdAdder.ts',
+      'src/components/pwa/PwaUpdateBanner.tsx',
+    ];
+
+    // The eager set is what `coreTranslations.ts` pulls in synchronously at module
+    // load: its own maps plus every pack it imports. Anything else is lazy.
+    const coreSource = readProjectFile('src/i18n/coreTranslations.ts');
+    const eagerFiles = [
+      'src/i18n/coreTranslations.ts',
+      ...Array.from(coreSource.matchAll(/from '\.\/(translations\/[a-zA-Z]+|voiceStyleTranslations)'/g)).map(
+        (match) => `src/i18n/${match[1]}.ts`,
+      ),
+    ];
+
+    expect(eagerFiles.length).toBeGreaterThan(1);
+
+    const keyDefinition = /^\s*([a-zA-Z0-9_]+):\s*\{\s*\n?\s*en:/gm;
+    const eagerKeys = new Set<string>();
+    for (const file of eagerFiles) {
+      for (const match of readProjectFile(file).matchAll(keyDefinition)) {
+        eagerKeys.add(match[1]);
+      }
+    }
+
+    const offenders = shellSurfaces.flatMap((file) => {
+      const source = readProjectFile(file);
+      return Array.from(source.matchAll(/\bt\('([^']+)'/g))
+        .map((match) => match[1])
+        .filter((key) => !eagerKeys.has(key))
+        .map((key) => `${file} uses ${key}, which only a lazy pack defines`);
+    });
+
+    expect(offenders).toEqual([]);
+  });
 });

@@ -297,15 +297,6 @@ const modelSettings = {
     ko: '이 설정을 변경한 후 추가된 파일에 적용됩니다. 켜면 Files API를 우선합니다. 끄면 가능한 경우 콘텐츠를 인라인으로 전송합니다. 크기가 큰 파일은 여전히 Files API를 사용할 수 있습니다.',
     fr: "S'applique aux fichiers ajoutés après modification de ce paramètre. Activé privilégie Files API. Désactivé envoie le contenu de manière intégrée lorsque c'est possible ; les fichiers trop volumineux peuvent toujours utiliser Files API.",
   },
-  settingsGenerateQuadImagesTooltip: {
-    en: 'When enabled, image-generation prompts will produce four independent variations at once. This will consume more API credits.',
-    zh: '启用后，图片生成提示词将一次性生成四张独立变体。这将消耗更多 API 用量。',
-    ja: '有効にすると、画像生成プロンプトで一度に4つの独立したバリエーションが生成されます。APIクレジットを多く消費します。',
-    de: 'Wenn aktiviert, erzeugen Bildgenerierungs-Prompts vier unabhängige Variationen auf einmal. Dies verbraucht mehr API-Credits.',
-    es: 'Cuando esté habilitado, las solicitudes de generación de imágenes producirán cuatro variaciones independientes a la vez. Esto consumirá más créditos de API.',
-    ko: '활성화하면 이미지 생성 프롬프트가 한 번에 네 가지 독립적인 변형을 생성합니다. API 크레딧이 더 많이 소모됩니다.',
-    fr: "Lorsqu'ils sont activés, les prompts de génération d'images produiront quatre variations indépendantes à la fois. Cela consommera plus de crédits API.",
-  },
   settingsLiveArtifactsSystemPromptLabel: {
     en: 'LiveUI Prompt',
     zh: 'LiveUI 提示词',
