@@ -274,6 +274,15 @@ export const createProviderVirtualMcpServer = (deps: ProviderToolsDeps): Virtual
     id: 'amc_provider_manager',
     name: 'AMC Provider Manager',
     description: 'Configure and diagnose third-party AI API providers and connections.',
+    // Deleting a connection is unrecoverable, and the plan layer already returns
+    // `needs-approval` for it — but that verdict is only honoured by the dialog, which
+    // is driven by this list (`src/features/mcp/toolApproval.ts`). Without the entry the
+    // delete branch below executed the verdict and removed the connection outright.
+    //
+    // `update_connection` stays out on purpose: benign edits (name, key, models) should
+    // still apply directly, and its destructive edits (baseUrl / protocol / model list)
+    // already fail closed with `approval-unavailable` instead of being applied.
+    disabledAutoApproveTools: ['delete_connection'],
     listTools: async () => PROVIDER_VIRTUAL_MCP_TOOLS,
     callTool: async (toolName, args, signal) => {
       if (toolName === 'list_templates') {

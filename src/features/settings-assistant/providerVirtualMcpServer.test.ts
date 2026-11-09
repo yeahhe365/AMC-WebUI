@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createThirdPartyConnection } from '@/test/data/factories';
 import type { ThirdPartyConnection } from '@/types';
+import { requiresApproval } from '@/features/mcp/toolApproval';
+import type { McpServerConfig } from '../../../shared/mcpServerConfig';
 import { createProviderVirtualMcpServer } from './providerVirtualMcpServer';
 
 describe('providerVirtualMcpServer', () => {
@@ -33,6 +35,19 @@ describe('providerVirtualMcpServer', () => {
     expect(toolNames).toContain('update_connection');
     expect(toolNames).toContain('delete_connection');
     expect(toolNames).toContain('test_connection');
+  });
+
+  it('gates the unrecoverable write tool behind the approval dialog', () => {
+    const { deps } = createTestDeps();
+    const server = createProviderVirtualMcpServer(deps);
+    const config = { disabledAutoApproveTools: server.disabledAutoApproveTools } as McpServerConfig;
+
+    // `planProviderPatch` returns `needs-approval` for a delete, but only this list
+    // makes the runtime actually ask: without it the verdict was executed silently.
+    expect(requiresApproval(config, 'delete_connection')).toBe(true);
+    // A delete has no equivalent of the update branch's `approval-unavailable` refusal,
+    // so the list is the only thing standing between the model and a silent deletion.
+    expect(server.disabledAutoApproveTools).toEqual(['delete_connection']);
   });
 
   it('lists templates without throwing', async () => {

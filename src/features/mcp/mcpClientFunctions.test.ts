@@ -721,3 +721,33 @@ describe('createMcpClientFunctions virtual servers', () => {
     expect(result.generatedFiles).toEqual([mockFile]);
   });
 });
+
+describe('createMcpClientFunctions virtual server approval gate', () => {
+  const gatedServer: VirtualMcpServer = {
+    id: 'amc_provider_manager',
+    name: 'AMC Provider Manager',
+    description: 'Virtual server that deletes things',
+    disabledAutoApproveTools: ['delete_connection'],
+    listTools: async () => [{ name: 'delete_connection', description: 'Delete', inputSchema: { type: 'object' } }],
+    callTool: vi.fn(async () => ({ content: [{ type: 'text', text: 'deleted' }] })),
+  };
+
+  it('asks before running a gated virtual tool and skips it when denied', async () => {
+    const requestApproval = vi.fn(async () => 'deny' as const);
+    const fns = await createMcpClientFunctions({
+      servers: [],
+      virtualServers: [gatedServer],
+      requestApproval,
+    });
+
+    // Approval is honoured for virtual servers too: the list lives on the server object,
+    // so a server that forgets to declare it runs its destructive tools unattended.
+    await expect(
+      fns[toMcpFunctionName('amc_provider_manager', 'delete_connection')].handler({ connectionId: 'c1' }, undefined),
+    ).rejects.toThrow(/denied/i);
+    expect(requestApproval).toHaveBeenCalledWith(
+      expect.objectContaining({ serverId: 'amc_provider_manager', toolName: 'delete_connection' }),
+    );
+    expect(gatedServer.callTool).not.toHaveBeenCalled();
+  });
+});
