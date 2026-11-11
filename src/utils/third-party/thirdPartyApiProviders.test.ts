@@ -139,6 +139,16 @@ describe('createConnectionFromTemplate', () => {
     expect(second.extraHeaders).toEqual({});
   });
 
+  it('creates an Atlas Cloud connection on the OpenAI-compatible endpoint', () => {
+    const conn = createConnectionFromTemplate('atlascloud', [], 'conn-atlas');
+
+    expect(conn.name).toBe('Atlas Cloud');
+    expect(conn.templateId).toBe('atlascloud');
+    expect(conn.protocol).toBe('openai-compatible');
+    expect(conn.baseUrl).toBe('https://api.atlascloud.ai/v1');
+    expect(conn.modelId).toBe('deepseek-ai/deepseek-v4-pro');
+  });
+
   it('provides valid defaults and non-empty models for all template IDs', () => {
     THIRD_PARTY_TEMPLATE_IDS.forEach((templateId) => {
       const conn = createConnectionFromTemplate(templateId, [], `test-${templateId}`);
