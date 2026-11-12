@@ -511,7 +511,7 @@ OpenAI 兼容模式使用独立模型列表，可在设置中手动维护或从�
 
 | 类型                | 模型                                                                                                                                                                     |
 | :------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Gemini 4**        | gemini-4-carbon, gemini-4-argon                                                                                                                                          |
+| **Gemini 4**        | gemini-4-hydrogen, gemini-4-carbon, gemini-4-argon                                                                                                                       |
 | **Gemini 3.x**      | gemini-3.8-flash, gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3.1-pro-preview, gemini-3.8-live, gemini-3.8-live-extended-thinking, gemini-3.5-live-translate-preview |
 | **Robotics**        | gemini-robotics-er-2-preview                                                                                                                                             |
 | **Gemma 4**         | gemma-4-31b-it, gemma-4-26b-a4b-it                                                                                                                                       |

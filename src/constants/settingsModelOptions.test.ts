@@ -4,6 +4,7 @@ import { AVAILABLE_TRANSCRIPTION_MODELS, CONNECTION_TEST_MODELS } from './settin
 describe('settingsModelOptions', () => {
   it('keeps connection test models aligned with the supported defaults', () => {
     expect(CONNECTION_TEST_MODELS.map((model) => model.id)).toEqual([
+      'gemini-4-hydrogen',
       'gemini-4-carbon',
       'gemini-4-argon',
       'gemini-3.8-flash',

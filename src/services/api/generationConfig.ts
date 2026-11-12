@@ -19,6 +19,7 @@ import { toApiSafetySettings } from '@/constants/safetySettings';
 import {
   isGemini3Model,
   isGemini4Model,
+  getDefaultThinkingLevelForModel,
   isGemini3ImageModel,
   isGeminiRoboticsModel,
   isGemmaModel,
@@ -40,7 +41,8 @@ const THINKING_LEVEL_FOR_SDK = {
   LOW: 'LOW' as GenAIThinkingLevel,
   MEDIUM: 'MEDIUM' as GenAIThinkingLevel,
   HIGH: 'HIGH' as GenAIThinkingLevel,
-  XHIGH: 'HIGH' as GenAIThinkingLevel,
+  // The API supports XHIGH for Hydrogen; the installed SDK enum has not caught up.
+  XHIGH: 'XHIGH' as GenAIThinkingLevel,
   MAX: 'HIGH' as GenAIThinkingLevel,
 } as const;
 
@@ -340,8 +342,12 @@ async function buildGenerationConfigFromOptions({
     generationConfig.thinkingConfig = {
       includeThoughts: true,
       thinkingLevel: toSdkThinkingLevel(
-        normalizeThinkingLevelForModel(modelId, thinkingLevel, isGemini4Model(modelId) ? 'MEDIUM' : 'HIGH'),
-        isGemini4Model(modelId) ? 'MEDIUM' : 'HIGH',
+        normalizeThinkingLevelForModel(
+          modelId,
+          thinkingLevel,
+          isGemini4Model(modelId) ? getDefaultThinkingLevelForModel(modelId) : 'HIGH',
+        ),
+        isGemini4Model(modelId) ? getDefaultThinkingLevelForModel(modelId) : 'HIGH',
       ),
     };
 

@@ -29,6 +29,13 @@ interface ModalityPricing {
 }
 
 const MODALITY_TEXT_PRICING: Record<string, ModalityPricing | null> = {
+  // Official Gemini 4 Hydrogen standard rates per million tokens.
+  'gemini-4-hydrogen': {
+    prompt: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
+    cache: { TEXT: 0.075, IMAGE: 0.075, AUDIO: 0.075 },
+    response: { TEXT: 7.5 },
+    tool: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
+  },
   // Official Gemini 4 Carbon pricing matches Argon: $2 input / $10 output /
   // $0.10 cache through 2026-11-30, then $4 / $20 / $0.20 from 2026-12-01.
   'gemini-4-carbon': {

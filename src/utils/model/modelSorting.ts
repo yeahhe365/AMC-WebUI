@@ -58,6 +58,7 @@ export const deduplicateModelsById = (models: ModelOption[]): ModelOption[] => {
 
 export const sortModels = (models: ModelOption[]): ModelOption[] => {
   const pinnedPriorityOrder: Record<string, number> = {
+    'gemini-4-hydrogen': -1,
     'gemini-4-carbon': 0,
     'gemini-4-argon': 1,
     'gemini-3.1-pro-preview': 2,

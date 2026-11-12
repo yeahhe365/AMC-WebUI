@@ -1,6 +1,14 @@
 import type { CatalogModelSpec } from './types';
 
 export const GOOGLE_MODELS: Record<string, CatalogModelSpec> = {
+  'gemini-4-hydrogen': {
+    id: 'gemini-4-hydrogen',
+    name: 'Gemini 4 Hydrogen',
+    contextWindow: 1_048_576,
+    maxOutputTokens: 65_536,
+    capabilities: { vision: true, thinking: true, tools: true },
+    ownedBy: 'google',
+  },
   'gemini-4-carbon': {
     id: 'gemini-4-carbon',
     name: 'Gemini 4 Carbon',

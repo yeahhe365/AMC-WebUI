@@ -3,6 +3,25 @@ import { calculateApiUsageRecordPriceUsd, estimateMessageCostUsd, formatCostUsd 
 import type { ApiUsageRecord } from '@/services/db/dbService';
 
 describe('calculateApiUsageRecordPriceUsd', () => {
+  it('prices Hydrogen input, cached input and output at official rates', () => {
+    const record: ApiUsageRecord = {
+      timestamp: Date.now(),
+      modelId: 'gemini-4-hydrogen',
+      promptTokens: 100_000,
+      cachedPromptTokens: 50_000,
+      completionTokens: 20_000,
+      totalTokens: 120_000,
+      exactPricing: {
+        version: 1,
+        requestKind: 'chat',
+        promptTokensDetails: [{ modality: 'TEXT', tokenCount: 100_000 }],
+        cacheTokensDetails: [{ modality: 'TEXT', tokenCount: 50_000 }],
+        responseTokensDetails: [{ modality: 'TEXT', tokenCount: 20_000 }],
+      },
+    };
+    expect(calculateApiUsageRecordPriceUsd(record)).toBeCloseTo(0.30375, 6);
+  });
+
   it('keeps legacy Gemini 3.1 Pro records unavailable when exact evidence is missing', () => {
     const record: ApiUsageRecord = {
       timestamp: Date.now(),

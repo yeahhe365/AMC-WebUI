@@ -14,7 +14,9 @@ vi.mock('@/utils/model/modelCapabilities', async () => {
 
   return {
     ...actual,
-    isGemini3Model: vi.fn((id: string) => id?.includes('gemini-3') && !id?.includes('transcribe')),
+    isGemini3Model: vi.fn(
+      (id: string) => (id?.includes('gemini-3') || id?.includes('gemini-4')) && !id?.includes('transcribe'),
+    ),
     isGeminiRoboticsModel: vi.fn((id: string) => id?.includes('gemini-robotics-er')),
     isGemmaModel: vi.fn((id: string) => id?.toLowerCase().includes('gemma')),
   };
@@ -121,6 +123,16 @@ const buildGenerationConfig = (
 };
 
 describe('buildGenerationConfig', () => {
+  it('sends Hydrogen XHIGH unchanged and uses HIGH when no level is specified', async () => {
+    const settings = { ...DEFAULT_APP_SETTINGS, modelId: 'gemini-4-hydrogen', thinkingLevel: 'XHIGH' as const };
+    const extraHigh = await buildGenerationConfigFromSettings({ settings });
+    expect(extraHigh.thinkingConfig?.thinkingLevel).toBe('XHIGH');
+    const defaultConfig = await buildGenerationConfigFromSettings({
+      settings: { ...settings, thinkingLevel: undefined },
+    });
+    expect(defaultConfig.thinkingConfig?.thinkingLevel).toBe('HIGH');
+  });
+
   const baseConfig = {
     temperature: 1,
     topP: 0.95,

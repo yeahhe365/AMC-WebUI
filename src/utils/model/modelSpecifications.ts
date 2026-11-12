@@ -127,7 +127,12 @@ const isVideoSupportedModel = (modelId: string): boolean => {
   ) {
     return false;
   }
-  if (lower.includes('gemini-1.5') || lower.includes('gemini-2') || lower.includes('gemini-3')) {
+  if (
+    lower.includes('gemini-1.5') ||
+    lower.includes('gemini-2') ||
+    lower.includes('gemini-3') ||
+    lower.includes('gemini-4')
+  ) {
     return true;
   }
   if (lower.includes('qvq') || lower.includes('qwen-vl-max') || lower.includes('qwen2.5-vl')) {
@@ -149,7 +154,12 @@ const isPdfSupportedModel = (modelId: string): boolean => {
   if (lower.includes('tts')) {
     return false;
   }
-  if (lower.includes('gemini-1.5') || lower.includes('gemini-2') || lower.includes('gemini-3')) {
+  if (
+    lower.includes('gemini-1.5') ||
+    lower.includes('gemini-2') ||
+    lower.includes('gemini-3') ||
+    lower.includes('gemini-4')
+  ) {
     return true;
   }
   if (
@@ -416,6 +426,10 @@ const resolveThinkingLevelSpec = (modelId: string): ThinkingLevelSpec | undefine
   // Gemini 3.5 Flash-Lite
   if (lower.includes('gemini-3.5-flash-lite')) {
     return { type: 'range', min: 'MINIMAL', max: 'HIGH', defaultLevel: 'MINIMAL' };
+  }
+
+  if (lower.includes('gemini-4-hydrogen')) {
+    return { type: 'range', min: 'LOW', max: 'XHIGH', defaultLevel: 'HIGH' };
   }
 
   // Gemini 4 Argon defaults to MEDIUM; Gemini 3.1 Pro defaults to HIGH.

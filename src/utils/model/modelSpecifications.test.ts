@@ -4,6 +4,16 @@ import type { ModelOption } from '@/types';
 import { getTranslator } from '@/i18n/coreTranslations';
 
 describe('modelSpecifications', () => {
+  it('describes Gemini 4 Hydrogen capabilities and thinking levels', () => {
+    const spec = getModelSpecification({ id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen' });
+    expect(spec.contextWindow).toContain('1M');
+    expect(spec.maxOutput).toContain('65,536');
+    expect(spec.thinkingLevelSpec).toMatchObject({ min: 'LOW', max: 'XHIGH', defaultLevel: 'HIGH' });
+    expect(spec.modalities.map((modality) => modality.id)).toEqual(
+      expect.arrayContaining(['vision', 'audio', 'video']),
+    );
+  });
+
   it('resolves specifications for Gemini 3.1 Pro text model', () => {
     const model: ModelOption = {
       id: 'gemini-3.1-pro-preview',

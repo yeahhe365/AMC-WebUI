@@ -115,6 +115,8 @@ export const ThinkingSpeedControl: React.FC = () => {
   let supportedLevels: ThinkingLevel[];
   if (isImageThinkingLevelOnly) {
     supportedLevels = ['MINIMAL', 'HIGH'];
+  } else if (modelId.toLowerCase().includes('gemini-4-hydrogen')) {
+    supportedLevels = ['LOW', 'MEDIUM', 'HIGH', 'XHIGH'];
   } else if (isReasoning) {
     supportedLevels = ['MINIMAL', 'LOW', 'MEDIUM', 'HIGH', 'XHIGH', 'MAX'];
   } else if (supportsThinkingLevel) {

@@ -494,6 +494,8 @@ export const getDefaultThinkingLevelForModel = (modelId: string, fallback?: Thin
     return 'MEDIUM';
   }
 
+  if (lowerId.includes('gemini-4-hydrogen')) return 'HIGH';
+
   if (isGemini4Model(modelId)) {
     return 'MEDIUM';
   }
@@ -523,7 +525,8 @@ export const normalizeThinkingLevelForModel = (
   thinkingLevel: ThinkingLevel | undefined,
   fallback?: ThinkingLevel,
 ): ThinkingLevel => {
-  const resolvedLevel = thinkingLevel ?? fallback ?? (isGemini4Model(modelId) ? 'MEDIUM' : 'HIGH');
+  const resolvedLevel =
+    thinkingLevel ?? fallback ?? (isGemini4Model(modelId) ? getDefaultThinkingLevelForModel(modelId) : 'HIGH');
 
   // Both families reject MINIMAL with an API error per their model cards.
   if (
@@ -550,6 +553,9 @@ export const normalizeThinkingLevelForModel = (
   if (isGemini3Model(modelId) || isGeminiRoboticsModel(modelId)) {
     if (resolvedLevel === 'NONE') {
       return 'MINIMAL';
+    }
+    if (modelId.toLowerCase().includes('gemini-4-hydrogen') && (resolvedLevel === 'XHIGH' || resolvedLevel === 'MAX')) {
+      return 'XHIGH';
     }
     if (resolvedLevel === 'XHIGH' || resolvedLevel === 'MAX') {
       return 'HIGH';

@@ -27,6 +27,11 @@ const MODEL_REGISTRY: RegisteredModel[] = [
     groups: ['defaultPinned'],
   },
   {
+    id: 'gemini-4-hydrogen',
+    name: 'Gemini 4 Hydrogen',
+    groups: ['defaultPinned', 'liveArtifacts', 'connectionTest'],
+  },
+  {
     id: 'gemini-4-carbon',
     name: 'Gemini 4 Carbon',
     groups: ['defaultPinned', 'liveArtifacts', 'connectionTest'],

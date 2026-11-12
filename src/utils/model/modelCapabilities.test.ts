@@ -330,6 +330,11 @@ describe('getDefaultThinkingLevelForModel', () => {
 });
 
 describe('normalizeThinkingLevelForModel', () => {
+  it('preserves Hydrogen extra-high thinking and defaults to high', () => {
+    expect(normalizeThinkingLevelForModel('gemini-4-hydrogen', 'XHIGH')).toBe('XHIGH');
+    expect(getDefaultThinkingLevelForModel('gemini-4-hydrogen')).toBe('HIGH');
+  });
+
   it('maps MINIMAL to LOW for Gemini 3 Pro text models', () => {
     expect(normalizeThinkingLevelForModel('gemini-3.1-pro-preview', 'MINIMAL')).toBe('LOW');
     expect(normalizeThinkingLevelForModel('models/gemini-3-pro-preview', 'MINIMAL')).toBe('LOW');

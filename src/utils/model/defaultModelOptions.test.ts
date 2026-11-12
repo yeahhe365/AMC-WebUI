@@ -114,7 +114,7 @@ describe('getDefaultModelOptions', () => {
     expect(models.every((model) => !/\bpreview\b/i.test(model.name))).toBe(true);
   });
 
-  it('pins both Gemini 4 flagships, with Carbon first and Argon right behind it', () => {
+  it('pins Hydrogen first, ahead of the Gemini 4 flagships', () => {
     const models = getDefaultModelOptions();
     const carbon = models.find((model) => model.id === 'gemini-4-carbon');
     const argon = models.find((model) => model.id === 'gemini-4-argon');
@@ -123,7 +123,8 @@ describe('getDefaultModelOptions', () => {
     expect(argon).toBeDefined();
     expect(carbon?.isPinned).toBe(true);
     expect(argon?.isPinned).toBe(true);
-    expect(models[0]?.id).toBe('gemini-4-carbon');
-    expect(models[1]?.id).toBe('gemini-4-argon');
+    expect(models[0]).toMatchObject({ id: 'gemini-4-hydrogen', isPinned: true });
+    expect(models[1]?.id).toBe('gemini-4-carbon');
+    expect(models[2]?.id).toBe('gemini-4-argon');
   });
 });

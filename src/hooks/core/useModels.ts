@@ -5,8 +5,8 @@ import { sanitizeModelOptions, sortModels } from '@/utils/model/modelSorting';
 import { useModelPreferencesStore } from '@/stores/modelPreferencesStore';
 import { getDefaultModelOptions } from '@/utils/model/defaultModelOptions';
 
-/** Gemini 4 flagships that should always stay pinned near the top of the picker. */
-const TOP_FRONTIER_MODEL_IDS = new Set(['gemini-4-carbon', 'gemini-4-argon']);
+/** Gemini 4 models that should stay pinned near the top of the picker. */
+const TOP_FRONTIER_MODEL_IDS = new Set(['gemini-4-hydrogen', 'gemini-4-carbon', 'gemini-4-argon']);
 
 const reconcileCustomModelsWithDefaults = (
   customModels: ModelOption[],
@@ -20,7 +20,7 @@ const reconcileCustomModelsWithDefaults = (
   let hasChanges = missingDefaults.length > 0;
   let updatedModels = [...customModels];
 
-  // Auto-pin the current Gemini 4 flagships (Carbon, Argon) if they exist but are
+  // Auto-pin the preferred Gemini 4 models if they exist but are
   // unpinned, so the newest frontier models take their rightful top pinned slots.
   updatedModels = updatedModels.map((model) => {
     if (TOP_FRONTIER_MODEL_IDS.has(model.id.trim().toLowerCase()) && !model.isPinned) {
