@@ -231,6 +231,29 @@ describe('calculateApiUsageRecordPriceUsd', () => {
     // 0.1 * 2.0 + 0.05 * 0.1 + 0.02 * 10.0 = 0.2 + 0.005 + 0.2 = 0.405
     expect(calculateApiUsageRecordPriceUsd(record)).toBeCloseTo(0.405, 6);
   });
+
+  it('prices Gemini 4 Carbon with the intro rate, then the December standard rate', () => {
+    const buildRecord = (timestamp: number): ApiUsageRecord => ({
+      timestamp,
+      modelId: 'gemini-4-carbon',
+      promptTokens: 100_000,
+      cachedPromptTokens: 50_000,
+      completionTokens: 20_000,
+      totalTokens: 120_000,
+      exactPricing: {
+        version: 1,
+        requestKind: 'chat',
+        promptTokensDetails: [{ modality: 'TEXT', tokenCount: 100_000 }],
+        cacheTokensDetails: [{ modality: 'TEXT', tokenCount: 50_000 }],
+        responseTokensDetails: [{ modality: 'TEXT', tokenCount: 20_000 }],
+      },
+    });
+
+    // Intro: 0.1 * 2.0 + 0.05 * 0.1 + 0.02 * 10.0 = 0.405
+    expect(calculateApiUsageRecordPriceUsd(buildRecord(Date.UTC(2026, 10, 15)))).toBeCloseTo(0.405, 6);
+    // From 2026-12-01: 0.1 * 4.0 + 0.05 * 0.2 + 0.02 * 20.0 = 0.4 + 0.01 + 0.4 = 0.81
+    expect(calculateApiUsageRecordPriceUsd(buildRecord(Date.UTC(2026, 11, 2)))).toBeCloseTo(0.81, 6);
+  });
 });
 
 describe('estimateMessageCostUsd and formatCostUsd', () => {

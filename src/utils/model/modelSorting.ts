@@ -58,13 +58,14 @@ export const deduplicateModelsById = (models: ModelOption[]): ModelOption[] => {
 
 export const sortModels = (models: ModelOption[]): ModelOption[] => {
   const pinnedPriorityOrder: Record<string, number> = {
-    'gemini-4-argon': 0,
-    'gemini-3.1-pro-preview': 1,
-    'gemini-3.8-flash': 2,
-    'gemini-3.7-flash': 3,
-    'gemini-3.5-flash-lite': 4,
-    'gemini-3.6-flash': 5,
-    'gemini-3-flash-preview': 6,
+    'gemini-4-carbon': 0,
+    'gemini-4-argon': 1,
+    'gemini-3.1-pro-preview': 2,
+    'gemini-3.8-flash': 3,
+    'gemini-3.7-flash': 4,
+    'gemini-3.5-flash-lite': 5,
+    'gemini-3.6-flash': 6,
+    'gemini-3-flash-preview': 7,
   };
 
   const getCategoryWeight = (modelId: string) => {
@@ -73,6 +74,16 @@ export const sortModels = (models: ModelOption[]): ModelOption[] => {
     if (isImageGenerationModel(modelId)) return 4;
     if (capabilities.isNativeAudioModel || capabilities.isTranscribeModel) return 2;
     return 1;
+  };
+
+  // Unpinned companion models (image generation today) are ordered by an explicit
+  // rank instead of the display name, so the model Google recommends for new work
+  // leads its section. Without this, "Nano Banana 2 Lite" sorted above 2.1 because
+  // a space sorts before the dot in "2.1".
+  const companionModelOrder: Record<string, number> = {
+    'gemini-nano-banana-2.1': 0,
+    'gemini-3-pro-image': 1,
+    'gemini-3.1-flash-lite-image': 2,
   };
 
   return [...models].sort((modelA, modelB) => {
@@ -96,6 +107,14 @@ export const sortModels = (models: ModelOption[]): ModelOption[] => {
       const isModelBGeminiModern = modelB.id.includes('gemini-4') || modelB.id.includes('gemini-3');
       if (isModelAGeminiModern && !isModelBGeminiModern) return -1;
       if (!isModelAGeminiModern && isModelBGeminiModern) return 1;
+    }
+
+    const companionOrderA = companionModelOrder[modelA.id];
+    const companionOrderB = companionModelOrder[modelB.id];
+    if (companionOrderA !== undefined || companionOrderB !== undefined) {
+      if (companionOrderA === undefined) return 1;
+      if (companionOrderB === undefined) return -1;
+      if (companionOrderA !== companionOrderB) return companionOrderA - companionOrderB;
     }
 
     return modelA.name.localeCompare(modelB.name);

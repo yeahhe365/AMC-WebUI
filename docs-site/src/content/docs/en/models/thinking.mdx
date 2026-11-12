@@ -14,17 +14,20 @@ Google Gemini 3 models feature built-in reasoning mechanisms (Chain of Thought).
 Under **Settings -> Chat & Generation**:
 
 ### 1. Thinking Level
+
 For Gemini 3.x models the settings panel exposes **6 buttons** under **Settings -> Chat & Generation**:
+
 - **Default**: Leave unset; the app and model apply their default policy.
 - **Off** (`NONE`): Disable reasoning entirely.
-- **Minimal**: Basic internal consistency check only (`gemini-3.7-flash` and `gemini-3.8-flash` reject Minimal per API constraints; the app falls back to Low).
+- **Minimal**: Basic internal consistency check only (`gemini-3.8-flash` rejects Minimal per API constraints; the app falls back to Low).
 - **Low**: Light reasoning, suitable for straightforward queries.
 - **Medium**: Balanced exploration for general problem solving.
 - **High**: Full-power deep reasoning for complex architecture, logic, and mathematics.
 
-> 💡 **Quick Toggle**: Type `/fast` in the chat input to switch the current session to the lightweight tier (`Minimal` only for Flash / Robotics models that accept it, such as `gemini-3.5-flash-lite`; models that reject Minimal, including `gemini-3.7-flash` and `gemini-3.8-flash`, fall back to `Low`); run `/fast` again to leave it.
+> 💡 **Quick Toggle**: Type `/fast` in the chat input to switch the current session to the lightweight tier (`Minimal` only for Flash / Robotics models that accept it, such as `gemini-3.5-flash-lite`; models that reject Minimal, including `gemini-3.8-flash`, fall back to `Low`); run `/fast` again to leave it.
 
 ### 2. Thinking Token Budget
+
 - Models without thinking levels (e.g. the Gemini 2.5 family) use the budget slider, adjustable from `0` to `65,536` tokens (step 1024); each model keeps its own effective range (Gemini 3.x uses `128`–`32,768`).
 - Set to `-1` for automatic allocation determined by the model based on question difficulty.
 
@@ -33,6 +36,7 @@ For Gemini 3.x models the settings panel exposes **6 buttons** under **Settings 
 ## Chain of Thought Visualization
 
 In conversation view:
+
 - **Streaming Steps**: Watch the model examine hypotheses and self-correct before producing final answers.
 - **Metrics**: View elapsed reasoning time and token consumption upon completion.
 - **Thought Signatures**: Preserves internal thought tokens across turns to sustain context continuity.
@@ -42,5 +46,6 @@ In conversation view:
 ## Automated Thought Translation
 
 Gemini models frequently formulate internal reasoning in English. AMC WebUI includes an automatic translation engine:
+
 1. Turn on "Translate Thought Process" in settings.
 2. Lightweight `gemini-3.5-flash-lite` translates English thoughts into your chosen UI language in the background without delaying the primary streaming response.

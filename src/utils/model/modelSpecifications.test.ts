@@ -237,6 +237,14 @@ describe('modelSpecifications', () => {
     expect(formatThinkingLevelSpec(geminiProSpec.thinkingLevelSpec, tZh)).toBe('低 ~ 高 (默认 高)');
     expect(formatThinkingLevelSpec(geminiProSpec.thinkingLevelSpec, tEn)).toBe('Low ~ High (Default High)');
 
+    const carbonSpec = getModelSpecification({ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' });
+    expect(carbonSpec.descriptionKey).toBe('modelDescGemini4Carbon');
+    expect(formatThinkingLevelSpec(carbonSpec.thinkingLevelSpec, tZh)).toBe('低 ~ 高 (默认 中)');
+    expect(formatThinkingLevelSpec(carbonSpec.thinkingLevelSpec, tEn)).toBe('Low ~ High (Default Medium)');
+
+    const argonSpec = getModelSpecification({ id: 'gemini-4-argon', name: 'Gemini 4 Argon' });
+    expect(argonSpec.descriptionKey).toBe('modelDescGemini4Argon');
+
     const flashSpec = getModelSpecification({ id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' });
     expect(flashSpec.descriptionKey).toBe('modelDescGemini3Flash');
     expect(formatThinkingLevelSpec(flashSpec.thinkingLevelSpec, tZh)).toBe('低 ~ 高 (默认 中)');

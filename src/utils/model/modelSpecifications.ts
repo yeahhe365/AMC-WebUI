@@ -276,34 +276,43 @@ const resolveContextWindow = (modelId: string): { contextWindow: string; maxOutp
     return { contextWindow: '1,000,000 (1M)', maxOutput: '65,536 (64K)' };
   }
 
-  // Claude family
+  // Claude family — 5.x is 1M / 128K, the retired 3.x and 4.x lines were 200K
   if (
     lower.includes('claude-3') ||
+    lower.includes('claude-4') ||
     lower.includes('claude-sonnet') ||
     lower.includes('claude-opus') ||
+    lower.includes('claude-haiku') ||
     lower.includes('claude-fable')
   ) {
-    if (lower.includes('3-7') || lower.includes('sonnet-5') || lower.includes('fable-5')) {
+    const isCurrentGeneration = /claude-(fable-5|opus-5|sonnet-5|haiku-5)/.test(lower);
+    if (isCurrentGeneration) {
+      return { contextWindow: '1,000,000 (1M)', maxOutput: '131,072 (128K)' };
+    }
+    if (lower.includes('3-7') || lower.includes('claude-4')) {
       return { contextWindow: '200,000 (200K)', maxOutput: '64,000 (64K)' };
     }
     return { contextWindow: '200,000 (200K)', maxOutput: '8,192 (8K)' };
   }
 
-  // Grok family
-  if (lower.includes('grok-4.6') || lower.includes('grok-4.5')) {
-    return { contextWindow: '500,000 (500K)', maxOutput: '131,072 (128K)' };
+  // Grok family — xAI documents a context window only, never an output cap
+  if (lower.includes('grok-4.7') || lower.includes('grok-4.6') || lower.includes('grok-4.5')) {
+    return { contextWindow: '500,000 (500K)' };
   }
   if (lower.includes('grok-build-0.1')) {
-    return { contextWindow: '256,000 (256K)', maxOutput: '131,072 (128K)' };
+    return { contextWindow: '256,000 (256K)' };
   }
-  if (lower.includes('grok-4') || lower.includes('grok-3')) {
-    return { contextWindow: '1,000,000 (1M)', maxOutput: '131,072 (128K)' };
+  if (lower.includes('grok-4')) {
+    return { contextWindow: '1,000,000 (1M)' };
   }
-  if (lower.includes('grok-2')) {
-    return { contextWindow: '131,072 (128K)', maxOutput: '8,192 (8K)' };
+  if (lower.includes('grok-3') || lower.includes('grok-2')) {
+    return { contextWindow: '131,072 (128K)' };
   }
 
   // OpenAI family
+  if (lower.includes('gpt-6') || lower.includes('gpt6')) {
+    return { contextWindow: '1,050,000 (1.1M)', maxOutput: '128,000 (128K)' };
+  }
   if (
     lower.includes('gpt-5') ||
     lower.startsWith('o4') ||
@@ -319,27 +328,50 @@ const resolveContextWindow = (modelId: string): { contextWindow: string; maxOutp
     return { contextWindow: '128,000 (128K)', maxOutput: '16,384 (16K)' };
   }
 
-  // DeepSeek family
+  // DeepSeek family — V4.x only: 1M context, 384K output
   if (lower.includes('deepseek')) {
-    return { contextWindow: '64,000 ~ 128,000', maxOutput: '8,192 (8K)' };
+    return { contextWindow: '1,000,000 (1M)', maxOutput: '393,216 (384K)' };
   }
 
-  // Llama family
+  // Llama family — 4.x is 10M (Scout) / 1M (Maverick) at 8K output, 3.x is 128K at 4K
+  if (lower.includes('llama-4')) {
+    if (lower.includes('maverick')) {
+      return { contextWindow: '1,048,576 (1M)', maxOutput: '8,192 (8K)' };
+    }
+    return { contextWindow: '10,485,760 (10M)', maxOutput: '8,192 (8K)' };
+  }
   if (lower.includes('llama-3')) {
-    return { contextWindow: '128,000 (128K)', maxOutput: '8,192 (8K)' };
+    return { contextWindow: '128,000 (128K)', maxOutput: '4,096 (4K)' };
+  }
+
+  // Mistral family
+  if (lower.includes('codestral')) {
+    return { contextWindow: '131,072 (128K)' };
+  }
+  if (lower.includes('mistral') || lower.includes('pixtral')) {
+    return { contextWindow: '1,000,000 (1M)' };
   }
 
   // Qwen family
+  if (lower.includes('qwen-max')) {
+    return { contextWindow: '32,768 (32K)', maxOutput: '8,192 (8K)' };
+  }
   if (lower.includes('qwen') || lower.includes('qwq')) {
-    return { contextWindow: '32,000 ~ 128,000', maxOutput: '8,192 (8K)' };
+    return { contextWindow: '1,000,000 (1M)', maxOutput: '131,072 (128K)' };
   }
 
   // Kimi / GLM
+  if (lower.includes('kimi-k3')) {
+    return { contextWindow: '1,048,576 (1M)' };
+  }
   if (lower.includes('kimi')) {
-    return { contextWindow: '128,000 ~ 200,000', maxOutput: '8,192 (8K)' };
+    return { contextWindow: '262,144 (256K)' };
+  }
+  if (lower.includes('glm-5')) {
+    return { contextWindow: '1,000,000 (1M)', maxOutput: '131,072 (128K)' };
   }
   if (lower.includes('glm')) {
-    return { contextWindow: '128,000 (128K)', maxOutput: '4,096 (4K)' };
+    return { contextWindow: '131,072 (128K)', maxOutput: '32,768 (32K)' };
   }
 
   const catalogEntry =
@@ -517,6 +549,7 @@ const resolveThinkingBudget = (modelId: string): string | undefined => {
 
 const resolveModelDescriptionKey = (modelId: string): string | undefined => {
   const lower = modelId.toLowerCase();
+  if (lower.includes('gemini-4-carbon')) return 'modelDescGemini4Carbon';
   if (lower.includes('gemini-4')) return 'modelDescGemini4Argon';
   if (lower.includes('gemini-3.1-pro')) return 'modelDescGemini31Pro';
   if (
@@ -552,6 +585,9 @@ const resolveModelDescriptionKey = (modelId: string): string | undefined => {
 
 const resolveModelDescription = (modelId: string): string | undefined => {
   const lower = modelId.toLowerCase();
+  if (lower.includes('gemini-4-carbon')) {
+    return "Google's most capable reasoning model, built for complex software engineering, deep mathematical and scientific problem solving, high factual accuracy, and autonomous multi-step agents.";
+  }
   if (lower.includes('gemini-4')) {
     return 'Google frontier reasoning model built for complex software engineering, deep mathematical and scientific problem solving, and long-decode workflows.';
   }

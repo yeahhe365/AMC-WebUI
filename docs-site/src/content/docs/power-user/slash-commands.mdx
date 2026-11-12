@@ -18,12 +18,15 @@ import { SlashCommandFinder } from '@/components/SlashCommandFinder';
 ## 核心使用技巧
 
 ### 1. 快速换模型 (`/model`)
+
 输入 `/model` 并按下回车，输入框会自动填入 `/model ` 并展开当前所有可用模型的快速过滤选择浮层，按下 Tab 或回车即可瞬间完成模型切换。
 
 ### 2. 思考速度急转弯 (`/fast`)
-对于复杂会话，临时需要快速获得一个简单答复时，输入 `/fast` 并发送，应用会自动把思考等级降至 `Minimal`（仅限支持 Minimal 的 Flash / Robotics 模型，如 `gemini-3.5-flash-lite`）或 `Low`（其余模型，含 `gemini-3.7-flash`、`gemini-3.8-flash` 等不支持 Minimal 的型号）；再次输入 `/fast` 则会退出该轻量档，切回默认的深度推理。
+
+对于复杂会话，临时需要快速获得一个简单答复时，输入 `/fast` 并发送，应用会自动把思考等级降至 `Minimal`（仅限支持 Minimal 的 Flash / Robotics 模型，如 `gemini-3.5-flash-lite`）或 `Low`（其余模型，含 `gemini-3.8-flash` 等不支持 Minimal 的型号）；再次输入 `/fast` 则会退出该轻量档，切回默认的深度推理。
 
 ### 3. 多模态工具即时开关
+
 - `/online`：一键开启 Google 实时联网搜索。
 - `/deep`：启用深度多步规划检索（Deep Search）。
 - `/maps`：一键调出 Google Maps 地图位置检索。

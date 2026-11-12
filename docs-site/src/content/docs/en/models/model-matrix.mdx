@@ -15,35 +15,42 @@ AMC WebUI natively supports Google's latest Gemini 4 and Gemini 3.x series, embo
 
 ## Model Selection Guidelines
 
-### 1. Flagship Reasoning: `gemini-4-argon`
+### 1. Flagship Reasoning: `gemini-4-carbon` / `gemini-4-argon`
 
-- **Role**: The hardest long-horizon reasoning, single-pass reading of very long documents, and refactors that need very long output.
+- **Role**: The hardest long-horizon reasoning, math and science heavy lifting, autonomous multi-step agents, and refactors that need very long output.
 - **Highlights**: A shared 1M-token context window with decodes up to 1M tokens, full thinking levels, and Live Artifacts generation.
+- **Which one**: `gemini-4-carbon` is Google's most capable reasoning model (stronger factual accuracy and complex engineering); `gemini-4-argon` is faster with lower token spend per turn, better for latency-sensitive hard tasks.
 
 ### 2. Primary Workhorse: `gemini-3.8-flash`
 
 - **Role**: Default recommended model for daily programming, writing, tool invocation, and long-context processing.
 - **Highlights**: Extremely low latency, full Thinking levels (Low / Medium / High), multimodal file analysis, and Live Artifacts generation.
 
-### 3. Ultra-fast & Lightweight: `gemini-3.5-flash-lite`
+### 3. Previous-generation Workhorse: `gemini-3.6-flash`
+
+- **Role**: Production workloads that need a model ID that stays put instead of rolling with the flagship, plus workflows built before 3.8 Flash shipped.
+- **Highlights**: Same 1M-token context and 65,536-token output cap as 3.8 Flash, with thinking and multimodal input; Google marks it **Stable** with "No shutdown date announced".
+- **Which to pick**: Use `gemini-3.8-flash` for anything new; choose 3.6 only when you genuinely want the previous-generation Flash. Note that `gemini-3.5-flash` now auto-routes to 3.6.
+
+### 4. Ultra-fast & Lightweight: `gemini-3.5-flash-lite`
 
 - **Role**: High-throughput micro-queries, rapid classifications, and the dedicated background engine for **real-time chain-of-thought translation**.
 - **Highlights**: Minimal token cost and latency with support for the `Minimal` thinking level.
 
-### 4. Advanced Reasoning: `gemini-3.1-pro-preview`
+### 5. Advanced Reasoning: `gemini-3.1-pro-preview`
 
 - **Role**: Complex mathematical reasoning, academic research, and massive cross-repository codebase refactoring.
 - **Highlights**: 1M token context window and up to 32,768 thinking token budget.
 
-### 5. Embodied & Spatial Intelligence: `gemini-robotics-er-2-preview`
+### 6. Embodied & Spatial Intelligence: `gemini-robotics-er-2-preview`
 
 - **Role**: Spatial geometry, 3D spatial relationship deduction, and robotic task planning.
 - **Key Requirement**:
   - Google requires the calling API Key to have **API Restrictions applied in [Google AI Studio](https://aistudio.google.com/api-keys)**. Unrestricted keys will be rejected with `403 Forbidden`.
   - Recommended `Thinking Level: Medium` to balance spatial calculation accuracy with latency.
 
-### 6. Image Generation: `gemini-nano-banana-2.1`
+### 7. Image Generation: `gemini-nano-banana-2.1`
 
 - **Role**: Drawing tasks that need high resolution, custom aspect ratios and legible text, and the replacement Google names for `gemini-3.1-flash-image` users.
 - **Highlights**: `1K` / `2K` / `4K` output (default `1K`) across 14 aspect ratios; accepts text, image, video and PDF as reference; supports Thinking levels (`Minimal` / `Medium` / `High`, default `Medium`) and can ground on Google Web and Image Search.
-- **Which to pick**: stay on `gemini-3-pro-image` for image-plus-text input with stable multi-image output, choose `gemini-3.1-flash-image` for faster output, or `gemini-3.1-flash-lite-image` when cost comes first.
+- **Which to pick**: default to `gemini-nano-banana-2.1` (Google deprecated `gemini-3.1-flash-image`, and the app no longer lists it); stay on `gemini-3-pro-image` for image-plus-text input with stable multi-image output, or `gemini-3.1-flash-lite-image` when cost comes first.

@@ -1,6 +1,14 @@
 import type { CatalogModelSpec } from './types';
 
 export const GOOGLE_MODELS: Record<string, CatalogModelSpec> = {
+  'gemini-4-carbon': {
+    id: 'gemini-4-carbon',
+    name: 'Gemini 4 Carbon',
+    contextWindow: 1_048_576,
+    maxOutputTokens: 1_048_576,
+    capabilities: { vision: true, thinking: true, tools: true },
+    ownedBy: 'google',
+  },
   'gemini-4-argon': {
     id: 'gemini-4-argon',
     name: 'Gemini 4 Argon',
@@ -165,6 +173,8 @@ export const GOOGLE_MODELS: Record<string, CatalogModelSpec> = {
   // working until the December 1, 2026 shutdown, after which Google auto-routes
   // them to gemini-3.8-flash and gemini-3.5-flash-lite respectively. Keep their
   // metadata so ids that are already saved still resolve.
+  // 2.5 Flash-Lite is the exception in this generation: Google explicitly states
+  // it is *not* deprecated and has no shutdown date, so its metadata must stay.
   'gemini-2.5-pro': {
     id: 'gemini-2.5-pro',
     name: 'Gemini 2.5 Pro',
@@ -176,6 +186,14 @@ export const GOOGLE_MODELS: Record<string, CatalogModelSpec> = {
   'gemini-2.5-flash': {
     id: 'gemini-2.5-flash',
     name: 'Gemini 2.5 Flash',
+    contextWindow: 1_048_576,
+    maxOutputTokens: 65_536,
+    capabilities: { vision: true, thinking: true, tools: true },
+    ownedBy: 'google',
+  },
+  'gemini-2.5-flash-lite': {
+    id: 'gemini-2.5-flash-lite',
+    name: 'Gemini 2.5 Flash-Lite',
     contextWindow: 1_048_576,
     maxOutputTokens: 65_536,
     capabilities: { vision: true, thinking: true, tools: true },

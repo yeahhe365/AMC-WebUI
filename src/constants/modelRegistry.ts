@@ -27,6 +27,15 @@ const MODEL_REGISTRY: RegisteredModel[] = [
     groups: ['defaultPinned'],
   },
   {
+    id: 'gemini-4-carbon',
+    name: 'Gemini 4 Carbon',
+    groups: ['defaultPinned', 'liveArtifacts', 'connectionTest'],
+    groupLabels: {
+      liveArtifacts: 'Gemini 4 Carbon',
+      connectionTest: 'Gemini 4 Carbon',
+    },
+  },
+  {
     id: 'gemini-4-argon',
     name: 'Gemini 4 Argon',
     groups: ['defaultPinned', 'liveArtifacts', 'connectionTest'],
@@ -44,12 +53,12 @@ const MODEL_REGISTRY: RegisteredModel[] = [
     },
   },
   {
-    id: 'gemini-3.7-flash',
-    name: 'Gemini 3.7 Flash',
-    groups: ['liveArtifacts', 'connectionTest'],
-    groupLabels: {
-      liveArtifacts: 'Gemini 3.7 Flash',
-    },
+    // Previous-generation Flash, but Google still labels it Stable and it stays
+    // callable; modelConfiguration already lists it for thinking + raw mode, only
+    // the picker was missing it. Not pinned: it sorts below the 3.8 generation.
+    id: 'gemini-3.6-flash',
+    name: 'Gemini 3.6 Flash',
+    groups: ['defaultPinned'],
   },
   {
     id: 'gemini-3.5-flash-lite',
@@ -121,11 +130,6 @@ const MODEL_REGISTRY: RegisteredModel[] = [
   {
     id: 'gemini-3-pro-image',
     name: 'Nano Banana Pro',
-    groups: ['image'],
-  },
-  {
-    id: 'gemini-3.1-flash-image',
-    name: 'Nano Banana 2',
     groups: ['image'],
   },
   {

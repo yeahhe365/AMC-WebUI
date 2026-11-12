@@ -14,13 +14,17 @@ import { Card, CardGrid } from '@astrojs/starlight/components';
 ## Core Design Principles
 
 ### 1. Local-First Privacy
+
 In AMC WebUI, all conversation history, settings, and session data are **stored locally in your browser** (IndexedDB) by default, protected by the Web Locks API against concurrent multi-tab corruption:
+
 - Sensitive API keys remain in your browser storage (BYOK mode).
 - Chat histories and token usage logs are strictly under your control, supporting instant export and backup.
 - No third-party account registration required.
 
 ### 2. Dual-Routing Engine
+
 Unlike generic chat UIs, AMC WebUI splits network communication into two isolated pathways:
+
 - **Gemini Native Route**: Powered by `@google/genai` official SDK, supporting Thinking chain visualization, Live API (bidirectional audio/video), Google Grounding (Search & Maps), and Cloud Files API.
 - **OpenAI-Compatible Route**: Standard endpoints for third-party LLMs (DeepSeek, Claude, OpenRouter, Qwen, etc.) with independent API keys, base URLs, and custom model lists.
 
@@ -30,15 +34,35 @@ Unlike generic chat UIs, AMC WebUI splits network communication into two isolate
 
 <CardGrid>
   <Card title="🧠 Deep Reasoning (Thinking)" icon="rocket">
-    Fine-tune thinking token budgets (slider up to 65,536 tokens; 128–32,768 effective for Gemini 3.x) and levels (Off / Minimal / Low / Medium / High), with automated thought translation powered by lightweight models.
+    Fine-tune thinking token budgets (slider up to 65,536 tokens; 128–32,768 effective for Gemini 3.x) and levels (Off /
+    Minimal / Low / Medium / High), with automated thought translation powered by lightweight models.
   </Card>
   <Card title="🎙️ Real-time Audio/Video (Live API)" icon="laptop">
-    Low-latency bidirectional voice chat, webcam vision analysis, and screen sharing powered by WebSocket and AudioWorklet rendering.
+    Low-latency bidirectional voice chat, webcam vision analysis, and screen sharing powered by WebSocket and
+    AudioWorklet rendering.
   </Card>
   <Card title="🧩 Live Artifacts & Visualizations" icon="puzzle">
-    Automatic sandbox rendering of HTML/SVG code blocks. Built-in **Apache ECharts**, **Mermaid**, and **Graphviz** visualization engines.
+    Automatic sandbox rendering of HTML/SVG code blocks. Built-in **Apache ECharts**, **Mermaid**, and **Graphviz**
+    visualization engines.
   </Card>
   <Card title="🐍 Local Python WASM Sandbox" icon="setting">
-    Run Python code directly in a Web Worker via Pyodide with automatic plot capture and zero server overhead. The runtime ships `micropip` and auto-installs third-party packages such as numpy, pandas, and matplotlib on demand when they are imported.
+    Run Python code directly in a Web Worker via Pyodide with automatic plot capture and zero server overhead. The
+    runtime ships `micropip` and auto-installs third-party packages such as numpy, pandas, and matplotlib on demand when
+    they are imported.
   </Card>
 </CardGrid>
+
+---
+
+## Deployment Options
+
+AMC WebUI adapts to very different environments:
+
+1. **Static SPA**:
+   - The build output deploys as-is to Cloudflare Pages, Vercel, or GitHub Pages.
+   - The browser talks to Google's endpoints directly, so there is no server to host or maintain.
+2. **Docker Compose, two containers (recommended for self-hosting)**:
+   - A lightweight `web` container plus a Node `api` service.
+   - The API provides the Gemini proxy, the third-party model proxy, a full Live API WebSocket proxy, and the MCP bridge.
+3. **Static frontend + standalone Node API**:
+   - Frontend on an edge CDN, backend on your own cloud server — fast delivery with centralized key management.

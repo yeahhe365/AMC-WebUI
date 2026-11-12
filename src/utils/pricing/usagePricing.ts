@@ -29,6 +29,23 @@ interface ModalityPricing {
 }
 
 const MODALITY_TEXT_PRICING: Record<string, ModalityPricing | null> = {
+  // Official Gemini 4 Carbon pricing matches Argon: $2 input / $10 output /
+  // $0.10 cache through 2026-11-30, then $4 / $20 / $0.20 from 2026-12-01.
+  'gemini-4-carbon': {
+    prompt: { TEXT: 2, IMAGE: 2, AUDIO: 2 },
+    cache: { TEXT: 0.1, IMAGE: 0.1, AUDIO: 0.1 },
+    response: { TEXT: 10 },
+    tool: { TEXT: 2, IMAGE: 2, AUDIO: 2 },
+    scheduledRates: [
+      {
+        effectiveAt: Date.UTC(2026, 11, 1),
+        prompt: { TEXT: 4, IMAGE: 4, AUDIO: 4 },
+        cache: { TEXT: 0.2, IMAGE: 0.2, AUDIO: 0.2 },
+        response: { TEXT: 20 },
+        tool: { TEXT: 4, IMAGE: 4, AUDIO: 4 },
+      },
+    ],
+  },
   'gemini-4-argon': {
     prompt: { TEXT: 2, IMAGE: 2, AUDIO: 2 },
     cache: { TEXT: 0.1, IMAGE: 0.1, AUDIO: 0.1 },

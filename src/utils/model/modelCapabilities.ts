@@ -100,7 +100,11 @@ export const isDeepSeekReasoningModel = (modelId: string): boolean => {
     lowerId.includes('deepseek-reasoner') ||
     lowerId.includes('r1-distill') ||
     lowerId.includes('r1-zero') ||
+    // `deepseek-v4` matches the retired v4-flash / v4-pro snapshots; `deepseek-flash`
+    // is the renamed flash tier and thinks by default — the catalog says thinking: true
+    // for it, so both paths have to agree.
     lowerId.includes('deepseek-v4') ||
+    lowerId.includes('deepseek-flash') ||
     lowerId.includes('deepseek/r1') ||
     lowerId.includes('deepseek-ai/deepseek-r1')
   );

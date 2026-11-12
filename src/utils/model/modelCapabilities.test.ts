@@ -19,8 +19,9 @@ import {
 } from './modelCapabilities';
 
 describe('raw mode support', () => {
-  it('includes Gemini Robotics-ER 2 and Gemini 4 Argon', () => {
+  it('includes Gemini Robotics-ER 2 and both Gemini 4 flagships', () => {
     expect(MODELS_SUPPORTING_RAW_MODE).toContain('gemini-robotics-er-2-preview');
+    expect(MODELS_SUPPORTING_RAW_MODE).toContain('gemini-4-carbon');
     expect(MODELS_SUPPORTING_RAW_MODE).toContain('gemini-4-argon');
   });
 });
@@ -169,7 +170,8 @@ describe('getModelCapabilities', () => {
       expect(isDeepSeekReasoningModel('deepseek-ai/DeepSeek-R1')).toBe(true);
       expect(isDeepSeekReasoningModel('deepseek-r1-distill-qwen-32b')).toBe(true);
       expect(isDeepSeekReasoningModel('r1-distill-llama-70b')).toBe(true);
-      expect(isDeepSeekReasoningModel('deepseek-v4-flash')).toBe(true);
+      expect(isDeepSeekReasoningModel('deepseek-flash')).toBe(true);
+      expect(isDeepSeekReasoningModel('deepseek-v4-pro')).toBe(true);
       expect(isDeepSeekReasoningModel('deepseek-chat')).toBe(false);
       expect(isDeepSeekReasoningModel('deepseek-coder')).toBe(false);
     });
@@ -306,9 +308,11 @@ describe('getDefaultThinkingLevelForModel', () => {
     expect(getDefaultThinkingLevelForModel('gemini-robotics-er-2-preview')).toBe('MEDIUM');
   });
 
-  it('defaults Gemini 4 Argon to MEDIUM and rejects minimal thinking level', () => {
-    expect(getDefaultThinkingLevelForModel('gemini-4-argon')).toBe('MEDIUM');
-    expect(getModelCapabilities('gemini-4-argon').supportsMinimalThinkingLevel).toBe(false);
+  it('defaults both Gemini 4 flagships to MEDIUM and rejects minimal thinking level', () => {
+    for (const modelId of ['gemini-4-carbon', 'gemini-4-argon']) {
+      expect(getDefaultThinkingLevelForModel(modelId)).toBe('MEDIUM');
+      expect(getModelCapabilities(modelId).supportsMinimalThinkingLevel).toBe(false);
+    }
   });
 
   it('defaults Gemini 3.5 Flash-Lite and Gemma 4 to MINIMAL per official API', () => {

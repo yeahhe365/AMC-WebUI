@@ -12,26 +12,32 @@ description: 如何接入 DeepSeek、Claude、OpenRouter 等 OpenAI 兼容格式
 ## 严格的双路由配置隔离
 
 AMC WebUI 在设计之初就确立了**配置物理隔离**准则：
+
 - **独立 Base URL**：在 **设置 -> 第三方服务商 -> OpenAI 兼容** 填写的端点，仅用于第三方请求。
 - **独立 API Key**：第三方 Key 单独保存在本地 IndexedDB 中，绝不会被带入 Gemini 原生请求，反之亦然。
-- **独立模型列表**：支持独立管理第三方模型名称（例如 `deepseek-chat`、`deepseek-reasoner`、`claude-3-5-sonnet` 等）。
+- **独立模型列表**：支持独立管理第三方模型名称（例如 `deepseek-flash`、`claude-opus-5-5`、`kimi-k3.1-pro` 等）。
 
 ---
 
 ## 典型服务商配置示例
 
 ### 1. DeepSeek 官方
+
 - **服务商名称**：DeepSeek
 - **Base URL**：`https://api.deepseek.com/v1`
-- **常用模型**：`deepseek-chat`、`deepseek-reasoner`
-- **思考支持**：AMC WebUI 自动识别 `deepseek-reasoner`，并将其思维链内容折叠展示。
+- **常用模型**：`deepseek-flash`（V4.1 Flash）、`deepseek-v4-pro`
+- **思考支持**：两者默认开启 thinking，AMC WebUI 会把思维链折叠展示。
+- **注意**：旧的 `deepseek-chat` / `deepseek-reasoner` 已于 2026-07-24 下线，请求会直接报错，请改用上面的 ID。
 
 ### 2. OpenRouter (全球多模型聚合)
+
 - **Base URL**：`https://openrouter.ai/api/v1`
-- **常用模型**：`anthropic/claude-3.5-sonnet`、`meta-llama/llama-3.3-70b-instruct`
+- **常用模型**：`anthropic/claude-opus-5-5`、`meta-llama/Llama-4-Scout-17B-16E-Instruct`
 
 ### 3. Google AI Studio (OpenAI 兼容端点)
+
 Google 也提供了符合 OpenAI 协议的入口：
+
 - **Base URL**：`https://generativelanguage.googleapis.com/v1beta/openai`
 - **Key**：使用你的 `GEMINI_API_KEY`
 

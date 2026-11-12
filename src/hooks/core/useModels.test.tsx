@@ -117,11 +117,12 @@ describe('useModels', () => {
     unmount();
   });
 
-  it('automatically pins gemini-4-argon to the top if present in custom models but unpinned', () => {
+  it('automatically pins Gemini 4 Carbon and Argon when they sit unpinned in custom models', () => {
     useModelPreferencesStore.setState({
       customModels: [
         { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', isPinned: true },
         { id: 'gemini-4-argon', name: 'Gemini 4 Argon', isPinned: false },
+        { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon', isPinned: false },
       ],
       legacyModelPreferencesHydrated: true,
     });
@@ -129,8 +130,10 @@ describe('useModels', () => {
     const { result, unmount } = renderHook(() => useModels());
 
     const argon = result.current.apiModels.find((m) => m.id === 'gemini-4-argon');
+    const carbon = result.current.apiModels.find((m) => m.id === 'gemini-4-carbon');
     expect(argon?.isPinned).toBe(true);
-    expect(result.current.apiModels[0].id).toBe('gemini-4-argon');
+    expect(carbon?.isPinned).toBe(true);
+    expect(result.current.apiModels[0].id).toBe('gemini-4-carbon');
     unmount();
   });
 });

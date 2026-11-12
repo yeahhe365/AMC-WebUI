@@ -12,24 +12,29 @@ In addition to Google Gemini, AMC WebUI connects to standard OpenAI `/chat/compl
 ## Configuration Isolation
 
 AMC WebUI implements strict data isolation:
+
 - **Independent Base URL**: Configured in **Settings -> Third-Party Providers -> OpenAI Compatible**, completely separated from Gemini routes.
 - **Independent Key Storage**: Saved in a separate IndexedDB table, preventing accidental exposure to Google endpoints.
-- **Custom Model Lists**: Manage custom model names (e.g., `deepseek-chat`, `deepseek-reasoner`, `claude-3-5-sonnet`) independently.
+- **Custom Model Lists**: Manage custom model names (e.g., `deepseek-flash`, `claude-opus-5-5`, `kimi-k3.1-pro`) independently.
 
 ---
 
 ## Provider Setup Examples
 
 ### 1. DeepSeek
+
 - **Base URL**: `https://api.deepseek.com/v1`
-- **Models**: `deepseek-chat`, `deepseek-reasoner`
-- **Reasoning Support**: AMC WebUI detects `deepseek-reasoner` and folds thinking tokens into the UI thought container.
+- **Models**: `deepseek-flash` (V4.1 Flash), `deepseek-v4-pro`
+- **Reasoning Support**: Both are thinking models by default; AMC WebUI folds the thinking tokens into the UI thought container.
+- **Note**: the old `deepseek-chat` / `deepseek-reasoner` slugs were retired on 2026-07-24 and now fail outright — use the IDs above.
 
 ### 2. OpenRouter
+
 - **Base URL**: `https://openrouter.ai/api/v1`
-- **Models**: `anthropic/claude-3.5-sonnet`, `meta-llama/llama-3.3-70b-instruct`
+- **Models**: `anthropic/claude-opus-5-5`, `meta-llama/Llama-4-Scout-17B-16E-Instruct`
 
 ### 3. Google AI Studio (OpenAI Endpoint)
+
 - **Base URL**: `https://generativelanguage.googleapis.com/v1beta/openai`
 - **API Key**: Use your `GEMINI_API_KEY`
 

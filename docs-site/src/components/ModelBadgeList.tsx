@@ -18,13 +18,25 @@ interface ModelBadgeListProps {
 
 const MODELS: ModelInfo[] = [
   {
+    id: 'gemini-4-carbon',
+    name: 'Gemini 4 Carbon',
+    category: 'core',
+    contextWindow: '1M Tokens',
+    features: ['最强推理', '最长 1M 输出', '深度思考', 'Agent 长程任务'],
+    description:
+      'Google 最强推理模型，面向复杂软件工程、数理科学攻坚与自主多步 Agent；100 万 Token 上下文，解码上限同为 100 万 Token。',
+    descriptionEn:
+      "Google's most capable reasoning model for complex software engineering, math/science, and autonomous agents, with a shared 1M-token context and long decodes up to 1M tokens.",
+  },
+  {
     id: 'gemini-4-argon',
     name: 'Gemini 4 Argon',
     category: 'core',
     contextWindow: '1M Tokens',
     features: ['旗舰推理', '最长 1M 输出', '深度思考', 'Live Artifacts'],
-    description: '当前旗舰推理模型，100 万 Token 上下文与最长 100 万 Token 解码，面向最困难的长程任务。',
-    descriptionEn: 'Flagship reasoning model with a shared 1M-token context window and long decodes up to 1M tokens.',
+    description: '高效旗舰推理模型，响应更快、单轮 Token 消耗更低，100 万 Token 上下文与最长 100 万 Token 解码。',
+    descriptionEn:
+      'Efficient frontier reasoning model with faster responses and lower token spend per turn, plus 1M-token context and long decodes.',
   },
   {
     id: 'gemini-3.8-flash',
@@ -37,15 +49,6 @@ const MODELS: ModelInfo[] = [
     defaultBadge: true,
   },
   {
-    id: 'gemini-3.7-flash',
-    name: 'Gemini 3.7 Flash',
-    category: 'core',
-    contextWindow: '1M Tokens',
-    features: ['深度思考 (Low~High)', '通用对话', '多模态解析'],
-    description: '上一代主力通用模型，稳定可靠，适合日常对话与长文处理。',
-    descriptionEn: 'Previous-generation flagship model offering reliable everyday chat and long-context processing.',
-  },
-  {
     id: 'gemini-3.5-flash-lite',
     name: 'Gemini 3.5 Flash-Lite',
     category: 'core',
@@ -53,6 +56,16 @@ const MODELS: ModelInfo[] = [
     features: ['极速思考 (Minimal起)', '思维链实时翻译', '极低延迟'],
     description: '轻量高效模型，作为 AMC-WebUI 内部思维链多语言实时翻译的默认辅助模型。',
     descriptionEn: 'Lightweight efficient model used for real-time thinking process translation and quick tasks.',
+  },
+  {
+    id: 'gemini-3.6-flash',
+    name: 'Gemini 3.6 Flash',
+    category: 'core',
+    contextWindow: '1M Tokens',
+    features: ['上一代主力', 'Stable 无下线日期', '65K 输出'],
+    description: '上一代主力 Flash 模型，官方标注 Stable 且未公布下线日期；适合需要固定模型 ID 的生产负载。',
+    descriptionEn:
+      'Previous-generation Flash model marked Stable with no shutdown date announced, for workloads that need a fixed model id.',
   },
   {
     id: 'gemini-3.1-pro-preview',
@@ -155,15 +168,6 @@ const MODELS: ModelInfo[] = [
     features: ['MoE 稀疏激活', '高吞吐', '指令微调'],
     description: 'Gemma 4 系列 MoE 稀疏激活指令模型，兼顾吞吐与效果。',
     descriptionEn: 'MoE sparse-activation instruction-tuned Gemma 4 model balancing throughput and quality.',
-  },
-  {
-    id: 'gemini-3.1-flash-image',
-    name: 'Nano Banana 2',
-    category: 'media',
-    contextWindow: '128K Tokens',
-    features: ['原生生图', '比例定制 (1:1 / 16:9)', '多图并发'],
-    description: '快速原生图像生成模型，在出图速度与画质之间取得均衡。',
-    descriptionEn: 'Fast native image generation model balancing output speed and visual quality.',
   },
   {
     id: 'gemini-3.1-flash-lite-image',

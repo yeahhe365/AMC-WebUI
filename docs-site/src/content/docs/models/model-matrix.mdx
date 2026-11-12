@@ -15,35 +15,42 @@ AMC WebUI 深度集成了 Google 官方最新的 Gemini 4 / Gemini 3.x、Robotic
 
 ## 核心模型选型建议
 
-### 1. 旗舰推理：`gemini-4-argon`
+### 1. 旗舰推理：`gemini-4-carbon` / `gemini-4-argon`
 
-- **定位**：最困难的长程推理、超长文档一次性精读，以及需要超长输出的重构任务。
+- **定位**：最困难的长程推理、数理与科学攻坚、自主多步 Agent，以及需要超长输出的重构任务。
 - **优势**：100 万 Token 上下文，解码上限同样达到 100 万 Token；支持完整深度思考与 Live Artifacts 生成。
+- **如何取舍**：`gemini-4-carbon` 是 Google 当前最强推理模型（事实准确性与复杂工程能力更强）；`gemini-4-argon` 更快、单轮 Token 消耗更低，适合时延敏感的高难任务。
 
 ### 2. 主力通用模型：`gemini-3.8-flash`
 
 - **定位**：日常代码编写、长文阅读分析、普通闲聊与工具调用的**全能首选**。
 - **优势**：响应延迟低，首字吐出极快；支持完整的深度思考能力（Thinking Level: Low / Medium / High）；支持多模态文件解析与 Live Artifacts 生成。
 
-### 3. 超轻量低延迟：`gemini-3.5-flash-lite`
+### 3. 上一代主力：`gemini-3.6-flash`
+
+- **定位**：需要模型 ID 长期稳定、不随旗舰滚动的生产负载，以及 3.8 Flash 上线前既有的工作流。
+- **优势**：与 3.8 Flash 同为 100 万 Token 上下文、65,536 Token 输出上限，支持深度思考与多模态输入；官方标注 **Stable**，且 `No shutdown date announced`。
+- **怎么选**：新项目直接用 `gemini-3.8-flash`；只有确实需要「上一代、不再滚动更新」时选 3.6。注意 `gemini-3.5-flash` 已被官方自动路由到 3.6。
+
+### 4. 超轻量低延迟：`gemini-3.5-flash-lite`
 
 - **定位**：高频简短查询、高吞吐批量处理，以及 AMC WebUI 内部的**思维链实时翻译代理引擎**。
 - **优势**：极低的调用成本与极致延迟，支持从 `Minimal` 开始的最轻量思维预算。
 
-### 4. 学术与高难推理：`gemini-3.1-pro-preview`
+### 5. 学术与高难推理：`gemini-3.1-pro-preview`
 
 - **定位**：涉及超长上下文（100 万 Token）、复杂数学证明、跨多源大型工程代码库重构分析。
 - **优势**：配备高达 32,768 Tokens 的完整思维预算，逻辑严密，抗幻觉能力顶尖。
 
-### 5. 具身与空间推理：`gemini-robotics-er-2-preview`
+### 6. 具身与空间推理：`gemini-robotics-er-2-preview`
 
 - **定位**：三维空间关系推演、机器人操作规划、视觉空间几何测量。
 - **关键使用前置条件**：
   - Google 官方强制要求：调用该模型的 API Key **必须已在 [Google AI Studio](https://aistudio.google.com/api-keys) 添加限制 (API Restriction)**（例如限制使用项目或来源），未设置限制的 Key 请求会直接被服务端拦截并返回 `403 Forbidden`。
   - 建议将 `Thinking Level` 设为 `Medium` 以平衡空间几何解算的耗时与精度。
 
-### 6. 图像生成：`gemini-nano-banana-2.1`
+### 7. 图像生成：`gemini-nano-banana-2.1`
 
 - **定位**：需要高分辨率出图、画面比例定制与文字排版的绘图任务，也是官方为 `gemini-3.1-flash-image` 用户标注的推荐升级目标。
 - **优势**：可选 `1K` / `2K` / `4K` 输出（默认 `1K`），支持 14 种画面比例；可读取文本、图片、视频与 PDF 作为参考；支持 Thinking Level（`Minimal` / `Medium` / `High`，默认 `Medium`），并可用 Google 网页搜索与图片搜索补充素材。
-- **怎么选**：坚持「图片 + 文本」输入、需要稳定四图并发的沿用 `gemini-3-pro-image`；出图速度优先选 `gemini-3.1-flash-image`；成本优先选 `gemini-3.1-flash-lite-image`。
+- **怎么选**：默认首选 `gemini-nano-banana-2.1`（`gemini-3.1-flash-image` 已被官方弃用，应用不再列出）；坚持「图片 + 文本」输入、需要稳定四图并发的沿用 `gemini-3-pro-image`；成本优先选 `gemini-3.1-flash-lite-image`。

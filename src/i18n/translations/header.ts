@@ -341,6 +341,15 @@ export const headerTranslations = {
     fr: 'Recommandé',
     de: 'Empfohlen',
   },
+  modelDescGemini4Carbon: {
+    en: "Google's most capable reasoning model, built for complex software engineering, deep mathematical and scientific problem solving, high factual accuracy, and autonomous multi-step agents.",
+    zh: 'Google 最强推理模型，专为复杂软件工程、深度数理与科学问题求解、高事实准确性与自主多步 Agent 任务打造。',
+    ja: '複雑なソフトウェアエンジニアリング、高度な数学・科学的問題解決、高い事実正確性、自律的なマルチステップエージェントのために構築されたGoogleの最も高性能な推論モデル。',
+    ko: '복잡한 소프트웨어 엔지니어링, 심층 수학·과학 문제 해결, 높은 사실 정확성 및 자율적 다단계 에이전트 작업을 위해 구축된 Google의 최강 추론 모델입니다.',
+    es: 'El modelo de razonamiento más capaz de Google, diseñado para ingeniería de software compleja, resolución matemática y científica profunda, alta precisión fáctica y agentes autónomos de varios pasos.',
+    fr: "Modèle de raisonnement le plus puissant de Google, conçu pour l'ingénierie logicielle complexe, la résolution de problèmes mathématiques et scientifiques approfondis, une grande exactitude factuelle et des agents autonomes multi-étapes.",
+    de: 'Googles leistungsfähigstes Reasoning-Modell für komplexe Softwareentwicklung, tiefgehende mathematische und wissenschaftliche Problemlösung, hohe Faktenpräzision und autonome mehrstufige Agenten.',
+  },
   modelDescGemini4Argon: {
     en: 'Google frontier reasoning model built for complex software engineering, deep reasoning, and long-decode workflows.',
     zh: 'Google 旗舰级前沿推理模型，专为复杂软件工程、深度科学逻辑推理与超长解码工作流打造。',

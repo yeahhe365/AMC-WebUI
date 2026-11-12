@@ -7,6 +7,8 @@ export const DEFAULT_MODEL_ID = 'gemini-3.8-flash';
 export const ROBOTICS_MODEL = 'gemini-robotics-er-2-preview';
 
 export const REQUIRED_THINKING_MODEL_IDS: readonly string[] = [
+  'gemini-4-carbon',
+  'models/gemini-4-carbon',
   'gemini-4-argon',
   'models/gemini-4-argon',
   'gemini-3.1-pro-preview',
@@ -24,6 +26,7 @@ export const REQUIRED_THINKING_MODEL_IDS: readonly string[] = [
 ];
 
 export const MODELS_SUPPORTING_RAW_MODE = [
+  'gemini-4-carbon',
   'gemini-4-argon',
   'gemini-3.6-flash',
   'gemini-3.8-flash',

@@ -4,9 +4,9 @@ import { AVAILABLE_TRANSCRIPTION_MODELS, CONNECTION_TEST_MODELS } from './settin
 describe('settingsModelOptions', () => {
   it('keeps connection test models aligned with the supported defaults', () => {
     expect(CONNECTION_TEST_MODELS.map((model) => model.id)).toEqual([
+      'gemini-4-carbon',
       'gemini-4-argon',
       'gemini-3.8-flash',
-      'gemini-3.7-flash',
       'gemini-3.5-flash-lite',
       'gemini-3.1-pro-preview',
       'gemini-robotics-er-2-preview',
@@ -55,9 +55,15 @@ describe('settingsModelOptions', () => {
     expect(AVAILABLE_TRANSCRIPTION_MODELS.some((model) => model.id === 'gemini-3.6-flash')).toBe(false);
   });
 
-  it('shows Gemini 3.8 Flash and Gemini 3.7 Flash in connection test models and Gemini 3.5 Transcribe for transcription', () => {
+  it('does not expose the auto-routed Gemini 3.7 Flash text model', () => {
+    // 3.7 Flash has routed to 3.8 Flash since 2026-10-08, so offering it in the
+    // connection test would silently exercise a different model than the label says.
+    expect(CONNECTION_TEST_MODELS.some((model) => model.id === 'gemini-3.7-flash')).toBe(false);
+    expect(AVAILABLE_TRANSCRIPTION_MODELS.some((model) => model.id === 'gemini-3.7-flash')).toBe(false);
+  });
+
+  it('shows Gemini 3.8 Flash in connection test models and Gemini 3.5 Transcribe for transcription', () => {
     expect(CONNECTION_TEST_MODELS.find((model) => model.id === 'gemini-3.8-flash')?.name).toBe('Gemini 3.8 Flash');
-    expect(CONNECTION_TEST_MODELS.find((model) => model.id === 'gemini-3.7-flash')?.name).toBe('Gemini 3.7 Flash');
     expect(AVAILABLE_TRANSCRIPTION_MODELS.find((model) => model.id === 'gemini-3.5-transcribe')?.name).toBe(
       'Gemini 3.5 Transcribe',
     );
