@@ -10,6 +10,7 @@ For global CDN performance, you can deploy the static frontend to Cloudflare Pag
 ---
 
 ## 1. Frontend Pages Deployment
+
 1. Build the frontend:
    ```bash
    pnpm run build
@@ -19,14 +20,18 @@ For global CDN performance, you can deploy the static frontend to Cloudflare Pag
 ---
 
 ## 2. Standalone Backend Setup
+
 On your server (e.g. Linux VPS):
+
 ```bash
 pnpm run build:api
 pnpm run start:api
 ```
 
 ### CORS Configuration (`ALLOWED_ORIGINS`)
+
 Because frontend and backend reside on different domains, set `ALLOWED_ORIGINS` in your backend environment:
+
 ```bash
 PORT=3001
 ALLOWED_ORIGINS=https://your-app.pages.dev
@@ -36,6 +41,8 @@ GEMINI_API_KEY=AIzaSyYourServerManagedKey
 ---
 
 ## 3. Client Connection
+
 In the deployed frontend, navigate to **Settings -> Third-Party Providers**:
+
 - Enable "Custom API Config / Proxy".
 - Set the proxy endpoint: `https://api.yourdomain.com/api/gemini`.

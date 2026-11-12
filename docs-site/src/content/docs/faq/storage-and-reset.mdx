@@ -12,6 +12,7 @@ AMC WebUI 依托浏览器 IndexedDB 实现 Local-First 本地化存储。掌握�
 ## 1. 遇到页面数据不同步或加载停滞
 
 ### 排查步骤
+
 1. **检查是否有多标签页未关闭**：由于 Web Locks 写锁保护机制，若某一标签页崩溃未释放写锁，其他标签页可能等待。关闭多余标签页或刷新即可解除锁占用。
 2. **清除 Service Worker 预缓存**：
    - 打开浏览器开发者工具 (F12) -> **Application (应用)** -> **Service Workers**。
@@ -22,6 +23,7 @@ AMC WebUI 依托浏览器 IndexedDB 实现 Local-First 本地化存储。掌握�
 ## 2. 导出与全量重置 (Factory Reset)
 
 如果你希望将应用恢复到最初始的纯净状态：
+
 1. 先进入 **设置 -> 数据 (Data)**，点击 **「导出全部数据 (JSON)」** 下载备份存档。
 2. 打开开发者工具 (F12) -> **Application** -> **Storage** -> 点击 **Clear site data (清除网站数据)**。
 3. 刷新页面，此时数据库与设置已完全重置为出厂默认状态。

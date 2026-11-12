@@ -6,13 +6,14 @@ description: Deploying the web (frontend & reverse proxy) and api (Node backend 
 # Docker Compose Deployment
 
 Docker Compose is the recommended deployment mode for self-hosting. It runs as two decoupled lightweight containers:
+
 - **`web`**: Serves pre-built static assets, listens on `WEB_PORT` (default `8080`), and reverse-proxies `/api/*` to the backend.
 - **`api`**: Node.js backend listening on `PORT` (`3001`), hosting Gemini API proxies, third-party routes, and the Live WebSocket proxy.
 
 ---
 
 ## Quickstart
- 
+
 ### Option 1: Pull Official GHCR Prebuilt Images (Recommended)
 
 To run AMC WebUI without building from source, use the official multi-arch images (`linux/amd64` and `linux/arm64`):

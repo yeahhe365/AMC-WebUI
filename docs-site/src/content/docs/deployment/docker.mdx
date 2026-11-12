@@ -6,6 +6,7 @@ description: 使用 Docker Compose 部署 web (前端静态托管与反代) 与 
 # Docker Compose 双容器部署
 
 Docker Compose 是官方推荐的自用与局域网私有化部署方案。它将应用解耦为两个高效运行的轻量容器：
+
 - **`web`**：基于轻量 Node 服务托管前端静态资源，对外监听 `WEB_PORT`（默认 `8080`），并自动反代 `/api/*` 到后台。
 - **`api`**：Node.js API 服务，内部监听 `PORT`（默认 `3001`），承载 Gemini API 代理、第三方接口转发与 Live API WebSocket 全代理。
 

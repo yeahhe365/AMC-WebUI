@@ -17,6 +17,7 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 👉 **[在线演示站点 (Live Demo)](https://all-model-chat.pages.dev/)**
 
 在打开的页面中：
+
 1. 点击右上角的 **设置 (Settings)** 图标。
 2. 在 **第三方服务商** 面板填入你的 Google Gemini API Key。
 3. 即可立即开启对话！数据均保存在你的当前浏览器本地。
@@ -26,6 +27,7 @@ import { Tabs, TabItem } from '@astrojs/starlight/components';
 ## 方式二：本地标准开发模式
 
 ### 前置环境要求
+
 - **Node.js**：推荐使用 **Node.js 26**（项目根目录提供 `.nvmrc`），最低支持 Node.js 24。
 - **包管理器**：**pnpm 11+**（项目配置了严谨的 `engine-strict` 校验）。
 
@@ -39,14 +41,18 @@ git clone https://github.com/yeahhe365/AMC-WebUI.git
 cd AMC-WebUI
 
 # 2. 切换推荐的 Node 版本（如使用 nvm）
+
 nvm use
 
 # 3. 安装依赖
+
 pnpm install
 
 # 4. 启动本地开发服务
+
 pnpm dev
-```
+
+````
   </TabItem>
   <TabItem label="环境变量预置 (可选)">
 本地开发模式下，你可以在项目根目录创建 `.env.local` 预置默认密钥，避免每次清空缓存后手动输入：
@@ -55,7 +61,8 @@ pnpm dev
 # 仅本地开发模式生效 (前端 Vite 环境变量)
 VITE_GEMINI_API_KEY=AIzaSyYourGeminiApiKey
 VITE_OPENAI_API_KEY=sk-YourOpenAiKey
-```
+````
+
   </TabItem>
 </Tabs>
 

@@ -12,6 +12,7 @@ description: 在 AMC WebUI 中接入 Anthropic 开源的 MCP 协议，支持本�
 ## 支持的服务传输形态
 
 ### 1. 本地进程服务 (`stdio`)
+
 - **运行环境**：需在 **Docker Compose** 或自托管 Node API 环境下运行。
 - **配置示例**：
   ```json
@@ -27,6 +28,7 @@ description: 在 AMC WebUI 中接入 Anthropic 开源的 MCP 协议，支持本�
 - **安全开关**：服务端必须显式设置环境变量 `ENABLE_MCP_STDIO=true` 允许启动子进程。
 
 ### 2. 远程网络服务 (`http` / `sse`)
+
 - **运行机制**：通过 Streamable HTTP 长连接（`http`）或 Server-Sent Events（`sse`）与远程部署的 MCP 服务通信。
 - **架构与部署依赖**：所有 MCP 传输形态（无论是本地 `stdio` 还是远程 `http` / `sse`）均统一由后端 Node API 服务（`api` 容器或独立 `server/` 服务）作为安全桥接代理转发（端点为 `/api/mcp/*`）。纯静态托管（如 Cloudflare Pages）必须配置后端 Node API 地址，无法脱离后端独立运行 MCP。
 - **内网保护**：若需允许 Node API 服务访问局域网或本机 HTTP MCP 服务，需在服务端显式设置 `ENABLE_MCP_PRIVATE_HTTP=true`。

@@ -11,14 +11,14 @@ AMC WebUI provides **two distinct execution engines** for computation, data anal
 
 ## Engine Comparison
 
-| Feature | ☁️ Gemini Code Execution | 🐍 Local Pyodide WASM Sandbox |
-| :--- | :--- | :--- |
-| **Execution Host** | Google Cloud stateless container | Browser Web Worker (WebAssembly) |
-| **Data Privacy** | Sent to Google for processing | **100% Local**, zero network leaks |
-| **Package Loading** | Standard Google runtime | Dynamic on-import loading (numpy, pandas, matplotlib) |
-| **Package Expansion** | Fixed environment | **On-demand micropip installation** (scipy, scikit-learn) |
-| **File I/O** | Attachment analysis on server | Working directory mounting & output file export |
-| **Plot Rendering** | Text output or static images | **Automatic matplotlib plot interception** |
+| Feature               | ☁️ Gemini Code Execution         | 🐍 Local Pyodide WASM Sandbox                             |
+| :-------------------- | :------------------------------- | :-------------------------------------------------------- |
+| **Execution Host**    | Google Cloud stateless container | Browser Web Worker (WebAssembly)                          |
+| **Data Privacy**      | Sent to Google for processing    | **100% Local**, zero network leaks                        |
+| **Package Loading**   | Standard Google runtime          | Dynamic on-import loading (numpy, pandas, matplotlib)     |
+| **Package Expansion** | Fixed environment                | **On-demand micropip installation** (scipy, scikit-learn) |
+| **File I/O**          | Attachment analysis on server    | Working directory mounting & output file export           |
+| **Plot Rendering**    | Text output or static images     | **Automatic matplotlib plot interception**                |
 
 ---
 

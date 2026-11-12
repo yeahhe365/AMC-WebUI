@@ -12,6 +12,7 @@ description: 解决 WebSocket 代理断连、CORS 跨域报错与反向代理常
 ## 1. Live API WebSocket 连接立即断开
 
 ### 检查清单
+
 - **Docker 环境**：确保环境变量 `ENABLE_LIVE_WS_PROXY=true` 已开启。
 - **Nginx 反向代理配置**：如果在外层使用了 Nginx 反向代理，必须显式传递 WebSocket 升级头：
   ```nginx
@@ -30,11 +31,15 @@ description: 解决 WebSocket 代理断连、CORS 跨域报错与反向代理常
 ## 2. 跨域 CORS 拦截报错 (`Access-Control-Allow-Origin`)
 
 ### 现象
+
 前端部署在 `https://my-app.pages.dev`，后端在 `https://api.my-domain.com`，控制台提示 CORS 错误。
 
 ### 解决方案
+
 在 Node API 后端服务的 `.env` 中加入前端域名：
+
 ```bash
 ALLOWED_ORIGINS=https://my-app.pages.dev
 ```
+
 多个域名使用英文逗号 `,` 分隔，修改后重启后端服务。

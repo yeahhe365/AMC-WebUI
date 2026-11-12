@@ -25,8 +25,11 @@ You can try the online demo hosted on Cloudflare Pages without installing anythi
 ## Method 2: Local Development
 
 ### Prerequisites
+
 - **Node.js**: Recommended **Node.js 26** (`.nvmrc` provided in repo), minimum Node.js 24.
 - **Package Manager**: **pnpm 11+**.
+
+### Startup steps
 
 <Tabs>
   <TabItem label="Git Clone & Run">
@@ -36,14 +39,18 @@ git clone https://github.com/yeahhe365/AMC-WebUI.git
 cd AMC-WebUI
 
 # 2. Use recommended Node version
+
 nvm use
 
 # 3. Install dependencies
+
 pnpm install
 
 # 4. Start development server
+
 pnpm dev
-```
+
+````
   </TabItem>
   <TabItem label="Preconfigured Env (Optional)">
 Create a `.env.local` in the project root:
@@ -51,7 +58,8 @@ Create a `.env.local` in the project root:
 ```bash
 VITE_GEMINI_API_KEY=AIzaSyYourGeminiApiKey
 VITE_OPENAI_API_KEY=sk-YourOpenAiKey
-```
+````
+
   </TabItem>
 </Tabs>
 

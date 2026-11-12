@@ -85,4 +85,20 @@ describe('project documentation structure', () => {
       'Bundled scientific stack such as numpy, pandas, matplotlib, scipy, and scikit-learn',
     );
   });
+
+  it('lists every offered model id in both READMEs', () => {
+    // The README table is the user-facing promise of what the picker contains.
+    // gemini-3.6-flash shipped in MODEL_REGISTRY while the table still omitted it,
+    // so pin the two together: adding or removing a registry entry fails here until
+    // the READMEs are updated (registry ids are string literals; ROBOTICS_MODEL is not).
+    const registrySource = readProjectFile('src/constants/modelRegistry.ts');
+    const offeredIds = [...registrySource.matchAll(/^\s+id: '([^']+)',$/gm)].map((match) => match[1]);
+    expect(offeredIds.length).toBeGreaterThan(10);
+
+    const zhReadme = readProjectFile('README.md');
+    const enReadme = readProjectFile('README.en.md');
+    const missingFromDocs = offeredIds.filter((id) => !zhReadme.includes(id) || !enReadme.includes(id));
+
+    expect(missingFromDocs, 'README.md / README.en.md must document every registered model').toEqual([]);
+  });
 });

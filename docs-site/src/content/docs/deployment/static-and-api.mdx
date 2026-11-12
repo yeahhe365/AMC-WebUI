@@ -10,6 +10,7 @@ description: Cloudflare Pages / Vercel 静态前端托管配合独立 Node API �
 ---
 
 ## 1. 前端构建与 Pages 部署
+
 1. 在项目根目录构建前端纯静态包：
    ```bash
    pnpm run build
@@ -20,7 +21,9 @@ description: Cloudflare Pages / Vercel 静态前端托管配合独立 Node API �
 ---
 
 ## 2. 后端独立 API 启动
+
 在独立服务器（如 Ubuntu / Debian 虚拟机）上：
+
 ```bash
 # 编译并启动 Node API 服务
 pnpm run build:api
@@ -28,7 +31,9 @@ pnpm run start:api
 ```
 
 ### 跨域白名单配置 (`ALLOWED_ORIGINS`)
+
 由于前端与后端处于不同域名，必须在后端环境配置允许跨域访问的前端域名：
+
 ```bash
 PORT=3001
 ALLOWED_ORIGINS=https://your-amc-app.pages.dev,https://chat.yourdomain.com
@@ -38,7 +43,9 @@ GEMINI_API_KEY=AIzaSyYourServerManagedKey
 ---
 
 ## 3. 前端与后端对接
+
 打开部署好的前端页面，进入 **设置 -> 第三方服务商 (Third-Party Providers)**：
+
 - 开启「自定义 API 配置 / 代理」。
 - 填写后端的公开 API 地址，例如：`https://api.yourdomain.com/api/gemini`。
 - 此时普通的 Gemini 请求即走你的后端服务器代理，兼顾了前端的高速缓存与后端的安全代理。

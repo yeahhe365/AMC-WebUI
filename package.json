@@ -19,7 +19,7 @@
     "lint:fix": "eslint . --ext .ts,.tsx,.js,.mjs --fix --max-warnings=0",
     "knip": "knip",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,css,json,md,yml,yaml}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,css,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,css,json,md,mdx,yml,yaml}\"",
     "typecheck": "tsc --noEmit",
     "verify": "npm run format:check && npm run i18n:check && npm run typecheck && npm run lint && npm run test && npm run knip && npm run build && npm run build:api",
     "test:code-execution": "node scripts/run-vitest.mjs run src/utils/file-upload/fileUploadPolicy.test.ts src/features/chat-streaming/processors.test.ts src/utils/chat/builder.test.ts src/hooks/live-api/useLiveMessageProcessing.test.tsx src/services/api/chatApi.test.ts src/services/api/generation/tokenApi.test.ts src/services/api/apiClient.test.ts src/services/api/liveApiAuth.test.ts src/services/api/generationConfig.test.ts",

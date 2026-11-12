@@ -41,10 +41,13 @@ Understanding AMC WebUI's architecture and request pipelines is essential for se
 ## Technical Highlights
 
 ### 1. IndexedDB with Web Locks Mutex
+
 To enable safe multitasking across multiple browser tabs without database corruption, AMC WebUI guards write operations with `navigator.locks.request` and synchronizes UI state changes in real time via `BroadcastChannel`.
 
 ### 2. Role of the Node API Backend
+
 The Node API backend (`server/`) serves as an optional trusted self-hosted gateway:
+
 - **BYOK Priority**: Browser keys take precedence by default. Server keys act strictly as fallbacks.
 - **WebSocket Gateway**: Bridges complex client WebSockets to Google Live endpoints.
 - For public-facing deployments, front the application with authentication gateways (e.g., Cloudflare Access, Authelia, or Nginx).

@@ -12,6 +12,7 @@ description: Integrating Anthropic open Model Context Protocol in AMC WebUI, sup
 ## Supported Server Transports
 
 ### 1. Local Process (`stdio`)
+
 - **Prerequisite**: Requires **Docker Compose** or self-hosted Node backend.
 - **Sample Configuration**:
   ```json
@@ -27,6 +28,7 @@ description: Integrating Anthropic open Model Context Protocol in AMC WebUI, sup
 - **Security Flag**: Backend must have `ENABLE_MCP_STDIO=true` explicitly set.
 
 ### 2. Remote Network Service (`http` / `sse`)
+
 - **Protocol**: Connects via Streamable HTTP long-lived connections (`http`) or Server-Sent Events (`sse`) to remote MCP hosts.
 - **Backend Requirement**: All MCP transports (both local `stdio` and remote `http` / `sse`) are securely bridged through the Node API service (`api` container or standalone `server/`) via `/api/mcp/*`. Pure static frontend hosting (e.g. Cloudflare Pages) requires a companion Node API backend and cannot run MCP independently.
 - **Private Network Access**: To allow the API server to connect to intranet or localhost HTTP MCP servers, explicitly enable `ENABLE_MCP_PRIVATE_HTTP=true` on the server.
