@@ -74,26 +74,57 @@ const MODALITY_TEXT_PRICING: Record<string, ModalityPricing | null> = {
     response: { TEXT: 3 },
     tool: { TEXT: 0.5, IMAGE: 0.5, AUDIO: 1 },
   },
-  // Official Gemini API pricing (Standard): $1.50 input / $7.50 output / $0.15 cache.
+  // Gemini 3.6 / 3.7 / 3.8 Flash share one published rate card: $0.75 input /
+  // $3.75 output / $0.075 cache through 2026-12-31, then $1.50 / $7.50 / $0.15
+  // from 2027-01-01. The introductory numbers are the base entry; the raise is
+  // a scheduled rate, the same way the Gemini 4 models encode theirs. Billing
+  // the future rate early doubles every Flash estimate.
   'gemini-3.6-flash': {
-    prompt: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
-    cache: { TEXT: 0.15, IMAGE: 0.15, AUDIO: 0.15 },
-    response: { TEXT: 7.5 },
-    tool: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
+    prompt: { TEXT: 0.75, IMAGE: 0.75, AUDIO: 0.75 },
+    cache: { TEXT: 0.075, IMAGE: 0.075, AUDIO: 0.075 },
+    response: { TEXT: 3.75 },
+    tool: { TEXT: 0.75, IMAGE: 0.75, AUDIO: 0.75 },
+    scheduledRates: [
+      {
+        effectiveAt: Date.UTC(2027, 0, 1),
+        prompt: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
+        cache: { TEXT: 0.15, IMAGE: 0.15, AUDIO: 0.15 },
+        response: { TEXT: 7.5 },
+        tool: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
+      },
+    ],
   },
-  // Mirrors Gemini 3.6 Flash rates until official 3.7 pricing is published.
+  // Mirrors Gemini 3.6 Flash: same published card.
   'gemini-3.7-flash': {
-    prompt: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
-    cache: { TEXT: 0.15, IMAGE: 0.15, AUDIO: 0.15 },
-    response: { TEXT: 7.5 },
-    tool: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
+    prompt: { TEXT: 0.75, IMAGE: 0.75, AUDIO: 0.75 },
+    cache: { TEXT: 0.075, IMAGE: 0.075, AUDIO: 0.075 },
+    response: { TEXT: 3.75 },
+    tool: { TEXT: 0.75, IMAGE: 0.75, AUDIO: 0.75 },
+    scheduledRates: [
+      {
+        effectiveAt: Date.UTC(2027, 0, 1),
+        prompt: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
+        cache: { TEXT: 0.15, IMAGE: 0.15, AUDIO: 0.15 },
+        response: { TEXT: 7.5 },
+        tool: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
+      },
+    ],
   },
-  // Mirrors Gemini 3.7 Flash rates until official 3.8 pricing is published.
+  // Mirrors Gemini 3.6 Flash: same published card.
   'gemini-3.8-flash': {
-    prompt: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
-    cache: { TEXT: 0.15, IMAGE: 0.15, AUDIO: 0.15 },
-    response: { TEXT: 7.5 },
-    tool: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
+    prompt: { TEXT: 0.75, IMAGE: 0.75, AUDIO: 0.75 },
+    cache: { TEXT: 0.075, IMAGE: 0.075, AUDIO: 0.075 },
+    response: { TEXT: 3.75 },
+    tool: { TEXT: 0.75, IMAGE: 0.75, AUDIO: 0.75 },
+    scheduledRates: [
+      {
+        effectiveAt: Date.UTC(2027, 0, 1),
+        prompt: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
+        cache: { TEXT: 0.15, IMAGE: 0.15, AUDIO: 0.15 },
+        response: { TEXT: 7.5 },
+        tool: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
+      },
+    ],
   },
   // Official Gemini API pricing (Standard): $0.30 input (all modalities) / $2.50 output / $0.03 cache.
   'gemini-3.5-flash-lite': {
@@ -102,12 +133,17 @@ const MODALITY_TEXT_PRICING: Record<string, ModalityPricing | null> = {
     response: { TEXT: 2.5 },
     tool: { TEXT: 0.3, IMAGE: 0.3, AUDIO: 0.3 },
   },
-  // Gemini 3.5 Transcribe pricing ($0.30/M input audio & text tokens / $2.50/M output tokens / $0.03 cache).
+  // Gemini 3.5 Transcribe: $2.00 input (audio) / $12.00 output (text), or
+  // $0.003 and $0.002 per minute. The previous numbers here ($0.30 / $2.50 /
+  // $0.03) were Gemini 3.5 Flash-Lite's card, copied across by mistake, which
+  // under-reported transcription cost by roughly 6x.
+  // The published table has no context-caching row for this model, so `cache`
+  // is intentionally absent: a record that carries cached tokens stays
+  // unpriced instead of borrowing a rate nobody published.
   'gemini-3.5-transcribe': {
-    prompt: { TEXT: 0.3, AUDIO: 0.3 },
-    cache: { TEXT: 0.03, AUDIO: 0.03 },
-    response: { TEXT: 2.5 },
-    tool: { TEXT: 0.3, AUDIO: 0.3 },
+    prompt: { TEXT: 2, AUDIO: 2 },
+    response: { TEXT: 12 },
+    tool: { TEXT: 2, AUDIO: 2 },
   },
   'gemini-3.1-pro-preview': {
     prompt: { TEXT: 2 },
@@ -119,6 +155,35 @@ const MODALITY_TEXT_PRICING: Record<string, ModalityPricing | null> = {
     cacheAboveThreshold: { TEXT: 0.4 },
     responseAboveThreshold: { TEXT: 18 },
     toolAboveThreshold: { TEXT: 4 },
+  },
+  // The 2.5 generation is deprecated but still served until 2026-12-01, so
+  // users are billed on it today. Without these entries the substring fallback
+  // in estimateMessageCostUsd picked a newer model's card: 2.5 Flash was priced
+  // as 3.8 Flash (5x high), 2.5 Flash-Lite as 3.5 Flash-Lite (6x high).
+  'gemini-2.5-pro': {
+    prompt: { TEXT: 1.25 },
+    cache: { TEXT: 0.125 },
+    response: { TEXT: 10 },
+    tool: { TEXT: 1.25 },
+    thresholdTokens: PRO_MODEL_TIER_THRESHOLD_TOKENS,
+    promptAboveThreshold: { TEXT: 2.5 },
+    cacheAboveThreshold: { TEXT: 0.25 },
+    responseAboveThreshold: { TEXT: 15 },
+    toolAboveThreshold: { TEXT: 2.5 },
+  },
+  // $0.30 text/image/video, $1.00 audio; output $2.50.
+  'gemini-2.5-flash': {
+    prompt: { TEXT: 0.3, IMAGE: 0.3, AUDIO: 1 },
+    cache: { TEXT: 0.03, IMAGE: 0.03, AUDIO: 0.1 },
+    response: { TEXT: 2.5 },
+    tool: { TEXT: 0.3, IMAGE: 0.3, AUDIO: 1 },
+  },
+  // $0.10 text/image/video, $0.30 audio; output $0.40.
+  'gemini-2.5-flash-lite': {
+    prompt: { TEXT: 0.1, IMAGE: 0.1, AUDIO: 0.3 },
+    cache: { TEXT: 0.01, IMAGE: 0.01, AUDIO: 0.03 },
+    response: { TEXT: 0.4 },
+    tool: { TEXT: 0.1, IMAGE: 0.1, AUDIO: 0.3 },
   },
 };
 

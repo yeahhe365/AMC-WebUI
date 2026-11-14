@@ -21,7 +21,11 @@ export const GOOGLE_MODELS: Record<string, CatalogModelSpec> = {
     id: 'gemini-4-argon',
     name: 'Gemini 4 Argon',
     contextWindow: 1_048_576,
-    maxOutputTokens: 1_048_576,
+    // Google publishes 65,536 as the default synchronous cap; 1,048,576 is only
+    // reachable through long decode (background execution or client-side
+    // continuation), which this app does not implement. Advertising the 1M
+    // ceiling here would invite a per-request limit we cannot serve.
+    maxOutputTokens: 65_536,
     capabilities: { vision: true, thinking: true, tools: true },
     ownedBy: 'google',
   },

@@ -51,6 +51,13 @@ describe('isGemini3Model', () => {
     expect(isGemini4Model('gemini-3.8-flash')).toBe(false);
   });
 
+  it('treats gemini-3.5-flash as a Gemini 3 model', () => {
+    // Not in REQUIRED_THINKING_MODEL_IDS, so it used to fall through to the
+    // 2.5-era branch and receive `thinkingBudget` instead of `thinkingLevel`.
+    expect(isGemini3Model('gemini-3.5-flash')).toBe(true);
+    expect(isGemini3Model('models/gemini-3.5-flash')).toBe(true);
+  });
+
   it('returns false for the retired bare gemini-3-flash ID', () => {
     // Only gemini-3-flash-preview exists upstream; the bare stable ID is no
     // longer special-cased.

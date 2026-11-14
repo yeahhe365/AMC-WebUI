@@ -12,6 +12,10 @@ export const isGemini3Model = (modelId: string): boolean => {
     REQUIRED_THINKING_MODEL_IDS.some((model) => lowerId.includes(model)) ||
     lowerId.includes('gemini-3-pro') ||
     lowerId.includes('gemini-3.1-flash') ||
+    // 3.5 Flash shares the 3.x thinking surface with 3.5 Flash-Lite, but it is
+    // not in REQUIRED_THINKING_MODEL_IDS, so without this it fell through to the
+    // 2.5-era branch and was sent `thinkingBudget` instead of `thinkingLevel`.
+    lowerId.includes('gemini-3.5-flash') ||
     lowerId.includes('gemini-4')
   );
 };
