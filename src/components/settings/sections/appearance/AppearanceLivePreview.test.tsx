@@ -31,7 +31,7 @@ describe('AppearanceLivePreview', () => {
 
     const avatar = container.querySelector('img[src="/assets/assistant-avatar.png"]');
     expect(avatar).not.toBeNull();
-    expect(container.textContent).toContain('Gemini 3.8 Flash');
+    expect(container.textContent).toContain('Gemini 4 Hydrogen');
   });
 
   it('renders custom model display name reactively from settings', () => {

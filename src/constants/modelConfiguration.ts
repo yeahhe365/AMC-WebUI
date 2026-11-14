@@ -1,4 +1,9 @@
-export const DEFAULT_MODEL_ID = 'gemini-3.8-flash';
+/**
+ * Gemini 4 Hydrogen leads the built-in lineup. 3.8 Flash is no longer seeded into
+ * the picker (see modelRegistry.ts); saved sessions that still point at it keep
+ * working, and users can re-add it from Settings when they want it.
+ */
+export const DEFAULT_MODEL_ID = 'gemini-4-hydrogen';
 
 /**
  * Single source of truth for the Gemini Robotics ER model id.
@@ -92,5 +97,7 @@ export const DEFAULT_TTS_VOICE = 'Zephyr';
 
 export const DEFAULT_TRANSCRIPTION_MODEL_ID = 'gemini-3.5-transcribe';
 export const DEFAULT_TTS_MODEL_ID = 'gemini-3.8-flash-tts';
-export const DEFAULT_LIVE_ARTIFACTS_MODEL_ID = 'gemini-3.8-flash';
+// Name is historical (the Live Artifacts picker is gone); this now seeds the
+// connection-test dropdown, which must default to the model a fresh install chats with.
+export const DEFAULT_LIVE_ARTIFACTS_MODEL_ID = 'gemini-4-hydrogen';
 export const DEFAULT_THOUGHT_TRANSLATION_MODEL_ID = 'gemini-3.5-flash-lite';

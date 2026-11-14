@@ -13,7 +13,7 @@ import { formatApiKeyErrorMessage } from '@/utils/api/apiKeySelection';
 import { useChatStore } from '@/stores/chatStore';
 import { toastError } from '@/stores/toastStore';
 import { isServerCodeExecutionMode } from '@/utils/code/codeExecution';
-import { getModelCapabilities } from '@/utils/model/modelCapabilities';
+import { getModelCapabilities, isOmniVideoModel } from '@/utils/model/modelCapabilities';
 import { resolveChatApiRoute } from '@/utils/chat/chatApiRoute';
 import { updateSessionById } from '@/utils/chat/sessionMutations';
 import { sessionHasGeminiFilesApiReferences, usesGeminiFilesApiReference } from '@/utils/chat/geminiFilesApi';
@@ -30,6 +30,7 @@ import { createSenderStoreActions } from './senderStoreActions';
 import { sendStandardMessage } from './standardChatStrategy';
 import { sendTranscribeMessage } from './transcribeStrategy';
 import { sendTtsMessage } from './ttsStrategy';
+import { sendOmniVideoMessage } from './omniVideoStrategy';
 import { useChatStreamHandler } from './useChatStreamHandler';
 import { useMessageLifecycle } from './useMessageLifecycle';
 import { useModelRequestRunner } from './useModelRequestRunner';
@@ -211,6 +212,30 @@ export const useMessageSender = (props: MessageSenderProps) => {
         return;
       }
       const { keyToUse, shouldLockKey, generationId, abortController: newAbortController } = request;
+      if (apiRoute.apiMode === 'gemini-native' && isOmniVideoModel(activeModelId)) {
+        if (appSettings.isAutoScrollOnSendEnabled) userScrolledUpRef.current = false;
+        if (overrideOptions?.files === undefined) setSelectedFiles([]);
+        await sendOmniVideoMessage({
+          keyToUse,
+          activeSessionId,
+          messages: historyMessagesForTurn,
+          generationId,
+          abortController: newAbortController,
+          appSettings,
+          currentChatSettings: sessionToUpdate,
+          text: textToUse.trim(),
+          files: filesToUse,
+          editingMessageId: effectiveEditingId,
+          retryModelMessageId,
+          updateAndPersistSessions,
+          setActiveSessionId,
+          setActiveMessages: senderStoreActions.setActiveMessages,
+          runMessageLifecycle,
+          t,
+        });
+        if (editingMessageId) setEditingMessageId(null);
+        return;
+      }
       let filesReadyForSend = filesToUse;
       const isAnyFileUploading = filesToUse.some((file) => file.uploadState === 'uploading' || file.isProcessing);
 

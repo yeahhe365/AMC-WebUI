@@ -102,6 +102,8 @@ export interface ChatMessage {
   thoughtSignatures?: string[];
   excludeFromContext?: boolean;
   apiParts?: Part[]; // Preserves raw API parts for either user or model turns.
+  /** Interactions API state for continuing an Omni video editing conversation. */
+  omniInteraction?: { id: string; keyFingerprint: string; apiBase: string };
   isInternalToolMessage?: boolean; // Hidden client-side tool plumbing turn used to rebuild API context.
   toolParentMessageId?: string; // Visible model message ID associated with an internal tool turn.
   variants?: ChatMessage[];

@@ -6,6 +6,7 @@ const {
   mockSendStandardMessage,
   mockSendTtsMessage,
   mockSendImageEditMessage,
+  mockSendOmniVideoMessage,
   mockGetModelCapabilities,
   mockCreateMessage,
   mockCreateNewSession,
@@ -16,6 +17,7 @@ const {
   mockSendStandardMessage: vi.fn(),
   mockSendTtsMessage: vi.fn(),
   mockSendImageEditMessage: vi.fn(),
+  mockSendOmniVideoMessage: vi.fn(),
   mockGetModelCapabilities: vi.fn(),
   mockCreateMessage: vi.fn((role: string, content: string, options?: Record<string, unknown>) => ({
     id: 'error-message-id',
@@ -53,12 +55,17 @@ vi.mock('./imageEditStrategy', () => ({
   sendImageEditMessage: mockSendImageEditMessage,
 }));
 
+vi.mock('./omniVideoStrategy', () => ({
+  sendOmniVideoMessage: mockSendOmniVideoMessage,
+}));
+
 vi.mock('./senderStoreActions', () => ({
   createSenderStoreActions: () => mockSenderStoreActions,
 }));
 
 vi.mock('@/utils/model/modelCapabilities', () => ({
   getModelCapabilities: mockGetModelCapabilities,
+  isOmniVideoModel: (id: string) => id.replace(/^models\//, '') === 'gemini-omni-1.2-flash',
 }));
 
 vi.mock('@/utils/chat/ids', () => ({
@@ -129,6 +136,32 @@ describe('useMessageSender', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     useChatStore.setState({ selectedFiles: [] });
+  });
+
+  it('routes Omni image prompts to the video strategy without processing ordinary chat history', async () => {
+    mockGetModelCapabilities.mockReturnValue({
+      isTtsModel: false,
+      isGemini3ImageModel: false,
+      isNativeAudioModel: false,
+      permissions: { canAcceptAttachments: true, requiresTextPrompt: true },
+    });
+    const image = createUploadedFile({ type: 'image/png', uploadState: 'active', rawFile: new Blob(['image']) });
+    const { result, unmount } = renderMessageSender({
+      currentChatSettings: { modelId: 'gemini-omni-1.2-flash' },
+      selectedFiles: [image],
+    });
+    await act(async () => {
+      await result.current.handleSendMessage({ text: 'Animate' });
+    });
+    expect(mockSendOmniVideoMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: 'Animate',
+        files: [image],
+        keyToUse: 'api-key',
+      }),
+    );
+    expect(mockSendStandardMessage).not.toHaveBeenCalled();
+    unmount();
   });
 
   it('blocks attachments for models that cannot accept files', async () => {

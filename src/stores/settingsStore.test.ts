@@ -145,7 +145,7 @@ describe('settingsStore', () => {
       const { appSettings } = useSettingsStore.getState();
       expect(appSettings.providerId).toBe('gemini-native');
       expect(appSettings.apiKey).toBeNull();
-      expect(appSettings.modelId).toBe('gemini-3.8-flash');
+      expect(appSettings.modelId).toBe('gemini-4-hydrogen');
       expect(appSettings.thirdPartyApi.connections).toEqual([]);
     });
 

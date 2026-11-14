@@ -40,6 +40,7 @@ describe('useAppEvents PWA lifecycle', () => {
     modelId: 'gemini-3-flash-preview',
   });
   const availableModels: ModelOption[] = [
+    { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon', isPinned: true },
     { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', isPinned: true },
     { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', isPinned: true },
     { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', isPinned: true },
@@ -122,7 +123,7 @@ describe('useAppEvents PWA lifecycle', () => {
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
     });
 
-    expect(handleSelectModelInHeader).toHaveBeenCalledWith('gemini-3.8-flash');
+    expect(handleSelectModelInHeader).toHaveBeenCalledWith('gemini-4-carbon');
 
     textarea.remove();
     unmount();

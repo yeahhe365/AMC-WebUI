@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_MODEL_ID } from '@/constants/modelConfiguration';
 import { getDefaultModelOptions } from './defaultModelOptions';
 
 describe('getDefaultModelOptions', () => {
@@ -99,12 +100,22 @@ describe('getDefaultModelOptions', () => {
     expect(flash36?.isPinned).toBe(false);
   });
 
-  it('includes Gemini 3.8 Flash and Gemini 3.5 Transcribe in pinned defaults, and omits Gemini 3.7 Flash by default', () => {
+  it('keeps Gemini 3.5 Transcribe in the defaults but leaves 3.8 Flash and 3.7 Flash out', () => {
     const models = getDefaultModelOptions();
 
-    expect(models.some((model) => model.id === 'gemini-3.8-flash')).toBe(true);
+    // The picker ships Gemini 4 only. 3.8 Flash is still callable, so it is not
+    // gone from the catalog — it just has to be added by hand before it shows up.
+    expect(models.some((model) => model.id === 'gemini-3.8-flash')).toBe(false);
     expect(models.some((model) => model.id === 'gemini-3.7-flash')).toBe(false);
     expect(models.some((model) => model.id === 'gemini-3.5-transcribe')).toBe(true);
+  });
+
+  it('keeps the default model id inside the default list', () => {
+    const models = getDefaultModelOptions();
+
+    // A default the picker cannot render would leave new sessions on a model that
+    // only resolves through the id fallback.
+    expect(models.some((model) => model.id === DEFAULT_MODEL_ID)).toBe(true);
   });
 
   it('keeps preview ids but omits Preview from default display names', () => {

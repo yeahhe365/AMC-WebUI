@@ -509,15 +509,18 @@ AMC-WebUI/
 
 OpenAI 兼容模式使用独立模型列表，可在设置中手动维护或从兼容端点拉取；下表列出应用内置的 Gemini 原生默认模型。
 
-| 类型                | 模型                                                                                                                                                                     |
-| :------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Gemini 4**        | gemini-4-hydrogen, gemini-4-carbon, gemini-4-argon                                                                                                                       |
-| **Gemini 3.x**      | gemini-3.8-flash, gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3.1-pro-preview, gemini-3.8-live, gemini-3.8-live-extended-thinking, gemini-3.5-live-translate-preview |
-| **Robotics**        | gemini-robotics-er-2-preview                                                                                                                                             |
-| **Gemma 4**         | gemma-4-31b-it, gemma-4-26b-a4b-it                                                                                                                                       |
-| **图片生成**        | gemini-nano-banana-2.1, gemini-3-pro-image, gemini-3.1-flash-lite-image                                                                                                  |
-| **TTS**             | gemini-3.8-flash-tts (默认，30 种语音), gemini-3.8-flash-lite-tts                                                                                                        |
-| **转写 / 实时转写** | gemini-3.5-transcribe, gemini-3.5-transcribe-live                                                                                                                        |
+| 类型                | 模型                                                                                                                                                   |
+| :------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gemini 4**        | gemini-4-hydrogen, gemini-4-carbon, gemini-4-argon                                                                                                     |
+| **Gemini 3.x**      | gemini-3.6-flash, gemini-3.5-flash-lite, gemini-3.1-pro-preview, gemini-3.8-live, gemini-3.8-live-extended-thinking, gemini-3.5-live-translate-preview |
+| **Robotics**        | gemini-robotics-er-2-preview                                                                                                                           |
+| **Gemma 4**         | gemma-4-31b-it, gemma-4-26b-a4b-it                                                                                                                     |
+| **图片生成**        | gemini-nano-banana-2.1, gemini-3-pro-image, gemini-3.1-flash-lite-image                                                                                |
+| **视频生成与编辑**  | gemini-omni-1.2-flash（文字或参考图片生成视频，支持连续编辑；需付费）                                                                                  |
+| **TTS**             | gemini-3.8-flash-tts (默认，30 种语音), gemini-3.8-flash-lite-tts                                                                                      |
+| **转写 / 实时转写** | gemini-3.5-transcribe, gemini-3.5-transcribe-live                                                                                                      |
+
+> `gemini-3.8-flash` 仍可正常调用（连接测试中也能选到），但已不再内置到默认模型选择框；需要时可在 **设置 → 模型列表** 中手动添加，或从 Gemini API 同步模型。
 
 ---
 

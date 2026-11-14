@@ -21,16 +21,17 @@ AMC WebUI natively supports Google's latest Gemini 4 and Gemini 3.x series, embo
 - **Highlights**: A shared 1M-token context window with decodes up to 1M tokens, full thinking levels, and Live Artifacts generation.
 - **Which one**: `gemini-4-carbon` is Google's most capable reasoning model (stronger factual accuracy and complex engineering); `gemini-4-argon` is faster with lower token spend per turn, better for latency-sensitive hard tasks.
 
-### 2. Primary Workhorse: `gemini-3.8-flash`
+### 2. Default Workhorse: `gemini-4-hydrogen`
 
-- **Role**: Default recommended model for daily programming, writing, tool invocation, and long-context processing.
-- **Highlights**: Extremely low latency, full Thinking levels (Low / Medium / High), multimodal file analysis, and Live Artifacts generation.
+- **Role**: The default pick for daily programming, writing, tool invocation, and long-context processing — a fresh install starts here.
+- **Highlights**: 1M-token context with a 65,536-token output cap, `LOW`–`XHIGH` thinking levels (defaults to `HIGH`), and multimodal input; cheaper per token than Carbon or Argon, so it works as an everyday driver.
+- **Previous workhorse**: `gemini-3.8-flash` stays callable (1M context, 65K output, `LOW`–`HIGH` thinking) but no longer ships in the default picker; add it under **Settings → model list** or sync it from the Gemini API.
 
-### 3. Previous-generation Workhorse: `gemini-3.6-flash`
+### 3. Older Stable Release: `gemini-3.6-flash`
 
 - **Role**: Production workloads that need a model ID that stays put instead of rolling with the flagship, plus workflows built before 3.8 Flash shipped.
 - **Highlights**: Same 1M-token context and 65,536-token output cap as 3.8 Flash, with thinking and multimodal input; Google marks it **Stable** with "No shutdown date announced".
-- **Which to pick**: Use `gemini-3.8-flash` for anything new; choose 3.6 only when you genuinely want the previous-generation Flash. Note that `gemini-3.5-flash` now auto-routes to 3.6.
+- **Which to pick**: Use `gemini-4-hydrogen` for anything new; choose 3.6 only when you genuinely want the previous-generation Flash. Note that `gemini-3.5-flash` now auto-routes to 3.6.
 
 ### 4. Ultra-fast & Lightweight: `gemini-3.5-flash-lite`
 

@@ -272,6 +272,13 @@ describe('ChatInputActions', () => {
     expect(audioBtn).toHaveAttribute('title', 'Current model does not support MCP tools');
   });
 
+  it('disables MCP tools for the native Omni video model', () => {
+    renderActions({ currentModelId: 'gemini-omni-1.2-flash', providerId: 'gemini-native' });
+    const button = renderer.container.querySelector('[data-testid="mcp-picker-button"]');
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', 'Current model does not support MCP tools');
+  });
+
   it('enables MCP picker and hides Live controls on third-party provider routes', () => {
     useSettingsStore.setState({
       appSettings: {

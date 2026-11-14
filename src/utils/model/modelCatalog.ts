@@ -205,7 +205,9 @@ export const getQuickSwitchModelIds = (models: ModelOption[]): string[] => [
   ...new Set(buildModelCatalog(models).map((entry) => entry.id)),
 ];
 
-const DEFAULT_TAB_CYCLE_MODEL_IDS = ['gemini-3.1-pro-preview', 'gemini-3.8-flash'] as const;
+// Pro + the current fast flagship, both in the built-in lineup. 3.8 Flash used to
+// hold the Flash slot before it stopped being a default picker entry.
+const DEFAULT_TAB_CYCLE_MODEL_IDS = ['gemini-3.1-pro-preview', 'gemini-4-carbon'] as const;
 
 export const getTabCycleModelIds = (models: ModelOption[], configuredIds?: string[]): string[] => {
   const orderedIds = getQuickSwitchModelIds(models);

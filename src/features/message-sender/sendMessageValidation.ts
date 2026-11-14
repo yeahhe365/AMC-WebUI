@@ -10,6 +10,7 @@ import {
   isVideoMimeType,
 } from '@/utils/file/fileTypeClassification';
 import { normalizeModelId } from '@/utils/model/modelId';
+import { isOmniVideoModel } from '@/utils/model/modelCapabilities';
 import type { MessageSenderTranslator } from './messageSenderTypes';
 
 interface MessageSendPermissions {
@@ -122,6 +123,15 @@ export const validateMessageBeforeSend = ({
       activeModelId,
     });
     return { ok: false, fileError: t('messageSenderImageReferenceLimit') };
+  }
+
+  if (isOmniVideoModel(activeModelId)) {
+    if (files.some((file) => !isImageMimeType(file.type))) {
+      return { ok: false, fileError: t('omniImagesOnly') };
+    }
+    if (imageReferenceCount > 6) {
+      return { ok: false, fileError: t('omniImageLimit') };
+    }
   }
 
   if (isHostedGemma4TextImageModel(activeModelId)) {

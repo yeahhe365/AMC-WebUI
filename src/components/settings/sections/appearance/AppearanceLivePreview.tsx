@@ -3,6 +3,7 @@ import { Eye, Code, FileText } from 'lucide-react';
 import { useI18n } from '@/contexts/I18nContext';
 import type { AppSettings } from '@/types';
 import { getRegisteredModelName } from '@/constants/modelRegistry';
+import { DEFAULT_MODEL_ID } from '@/constants/modelConfiguration';
 import { KNOWN_MODELS_CATALOG } from '@/utils/model/knownModelsCatalog';
 import { lazyNamedComponent } from '@/utils/lazyNamedComponent';
 
@@ -23,7 +24,7 @@ export const AppearanceLivePreview: React.FC<AppearanceLivePreviewProps> = ({ se
   const [activeTab, setActiveTab] = useState<'code' | 'text'>('code');
   const fontSize = settings.baseFontSize || 16;
   const modelDisplayName = useMemo(() => {
-    const modelId = settings.modelId || 'gemini-3.8-flash';
+    const modelId = settings.modelId || DEFAULT_MODEL_ID;
     // Registry names carry the labels the picker intentionally uses (e.g. "Nano
     // Banana Pro"); the catalog then keeps retired-but-still-callable ids such as
     // gemini-3.7-flash showing a friendly name instead of their raw slug.

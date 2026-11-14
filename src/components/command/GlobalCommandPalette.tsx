@@ -50,7 +50,7 @@ const COMMON_MODELS = [
   { id: 'gemini-4-argon', name: 'Gemini 4 Argon', provider: 'Google', badge: 'Frontier' },
   { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'Anthropic', badge: 'Fast & Smart' },
   { id: 'gpt-6-sol', name: 'GPT-6 Sol', provider: 'OpenAI', badge: 'Omni' },
-  { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', provider: 'Google', badge: 'Next-Gen' },
+  { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash-Lite', provider: 'Google', badge: 'Lite' },
   { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', provider: 'Google', badge: 'Pro' },
   { id: 'deepseek-flash', name: 'DeepSeek Flash', provider: 'DeepSeek', badge: 'Reasoning' },
 ];

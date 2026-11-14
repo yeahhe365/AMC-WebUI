@@ -16,7 +16,7 @@ import { useComposerAuxiliaryActions } from './actions/useComposerAuxiliaryActio
 import { useAuxiliaryActionCollapse } from './actions/useAuxiliaryActionCollapse';
 import { COMPOSER_CLUSTER_GAP_CLASS, COMPOSER_CLUSTER_SEPARATION_CLASS } from '@/constants/designTokens';
 import { useChatInputActionsContext, useChatInputComposerStatusContext } from './ChatInputContext';
-import { isGemmaModel } from '@/utils/model/modelCapabilities';
+import { isGemmaModel, isOmniVideoModel } from '@/utils/model/modelCapabilities';
 import { GEMINI_PROVIDER_ID } from '@/types';
 
 const ChatInputActionsComponent: React.FC = () => {
@@ -53,6 +53,7 @@ const ChatInputActionsComponent: React.FC = () => {
     !isTranscribeModel &&
     !isNativeAudioModel &&
     !isImageGenerationModel &&
+    !(isGeminiNative && isOmniVideoModel(currentModelId)) &&
     !isGemma;
   const focusedToolStates = useMemo(
     () => ({

@@ -4,6 +4,9 @@ import { normalizeModelId } from './modelId';
 
 export const isGemini4Model = (modelId: string): boolean => !!modelId && modelId.toLowerCase().includes('gemini-4');
 
+export const isOmniVideoModel = (modelId: string): boolean =>
+  normalizeModelId(modelId).toLowerCase() === 'gemini-omni-1.2-flash';
+
 export const isGemini3Model = (modelId: string): boolean => {
   if (!modelId) return false;
   const lowerId = modelId.toLowerCase();
@@ -333,7 +336,9 @@ export const getModelCapabilities = (modelId: string): ModelCapabilities => {
   const gemini38LiveExtendedThinkingModel = isGemini38LiveExtendedThinkingModel(modelId);
   const roboticsModel = isGeminiRoboticsModel(modelId);
   const imageGenerationModel = isImageGenerationModel(modelId);
-  const canUseTextChatTools = !nativeAudioModel && !imageGenerationModel && !ttsModel && !transcribeModel;
+  const omniVideoModel = isOmniVideoModel(modelId);
+  const canUseTextChatTools =
+    !nativeAudioModel && !imageGenerationModel && !ttsModel && !transcribeModel && !omniVideoModel;
   const gemmaModel = isGemmaModel(modelId);
   // Gemma models on the Gemini API support no tools at all (no grounding, no
   // code execution) — tool toggles for them would only produce API 400s.
@@ -358,12 +363,12 @@ export const getModelCapabilities = (modelId: string): ModelCapabilities => {
       (canUseTextChatTools && !gemmaModel) ||
       (nativeAudioModel && !isLiveTranslateModel(modelId) && !isLiveTranscribeModel(modelId)),
     canUseUrlContext: canUseTextChatTools && !gemmaModel,
-    canUseTokenCount: !nativeAudioModel,
+    canUseTokenCount: !nativeAudioModel && !omniVideoModel,
     canUseYouTubeUrl: canUseTextChatTools,
     canGenerateSuggestions: canUseTextChatTools,
     canUseVoiceInput: !nativeAudioModel && !imageGenerationModel && !ttsModel,
     canUseLiveControls: nativeAudioModel,
-    requiresTextPrompt: ttsModel || imageGenerationModel,
+    requiresTextPrompt: ttsModel || imageGenerationModel || omniVideoModel,
   };
 
   let supportedAspectRatios: string[] | undefined;

@@ -18,6 +18,18 @@ interface ModelBadgeListProps {
 
 const MODELS: ModelInfo[] = [
   {
+    id: 'gemini-4-hydrogen',
+    name: 'Gemini 4 Hydrogen',
+    category: 'core',
+    contextWindow: '1M Tokens',
+    features: ['默认主力', '深度思考 (LOW~XHIGH)', '65K 输出', '多模态输入'],
+    description:
+      '当前默认主力模型：Gemini 4 世代的快速旗舰，100 万 Token 上下文、65,536 Token 输出，支持 LOW～XHIGH 深度思考，单 Token 价格低于 Carbon / Argon。',
+    descriptionEn:
+      'Current default: the fast Gemini 4 flagship with 1M-token context, 65,536-token output, LOW–XHIGH thinking, and lower per-token pricing than Carbon or Argon.',
+    defaultBadge: true,
+  },
+  {
     id: 'gemini-4-carbon',
     name: 'Gemini 4 Carbon',
     category: 'core',
@@ -43,10 +55,11 @@ const MODELS: ModelInfo[] = [
     name: 'Gemini 3.8 Flash',
     category: 'core',
     contextWindow: '1M Tokens',
-    features: ['深度思考 (Low~High)', '搜索与地图增强', '代码执行', 'Live Artifacts'],
-    description: '全项目默认主力模型，响应迅捷，兼顾强劲的逻辑推理与日常高并发使用。',
-    descriptionEn: 'Default powerhouse model. Fast responses, strong reasoning, and multimodal capabilities.',
-    defaultBadge: true,
+    features: ['上一代主力', '深度思考 (LOW~HIGH)', '65K 输出', '需手动添加'],
+    description:
+      '上一代主力模型：仍可正常调用（连接测试中也能选到），但已不再内置到默认选择框，需要时请在设置 → 模型列表中手动添加。',
+    descriptionEn:
+      'Previous-generation workhorse. Still callable (and still offered for connection tests), but no longer shipped in the default picker — add it under Settings → model list.',
   },
   {
     id: 'gemini-3.5-flash-lite',

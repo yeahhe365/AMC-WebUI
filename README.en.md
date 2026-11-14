@@ -495,15 +495,18 @@ AMC-WebUI/
 
 OpenAI Compatible mode uses a separate model list that you can manage manually or fetch from a compatible endpoint. The table below lists the built-in Gemini Native defaults.
 
-| Type             | Models                                                                                                                                                                                 |
-| :--------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Gemini 4         | `gemini-4-hydrogen`, `gemini-4-carbon`, `gemini-4-argon`                                                                                                                               |
-| Gemini 3.x       | `gemini-3.8-flash`, `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-pro-preview`, `gemini-3.8-live`, `gemini-3.8-live-extended-thinking`, `gemini-3.5-live-translate-preview` |
-| Robotics         | `gemini-robotics-er-2-preview`                                                                                                                                                         |
-| Gemma 4          | `gemma-4-31b-it`, `gemma-4-26b-a4b-it`                                                                                                                                                 |
-| Image generation | `gemini-nano-banana-2.1`, `gemini-3-pro-image`, `gemini-3.1-flash-lite-image`                                                                                                          |
-| TTS              | `gemini-3.8-flash-tts` (default, 30 voices), `gemini-3.8-flash-lite-tts`                                                                                                               |
-| Transcription    | `gemini-3.5-transcribe`, `gemini-3.5-transcribe-live`                                                                                                                                  |
+| Type             | Models                                                                                                                                                             |
+| :--------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gemini 4         | `gemini-4-hydrogen`, `gemini-4-carbon`, `gemini-4-argon`                                                                                                           |
+| Gemini 3.x       | `gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.1-pro-preview`, `gemini-3.8-live`, `gemini-3.8-live-extended-thinking`, `gemini-3.5-live-translate-preview` |
+| Robotics         | `gemini-robotics-er-2-preview`                                                                                                                                     |
+| Gemma 4          | `gemma-4-31b-it`, `gemma-4-26b-a4b-it`                                                                                                                             |
+| Image generation | `gemini-nano-banana-2.1`, `gemini-3-pro-image`, `gemini-3.1-flash-lite-image`                                                                                      |
+| Video generation | `gemini-omni-1.2-flash` (text or image to video, conversational editing; paid)                                                                                     |
+| TTS              | `gemini-3.8-flash-tts` (default, 30 voices), `gemini-3.8-flash-lite-tts`                                                                                           |
+| Transcription    | `gemini-3.5-transcribe`, `gemini-3.5-transcribe-live`                                                                                                              |
+
+> `gemini-3.8-flash` is still callable (and remains selectable for connection tests), but it no longer ships in the default model picker; add it by hand under **Settings → model list** or sync it from the Gemini API.
 
 ---
 

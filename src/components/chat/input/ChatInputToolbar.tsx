@@ -15,6 +15,7 @@ import { useChatInputToolbarContext } from './ChatInputContext';
 import { useI18n } from '@/contexts/I18nContext';
 import { TOOLBAR_IMAGE_CLUSTER_CLASS } from '@/constants/designTokens';
 import { GEMINI_PROVIDER_ID } from '@/types';
+import { isOmniVideoModel } from '@/utils/model/modelCapabilities';
 
 const ChatInputToolbarComponent: React.FC = () => {
   const { t } = useI18n();
@@ -59,6 +60,7 @@ const ChatInputToolbarComponent: React.FC = () => {
   const fileError = useChatStore((state) => state.appFileError);
   const providerId = currentChatSettings?.providerId;
   const isGeminiNative = providerId === undefined || providerId === GEMINI_PROVIDER_ID;
+  const showOmniNotice = isGeminiNative && isOmniVideoModel(currentChatSettings?.modelId ?? '');
 
   const ttsVoice = currentChatSettings?.ttsVoice;
   const mediaResolution = currentChatSettings?.mediaResolution;
@@ -101,6 +103,7 @@ const ChatInputToolbarComponent: React.FC = () => {
   const canShowAddByUrlInput = isGeminiNative && showAddByUrlInput;
 
   const hasVisibleContent =
+    showOmniNotice ||
     showAspectRatio ||
     showImageSize ||
     showImageOutputMode ||
@@ -122,6 +125,11 @@ const ChatInputToolbarComponent: React.FC = () => {
           : 'opacity-0 -translate-y-1 h-0 overflow-hidden pointer-events-none'
       }`}
     >
+      {showOmniNotice && (
+        <p data-testid="omni-cost-notice" className="text-xs text-[var(--theme-text-tertiary)]">
+          {t('omniCostNotice')}
+        </p>
+      )}
       {(showImageCluster ||
         canShowTtsVoice ||
         canShowLanguageDirection ||

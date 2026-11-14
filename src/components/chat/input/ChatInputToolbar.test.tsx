@@ -119,4 +119,12 @@ describe('ChatInputToolbar', () => {
 
     expect(renderer.container.querySelector('[data-testid="transcribe-settings-cluster"]')).toBeNull();
   });
+
+  it('shows a cost and state retention notice only for native Omni', () => {
+    renderToolbar({ modelId: 'gemini-omni-1.2-flash' });
+    const notice = renderer.container.querySelector('[data-testid="omni-cost-notice"]');
+    expect(notice?.textContent).toMatch(/0\.07/);
+    renderToolbar({ modelId: 'gemini-omni-1.2-flash', providerId: 'other' });
+    expect(renderer.container.querySelector('[data-testid="omni-cost-notice"]')).toBeNull();
+  });
 });

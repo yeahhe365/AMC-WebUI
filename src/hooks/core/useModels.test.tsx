@@ -100,20 +100,22 @@ describe('useModels', () => {
     unmount();
   });
 
-  it('omits Gemini 3.7 Flash by default but retains it when manually added by the user', () => {
+  it('omits retired default Flashes (3.7 / 3.8) but retains them when manually added', () => {
     const { result, unmount } = renderHook(() => useModels());
 
     expect(result.current.apiModels.some((m) => m.id === 'gemini-3.7-flash')).toBe(false);
-    expect(result.current.apiModels.some((m) => m.id === 'gemini-3.8-flash')).toBe(true);
+    expect(result.current.apiModels.some((m) => m.id === 'gemini-3.8-flash')).toBe(false);
 
     act(() => {
       result.current.setApiModels([
         ...result.current.apiModels,
         { id: 'gemini-3.7-flash', name: 'Gemini 3.7 Flash', isPinned: true },
+        { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
       ]);
     });
 
     expect(result.current.apiModels.some((m) => m.id === 'gemini-3.7-flash')).toBe(true);
+    expect(result.current.apiModels.some((m) => m.id === 'gemini-3.8-flash')).toBe(true);
     unmount();
   });
 

@@ -21,16 +21,17 @@ AMC WebUI 深度集成了 Google 官方最新的 Gemini 4 / Gemini 3.x、Robotic
 - **优势**：100 万 Token 上下文，解码上限同样达到 100 万 Token；支持完整深度思考与 Live Artifacts 生成。
 - **如何取舍**：`gemini-4-carbon` 是 Google 当前最强推理模型（事实准确性与复杂工程能力更强）；`gemini-4-argon` 更快、单轮 Token 消耗更低，适合时延敏感的高难任务。
 
-### 2. 主力通用模型：`gemini-3.8-flash`
+### 2. 默认主力：`gemini-4-hydrogen`
 
-- **定位**：日常代码编写、长文阅读分析、普通闲聊与工具调用的**全能首选**。
-- **优势**：响应延迟低，首字吐出极快；支持完整的深度思考能力（Thinking Level: Low / Medium / High）；支持多模态文件解析与 Live Artifacts 生成。
+- **定位**：日常代码编写、长文阅读分析、普通闲聊与工具调用的**默认首选**，新装后选择框里排在最前面的就是它。
+- **优势**：100 万 Token 上下文、65,536 Token 输出上限，支持 `LOW`～`XHIGH` 深度思考（默认 `HIGH`）与多模态输入；单 Token 价格低于 Carbon / Argon，适合作为日常主力。
+- **上一代主力**：`gemini-3.8-flash` 仍可正常调用（1M 上下文、65K 输出，思考等级 `LOW`～`HIGH`），但已不再内置到默认选择框；需要时可在 **设置 → 模型列表** 中手动添加，或从 Gemini API 同步模型。
 
-### 3. 上一代主力：`gemini-3.6-flash`
+### 3. 更早的稳定版：`gemini-3.6-flash`
 
 - **定位**：需要模型 ID 长期稳定、不随旗舰滚动的生产负载，以及 3.8 Flash 上线前既有的工作流。
 - **优势**：与 3.8 Flash 同为 100 万 Token 上下文、65,536 Token 输出上限，支持深度思考与多模态输入；官方标注 **Stable**，且 `No shutdown date announced`。
-- **怎么选**：新项目直接用 `gemini-3.8-flash`；只有确实需要「上一代、不再滚动更新」时选 3.6。注意 `gemini-3.5-flash` 已被官方自动路由到 3.6。
+- **怎么选**：新项目优先 `gemini-4-hydrogen`；确实需要「上一代、不再滚动更新」时选 3.6。注意 `gemini-3.5-flash` 已被官方自动路由到 3.6。
 
 ### 4. 超轻量低延迟：`gemini-3.5-flash-lite`
 

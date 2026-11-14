@@ -81,4 +81,30 @@ describe('MessageFiles', () => {
     expect(docContainer).not.toBeNull();
     expect(docContainer).not.toHaveClass('flex-shrink-0');
   });
+
+  it('plays and downloads generated videos inline', () => {
+    act(() => {
+      renderer.root.render(
+        <MessageFiles
+          files={[
+            createUploadedFile({
+              id: 'video-1',
+              name: 'generated-video-1.mp4',
+              type: 'video/mp4',
+              dataUrl: 'blob:video-1',
+            }),
+          ]}
+          onImageClick={() => {}}
+          messageId="message-video"
+          hasContentOrAudio={false}
+        />,
+      );
+    });
+    const video = renderer.container.querySelector('video');
+    expect(video?.getAttribute('src')).toBe('blob:video-1');
+    expect(video?.controls).toBe(true);
+    const download = renderer.container.querySelector('a[download]');
+    expect(download?.getAttribute('href')).toBe('blob:video-1');
+    expect(download?.getAttribute('download')).toBe('generated-video-1.mp4');
+  });
 });

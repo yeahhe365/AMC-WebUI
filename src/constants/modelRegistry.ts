@@ -14,6 +14,11 @@ interface RegisteredModel {
 
 const MODEL_REGISTRY: RegisteredModel[] = [
   {
+    id: 'gemini-omni-1.2-flash',
+    name: 'Gemini Omni 1.2 Flash',
+    groups: ['defaultPinned'],
+  },
+  {
     id: 'gemini-3.5-transcribe',
     name: 'Gemini 3.5 Transcribe',
     groups: ['defaultPinned', 'transcription'],
@@ -50,12 +55,12 @@ const MODEL_REGISTRY: RegisteredModel[] = [
     },
   },
   {
+    // Former default workhorse. The chat picker now ships Gemini 4 only, so 3.8
+    // stays out of `defaultPinned`; it remains callable and is kept as a
+    // connection-test target, and power users can re-add it from Settings.
     id: 'gemini-3.8-flash',
     name: 'Gemini 3.8 Flash',
-    groups: ['defaultPinned', 'liveArtifacts', 'connectionTest'],
-    groupLabels: {
-      liveArtifacts: 'Gemini 3.8 Flash',
-    },
+    groups: ['connectionTest'],
   },
   {
     // Previous-generation Flash, but Google still labels it Stable and it stays

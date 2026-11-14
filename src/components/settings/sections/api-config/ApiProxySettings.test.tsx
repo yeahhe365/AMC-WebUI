@@ -19,7 +19,7 @@ describe('ApiProxySettings', () => {
     });
 
     expect(document.body).toHaveTextContent(
-      'https://proxy.example.com/gemini/v1beta/models/gemini-3.8-flash:generateContent',
+      'https://proxy.example.com/gemini/v1beta/models/gemini-4-hydrogen:generateContent',
     );
   });
 

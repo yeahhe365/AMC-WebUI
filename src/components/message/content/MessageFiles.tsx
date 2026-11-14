@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { type UploadedFile } from '@/types';
 import { FileDisplay } from '@/components/message/FileDisplay';
 import { isImageMimeType } from '@/utils/file/fileTypeClassification';
+import { useI18n } from '@/contexts/I18nContext';
 
 interface MessageFilesProps {
   files: UploadedFile[];
@@ -22,15 +23,17 @@ export const MessageFiles: React.FC<MessageFilesProps> = ({
   isGemini3,
   hasContentOrAudio,
 }) => {
+  const { t } = useI18n();
   const hasToolResult = /\btool-result\b/.test(content || '');
 
-  const { imageFiles, documentFiles } = useMemo(() => {
+  const { imageFiles, documentFiles, generatedVideos } = useMemo(() => {
     if (!files || files.length === 0) {
-      return { imageFiles: [], documentFiles: [] };
+      return { imageFiles: [], documentFiles: [], generatedVideos: [] };
     }
 
     const imageAttachments: UploadedFile[] = [];
     const documentAttachments: UploadedFile[] = [];
+    const videos: UploadedFile[] = [];
     files.forEach((file) => {
       // Tool result blocks already render generated outputs inline.
       // Hide any generated attachments from the top strip to avoid duplicate previews.
@@ -38,11 +41,15 @@ export const MessageFiles: React.FC<MessageFilesProps> = ({
         return;
       }
 
+      if (file.name.startsWith('generated-video-') && file.type.startsWith('video/') && file.dataUrl) {
+        videos.push(file);
+        return;
+      }
       const isImageFile = isImageMimeType(file.type);
       if (isImageFile) imageAttachments.push(file);
       else documentAttachments.push(file);
     });
-    return { imageFiles: imageAttachments, documentFiles: documentAttachments };
+    return { imageFiles: imageAttachments, documentFiles: documentAttachments, generatedVideos: videos };
   }, [files, hasToolResult]);
 
   if (!files || files.length === 0) return null;
@@ -55,10 +62,18 @@ export const MessageFiles: React.FC<MessageFilesProps> = ({
 
   const showDocScroll = documentFiles.length > 4;
 
-  if (imageFiles.length === 0 && documentFiles.length === 0) return null;
+  if (imageFiles.length === 0 && documentFiles.length === 0 && generatedVideos.length === 0) return null;
 
   return (
     <div className={`flex flex-col gap-2 ${marginClass}`}>
+      {generatedVideos.map((file) => (
+        <div key={file.id} className="w-full max-w-xl">
+          <video src={file.dataUrl} controls preload="metadata" className="w-full rounded-xl" />
+          <a href={file.dataUrl} download={file.name} className="text-sm text-[var(--theme-text-link)]">
+            {t('filePreviewDownloadFile')}
+          </a>
+        </div>
+      ))}
       {imageFiles.length > 0 &&
         (isQuadImageView ? (
           <div className="grid grid-cols-2 gap-2">
