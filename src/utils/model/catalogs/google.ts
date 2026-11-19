@@ -17,6 +17,14 @@ export const GOOGLE_MODELS: Record<string, CatalogModelSpec> = {
     capabilities: { vision: true, thinking: true, tools: true },
     ownedBy: 'google',
   },
+  'gemini-4-neon': {
+    id: 'gemini-4-neon',
+    name: 'Gemini 4 Neon',
+    contextWindow: 1_048_576,
+    maxOutputTokens: 65_536,
+    capabilities: { vision: true, thinking: true, tools: true },
+    ownedBy: 'google',
+  },
   'gemini-4-argon': {
     id: 'gemini-4-argon',
     name: 'Gemini 4 Argon',

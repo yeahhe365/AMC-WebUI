@@ -61,12 +61,11 @@ export const useModelSelection = ({
         explicitProviderId && explicitProviderId !== GEMINI_PROVIDER_ID
           ? findThirdPartyConnection(appSettings, explicitProviderId)
           : undefined;
-      const inferredProvider =
-        !explicitProviderId || explicitProviderId === GEMINI_PROVIDER_ID
-          ? isThirdPartyModel
-            ? resolveProviderForModelId(appSettings, modelId)
-            : undefined
-          : undefined;
+      const inferredProvider = !explicitProviderId
+        ? isThirdPartyModel
+          ? resolveProviderForModelId(appSettings, modelId)
+          : undefined
+        : undefined;
       const sourceSettings = activeSessionId ? currentChatSettings : appSettings;
       const resolvedModelSettings: Partial<IndividualChatSettings> = resolveModelSwitchSettings({
         currentSettings: currentChatSettings,

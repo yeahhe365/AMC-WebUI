@@ -16,6 +16,8 @@ export const REQUIRED_THINKING_MODEL_IDS: readonly string[] = [
   'models/gemini-4-hydrogen',
   'gemini-4-carbon',
   'models/gemini-4-carbon',
+  'gemini-4-neon',
+  'models/gemini-4-neon',
   'gemini-4-argon',
   'models/gemini-4-argon',
   'gemini-3.1-pro-preview',

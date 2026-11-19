@@ -41,6 +41,16 @@ const MODELS: ModelInfo[] = [
       "Google's most capable reasoning model for complex software engineering, math/science, and autonomous agents, with a shared 1M-token context and long decodes up to 1M tokens.",
   },
   {
+    id: 'gemini-4-neon',
+    name: 'Gemini 4 Neon',
+    category: 'core',
+    contextWindow: '1M Tokens',
+    features: ['前沿推理', '深度思考 (LOW~XHIGH)', '65K 同步输出', '多模态输入'],
+    description: '快速前沿模型，适用于复杂软件工程、知识工作与科学任务；支持最高 XHIGH 思考档位。',
+    descriptionEn:
+      'Fast frontier model for complex software engineering, knowledge work, and science, with thinking up to XHIGH.',
+  },
+  {
     id: 'gemini-4-argon',
     name: 'Gemini 4 Argon',
     category: 'core',
@@ -55,11 +65,10 @@ const MODELS: ModelInfo[] = [
     name: 'Gemini 3.8 Flash',
     category: 'core',
     contextWindow: '1M Tokens',
-    features: ['上一代主力', '深度思考 (LOW~HIGH)', '65K 输出', '需手动添加'],
-    description:
-      '上一代主力模型：仍可正常调用（连接测试中也能选到），但已不再内置到默认选择框，需要时请在设置 → 模型列表中手动添加。',
+    features: ['上一代主力', '深度思考 (LOW~HIGH)', '65K 输出', '旧模型替代'],
+    description: '上一代主力模型，也是 Gemini 2.5 Pro 的官方替代型号，已内置于默认选择列表。',
     descriptionEn:
-      'Previous-generation workhorse. Still callable (and still offered for connection tests), but no longer shipped in the default picker — add it under Settings → model list.',
+      'Previous-generation workhorse and the official replacement for Gemini 2.5 Pro, included in the default picker.',
   },
   {
     id: 'gemini-3.5-flash-lite',

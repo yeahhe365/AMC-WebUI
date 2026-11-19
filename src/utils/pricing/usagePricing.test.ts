@@ -3,6 +3,24 @@ import { calculateApiUsageRecordPriceUsd, estimateMessageCostUsd, formatCostUsd 
 import type { ApiUsageRecord } from '@/services/db/dbService';
 
 describe('calculateApiUsageRecordPriceUsd', () => {
+  it('prices Neon multimodal input, cache, and output at published rates', () => {
+    const record: ApiUsageRecord = {
+      timestamp: Date.now(),
+      modelId: 'gemini-4-neon',
+      promptTokens: 100_000,
+      cachedPromptTokens: 50_000,
+      completionTokens: 20_000,
+      exactPricing: {
+        version: 1,
+        requestKind: 'chat',
+        promptTokensDetails: [{ modality: 'AUDIO', tokenCount: 100_000 }],
+        cacheTokensDetails: [{ modality: 'IMAGE', tokenCount: 50_000 }],
+        responseTokensDetails: [{ modality: 'TEXT', tokenCount: 20_000 }],
+      },
+    };
+    expect(calculateApiUsageRecordPriceUsd(record)).toBeCloseTo(0.6075);
+  });
+
   it('prices Hydrogen input, cached input and output at official rates', () => {
     const record: ApiUsageRecord = {
       timestamp: Date.now(),
@@ -393,5 +411,34 @@ describe('estimateMessageCostUsd and formatCostUsd', () => {
     expect(formatCostUsd(0.0012)).toBe('$0.0012');
     expect(formatCostUsd(1.5)).toBe('$1.50');
     expect(formatCostUsd(null)).toBe('—');
+  });
+});
+
+describe('retired Gemini 2.5 route pricing', () => {
+  it('preserves historical rates and avoids claiming exact prices after automatic routing', () => {
+    const record: ApiUsageRecord = {
+      timestamp: Date.UTC(2026, 10, 30),
+      modelId: 'gemini-2.5-pro',
+      promptTokens: 1_000_000,
+      completionTokens: 1_000_000,
+      exactPricing: {
+        version: 1,
+        requestKind: 'chat',
+        promptTokensDetails: [{ modality: 'TEXT', tokenCount: 1_000_000 }],
+        responseTokensDetails: [{ modality: 'TEXT', tokenCount: 1_000_000 }],
+      },
+    };
+    expect(calculateApiUsageRecordPriceUsd(record)).toBeCloseTo(17.5);
+    expect(calculateApiUsageRecordPriceUsd({ ...record, timestamp: Date.UTC(2026, 11, 1) })).toBeNull();
+    expect(
+      calculateApiUsageRecordPriceUsd({ ...record, modelId: 'gemini-2.5-flash', timestamp: Date.UTC(2026, 11, 1) }),
+    ).toBeNull();
+    expect(
+      calculateApiUsageRecordPriceUsd({
+        ...record,
+        modelId: 'gemini-2.5-flash-lite',
+        timestamp: Date.UTC(2026, 11, 1),
+      }),
+    ).not.toBeNull();
   });
 });

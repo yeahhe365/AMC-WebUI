@@ -123,8 +123,8 @@ const buildGenerationConfig = (
 };
 
 describe('buildGenerationConfig', () => {
-  it('sends Hydrogen XHIGH unchanged and uses HIGH when no level is specified', async () => {
-    const settings = { ...DEFAULT_APP_SETTINGS, modelId: 'gemini-4-hydrogen', thinkingLevel: 'XHIGH' as const };
+  it.each(['gemini-4-hydrogen', 'gemini-4-neon'])('sends %s XHIGH unchanged and defaults to HIGH', async (modelId) => {
+    const settings = { ...DEFAULT_APP_SETTINGS, modelId, thinkingLevel: 'XHIGH' as const };
     const extraHigh = await buildGenerationConfigFromSettings({ settings });
     expect(extraHigh.thinkingConfig?.thinkingLevel).toBe('XHIGH');
     const defaultConfig = await buildGenerationConfigFromSettings({

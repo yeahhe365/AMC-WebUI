@@ -47,6 +47,7 @@ export interface GlobalCommandPaletteProps {
 const COMMON_MODELS = [
   { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen', provider: 'Google', badge: 'Fast' },
   { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon', provider: 'Google', badge: 'Frontier' },
+  { id: 'gemini-4-neon', name: 'Gemini 4 Neon', provider: 'Google', badge: 'Frontier' },
   { id: 'gemini-4-argon', name: 'Gemini 4 Argon', provider: 'Google', badge: 'Frontier' },
   { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', provider: 'Anthropic', badge: 'Fast & Smart' },
   { id: 'gpt-6-sol', name: 'GPT-6 Sol', provider: 'OpenAI', badge: 'Omni' },

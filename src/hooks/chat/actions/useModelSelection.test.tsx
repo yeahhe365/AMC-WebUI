@@ -110,6 +110,30 @@ describe('useModelSelection', () => {
     unmount();
   });
 
+  it('honors an explicit Gemini provider even if a third-party model has the same ID', () => {
+    const updateAndPersistSessions = vi.fn();
+    const settings = createChatSettings();
+    const { result, unmount } = renderHook(() =>
+      useModelSelection({
+        appSettings: appSettingsWithSharedModel(),
+        activeSessionId: 'session-1',
+        currentChatSettings: settings,
+        isLoading: false,
+        updateAndPersistSessions,
+        setActiveSessionId: vi.fn(),
+        setCurrentChatSettings: vi.fn(),
+        setIsSwitchingModel: vi.fn(),
+        handleStopGenerating: vi.fn(),
+        userScrolledUpRef: { current: false },
+      }),
+    );
+    act(() => result.current.handleSelectModelInHeader('shared-model', GEMINI_PROVIDER_ID));
+    const update = updateAndPersistSessions.mock.calls[0]?.[0];
+    const [session] = update([createSavedChatSession({ id: 'session-1', settings })]);
+    expect(session.settings.providerId).toBe(GEMINI_PROVIDER_ID);
+    unmount();
+  });
+
   it('falls back to inference when no explicit providerId is given', () => {
     const updateAndPersistSessions = vi.fn();
 

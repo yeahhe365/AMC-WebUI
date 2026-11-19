@@ -81,6 +81,7 @@ export const useChatHeaderRuntimeValues = ({
       currentModelName,
       availableModels: headerAvailableModels,
       selectedModelId: headerSelectedModelId,
+      isGeminiRoute: currentApiRoute.apiMode === 'gemini-native',
       isLiveArtifactsPromptActive,
       isLiveArtifactsPromptBusy: !!isLiveArtifactsPromptBusy,
       isPipSupported: pipState.isPipSupported,
@@ -96,6 +97,7 @@ export const useChatHeaderRuntimeValues = ({
     [
       activeSessionId,
       currentModelName,
+      currentApiRoute.apiMode,
       handleAppDragEnter,
       handleAppDragLeave,
       handleAppDragOver,

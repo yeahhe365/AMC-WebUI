@@ -503,7 +503,7 @@ export const getDefaultThinkingLevelForModel = (modelId: string, fallback?: Thin
     return 'MEDIUM';
   }
 
-  if (lowerId.includes('gemini-4-hydrogen')) return 'HIGH';
+  if (lowerId.includes('gemini-4-hydrogen') || lowerId.includes('gemini-4-neon')) return 'HIGH';
 
   if (isGemini4Model(modelId)) {
     return 'MEDIUM';
@@ -563,7 +563,10 @@ export const normalizeThinkingLevelForModel = (
     if (resolvedLevel === 'NONE') {
       return 'MINIMAL';
     }
-    if (modelId.toLowerCase().includes('gemini-4-hydrogen') && (resolvedLevel === 'XHIGH' || resolvedLevel === 'MAX')) {
+    if (
+      (modelId.toLowerCase().includes('gemini-4-hydrogen') || modelId.toLowerCase().includes('gemini-4-neon')) &&
+      (resolvedLevel === 'XHIGH' || resolvedLevel === 'MAX')
+    ) {
       return 'XHIGH';
     }
     if (resolvedLevel === 'XHIGH' || resolvedLevel === 'MAX') {

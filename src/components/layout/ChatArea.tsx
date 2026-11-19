@@ -1,5 +1,6 @@
 import React, { useMemo, useRef } from 'react';
 import { Header } from '@/components/header/Header';
+import { LegacyGeminiMigration } from '@/components/header/LegacyGeminiMigration';
 import { MessageList } from '@/components/chat/message-list/MessageList';
 import { ChatInput } from '@/components/chat/input/ChatInput';
 import { ChatWidthControls } from '@/components/chat/width/ChatWidthControls';
@@ -30,6 +31,7 @@ export const ChatArea: React.FC = () => {
     currentModelName,
     availableModels,
     selectedModelId,
+    isGeminiRoute,
     isLiveArtifactsPromptActive,
     isLiveArtifactsPromptBusy,
     isPipSupported,
@@ -80,6 +82,13 @@ export const ChatArea: React.FC = () => {
         themeId={themeId}
         newChatShortcut={newChatShortcut}
         pipShortcut={pipShortcut}
+      />
+
+      <LegacyGeminiMigration
+        modelId={selectedModelId}
+        isGemini={isGeminiRoute}
+        onSelectModel={onSelectModel}
+        disabled={isLoading || isSwitchingModel}
       />
 
       <ModelsErrorDisplay error={modelsLoadingError} />

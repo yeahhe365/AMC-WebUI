@@ -15,17 +15,19 @@ AMC WebUI natively supports Google's latest Gemini 4 and Gemini 3.x series, embo
 
 ## Model Selection Guidelines
 
-### 1. Flagship Reasoning: `gemini-4-carbon` / `gemini-4-argon`
+### 1. Flagship Reasoning: `gemini-4-carbon` / `gemini-4-neon` / `gemini-4-argon`
 
 - **Role**: The hardest long-horizon reasoning, math and science heavy lifting, autonomous multi-step agents, and refactors that need very long output.
-- **Highlights**: A shared 1M-token context window with decodes up to 1M tokens, full thinking levels, and Live Artifacts generation.
+- **Highlights**: A shared 1M-token context window, thinking levels, and Live Artifacts generation. AMC supports synchronous responses up to 65,536 tokens; long decode is not implemented.
 - **Which one**: `gemini-4-carbon` is Google's most capable reasoning model (stronger factual accuracy and complex engineering); `gemini-4-argon` is faster with lower token spend per turn, better for latency-sensitive hard tasks.
+
+- **Neon**: A fast frontier model with up to XHIGH thinking and a standard synchronous output limit of 65,536 tokens.
 
 ### 2. Default Workhorse: `gemini-4-hydrogen`
 
 - **Role**: The default pick for daily programming, writing, tool invocation, and long-context processing — a fresh install starts here.
 - **Highlights**: 1M-token context with a 65,536-token output cap, `LOW`–`XHIGH` thinking levels (defaults to `HIGH`), and multimodal input; cheaper per token than Carbon or Argon, so it works as an everyday driver.
-- **Previous workhorse**: `gemini-3.8-flash` stays callable (1M context, 65K output, `LOW`–`HIGH` thinking) but no longer ships in the default picker; add it under **Settings → model list** or sync it from the Gemini API.
+- **Previous workhorse**: `gemini-3.8-flash` remains in the default picker (1M context, 65K output, `LOW`–`HIGH` thinking) as the official replacement for Gemini 2.5 Pro.
 
 ### 3. Older Stable Release: `gemini-3.6-flash`
 

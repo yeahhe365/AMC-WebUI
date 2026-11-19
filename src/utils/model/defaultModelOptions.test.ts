@@ -100,12 +100,10 @@ describe('getDefaultModelOptions', () => {
     expect(flash36?.isPinned).toBe(false);
   });
 
-  it('keeps Gemini 3.5 Transcribe in the defaults but leaves 3.8 Flash and 3.7 Flash out', () => {
+  it('offers the 3.8 Flash migration target while leaving 3.7 Flash out', () => {
     const models = getDefaultModelOptions();
 
-    // The picker ships Gemini 4 only. 3.8 Flash is still callable, so it is not
-    // gone from the catalog — it just has to be added by hand before it shows up.
-    expect(models.some((model) => model.id === 'gemini-3.8-flash')).toBe(false);
+    expect(models.some((model) => model.id === 'gemini-3.8-flash')).toBe(true);
     expect(models.some((model) => model.id === 'gemini-3.7-flash')).toBe(false);
     expect(models.some((model) => model.id === 'gemini-3.5-transcribe')).toBe(true);
   });
@@ -136,6 +134,7 @@ describe('getDefaultModelOptions', () => {
     expect(argon?.isPinned).toBe(true);
     expect(models[0]).toMatchObject({ id: 'gemini-4-hydrogen', isPinned: true });
     expect(models[1]?.id).toBe('gemini-4-carbon');
-    expect(models[2]?.id).toBe('gemini-4-argon');
+    expect(models[2]?.id).toBe('gemini-4-neon');
+    expect(models[3]?.id).toBe('gemini-4-argon');
   });
 });

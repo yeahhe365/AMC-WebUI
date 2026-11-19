@@ -15,17 +15,19 @@ AMC WebUI 深度集成了 Google 官方最新的 Gemini 4 / Gemini 3.x、Robotic
 
 ## 核心模型选型建议
 
-### 1. 旗舰推理：`gemini-4-carbon` / `gemini-4-argon`
+### 1. 旗舰推理：`gemini-4-carbon` / `gemini-4-neon` / `gemini-4-argon`
 
 - **定位**：最困难的长程推理、数理与科学攻坚、自主多步 Agent，以及需要超长输出的重构任务。
-- **优势**：100 万 Token 上下文，解码上限同样达到 100 万 Token；支持完整深度思考与 Live Artifacts 生成。
+- **优势**：100 万 Token 上下文，支持深度思考与 Live Artifacts 生成。AMC 当前支持最多 65,536 Token 同步输出，尚未实现长解码。
 - **如何取舍**：`gemini-4-carbon` 是 Google 当前最强推理模型（事实准确性与复杂工程能力更强）；`gemini-4-argon` 更快、单轮 Token 消耗更低，适合时延敏感的高难任务。
+
+- **Neon**：快速前沿模型，支持最高 XHIGH 思考档位，标准同步输出上限为 65,536 token。
 
 ### 2. 默认主力：`gemini-4-hydrogen`
 
 - **定位**：日常代码编写、长文阅读分析、普通闲聊与工具调用的**默认首选**，新装后选择框里排在最前面的就是它。
 - **优势**：100 万 Token 上下文、65,536 Token 输出上限，支持 `LOW`～`XHIGH` 深度思考（默认 `HIGH`）与多模态输入；单 Token 价格低于 Carbon / Argon，适合作为日常主力。
-- **上一代主力**：`gemini-3.8-flash` 仍可正常调用（1M 上下文、65K 输出，思考等级 `LOW`～`HIGH`），但已不再内置到默认选择框；需要时可在 **设置 → 模型列表** 中手动添加，或从 Gemini API 同步模型。
+- **上一代主力**：`gemini-3.8-flash` 仍在默认选择列表中（1M 上下文、65K 输出，思考等级 `LOW`～`HIGH`），也是 Gemini 2.5 Pro 的官方替代型号。
 
 ### 3. 更早的稳定版：`gemini-3.6-flash`
 

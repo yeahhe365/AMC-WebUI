@@ -36,6 +36,12 @@ const MODALITY_TEXT_PRICING: Record<string, ModalityPricing | null> = {
     response: { TEXT: 7.5 },
     tool: { TEXT: 1.5, IMAGE: 1.5, AUDIO: 1.5 },
   },
+  'gemini-4-neon': {
+    prompt: { TEXT: 3, IMAGE: 3, AUDIO: 3 },
+    cache: { TEXT: 0.15, IMAGE: 0.15, AUDIO: 0.15 },
+    response: { TEXT: 15 },
+    tool: { TEXT: 3, IMAGE: 3, AUDIO: 3 },
+  },
   // Official Gemini 4 Carbon pricing matches Argon: $2 input / $10 output /
   // $0.10 cache through 2026-11-30, then $4 / $20 / $0.20 from 2026-12-01.
   'gemini-4-carbon': {
@@ -187,6 +193,11 @@ const MODALITY_TEXT_PRICING: Record<string, ModalityPricing | null> = {
   },
 };
 
+// Usage records do not retain the provider or actual routed model, so a legacy
+// ID after Google's cutover is insufficient evidence for an exact rate.
+const hasAmbiguousLegacyRoute = (modelId: string, timestamp: number) =>
+  timestamp >= Date.UTC(2026, 11, 1) && (modelId === 'gemini-2.5-pro' || modelId === 'gemini-2.5-flash');
+
 const getScheduledRates = (pricing: ModalityPricing, timestamp: number): ScheduledModalityRates | undefined => {
   let effectiveRates: ScheduledModalityRates | undefined;
   for (const candidate of pricing.scheduledRates ?? []) {
@@ -229,6 +240,7 @@ const calculateFromExactPricing = (
   timestamp = Date.now(),
 ): number | null => {
   const normalizedModelId = normalizeModelId(modelId);
+  if (hasAmbiguousLegacyRoute(normalizedModelId, timestamp)) return null;
 
   // Per-image Imagen pricing was removed with Imagen model support. Historical
   // image_generate usage records stay unpriced.
@@ -328,6 +340,7 @@ export interface TokenCostStats {
 
 export const estimateMessageCostUsd = (modelId: string, tokens: TokenCostStats): number | null => {
   const normalized = normalizeModelId(modelId);
+  if (hasAmbiguousLegacyRoute(normalized, Date.now())) return null;
   const promptTokens = tokens.promptTokens ?? 0;
   const completionTokens = tokens.completionTokens ?? 0;
   const cachedPromptTokens = tokens.cachedPromptTokens ?? 0;

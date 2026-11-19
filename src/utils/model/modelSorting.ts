@@ -60,7 +60,8 @@ export const sortModels = (models: ModelOption[]): ModelOption[] => {
   const pinnedPriorityOrder: Record<string, number> = {
     'gemini-4-hydrogen': -1,
     'gemini-4-carbon': 0,
-    'gemini-4-argon': 1,
+    'gemini-4-neon': 1,
+    'gemini-4-argon': 1.5,
     'gemini-3.1-pro-preview': 2,
     'gemini-3.8-flash': 3,
     'gemini-3.7-flash': 4,

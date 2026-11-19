@@ -6,7 +6,7 @@ import { useModelPreferencesStore } from '@/stores/modelPreferencesStore';
 import { getDefaultModelOptions } from '@/utils/model/defaultModelOptions';
 
 /** Gemini 4 models that should stay pinned near the top of the picker. */
-const TOP_FRONTIER_MODEL_IDS = new Set(['gemini-4-hydrogen', 'gemini-4-carbon', 'gemini-4-argon']);
+const TOP_FRONTIER_MODEL_IDS = new Set(['gemini-4-hydrogen', 'gemini-4-carbon', 'gemini-4-neon', 'gemini-4-argon']);
 
 const reconcileCustomModelsWithDefaults = (
   customModels: ModelOption[],

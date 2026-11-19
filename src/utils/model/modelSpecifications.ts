@@ -428,7 +428,7 @@ const resolveThinkingLevelSpec = (modelId: string): ThinkingLevelSpec | undefine
     return { type: 'range', min: 'MINIMAL', max: 'HIGH', defaultLevel: 'MINIMAL' };
   }
 
-  if (lower.includes('gemini-4-hydrogen')) {
+  if (lower.includes('gemini-4-hydrogen') || lower.includes('gemini-4-neon')) {
     return { type: 'range', min: 'LOW', max: 'XHIGH', defaultLevel: 'HIGH' };
   }
 
@@ -563,6 +563,7 @@ const resolveThinkingBudget = (modelId: string): string | undefined => {
 
 const resolveModelDescriptionKey = (modelId: string): string | undefined => {
   const lower = modelId.toLowerCase();
+  if (lower.includes('gemini-4-neon')) return 'modelDescGemini4Neon';
   if (lower.includes('gemini-4-carbon')) return 'modelDescGemini4Carbon';
   if (lower.includes('gemini-4')) return 'modelDescGemini4Argon';
   if (lower.includes('gemini-3.1-pro')) return 'modelDescGemini31Pro';
@@ -599,6 +600,9 @@ const resolveModelDescriptionKey = (modelId: string): string | undefined => {
 
 const resolveModelDescription = (modelId: string): string | undefined => {
   const lower = modelId.toLowerCase();
+  if (lower.includes('gemini-4-neon')) {
+    return 'Fast frontier model for complex software engineering, knowledge work, and science.';
+  }
   if (lower.includes('gemini-4-carbon')) {
     return "Google's most capable reasoning model, built for complex software engineering, deep mathematical and scientific problem solving, high factual accuracy, and autonomous multi-step agents.";
   }

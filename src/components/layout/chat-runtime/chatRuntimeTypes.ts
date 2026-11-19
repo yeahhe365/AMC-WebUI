@@ -25,6 +25,7 @@ export interface ChatHeaderRuntimeValue {
   currentModelName: string;
   availableModels: ModelOption[];
   selectedModelId: string;
+  isGeminiRoute: boolean;
   isLiveArtifactsPromptActive: boolean;
   isLiveArtifactsPromptBusy: boolean;
   isPipSupported: boolean;

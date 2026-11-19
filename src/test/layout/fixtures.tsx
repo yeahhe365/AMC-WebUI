@@ -145,6 +145,7 @@ export const createChatAreaProviderValue = (overrides: ChatAreaProviderValueOver
       currentModelName: 'Test Model',
       availableModels: inputOverrides.availableModels ?? [],
       selectedModelId: currentChatSettings?.modelId ?? createChatSettings().modelId,
+      isGeminiRoute: true,
       isLiveArtifactsPromptActive: false,
       isLiveArtifactsPromptBusy: false,
       isPipSupported: true,

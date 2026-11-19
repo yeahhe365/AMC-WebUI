@@ -1,4 +1,31 @@
 export const headerTranslations = {
+  legacyGeminiMigrationNotice: {
+    en: 'From 2026-12-01 Google routes this model to a replacement; behavior and pricing may change.',
+    zh: '从 2026-12-01 起，Google 将此模型自动转至替代模型，行为和费用可能改变。',
+    ja: '2026-12-01 から Google はこのモデルを代替モデルに転送します。動作と料金が変わる場合があります。',
+    ko: '2026-12-01부터 Google이 이 모델을 대체 모델로 연결하며 동작과 요금이 변경될 수 있습니다.',
+    es: 'Desde el 2026-12-01 Google redirigirá este modelo a otro; el comportamiento y el precio pueden cambiar.',
+    fr: 'À partir du 2026-12-01, Google redirige ce modèle vers un remplaçant ; son fonctionnement et son tarif peuvent changer.',
+    de: 'Ab dem 2026-12-01 leitet Google dieses Modell auf einen Ersatz um; Verhalten und Preise können sich ändern.',
+  },
+  legacyGeminiMigrationSwitch: {
+    en: 'Switch to',
+    zh: '切换至',
+    ja: '切り替え先',
+    ko: '전환:',
+    es: 'Cambiar a',
+    fr: 'Passer à',
+    de: 'Wechseln zu',
+  },
+  modelDescGemini4Neon: {
+    en: 'Fast frontier model for complex software engineering, knowledge work, and science.',
+    zh: '快速前沿模型，适用于复杂软件工程、知识工作和科学任务。',
+    ja: '複雑なソフトウェア開発、知識作業、科学向けの高速な最先端モデル。',
+    ko: '복잡한 소프트웨어 개발, 지식 작업 및 과학을 위한 빠른 최첨단 모델입니다.',
+    es: 'Modelo avanzado y rápido para ingeniería de software compleja, trabajo intelectual y ciencia.',
+    fr: 'Modèle avancé et rapide pour le développement logiciel complexe, le travail intellectuel et les sciences.',
+    de: 'Schnelles Spitzenmodell für komplexe Softwareentwicklung, Wissensarbeit und Wissenschaft.',
+  },
   modelPickerDetailSelected: {
     en: 'Current selection',
     zh: '当前选择',
